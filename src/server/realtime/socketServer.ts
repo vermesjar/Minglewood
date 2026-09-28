@@ -4,6 +4,7 @@ import { WebSocketServer, type WebSocket } from 'ws';
 import { clientMsgSchema, type ServerMsg } from '@shared/protocol';
 import { getScene } from '@shared/world';
 import { sessionFromRequest, verifyToken } from '../auth/session';
+import { config } from '../config';
 import type { Store } from '../store/store';
 import type { OrgHub, HubClient } from './orgHub';
 import { TokenBucket } from './rateLimit';
@@ -19,6 +20,22 @@ export function attachSockets(server: Server, store: Store, hubs: Map<string, Or
   server.on('upgrade', (req, socket, head) => {
     const url = new URL(req.url ?? '/', 'http://x');
     if (!url.pathname.endsWith('/ws')) return;
+    // Cookie-authenticated sockets must come from our own origin (or the Discord Activity proxy).
+    const origin = req.headers.origin;
+    if (origin && !url.searchParams.get('token')) {
+      let ok = false;
+      try {
+        const o = new URL(origin);
+        ok = o.host === req.headers.host || o.host === new URL(config.publicUrl).host || o.hostname.endsWith('.discordsays.com');
+      } catch {
+        ok = false;
+      }
+      if (!ok) {
+        socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
+        socket.destroy();
+        return;
+      }
+    }
     const session = sessionFromRequest(req) ?? verifyToken(url.searchParams.get('token'));
     const hub = session && hubs.get(session.orgId);
     if (!session || !hub || !store.member(session.orgId, session.memberId)) {
