@@ -567,6 +567,11 @@ export class OrgHub extends EventEmitter<HubEvents> {
     this.directoryDirty = true;
   }
 
+  /** Organizational memory grew: everyone's world gets the new artifact. */
+  artifactsChanged(addedId?: string) {
+    this.broadcast({ t: 'artifacts', artifacts: this.data.artifacts, added: addedId });
+  }
+
   /** Notify everyone that events changed (admin created one, one started/ended). */
   eventsChanged() {
     this.rebuildGrids();

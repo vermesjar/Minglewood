@@ -8,6 +8,7 @@ import type { KnockKind, KnockReply, Occupant, ServerMsg } from '@shared/protoco
 import type { EmoteId } from '@shared/presence';
 import { EMOTE_IDS } from '@shared/presence';
 import { getScene, TOWN_ID, buildingForRoom } from '@shared/world';
+import { sceneWithMemory } from '@shared/world/memory';
 import type { SceneObject } from '@shared/world/scene';
 import { isSeat } from '@shared/world/scene';
 import { WalkGrid } from '@shared/world/walkGrid';
@@ -240,6 +241,17 @@ class Game {
         });
         this.refreshBadges();
         break;
+      case 'artifacts': {
+        setState((s) => (s.boot ? { boot: { ...s.boot, artifacts: m.artifacts } } : {}));
+        const cur = getState().sceneId;
+        const added = m.added ? m.artifacts.find((a) => a.id === m.added) : undefined;
+        if (added && cur === added.sceneId && this.lastScene) this.loadScene(cur, Object.values(getState().occupants));
+        if (added) {
+          const room = getState().boot?.rooms.find((r) => r.id === added.sceneId);
+          toast(`🏺 New in ${room?.name ?? 'town'}: “${added.title}”`, 'celebrate', { label: 'Go see it', run: () => this.showArtifact(added.id) }, 12000);
+        }
+        break;
+      }
       case 'profile':
         setState((s) => {
           const map = new Map(s.membersById);
@@ -261,7 +273,7 @@ class Game {
       occupants: Object.fromEntries(occupants.map((o) => [o.memberId, o])),
       selection: null,
     });
-    const scene = getScene(sceneId);
+    const scene = this.scene(sceneId);
     if (this.world && scene) {
       const active = this.activeEvents();
       const decor = new Set(active.map((e) => e.decor));
@@ -322,6 +334,31 @@ class Game {
     this.world.setBadges(badges);
     const festive = new Set(active.filter((e) => e.decor === 'balloons' || e.decor === 'launch').map((e) => e.roomId));
     this.world.setFestive(festive);
+  }
+
+  /** The scene as it looks today, including artifacts added since it was authored. */
+  scene(sceneId: string) {
+    const base = getScene(sceneId);
+    return base ? sceneWithMemory(base, getState().boot?.artifacts ?? []) : undefined;
+  }
+
+  object(sceneId: string, objectId: string) {
+    return this.scene(sceneId)?.objects.find((o) => o.id === objectId);
+  }
+
+  /** Walk the viewer to a piece of history and open its story. */
+  showArtifact(artifactId: string) {
+    const a = getState().boot?.artifacts.find((x) => x.id === artifactId);
+    if (!a) return;
+    const open = () => {
+      const o = this.scene(a.sceneId)?.objects.find((x) => x.artifactId === artifactId);
+      if (o) setState({ selection: { kind: 'object', sceneId: a.sceneId, objectId: o.id, x: window.innerWidth / 2, y: window.innerHeight / 2 } });
+    };
+    if (getState().sceneId === a.sceneId) open();
+    else {
+      this.goTo(a.sceneId);
+      setTimeout(open, 1600);
+    }
   }
 
   grid(sceneId: string): WalkGrid | null {

@@ -78,6 +78,8 @@ export interface AdminOverview {
   bindings: BindingView[];
   connections: ProviderConnection[];
   events: OrgEvent[];
+  artifacts: HistoricalArtifact[];
+  members: Array<{ id: string; displayName: string; teamId: string }>;
   audit: AuditEntry[];
   memberCount: number;
   discord: { configured: boolean; botConfigured: boolean; installUrl: string | null; capabilities: ProviderCapabilities };

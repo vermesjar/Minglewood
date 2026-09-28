@@ -1,5 +1,4 @@
 import { STATUS_META } from '@shared/presence';
-import { findObject } from '@shared/world';
 import { game } from '../app/game';
 import { setState, useStore } from '../app/store';
 import { AvatarCanvas, Popover, StatusDot, formatDate, formatTime, localTime, tenureLabel, timeAgo } from './common';
@@ -149,7 +148,7 @@ function ObjectCard({ sceneId, objectId, x, y }: { sceneId: string; objectId: st
   const directory = useStore((s) => s.directory);
   const members = useStore((s) => s.membersById);
   const events = useStore((s) => s.events);
-  const o = findObject(sceneId, objectId);
+  const o = game.object(sceneId, objectId);
   if (!o || !boot) return null;
 
   const artAction = o.actions?.find((a): a is { kind: 'artifact'; artifactId: string } => a.kind === 'artifact');

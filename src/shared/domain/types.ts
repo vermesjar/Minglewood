@@ -214,6 +214,8 @@ export interface HistoricalArtifact {
   teamIds: Id[];
   contributorIds: Id[];
   addedBy?: Id;
+  /** Where it hangs on a room's memory wall (artifacts added after the world was authored). */
+  placement?: { wall: 'left' | 'right'; at: number };
 }
 
 export interface AuditEntry {

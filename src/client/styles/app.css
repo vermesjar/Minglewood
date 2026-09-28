@@ -1772,3 +1772,8 @@ body.rm *::after {
   color: #6b6875;
   margin-left: 8px;
 }
+.agrid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}

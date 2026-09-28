@@ -2,10 +2,11 @@ import { useCallback, useEffect, useState } from 'react';
 import type { AdminOverview, ExternalChannel, ProviderCapabilities } from '@shared/api';
 import type { Room } from '@shared/domain/types';
 import { BRAND } from '@shared/brand';
+import { MEMORY_SLOTS } from '@shared/world/memory';
 import { api } from '../app/api';
 import { useStore } from '../app/store';
 
-type Tab = 'overview' | 'rooms' | 'discord' | 'events' | 'audit';
+type Tab = 'overview' | 'rooms' | 'memory' | 'discord' | 'events' | 'audit';
 
 /** [capability, label, how, possible on Discord at all] — verified against current Discord docs. */
 const CAPS: Array<[keyof ProviderCapabilities, string, string, boolean]> = [
@@ -60,6 +61,7 @@ export function AdminConsole() {
           [
             ['overview', 'Organization'],
             ['rooms', 'Rooms & channels'],
+            ['memory', 'Company memory'],
             ['discord', 'Discord'],
             ['events', 'Events'],
             ['audit', 'Audit log'],
@@ -75,6 +77,7 @@ export function AdminConsole() {
         <main className="admin-body">
           {tab === 'overview' && <OrgTab data={data} reload={load} />}
           {tab === 'rooms' && <RoomsTab data={data} reload={load} />}
+          {tab === 'memory' && <MemoryTab data={data} reload={load} />}
           {tab === 'discord' && <DiscordTab data={data} reload={load} />}
           {tab === 'events' && <EventsTab data={data} reload={load} />}
           {tab === 'audit' && <AuditTab data={data} />}
@@ -475,5 +478,118 @@ function AuditTab({ data }: { data: AdminOverview }) {
         </tbody>
       </table>
     </section>
+  );
+}
+
+function MemoryTab({ data, reload }: TabProps) {
+  const [title, setTitle] = useState('');
+  const [kind, setKind] = useState('launch');
+  const [roomId, setRoomId] = useState('launch');
+  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [story, setStory] = useState('');
+  const [people, setPeople] = useState<string[]>([]);
+  const [teams, setTeams] = useState<string[]>([]);
+  const [msg, setMsg] = useState('');
+  const placedIn = (id: string) => data.artifacts.filter((a) => a.sceneId === id && a.placement).length;
+  const create = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await api('/admin/artifacts', {
+        method: 'POST',
+        json: { title, kind, roomId, occurredAt: date, story, contributorIds: people, teamIds: teams },
+      });
+      setTitle('');
+      setStory('');
+      setPeople([]);
+      setMsg('Added. Everyone in the world just got a little note about it.');
+      reload();
+    } catch (x) {
+      setMsg((x as Error).message);
+    }
+  };
+  const multi = (e: React.ChangeEvent<HTMLSelectElement>) => [...e.target.selectedOptions].map((o) => o.value);
+  return (
+    <div className="agrid">
+      <section className="apanel">
+        <h2>Commemorate a moment</h2>
+        <p className="amuted">
+          Launches, awards, offsites and milestones become artifacts on a room’s memory wall — with the story and the
+          people behind them. Over the years, the world fills with your company’s history.
+        </p>
+        <form onSubmit={create}>
+          <label className="afield">
+            What happened?
+            <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Aurora 2.0 shipped" required maxLength={80} />
+          </label>
+          <div className="agrid2">
+            <label className="afield">
+              Kind
+              <select value={kind} onChange={(e) => setKind(e.target.value)}>
+                {['launch', 'award', 'offsite', 'milestone', 'tenure', 'tradition'].map((k) => (
+                  <option key={k}>{k}</option>
+                ))}
+              </select>
+            </label>
+            <label className="afield">
+              When
+              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            </label>
+          </div>
+          <label className="afield">
+            Where it lives
+            <select value={roomId} onChange={(e) => setRoomId(e.target.value)}>
+              {data.rooms.map((r) => (
+                <option key={r.id} value={r.id} disabled={placedIn(r.id) >= (MEMORY_SLOTS[r.id]?.length ?? 0)}>
+                  {r.name} ({(MEMORY_SLOTS[r.id]?.length ?? 0) - placedIn(r.id)} spots left)
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="afield">
+            The story
+            <textarea value={story} onChange={(e) => setStory(e.target.value)} rows={3} required maxLength={600} placeholder="Eleven weeks, one very stubborn sync bug, and a launch party in Lantern Hall." />
+          </label>
+          <div className="agrid2">
+            <label className="afield">
+              People (ctrl/cmd-click)
+              <select multiple size={6} value={people} onChange={(e) => setPeople(multi(e))}>
+                {[...data.members].sort((a, b) => a.displayName.localeCompare(b.displayName)).map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.displayName}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="afield">
+              Teams
+              <select multiple size={6} value={teams} onChange={(e) => setTeams(multi(e))}>
+                {data.teams.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.emoji} {t.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <button className="abtn primary">Add to the world</button>
+          {msg && <p className="amuted">{msg}</p>}
+        </form>
+      </section>
+      <section className="apanel">
+        <h2>The company’s history so far</h2>
+        <ul className="alist">
+          {[...data.artifacts]
+            .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt))
+            .map((a) => (
+              <li key={a.id}>
+                <strong>{a.title}</strong>
+                <div className="amuted">
+                  {a.occurredAt} · {a.kind} · {data.rooms.find((r) => r.id === a.sceneId)?.name ?? 'Town'}
+                </div>
+              </li>
+            ))}
+        </ul>
+      </section>
+    </div>
   );
 }

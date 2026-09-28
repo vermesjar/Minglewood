@@ -4,6 +4,7 @@ import { WalkGrid } from './walkGrid';
 import { findPath, isValidPath, positionAlong } from './pathfinding';
 import { isSeat } from './scene';
 import { buildSeed, ROOMS, DEMO_BINDINGS } from '../seed/northstar';
+import { MEMORY_SLOTS, nextFreeSlot, sceneWithMemory } from './memory';
 
 describe('northstar world', () => {
   const town = getScene(TOWN_ID)!;
@@ -84,5 +85,35 @@ describe('pathfinding', () => {
     const mid = positionAlong(path, 1000 / 4.2, 4.2);
     expect(mid.x).toBeCloseTo(1, 3);
     expect(positionAlong(path, 10_000).done).toBe(true);
+  });
+});
+
+describe('memory walls', () => {
+  it('slots sit on free wall space in every room', () => {
+    for (const r of ROOMS) {
+      const scene = getScene(r.id)!;
+      const slots = MEMORY_SLOTS[r.id];
+      expect(slots?.length, r.id).toBeGreaterThan(0);
+      for (const slot of slots) {
+        const span = slot.wall === 'right' ? scene.width : scene.height;
+        expect(slot.at, `${r.id} ${slot.wall}:${slot.at}`).toBeLessThan(span);
+        for (const o of scene.objects.filter((x) => x.wall === slot.wall)) {
+          const start = slot.wall === 'right' ? o.x : o.y;
+          const len = slot.wall === 'right' ? (o.w ?? 1) : (o.d ?? o.w ?? 1);
+          const overlaps = slot.at >= start && slot.at < start + len;
+          expect(overlaps, `${r.id} slot ${slot.wall}:${slot.at} vs ${o.id}`).toBe(false);
+        }
+      }
+    }
+  });
+
+  it('fills slots in order and places new artifacts in the scene', () => {
+    const { artifacts } = buildSeed();
+    const s1 = nextFreeSlot('launch', artifacts)!;
+    const added = { ...artifacts[0], id: 'art-x', objectId: 'mem-art-x', sceneId: 'launch', placement: s1 };
+    const s2 = nextFreeSlot('launch', [...artifacts, added])!;
+    expect(`${s2.wall}:${s2.at}`).not.toBe(`${s1.wall}:${s1.at}`);
+    const scene = sceneWithMemory(getScene('launch')!, [...artifacts, added]);
+    expect(scene.objects.some((o) => o.artifactId === 'art-x' && o.wall === s1.wall)).toBe(true);
   });
 });

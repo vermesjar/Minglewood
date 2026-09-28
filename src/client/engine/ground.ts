@@ -282,7 +282,41 @@ function drawWallItem(c: CanvasRenderingContext2D, o: SceneObject, u0: number, s
       rect(c, u0 + 0.1, 14, span - 0.2, 2.5, darken('#fbf6ea', 0.2));
       return [14, 46];
     }
-    case 'frame': {
+    case 'plaque': {
+      const metal = o.variant === 'silver' ? '#c9d2da' : '#e8b93f';
+      rect(c, u0 + 0.2, 24, 0.6, 16, '#6b4428');
+      rect(c, u0 + 0.26, 25.5, 0.48, 13, '#8a5a3b');
+      rect(c, u0 + 0.32, 29, 0.36, 6, metal);
+      rect(c, u0 + 0.36, 33, 0.28, 1, darken(metal, 0.35));
+      rect(c, u0 + 0.36, 31, 0.2, 1, darken(metal, 0.35));
+      rect(c, u0 + 0.44, 36, 0.12, 2, metal);
+      return [24, 40];
+    }
+    case 'frame':
+      if (o.variant === 'rocket' || o.variant === 'photo' || o.variant === 'star') {
+        rect(c, u0 + 0.12, 24, 0.76, 17, '#e8b93f');
+        rect(c, u0 + 0.17, 25.3, 0.66, 14.4, o.variant === 'rocket' ? '#1f2a44' : o.variant === 'star' ? '#2c4a63' : '#bfe7ef');
+        if (o.variant === 'rocket') {
+          rect(c, u0 + 0.46, 29, 0.08, 8, '#f4f1ea');
+          rect(c, u0 + 0.47, 37, 0.06, 1.5, '#e0503f');
+          rect(c, u0 + 0.4, 29, 0.06, 2, '#e0503f');
+          rect(c, u0 + 0.54, 29, 0.06, 2, '#e0503f');
+          rect(c, u0 + 0.46, 27, 0.08, 2, '#ff8a3d');
+          rect(c, u0 + 0.25, 35, 0.04, 1, '#fffaf0');
+          rect(c, u0 + 0.7, 32, 0.04, 1, '#fffaf0');
+        } else if (o.variant === 'star') {
+          rect(c, u0 + 0.46, 28, 0.08, 9, '#ffd23f');
+          rect(c, u0 + 0.34, 31.5, 0.32, 2, '#ffd23f');
+        } else {
+          rect(c, u0 + 0.17, 25.3, 0.66, 4, '#7cc26a');
+          for (let i = 0; i < 4; i++) {
+            rect(c, u0 + 0.24 + i * 0.14, 29, 0.08, 4, ['#e0503f', '#3f8fd8', '#f2c14e', '#9b6bd6'][i]);
+            rect(c, u0 + 0.24 + i * 0.14, 33, 0.08, 2, '#e8b088');
+          }
+        }
+        return [24, 41];
+      }
+    {
       const pal: Record<string, string[]> = {
         garage: ['#8a7a66', '#c9b79a', '#5a4a3a'],
         customer: ['#fffaf0', '#3a3a46', '#e0503f'],

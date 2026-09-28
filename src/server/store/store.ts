@@ -58,6 +58,7 @@ export interface PersistedOrg {
   bindings: RoomBinding[];
   connections: ProviderConnection[];
   customEvents: OrgEvent[];
+  customArtifacts?: HistoricalArtifact[];
   audit: AuditEntry[];
 }
 
@@ -89,7 +90,7 @@ export class Store {
       bindings: saved?.bindings ?? DEMO_BINDINGS.map((b) => ({ ...b })),
       connections: saved?.connections ?? [],
       events: [...seed.events, ...(saved?.customEvents ?? [])],
-      artifacts: seed.artifacts,
+      artifacts: [...seed.artifacts, ...(saved?.customArtifacts ?? [])],
       audit: saved?.audit ?? [],
       sim: seed.sim,
     });
@@ -195,6 +196,11 @@ export class Store {
     this.scheduleSave();
   }
 
+  addArtifact(orgId: string, a: HistoricalArtifact): void {
+    this.get(orgId).artifacts.push(a);
+    this.scheduleSave();
+  }
+
   audit(orgId: string, actorId: string, action: string, target: string, detail?: string): void {
     const d = this.get(orgId);
     d.audit.unshift({ id: randomUUID(), orgId, actorId, action, target, detail, at: new Date().toISOString() });
@@ -212,7 +218,9 @@ export class Store {
 
   async flush(): Promise<void> {
     const out: Record<string, PersistedOrg> = {};
-    const seedEventIds = new Set(buildSeed().events.map((e) => e.id));
+    const seed = buildSeed();
+    const seedEventIds = new Set(seed.events.map((e) => e.id));
+    const seedArtifactIds = new Set(seed.artifacts.map((a) => a.id));
     for (const [id, d] of this.orgs) {
       out[id] = {
         org: d.org,
@@ -222,6 +230,7 @@ export class Store {
         bindings: d.bindings,
         connections: d.connections,
         customEvents: d.events.filter((e) => !seedEventIds.has(e.id)),
+        customArtifacts: d.artifacts.filter((a) => !seedArtifactIds.has(a.id)),
         audit: d.audit,
       };
     }

@@ -5,6 +5,7 @@ import { discordBotConfigured, discordConfigured } from '../config';
 import { requireAdmin, requireMember, type AppContext, authed } from '../context';
 import { bindingView } from './api';
 import { DiscordApiError } from '../providers/discord/api';
+import { nextFreeSlot } from '@shared/world/memory';
 
 /**
  * Admin console API. Every mutation is org-scoped by the session and recorded in the audit log.
@@ -25,6 +26,8 @@ export function adminRoutes(ctx: AppContext, onDiscordConnected: (orgId: string)
       bindings: d.bindings.map((b) => bindingView(ctx, b)),
       connections: d.connections,
       events: d.events,
+      artifacts: d.artifacts,
+      members: [...d.members.values()].map((m) => ({ id: m.id, displayName: m.displayName, teamId: m.teamId })),
       audit: d.audit.slice(0, 50),
       memberCount: d.members.size,
       discord: {
@@ -178,6 +181,46 @@ export function adminRoutes(ctx: AppContext, onDiscordConnected: (orgId: string)
     ctx.store.audit(orgId, member.id, 'event.created', ev.id, ev.title);
     ctx.hubs.get(orgId)?.eventsChanged();
     res.json({ event: ev });
+  });
+
+  /** Commemorate a moment: the company's history becomes a physical artifact in a room. */
+  r.post('/artifacts', (req, res) => {
+    const { orgId, member } = authed(req);
+    const body = z
+      .object({
+        title: z.string().trim().min(1).max(80),
+        story: z.string().trim().min(1).max(600),
+        kind: z.enum(['launch', 'award', 'offsite', 'milestone', 'tenure', 'tradition']),
+        roomId: z.string().max(40),
+        occurredAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+        contributorIds: z.array(z.string().max(40)).max(30).default([]),
+        teamIds: z.array(z.string().max(40)).max(10).default([]),
+      })
+      .safeParse(req.body);
+    if (!body.success) return res.status(400).json({ error: 'invalid input' });
+    const d = ctx.store.get(orgId);
+    if (!d.rooms.some((x) => x.id === body.data.roomId)) return res.status(404).json({ error: 'room not found' });
+    const slot = nextFreeSlot(body.data.roomId, d.artifacts);
+    if (!slot) return res.status(409).json({ error: 'This room’s memory wall is full — try another room.' });
+    const id = `art-${randomUUID().slice(0, 8)}`;
+    const artifact = {
+      id,
+      orgId,
+      sceneId: body.data.roomId,
+      objectId: `mem-${id}`,
+      title: body.data.title,
+      story: body.data.story,
+      kind: body.data.kind,
+      occurredAt: body.data.occurredAt,
+      contributorIds: body.data.contributorIds.filter((c) => d.members.has(c)),
+      teamIds: body.data.teamIds.filter((t) => d.teams.some((x) => x.id === t)),
+      addedBy: member.id,
+      placement: slot,
+    };
+    ctx.store.addArtifact(orgId, artifact);
+    ctx.store.audit(orgId, member.id, 'artifact.added', id, artifact.title);
+    ctx.hubs.get(orgId)?.artifactsChanged(id);
+    res.json({ artifact });
   });
 
   return r;

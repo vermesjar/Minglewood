@@ -7,7 +7,7 @@
  * coarse, throttled `directory` message (status + which room), never positions.
  */
 import { z } from 'zod';
-import type { AvatarLoadout, Member, OrgEvent, PresenceState, PresenceStatus } from './domain/types';
+import type { AvatarLoadout, HistoricalArtifact, Member, OrgEvent, PresenceState, PresenceStatus } from './domain/types';
 import type { Facing } from './world/scene';
 import type { Tile } from './world/pathfinding';
 import { EMOTE_IDS, type EmoteId } from './presence';
@@ -50,6 +50,7 @@ export type ServerMsg =
   | { t: 'knock-result'; knockId: string; targetId: string; reply: KnockReply; message?: string; sceneId?: string }
   | { t: 'toast'; text: string; tone?: 'info' | 'celebrate' | 'social' }
   | { t: 'events'; events: OrgEvent[] }
+  | { t: 'artifacts'; artifacts: HistoricalArtifact[]; added?: string }
   | { t: 'member'; memberId: string; avatar: AvatarLoadout; unlockedItems: string[] }
   | { t: 'profile'; member: Omit<Member, 'settings'> }
   | { t: 'error'; message: string };

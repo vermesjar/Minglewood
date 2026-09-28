@@ -1,5 +1,4 @@
 import { STATUS_META } from '@shared/presence';
-import { getScene } from '@shared/world';
 import { game } from '../app/game';
 import { setState, toast, useStore } from '../app/store';
 import { openLink } from '../discord/activity';
@@ -60,10 +59,8 @@ export function RoomPanel() {
   const people = Object.values(occupants).sort((a, b) => a.memberId.localeCompare(b.memberId));
   const speaking = people.filter((p) => p.speaking).length;
   const artifacts = boot.artifacts.filter((a) => a.sceneId === room.id);
-  const scene = getScene(room.id);
-
   const openArtifact = (artifactId: string) => {
-    const o = scene?.objects.find((x) => x.artifactId === artifactId);
+    const o = game.scene(room.id)?.objects.find((x) => x.artifactId === artifactId);
     if (!o) return;
     game.quest('artifact');
     setState({ selection: { kind: 'object', sceneId: room.id, objectId: o.id, x: window.innerWidth - 380, y: 260 } });
