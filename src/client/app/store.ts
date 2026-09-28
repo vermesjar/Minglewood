@@ -61,6 +61,7 @@ export interface State {
   announce: string;
   /** Decorate mode: which catalog item is selected (null = remove mode). */
   decorate: { itemId: string | null } | null;
+  authError: string | null;
 }
 
 const reducedDefault = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -103,6 +104,7 @@ let state: State = {
   inDiscord: false,
   announce: '',
   decorate: null,
+  authError: null,
 };
 
 const listeners = new Set<() => void>();

@@ -15,6 +15,7 @@ const ERRORS: Record<string, string> = {
   no_guild: 'No Discord server is connected yet — an admin needs to connect one.',
   oauth_state: 'The sign-in link expired. Please try again.',
   oauth_failed: 'Discord sign-in failed. Please try again.',
+  activity_auth: 'Minglewood needs your OK in Discord to know who you are. Relaunch the Activity to try again.',
 };
 
 /** Slowly drifting preview of the town behind the sign-in card. */
@@ -51,13 +52,15 @@ function WorldBackdrop() {
 
 export function Landing() {
   const config = useStore((s) => s.config);
+  const authError = useStore((s) => s.authError);
+  const inDiscord = useStore((s) => s.inDiscord);
   const [name, setName] = useState('');
   const [teamId, setTeamId] = useState('team-aurora');
   const [interests, setInterests] = useState<string[]>(['coffee']);
   const [admin, setAdmin] = useState(true);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(() => {
-    const e = new URLSearchParams(location.search).get('error');
+    const e = authError ?? new URLSearchParams(location.search).get('error');
     return e ? (ERRORS[e] ?? 'Something went wrong signing in.') : null;
   });
 
@@ -98,7 +101,12 @@ export function Landing() {
           build a place with its own history.
         </p>
 
-        <form onSubmit={submit} className="landing-form">
+        {inDiscord && err && (
+          <p className="error" role="alert">
+            {err}
+          </p>
+        )}
+        <form onSubmit={submit} className="landing-form" hidden={inDiscord}>
           <h2>
             Start your first day at <span className="hl">Northstar Labs</span>
             <span className="demo-chip">demo company</span>

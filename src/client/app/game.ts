@@ -54,11 +54,18 @@ class Game {
         setActivityTransport('');
         const config = await api<PublicConfig>('/config');
         setState({ config });
-        if (config.discord.clientId) {
-          const ctx = await startActivity(config.discord.clientId, (n) =>
-            toast(`${n} ${n === 1 ? 'person is' : 'people are'} here in this Discord Activity`, 'social'),
-          );
-          if (ctx.roomId) this.initialScene = ctx.roomId;
+        if (config.discord.clientId && !this.activityStarted) {
+          try {
+            const ctx = await startActivity(config.discord.clientId, (n) =>
+              toast(`${n} ${n === 1 ? 'person is' : 'people are'} here in this Discord Activity`, 'social'),
+            );
+            this.activityStarted = true;
+            if (ctx.roomId) this.initialScene = ctx.roomId;
+          } catch (e) {
+            // Declined or not a member: explain instead of re-prompting.
+            setState({ phase: 'landing', authError: e instanceof ApiError && e.status === 403 ? 'not_member' : 'activity_auth' });
+            return;
+          }
         }
       } else {
         const config = await api<PublicConfig>('/config');
@@ -80,6 +87,7 @@ class Game {
   }
 
   private startAttempts = 0;
+  private activityStarted = false;
 
   begin(boot: Bootstrap) {
     this.meId = boot.me.id;

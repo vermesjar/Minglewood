@@ -1,7 +1,7 @@
 # Progress
 
 ## Current milestone
-**M8 — Polish** (M1–M7 complete as a first vertical slice).
+**M8 — Polish** (M1–M7 complete; vertical slice plus live organizational memory and team-owned spaces).
 
 ## Completed
 - **M1 Foundation** — TypeScript app (Vite/React client, Express/ws server, shared domain),
@@ -31,7 +31,7 @@
   restore, API rate limiting, live profile broadcast for new coworkers.
 - Tests: world integrity, pathfinding, memory walls, decoration placement, hub authority/privacy/
   knocks/rewards/quiet rooms, Discord provider + voice presence (mocked HTTP), serendipity,
-  calendar presence, sessions (36 passing). Typecheck + ESLint clean. Production build verified.
+  calendar presence, sessions, and an end-to-end two-user HTTP+WebSocket test (38 passing). Typecheck + ESLint clean. Production build verified.
 
 ## Important decisions
 - Custom Canvas2D renderer over Phaser/PixiJS (see ARCHITECTURE.md).
@@ -49,9 +49,9 @@
 - Mobile works (pointer events, responsive panels) but is not yet designed for.
 
 ## Next actions
-1. Visual QA pass across every interior; tune furniture and depth edge cases.
-2. Refresh bootstrap on returning from admin; live binding updates.
-3. Unlockable decor tied to team milestones; members suggesting artifacts for admin approval.
-4. PostgresPersistence + Redis fan-out for multi-instance hubs.
-5. Real calendar provider (Google) behind `CalendarProvider`.
-6. Playwright smoke tests for the core loop (enter → knock → jump → party).
+1. Try the Discord flows against a real server (credentials needed) and tune copy/edge cases.
+2. Unlockable decor tied to team milestones; members propose artifacts for admin approval.
+3. `PostgresPersistence` + Redis fan-out for multi-instance hubs; per-visibility directory caching.
+4. Real calendar provider (Google) behind `CalendarProvider`.
+5. Browser-level smoke tests (Playwright) for enter → knock → jump → party.
+6. Sprite-sheet art pipeline behind `sprites/registry.ts`; day/night ambience.
