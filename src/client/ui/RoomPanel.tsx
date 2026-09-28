@@ -86,6 +86,16 @@ export function RoomPanel() {
         </div>
       </header>
       <p className="room-desc">{room.description}</p>
+      {owner &&
+        (game.canDecorate(room.id) ? (
+          <button className="btn small decorate-btn" onClick={() => game.setDecorate({ itemId: 'plant-small' })}>
+            🌿 Decorate our space
+          </button>
+        ) : (
+          <p className="muted small">
+            {owner.emoji} {owner.name} made this room their own.
+          </p>
+        ))}
 
       {ev && (
         <div className="event-card festive compact">

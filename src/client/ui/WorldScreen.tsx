@@ -12,6 +12,7 @@ import { PeoplePanel } from './PeoplePanel';
 import { AvatarEditor } from './AvatarEditor';
 import { ProfilePanel } from './ProfilePanel';
 import { Welcome, TourGuide } from './Welcome';
+import { DecoratePalette } from './DecoratePalette';
 
 export function WorldScreen() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -45,6 +46,7 @@ export function WorldScreen() {
       <Sidebar />
       <RoomPanel />
       <ActionBar />
+      <DecoratePalette />
       <SelectionLayer />
       <Toasts />
       <TourGuide />

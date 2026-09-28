@@ -22,6 +22,7 @@ import type {
   Team,
   World,
 } from '@shared/domain/types';
+import type { Decoration } from '@shared/world/decor';
 import {
   buildSeed,
   DEMO_BINDINGS,
@@ -45,6 +46,7 @@ export interface OrgData {
   connections: ProviderConnection[];
   events: OrgEvent[];
   artifacts: HistoricalArtifact[];
+  decorations: Decoration[];
   audit: AuditEntry[];
   sim: Record<string, SimProfile>;
 }
@@ -59,6 +61,7 @@ export interface PersistedOrg {
   connections: ProviderConnection[];
   customEvents: OrgEvent[];
   customArtifacts?: HistoricalArtifact[];
+  decorations?: Decoration[];
   audit: AuditEntry[];
 }
 
@@ -91,6 +94,7 @@ export class Store {
       connections: saved?.connections ?? [],
       events: [...seed.events, ...(saved?.customEvents ?? [])],
       artifacts: [...seed.artifacts, ...(saved?.customArtifacts ?? [])],
+      decorations: saved?.decorations ?? [],
       audit: saved?.audit ?? [],
       sim: seed.sim,
     });
@@ -196,6 +200,19 @@ export class Store {
     this.scheduleSave();
   }
 
+  addDecoration(orgId: string, d: Decoration): void {
+    this.get(orgId).decorations.push(d);
+    this.scheduleSave();
+  }
+
+  removeDecoration(orgId: string, id: string): Decoration | undefined {
+    const data = this.get(orgId);
+    const found = data.decorations.find((d) => d.id === id);
+    data.decorations = data.decorations.filter((d) => d.id !== id);
+    this.scheduleSave();
+    return found;
+  }
+
   addArtifact(orgId: string, a: HistoricalArtifact): void {
     this.get(orgId).artifacts.push(a);
     this.scheduleSave();
@@ -231,6 +248,7 @@ export class Store {
         connections: d.connections,
         customEvents: d.events.filter((e) => !seedEventIds.has(e.id)),
         customArtifacts: d.artifacts.filter((a) => !seedArtifactIds.has(a.id)),
+        decorations: d.decorations,
         audit: d.audit,
       };
     }

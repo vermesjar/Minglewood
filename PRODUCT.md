@@ -40,7 +40,12 @@ the presence, the discovery, the identity and — over years — the history.
 - Serendipity suggestions that are deterministic, explainable ("Why?"), and dismissible.
 - Events that transform the world (bunting, balloons, banners, confetti) and grant keepsakes.
 - Organizational memory: artifacts with provenance (Founders' Oak, the 1,000th-customer bench,
-  Aurora rocket, Lisbon offsite photo, trophy case, time capsule…).
+  Aurora rocket, Lisbon offsite photo, trophy case, time capsule…) — and admins can
+  **commemorate new moments**, which appear on a room's memory wall for everyone, live, with a
+  town-wide note. Worlds visibly accumulate history.
+- **Team-owned spaces**: members of the team that owns a room can decorate it (plants, lamps,
+  beanbags, armchairs, an arcade cabinet…). Placement is validated so doors and seats are never
+  blocked, and everyone sees changes live.
 - Search/teleport to people, places, teams, projects and events; accessible people directory.
 - Admin: org settings, room ↔ channel bindings, Discord connection, events, audit log.
 - Realtime multiplayer; Discord OAuth, membership verification, voice presence, Activity mode.

@@ -59,6 +59,8 @@ export interface State {
   hoverLabel: string | null;
   inDiscord: boolean;
   announce: string;
+  /** Decorate mode: which catalog item is selected (null = remove mode). */
+  decorate: { itemId: string | null } | null;
 }
 
 const reducedDefault = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -100,6 +102,7 @@ let state: State = {
   hoverLabel: null,
   inDiscord: false,
   announce: '',
+  decorate: null,
 };
 
 const listeners = new Set<() => void>();

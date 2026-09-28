@@ -4,7 +4,6 @@
  * Minglewood. This is how real conversations become visible places.
  */
 import { isSeat } from '@shared/world/scene';
-import { getScene } from '@shared/world';
 import type { OrgHub } from '../realtime/orgHub';
 import type { Store } from '../store/store';
 import type { VoiceStateChange } from './types';
@@ -36,7 +35,7 @@ export class VoicePresenceSync {
       return;
     }
     if (actor?.sceneId === binding.roomId) return;
-    const scene = getScene(binding.roomId);
+    const scene = this.hub.scene(binding.roomId);
     const seat = scene?.objects.find((o) => isSeat(o) && !this.hub.seatTaken(binding.roomId, o.id));
     this.hub.enter(memberId, binding.roomId, 'provider', seat ? [seat.x, seat.y] : undefined);
     if (seat) this.hub.sit(memberId, seat.id);

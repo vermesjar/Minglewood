@@ -99,7 +99,7 @@ export class LifeSim {
   }
 
   private freeSeat(sceneId: string) {
-    const scene = getScene(sceneId);
+    const scene = this.hub.scene(sceneId);
     if (!scene) return undefined;
     const seats = scene.objects.filter(
       (o) => isSeat(o) && !this.hub.seatTaken(sceneId, o.id) && !this.reserved.has(`${sceneId}:${o.id}`),

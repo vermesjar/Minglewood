@@ -8,7 +8,8 @@ import type { KnockKind, KnockReply, Occupant, ServerMsg } from '@shared/protoco
 import type { EmoteId } from '@shared/presence';
 import { EMOTE_IDS } from '@shared/presence';
 import { getScene, TOWN_ID, buildingForRoom } from '@shared/world';
-import { sceneWithMemory } from '@shared/world/memory';
+import { livedScene } from '@shared/world/lived';
+import { DECOR_BY_ID, decorObject, placementProblem } from '@shared/world/decor';
 import type { SceneObject } from '@shared/world/scene';
 import { isSeat } from '@shared/world/scene';
 import { WalkGrid } from '@shared/world/walkGrid';
@@ -118,6 +119,7 @@ class Game {
       onObjectClick: (o, p) => this.onObjectClick(o, p),
       onObjectActivate: (o) => this.onObjectActivate(o),
       onHover: (label) => setState({ hoverLabel: label }),
+      onHoverTile: (tile) => this.updateGhost(tile),
       nameOf: (id) => getState().membersById.get(id)?.displayName ?? 'Someone',
     });
     this.applyPrefs();
@@ -252,6 +254,12 @@ class Game {
         }
         break;
       }
+      case 'decor': {
+        setState((s) => (s.boot ? { boot: { ...s.boot, decorations: m.decorations } } : {}));
+        if (getState().sceneId === m.roomId && this.lastScene) this.loadScene(m.roomId, Object.values(getState().occupants));
+        if (m.by && m.by !== this.meId && getState().sceneId === m.roomId) toast(`🌿 ${this.name(m.by).split(' ')[0]} just redecorated`, 'social', undefined, 3500);
+        break;
+      }
       case 'profile':
         setState((s) => {
           const map = new Map(s.membersById);
@@ -296,6 +304,7 @@ class Game {
   }
 
   private onEnteredScene(sceneId: string) {
+    if (getState().decorate) this.setDecorate(null);
     const s = getState();
     const room = s.boot?.rooms.find((r) => r.id === sceneId);
     this.announce(room ? `You entered ${room.name}` : 'You are in town');
@@ -339,7 +348,8 @@ class Game {
   /** The scene as it looks today, including artifacts added since it was authored. */
   scene(sceneId: string) {
     const base = getScene(sceneId);
-    return base ? sceneWithMemory(base, getState().boot?.artifacts ?? []) : undefined;
+    const boot = getState().boot;
+    return base ? livedScene(base, boot?.artifacts ?? [], boot?.decorations ?? []) : undefined;
   }
 
   object(sceneId: string, objectId: string) {
@@ -362,10 +372,11 @@ class Game {
   }
 
   grid(sceneId: string): WalkGrid | null {
-    const scene = getScene(sceneId);
+    const scene = this.scene(sceneId);
     if (!scene) return null;
     const decor = [...new Set(this.activeEvents().map((e) => e.decor))].sort().join(',');
-    const key = `${sceneId}|${decor}`;
+    const placed = (getState().boot?.decorations ?? []).filter((d) => d.roomId === sceneId).map((d) => d.id).join(',');
+    const key = `${sceneId}|${decor}|${placed}`;
     let g = this.grids.get(key);
     if (!g) {
       g = new WalkGrid(scene, new Set(decor.split(',').filter(Boolean)));
@@ -425,6 +436,11 @@ class Game {
   }
 
   private onGroundClick(t: Tile) {
+    const dec = getState().decorate;
+    if (dec) {
+      if (dec.itemId) void this.placeDecoration(dec.itemId, t);
+      return;
+    }
     setState({ selection: null });
     this.world?.setSelected(null);
     this.walkTo(t);
@@ -520,6 +536,11 @@ class Game {
 
   private onObjectClick(o: SceneObject, p: { x: number; y: number }) {
     const sceneId = getState().sceneId!;
+    if (getState().decorate) {
+      if (o.id.startsWith('decor-')) void this.removeDecoration(o.id.slice(6));
+      else toast('That piece belongs to the room — you can remove things your team added.', 'info', undefined, 3000);
+      return;
+    }
     const kinds = new Set(o.actions?.map((a) => a.kind));
     if (kinds.has('exit')) return this.exitToTown();
     if (kinds.has('sit')) {
@@ -602,6 +623,55 @@ class Game {
       map.set(me.id, { ...map.get(me.id)!, ...me });
       return { boot: s.boot ? { ...s.boot, me } : s.boot, membersById: map };
     });
+  }
+
+  /* ------------------------------------------------------------------ decorating */
+
+  canDecorate(roomId: string | null): boolean {
+    const s = getState();
+    const me = s.boot?.me;
+    const room = s.boot?.rooms.find((r) => r.id === roomId);
+    if (!me || !room) return false;
+    return me.role !== 'member' || (!!room.ownerTeamId && room.ownerTeamId === me.teamId);
+  }
+
+  setDecorate(mode: { itemId: string | null } | null) {
+    setState({ decorate: mode, selection: null });
+    if (!mode) this.world?.setGhost(null);
+  }
+
+  private updateGhost(tile: Tile | null) {
+    const dec = getState().decorate;
+    const sceneId = getState().sceneId;
+    if (!dec?.itemId || !tile || !sceneId || !this.world) {
+      this.world?.setGhost(null);
+      return;
+    }
+    const scene = this.scene(sceneId);
+    const obj = decorObject({ id: 'ghost', roomId: sceneId, itemId: dec.itemId, x: tile[0], y: tile[1], placedBy: '', placedAt: '' });
+    if (!scene || !obj) return;
+    const occupied = new Set(Object.values(getState().occupants).map((o) => `${Math.round(o.x)},${Math.round(o.y)}`));
+    this.world.setGhost({ obj, valid: !placementProblem(scene, tile[0], tile[1], occupied) });
+  }
+
+  async placeDecoration(itemId: string, t: Tile) {
+    const sceneId = getState().sceneId;
+    if (!sceneId) return;
+    try {
+      await api(`/rooms/${sceneId}/decor`, { method: 'POST', json: { itemId, x: t[0], y: t[1] } });
+      toast(`Placed ${DECOR_BY_ID.get(itemId)?.name.toLowerCase()} ✨`, 'celebrate', undefined, 2000);
+    } catch (e) {
+      toast((e as Error).message, 'info', undefined, 3500);
+    }
+  }
+
+  async removeDecoration(id: string) {
+    const sceneId = getState().sceneId;
+    try {
+      await api(`/rooms/${sceneId}/decor/${id}`, { method: 'DELETE' });
+    } catch (e) {
+      toast((e as Error).message, 'info', undefined, 3500);
+    }
   }
 
   quest(id: string) {

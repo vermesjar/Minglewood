@@ -12,6 +12,7 @@ import type {
   Team,
   World,
 } from './domain/types';
+import type { Decoration } from './world/decor';
 
 export interface ProviderCapabilities {
   /** Sign in with the provider and verify workspace membership. */
@@ -58,6 +59,7 @@ export interface Bootstrap {
   bindings: BindingView[];
   events: OrgEvent[];
   artifacts: HistoricalArtifact[];
+  decorations: Decoration[];
   me: Member;
   capabilities: { discord: ProviderCapabilities | null; demo: ProviderCapabilities };
   discordConnected: boolean;

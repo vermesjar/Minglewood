@@ -131,7 +131,7 @@ function ProfileCard({ id, x, y }: { id: string; x: number; y: number }) {
               👕 Wardrobe
             </button>
             <button className="btn" onClick={() => setState({ panel: 'profile', selection: null })}>
-              🪪 Edit profile
+              📝 Edit profile
             </button>
           </div>
         )}

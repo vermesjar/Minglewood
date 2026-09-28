@@ -71,6 +71,13 @@ Deliberately **not persisted**: presence, positions, session history. Presence i
 the Discord gateway is translated by `VoicePresenceSync` into ordinary actors (`via: 'provider'`).
 See [docs/DISCORD.md](docs/DISCORD.md) for the verified capability matrix.
 
+### Scenes as lived in
+`livedScene(base, artifacts, decorations)` composes the authored scene with what the company has
+added since: memory-wall artifacts (`shared/world/memory.ts`, fixed wall slots per room) and team
+decorations (`shared/world/decor.ts`). The same composition feeds the server's walk grids and the
+client's renderer, and `placementProblem` (shared) guarantees decorations never block the door or
+a seat — validated on the server, previewed on the client.
+
 ### Calendar-derived presence
 `shared/calendar.ts` defines `CalendarProvider` and `presenceFromCalendar`. The demo uses a
 deterministic mock; Google/Outlook providers implement the same interface. Only busy blocks are

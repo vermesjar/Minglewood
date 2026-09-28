@@ -15,6 +15,7 @@ import type { DirectoryEntry, KnockKind, KnockReply, Occupant, ServerMsg } from 
 import type { EmoteId } from '@shared/presence';
 import { STATUS_META } from '@shared/presence';
 import { allScenes, buildingForRoom, getScene, TOWN_ID } from '@shared/world';
+import { livedScene } from '@shared/world/lived';
 import type { Facing, SceneDef } from '@shared/world/scene';
 import { isSeat } from '@shared/world/scene';
 import { WalkGrid } from '@shared/world/walkGrid';
@@ -101,9 +102,21 @@ export class OrgHub extends EventEmitter<HubEvents> {
     return new Set(this.activeEvents().map((e) => e.decor));
   }
 
+  /** The scene as lived in: authored layout + memory-wall artifacts + team decorations. */
+  scene(sceneId: string): SceneDef | undefined {
+    const base = getScene(sceneId);
+    return base && livedScene(base, this.data.artifacts, this.data.decorations);
+  }
+
   rebuildGrids() {
     const decor = this.activeDecor();
-    for (const [id, scene] of allScenes()) this.grids.set(id, new WalkGrid(scene, decor));
+    for (const id of allScenes().keys()) this.grids.set(id, new WalkGrid(this.scene(id)!, decor));
+  }
+
+  /** Teams changed their room: rebuild walkability and tell everyone. */
+  decorChanged(roomId: string, by?: string) {
+    this.rebuildGrids();
+    this.broadcast({ t: 'decor', decorations: this.data.decorations, roomId, by });
   }
 
   grid(sceneId: string): WalkGrid | undefined {
@@ -217,7 +230,7 @@ export class OrgHub extends EventEmitter<HubEvents> {
 
   /** Places an actor in a scene (live user, sim, or provider). Returns the actor. */
   enter(memberId: string, sceneId: string, via: Occupant['via'], at?: Tile): Actor | null {
-    const scene = getScene(sceneId);
+    const scene = this.scene(sceneId);
     const grid = this.grids.get(sceneId);
     if (!scene || !grid || !this.member(memberId)) return null;
     const prev = this.actors.get(memberId);
@@ -351,7 +364,7 @@ export class OrgHub extends EventEmitter<HubEvents> {
   }
 
   seatAt(sceneId: string, x: number, y: number) {
-    return getScene(sceneId)?.objects.find((o) => isSeat(o) && o.x === x && o.y === y);
+    return this.scene(sceneId)?.objects.find((o) => isSeat(o) && o.x === x && o.y === y);
   }
 
   seatTaken(sceneId: string, objectId: string, except?: string): boolean {
@@ -361,7 +374,7 @@ export class OrgHub extends EventEmitter<HubEvents> {
   sit(memberId: string, objectId: string): boolean {
     const a = this.actors.get(memberId);
     if (!a) return false;
-    const seat = getScene(a.sceneId)?.objects.find((o) => o.id === objectId && isSeat(o));
+    const seat = this.scene(a.sceneId)?.objects.find((o) => o.id === objectId && isSeat(o));
     if (!seat || this.seatTaken(a.sceneId, objectId, memberId)) return false;
     const pos = this.position(a);
     if (Math.hypot(pos.x - seat.x, pos.y - seat.y) > 1.6) return false;

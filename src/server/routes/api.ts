@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { BRAND } from '@shared/brand';
 import type { Member, RoomBinding } from '@shared/domain/types';
 import { loadoutSchema } from '@shared/protocol';
+import { DECOR_BY_ID, MAX_DECOR_PER_ROOM, placementProblem } from '@shared/world/decor';
+import { randomUUID } from 'node:crypto';
 import { config, discordConfigured } from '../config';
 import { requireMember, type AppContext, authed } from '../context';
 import type { BindingView, PublicMember } from '@shared/api';
@@ -64,6 +66,7 @@ export function apiRoutes(ctx: AppContext): Router {
       bindings: d.bindings.map((b) => bindingView(ctx, b)),
       events: d.events,
       artifacts: d.artifacts,
+      decorations: d.decorations,
       me: member,
       capabilities: {
         discord: discordConfigured() ? ctx.discord.capabilities : null,
@@ -92,6 +95,55 @@ export function apiRoutes(ctx: AppContext): Router {
     if (!body.success) return res.status(400).json({ error: 'invalid loadout' });
     ctx.hubs.get(orgId)?.setAvatar(member.id, body.data);
     res.json({ avatar: ctx.store.member(orgId, member.id)?.avatar });
+  });
+
+  /** Team-owned rooms: members of the owning team (or admins) can decorate. */
+  const canDecorate = (orgId: string, memberId: string, roomId: string) => {
+    const m = ctx.store.member(orgId, memberId);
+    const room = ctx.store.get(orgId).rooms.find((r) => r.id === roomId);
+    if (!m || !room) return false;
+    return m.role !== 'member' || (!!room.ownerTeamId && room.ownerTeamId === m.teamId);
+  };
+
+  r.post('/rooms/:roomId/decor', auth, (req, res) => {
+    const { orgId, member } = authed(req);
+    const roomId = req.params.roomId;
+    const body = z.object({ itemId: z.string().max(40), x: z.number().int(), y: z.number().int() }).safeParse(req.body);
+    if (!body.success || !DECOR_BY_ID.has(body.data.itemId)) return res.status(400).json({ error: 'invalid input' });
+    if (!canDecorate(orgId, member.id, roomId)) return res.status(403).json({ error: 'Only the team that owns this room can decorate it.' });
+    const d = ctx.store.get(orgId);
+    if (d.decorations.filter((x) => x.roomId === roomId).length >= MAX_DECOR_PER_ROOM)
+      return res.status(409).json({ error: 'This room is fully decorated — remove something first.' });
+    const hub = ctx.hubs.get(orgId)!;
+    const scene = hub.scene(roomId);
+    if (!scene) return res.status(404).json({ error: 'room not found' });
+    const occupied = new Set(hub.actorsIn(roomId).map((a) => `${Math.round(a.x)},${Math.round(a.y)}`));
+    const problem = placementProblem(scene, body.data.x, body.data.y, occupied);
+    if (problem) return res.status(409).json({ error: problem });
+    const decoration = {
+      id: randomUUID().slice(0, 8),
+      roomId,
+      itemId: body.data.itemId,
+      x: body.data.x,
+      y: body.data.y,
+      placedBy: member.id,
+      placedAt: new Date().toISOString(),
+    };
+    ctx.store.addDecoration(orgId, decoration);
+    ctx.store.audit(orgId, member.id, 'decor.added', roomId, body.data.itemId);
+    hub.decorChanged(roomId, member.id);
+    res.json({ decoration });
+  });
+
+  r.delete('/rooms/:roomId/decor/:id', auth, (req, res) => {
+    const { orgId, member } = authed(req);
+    if (!canDecorate(orgId, member.id, req.params.roomId)) return res.status(403).json({ error: 'not your team’s room' });
+    const found = ctx.store.get(orgId).decorations.find((x) => x.id === req.params.id && x.roomId === req.params.roomId);
+    if (!found) return res.status(404).json({ error: 'not found' });
+    ctx.store.removeDecoration(orgId, found.id);
+    ctx.store.audit(orgId, member.id, 'decor.removed', req.params.roomId, found.itemId);
+    ctx.hubs.get(orgId)?.decorChanged(req.params.roomId, member.id);
+    res.json({ ok: true });
   });
 
   /** Resolve an Activity launch context (guild/channel) to the room bound to it. */

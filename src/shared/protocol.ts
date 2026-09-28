@@ -9,6 +9,7 @@
 import { z } from 'zod';
 import type { AvatarLoadout, HistoricalArtifact, Member, OrgEvent, PresenceState, PresenceStatus } from './domain/types';
 import type { Facing } from './world/scene';
+import type { Decoration } from './world/decor';
 import type { Tile } from './world/pathfinding';
 import { EMOTE_IDS, type EmoteId } from './presence';
 
@@ -51,6 +52,7 @@ export type ServerMsg =
   | { t: 'toast'; text: string; tone?: 'info' | 'celebrate' | 'social' }
   | { t: 'events'; events: OrgEvent[] }
   | { t: 'artifacts'; artifacts: HistoricalArtifact[]; added?: string }
+  | { t: 'decor'; decorations: Decoration[]; roomId: string; by?: string }
   | { t: 'member'; memberId: string; avatar: AvatarLoadout; unlockedItems: string[] }
   | { t: 'profile'; member: Omit<Member, 'settings'> }
   | { t: 'error'; message: string };

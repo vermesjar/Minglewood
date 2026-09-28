@@ -1777,3 +1777,58 @@ body.rm *::after {
   grid-template-columns: 1fr 1fr;
   gap: 12px;
 }
+.decorate {
+  position: absolute;
+  left: 50%;
+  bottom: 80px;
+  transform: translateX(-50%);
+  z-index: 16;
+  padding: 10px 12px;
+  width: min(760px, calc(100vw - 24px));
+  box-shadow: var(--shadow-lg);
+}
+.decorate-head {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.decorate-head .muted {
+  flex: 1;
+}
+.decorate-items {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+.decor-item {
+  flex: none;
+  width: 78px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  border: 2px solid var(--paper-3);
+  background: var(--white);
+  border-radius: 12px;
+  padding: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: center;
+  line-height: 1.15;
+}
+.decor-item.on {
+  border-color: var(--ink);
+  background: #fff1b3;
+}
+.decor-remove {
+  font-size: 28px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+}
+.decorate-btn {
+  margin-bottom: 8px;
+}

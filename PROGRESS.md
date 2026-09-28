@@ -22,8 +22,16 @@
 - **M7 Discord** — OAuth (identify, guilds.members.read) with guild membership check, bot channel
   listing, voice-state gateway → room presence, deep-link join, Embedded App SDK Activity mode
   (authorize/authenticate via server exchange, proxy-aware transport, launch-channel → room).
-- Tests: world integrity, pathfinding, hub authority/privacy/knocks/rewards, serendipity,
-  calendar presence, sessions (24 passing). Typecheck + ESLint clean. Production build verified.
+- **Organizational memory, live**: admins commemorate moments onto room memory walls; broadcast
+  to everyone with a "Go see it" note.
+- **Team-owned spaces**: decorate mode with ghost preview, shared placement validation (doors and
+  seats stay reachable), live updates, audit-logged.
+- Robustness: arrival/transition logic independent of frame rendering (background tabs), startup
+  retries during server restarts, UI-aware camera framing, x-ray silhouettes, quiet-room status
+  restore, API rate limiting, live profile broadcast for new coworkers.
+- Tests: world integrity, pathfinding, memory walls, decoration placement, hub authority/privacy/
+  knocks/rewards/quiet rooms, Discord provider + voice presence (mocked HTTP), serendipity,
+  calendar presence, sessions (36 passing). Typecheck + ESLint clean. Production build verified.
 
 ## Important decisions
 - Custom Canvas2D renderer over Phaser/PixiJS (see ARCHITECTURE.md).
@@ -39,12 +47,11 @@
 - Single-process realtime + JSON store (no horizontal scaling yet).
 - Procedural placeholder art; no sprite sheets yet. Emoji rendering depends on the OS font.
 - Mobile works (pointer events, responsive panels) but is not yet designed for.
-- Admin binding changes appear in the world after a page refresh.
 
 ## Next actions
 1. Visual QA pass across every interior; tune furniture and depth edge cases.
 2. Refresh bootstrap on returning from admin; live binding updates.
-3. Team-owned room decoration (drag furniture within permitted interiors) + artifact authoring.
+3. Unlockable decor tied to team milestones; members suggesting artifacts for admin approval.
 4. PostgresPersistence + Redis fan-out for multi-instance hubs.
 5. Real calendar provider (Google) behind `CalendarProvider`.
 6. Playwright smoke tests for the core loop (enter → knock → jump → party).

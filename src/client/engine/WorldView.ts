@@ -33,6 +33,7 @@ export interface WorldCallbacks {
   onObjectClick(obj: SceneObject, screen: { x: number; y: number }): void;
   onObjectActivate(obj: SceneObject): void;
   onHover?(label: string | null): void;
+  onHoverTile?(tile: Tile | null): void;
   nameOf(memberId: string): string;
 }
 
@@ -93,6 +94,7 @@ export class WorldView {
   private last = performance.now();
   private pointer = { down: false, x: 0, y: 0, sx: 0, sy: 0, moved: false, id: -1 };
   private hoverTile: Tile | null = null;
+  private ghost: { obj: SceneObject; valid: boolean } | null = null;
   private transition: { phase: 'close' | 'hold' | 'open'; t: number; mid?: () => void | Promise<unknown> } | null = null;
   private resizeObs: ResizeObserver;
   reducedMotion = false;
@@ -255,6 +257,11 @@ export class WorldView {
     for (const s of this.statics) {
       s.festive = s.obj.building && s.obj.roomId && rooms.has(s.obj.roomId) ? festiveFor(s.obj) : null;
     }
+  }
+
+  /** Placement preview for decorate mode. */
+  setGhost(g: { obj: SceneObject; valid: boolean } | null) {
+    this.ghost = g;
   }
 
   setBadges(b: Map<string, BuildingBadge>) {
@@ -560,6 +567,17 @@ export class WorldView {
         this.drawActor(d);
       }
     }
+    if (this.ghost) {
+      const g = this.ghost;
+      this.diamond(g.obj.x, g.obj.y, g.valid ? 'rgba(47,191,113,0.95)' : 'rgba(224,80,63,0.95)', 1.5);
+      const sprite = spriteFor(g.obj);
+      if (sprite) {
+        const p = isoToScreen(g.obj.x, g.obj.y);
+        c.globalAlpha = g.valid ? 0.75 : 0.35;
+        c.drawImage(sprite.canvas, p.x - sprite.ax, p.y - sprite.ay);
+        c.globalAlpha = 1;
+      }
+    }
     this.effects.drawOver(c);
 
     // X-ray: faint silhouettes where buildings hide people, so nobody gets lost behind a roof.
@@ -854,7 +872,9 @@ export class WorldView {
     if (hit?.kind === 'actor') this.hover = { kind: 'actor', id: hit.id };
     else if (hit?.kind === 'object') this.hover = { kind: 'object', id: hit.obj.id };
     else this.hover = null;
-    this.hoverTile = hit?.kind === 'tile' ? hit.tile : null;
+    const nextTile = hit?.kind === 'tile' ? hit.tile : null;
+    if (nextTile?.join() !== this.hoverTile?.join()) this.cb.onHoverTile?.(nextTile);
+    this.hoverTile = nextTile;
     this.canvas.style.cursor = this.hover ? 'pointer' : 'default';
     if (prev?.id !== this.hover?.id) {
       const label =

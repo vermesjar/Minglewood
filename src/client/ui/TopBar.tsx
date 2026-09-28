@@ -101,7 +101,7 @@ function MeMenu() {
             👕 Wardrobe & avatar
           </button>
           <button role="menuitem" className="menu-item" onClick={pick(() => setState({ panel: 'profile' }))}>
-            🪪 Profile, privacy & accessibility
+            📝 Profile, privacy & accessibility
           </button>
           <button role="menuitem" className="menu-item" onClick={pick(() => setState({ panel: 'people' }))}>
             👥 People directory
