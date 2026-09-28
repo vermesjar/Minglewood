@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { BRAND } from '@shared/brand';
 import { setState, useStore } from './app/store';
+import { game } from './app/game';
 import { Landing } from './ui/Landing';
 import { WorldScreen } from './ui/WorldScreen';
 import { AdminConsole } from './admin/AdminConsole';
@@ -11,7 +12,11 @@ export function App() {
   const prefs = useStore((s) => s.prefs);
 
   useEffect(() => {
-    const onHash = () => setState({ view: location.hash === '#/admin' ? 'admin' : 'world' });
+    const onHash = () => {
+      const view = location.hash === '#/admin' ? 'admin' : 'world';
+      setState({ view });
+      if (view === 'world') void game.refreshBoot();
+    };
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
   }, []);

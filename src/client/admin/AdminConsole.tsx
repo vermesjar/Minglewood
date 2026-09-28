@@ -7,14 +7,15 @@ import { useStore } from '../app/store';
 
 type Tab = 'overview' | 'rooms' | 'discord' | 'events' | 'audit';
 
-const CAPS: Array<[keyof ProviderCapabilities, string, string]> = [
-  ['identity', 'Sign in with Discord', 'OAuth2 with identify + guilds.members.read; membership of the connected server is verified.'],
-  ['channelListing', 'List channels for binding', 'Bot token, GET /guilds/{id}/channels (View Channels permission only).'],
-  ['voicePresence', 'See who’s in voice', 'Gateway GUILD_VOICE_STATES intent (non-privileged). People in a bound voice channel appear in the room.'],
-  ['speakingIndicators', 'Live speaking indicators', 'Needs rpc.voice.read, which Discord grants only to approved partners. Shown as unavailable.'],
-  ['directVoiceJoin', 'Move people into voice automatically', 'Not possible: no API moves a user into voice unless already connected, and the SDK has no join command. We deep-link instead.'],
-  ['deepLinkJoin', 'Open the channel in Discord', 'discord.com/channels/{guild}/{channel} — one click in Discord to join voice.'],
-  ['embeddedApp', 'Run inside Discord as an Activity', 'Embedded App SDK; Activity launch in a bound voice channel drops people into that room.'],
+/** [capability, label, how, possible on Discord at all] — verified against current Discord docs. */
+const CAPS: Array<[keyof ProviderCapabilities, string, string, boolean]> = [
+  ['identity', 'Sign in with Discord', 'OAuth2 with identify + guilds.members.read; membership of the connected server is verified.', true],
+  ['channelListing', 'List channels for binding', 'Bot token, GET /guilds/{id}/channels (View Channels permission only).', true],
+  ['voicePresence', 'See who’s in voice', 'Gateway GUILD_VOICE_STATES intent (non-privileged). People in a bound voice channel appear in the room.', true],
+  ['speakingIndicators', 'Live speaking indicators', 'Needs rpc.voice.read, which Discord grants only to approved partners. Shown as unavailable.', false],
+  ['directVoiceJoin', 'Move people into voice automatically', 'Not possible: no API moves a user into voice unless already connected, and the SDK has no join command. We deep-link instead.', false],
+  ['deepLinkJoin', 'Open the channel in Discord', 'discord.com/channels/{guild}/{channel} — one click in Discord to join voice.', true],
+  ['embeddedApp', 'Run inside Discord as an Activity', 'Embedded App SDK; Activity launch in a bound voice channel drops people into that room.', true],
 ];
 
 export function AdminConsole() {
@@ -31,8 +32,14 @@ export function AdminConsole() {
 
   if (me && me.role === 'member') {
     return (
-      <div className="admin">
-        <p>Admins only. <a href="#/">Back to town</a></p>
+      <div className="admin admin-gate">
+        <section className="apanel">
+          <h2>Admins only</h2>
+          <p className="amuted">The admin console configures rooms, channels and events for {BRAND.name}. Ask an admin if you need a change.</p>
+          <a className="abtn primary" href="#/">
+            ← Back to the world
+          </a>
+        </section>
       </div>
     );
   }
@@ -332,15 +339,20 @@ function DiscordTab({ data, reload }: TabProps) {
         <h2>What Discord lets us do</h2>
         <p className="amuted">Verified against Discord’s current developer docs. Where the platform says no, we degrade gracefully instead of hacking around it.</p>
         <ul className="acaps">
-          {CAPS.map(([k, label, how]) => (
-            <li key={k} className={d.capabilities[k] ? 'yes' : 'no'}>
-              <span className="acap-mark">{d.capabilities[k] ? '✓' : '—'}</span>
-              <div>
-                <strong>{label}</strong>
-                <div className="amuted">{how}</div>
-              </div>
-            </li>
-          ))}
+          {CAPS.map(([k, label, how, possible]) => {
+            const on = possible && d.capabilities[k];
+            const state = on ? 'yes' : possible ? 'setup' : 'no';
+            return (
+              <li key={k} className={state}>
+                <span className="acap-mark">{on ? '✓' : possible ? '○' : '✕'}</span>
+                <div>
+                  <strong>{label}</strong>
+                  <span className="acap-state">{on ? 'enabled' : possible ? 'needs configuration' : 'not offered by Discord'}</span>
+                  <div className="amuted">{how}</div>
+                </div>
+              </li>
+            );
+          })}
         </ul>
       </section>
     </div>

@@ -10,6 +10,7 @@ import { Store } from './store/store';
 import { JsonFilePersistence } from './store/jsonFile';
 import { OrgHub } from './realtime/orgHub';
 import { attachSockets } from './realtime/socketServer';
+import { KeyedLimiter } from './realtime/rateLimit';
 import { LifeSim } from './sim/lifeSim';
 import { DiscordProvider } from './providers/discord/provider';
 import { DemoProvider } from './providers/demo';
@@ -79,6 +80,14 @@ async function main() {
   app.disable('x-powered-by');
   app.set('trust proxy', 1);
   app.use(express.json({ limit: '64kb' }));
+  const apiLimiter = new KeyedLimiter(600, 60_000);
+  app.use('/api', (req, res, next) => {
+    if (!apiLimiter.allow(req.ip ?? 'unknown')) {
+      res.status(429).json({ error: 'too many requests' });
+      return;
+    }
+    next();
+  });
   app.use((_req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');

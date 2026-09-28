@@ -1,5 +1,5 @@
 import type { RoomBinding } from '@shared/domain/types';
-import { config, discordBotConfigured } from '../../config';
+import { config, discordBotConfigured, discordConfigured } from '../../config';
 import type {
   CommunicationProvider,
   ExternalChannel,
@@ -19,7 +19,7 @@ export class DiscordProvider implements CommunicationProvider {
 
   get capabilities(): ProviderCapabilities {
     return {
-      identity: true,
+      identity: discordConfigured(),
       channelListing: discordBotConfigured(),
       voicePresence: discordBotConfigured(),
       // Speaking events exist in the Embedded App SDK but require the `rpc.voice.read` scope,

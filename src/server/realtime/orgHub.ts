@@ -70,6 +70,7 @@ export class OrgHub extends EventEmitter<HubEvents> {
   private grids = new Map<string, WalkGrid>();
   private knocks = new Map<string, Knock>();
   private heldKnocks = new Map<string, Knock[]>();
+  private beforeQuiet = new Map<string, Pick<PresenceState, 'status' | 'note'>>();
   private directoryDirty = true;
   private timer: NodeJS.Timeout;
 
@@ -236,11 +237,20 @@ export class OrgHub extends EventEmitter<HubEvents> {
     const p = this.presenceOf(memberId);
     p.sceneId = sceneId;
     if (p.status === 'offline') p.status = 'available';
-    // Quiet rooms mean focus.
+    // Quiet rooms mean focus; leaving one restores whatever you had before.
     const room = this.data.rooms.find((r) => r.id === sceneId);
-    if (room?.quiet && via === 'live' && p.status !== 'meeting') {
+    const prevRoom = this.data.rooms.find((r) => r.id === fromScene);
+    if (via === 'live' && room?.quiet && !prevRoom?.quiet && p.status !== 'meeting') {
+      this.beforeQuiet.set(memberId, { status: p.status, note: p.note });
       p.status = 'focused';
       p.source = 'default';
+    } else if (via === 'live' && prevRoom?.quiet && !room?.quiet) {
+      const before = this.beforeQuiet.get(memberId);
+      this.beforeQuiet.delete(memberId);
+      if (p.status === 'focused' && p.source === 'default') {
+        p.status = before?.status && before.status !== 'offline' ? before.status : 'available';
+        p.note = before?.note;
+      }
     }
 
     for (const c of this.clients.values()) {

@@ -97,6 +97,8 @@ export class WorldView {
   private resizeObs: ResizeObserver;
   reducedMotion = false;
   showAllNames = false;
+  /** Screen space covered by UI panels, so framing centers on what's actually visible. */
+  private insets = { left: 0, right: 0, top: 60, bottom: 80 };
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -206,8 +208,21 @@ export class WorldView {
       const me = this.actors.get(this.meId);
       const c = me ? isoToScreen(me.x + 0.5, me.y + 0.5) : isoToScreen(scene.spawn.x, scene.spawn.y);
       const z = this.vw < 700 ? 1.5 : 2;
-      this.camera.jump(c.x, c.y - 20, z);
+      const [sx, sy] = this.insetShift(z);
+      this.camera.jump(c.x + sx, c.y - 20 + sy, z);
     }
+  }
+
+  setInsets(insets: Partial<{ left: number; right: number; top: number; bottom: number }>) {
+    const before = JSON.stringify(this.insets);
+    this.insets = { ...this.insets, ...insets };
+    if (before !== JSON.stringify(this.insets) && this.scene?.kind === 'interior') this.fitInterior(false);
+  }
+
+  /** Horizontal/vertical shift (in art px) that centers content in the uncovered area. */
+  private insetShift(z = this.camera.tzoom): [number, number] {
+    const { left, right, top, bottom } = this.insets;
+    return [(right - left) / 2 / z, (bottom - top) / 2 / z];
   }
 
   private fitInterior(jump: boolean) {
@@ -217,15 +232,22 @@ export class WorldView {
     const right = isoToScreen(s.width, 0).x;
     const top = -62;
     const bottom = isoToScreen(s.width, s.height).y + 10;
-    const zx = (this.vw - 80) / (right - left);
-    const zy = (this.vh - 180) / (bottom - top);
+    const availW = this.vw - this.insets.left - this.insets.right - 40;
+    const availH = this.vh - this.insets.top - this.insets.bottom - 30;
+    const zx = availW / (right - left);
+    const zy = availH / (bottom - top);
     const fit = Math.max(1, Math.min(4, Math.min(zx, zy)));
-    const z = Math.floor(fit * 2) / 2 || fit;
+    const z = Math.floor(fit * 4) / 4 || fit;
     this.camera.minZoom = Math.max(1, z * 0.75);
     this.camera.maxZoom = 5;
-    const cx = (left + right) / 2;
-    const cy = (top + bottom) / 2 + 10;
+    const [sx, sy] = this.insetShift(z);
+    const cx = (left + right) / 2 + sx;
+    const cy = (top + bottom) / 2 + sy;
     if (jump) this.camera.jump(cx, cy, z);
+    else {
+      this.camera.tzoom = z;
+      this.camera.panTo(cx, cy);
+    }
   }
 
   setFestive(rooms: Set<string>) {
@@ -298,13 +320,26 @@ export class WorldView {
     return this.actors.has(id);
   }
 
+  /** Position from the path itself, independent of whether frames are being rendered. */
+  private livePos(a: ActorView): { x: number; y: number; moving: boolean } {
+    const path = a.occ.path;
+    if (path && a.occ.pathStartedAt !== undefined) {
+      const p = positionAlong(path, this.now() - a.occ.pathStartedAt);
+      return { x: p.x, y: p.y, moving: !p.done };
+    }
+    return { x: a.x, y: a.y, moving: false };
+  }
+
   actorTile(id: string): Tile | null {
     const a = this.actors.get(id);
-    return a ? [Math.round(a.x), Math.round(a.y)] : null;
+    if (!a) return null;
+    const p = this.livePos(a);
+    return [Math.round(p.x), Math.round(p.y)];
   }
 
   isMoving(id: string): boolean {
-    return !!this.actors.get(id)?.moving;
+    const a = this.actors.get(id);
+    return !!a && this.livePos(a).moving;
   }
 
   say(memberId: string, text: string) {
@@ -345,7 +380,8 @@ export class WorldView {
 
   focusOn(tile: Tile) {
     const p = isoToScreen(tile[0] + 0.5, tile[1] + 0.5);
-    this.camera.panTo(p.x, p.y - 20);
+    const [sx, sy] = this.insetShift();
+    this.camera.panTo(p.x + sx, p.y - 20 + sy);
   }
 
   zoomBy(f: number) {
@@ -354,7 +390,16 @@ export class WorldView {
 
   /** Iris transition. `mid` runs when the screen is covered. */
   transitionTo(mid: () => void | Promise<unknown>) {
-    this.transition = { phase: 'close', t: this.reducedMotion ? 0.7 : 0, mid };
+    if (document.hidden) {
+      // No frames are rendered in background tabs; don't let navigation wait for an animation.
+      this.runMid(mid);
+      return;
+    }
+    const tr = { phase: 'close' as const, t: this.reducedMotion ? 0.7 : 0, mid };
+    this.transition = tr;
+    setTimeout(() => {
+      if (this.transition === tr) this.runMid(mid);
+    }, 900);
   }
 
   private runMid(mid?: () => void | Promise<unknown>) {

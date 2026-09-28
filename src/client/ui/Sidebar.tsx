@@ -81,7 +81,10 @@ export function Sidebar() {
   }, [boot, members, directory, events, now, sceneId, dismissed, greeted]);
 
   if (!boot) return null;
-  const toggle = () => setState((s) => ({ prefs: { ...s.prefs, sidebarOpen: !s.prefs.sidebarOpen } }));
+  const toggle = () => {
+    setState((s) => ({ prefs: { ...s.prefs, sidebarOpen: !s.prefs.sidebarOpen } }));
+    game.syncInsets();
+  };
   if (!open) {
     return (
       <button className="btn sidebar-toggle collapsed" onClick={toggle} aria-label="Open sidebar">
@@ -224,4 +227,4 @@ export function Sidebar() {
 }
 
 // Keep `getState` tree-shaken import used for debugging in dev tools.
-if (import.meta.env.DEV) (window as unknown as { mw: unknown }).mw = { getState, game };
+if (import.meta.env.DEV) (window as unknown as { mw: unknown }).mw = { getState, setState, game };

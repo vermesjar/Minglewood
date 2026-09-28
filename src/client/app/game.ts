@@ -99,6 +99,17 @@ class Game {
     if (!this.arrivalTimer) this.arrivalTimer = window.setInterval(() => this.checkArrival(), 90);
   }
 
+  /** Re-read org config (rooms, bindings, events) — e.g. after an admin edits it. */
+  async refreshBoot() {
+    try {
+      const boot = await api<Bootstrap>('/bootstrap');
+      setState({ boot, membersById: new Map(boot.members.map((m) => [m.id, m])), events: boot.events });
+      this.refreshBadges();
+    } catch {
+      /* keep the current snapshot */
+    }
+  }
+
   attach(canvas: HTMLCanvasElement) {
     this.world = new WorldView(canvas, {
       onGroundClick: (t) => this.onGroundClick(t),
@@ -120,8 +131,21 @@ class Game {
     if (this.keyHandler) window.removeEventListener('keydown', this.keyHandler);
   }
 
+  /** Tell the renderer which parts of the screen the panels cover. */
+  syncInsets() {
+    const s = getState();
+    if (!this.world) return;
+    const narrow = window.innerWidth <= 820;
+    const interior = !!s.boot?.rooms.some((r) => r.id === s.sceneId);
+    this.world.setInsets({
+      left: !narrow && s.prefs.sidebarOpen ? 305 : 0,
+      right: !narrow && interior ? 325 : 0,
+    });
+  }
+
   applyPrefs() {
     const p = getState().prefs;
+    this.syncInsets();
     if (!this.world) return;
     this.world.reducedMotion = p.reducedMotion;
     this.world.effects.reducedMotion = p.reducedMotion;
@@ -244,6 +268,7 @@ class Game {
       const festiveRooms = new Set(active.filter((e) => e.decor === 'balloons' || e.decor === 'launch').map((e) => e.roomId));
       const ev = active.find((e) => e.roomId === sceneId);
       this.world.setServerOffset(this.rt?.serverOffset ?? 0);
+      this.syncInsets();
       this.world.loadScene(scene, occupants, {
         meId: this.meId,
         activeDecor: decor,
