@@ -33,6 +33,21 @@
   knocks/rewards/quiet rooms, Discord provider + voice presence (mocked HTTP), serendipity,
   calendar presence, sessions, and an end-to-end two-user HTTP+WebSocket test (38 passing). Typecheck + ESLint clean. Production build verified.
 
+- **World polish (branch `world-polish`, in progress)** — toward an "AAA Habbo-equivalent" look:
+  - *Movement*: held-key steering with continuous paths (server-validated), pixel-perfect zoom steps.
+  - *Art pipeline*: gpt-image (masked edits on construction guides) → pixelize → anchors/footprints
+    → manifest (`art/studio.py`, `art/ART_DIRECTION.md`); every furniture piece in 4 rotations;
+    `npm run furniture:review` lints footprint centring, stray pixels, rotations, seat heights.
+  - *Characters*: one template (frame) + add-on parts conformed to a standard, two body bases with a
+    mesh warp, generated hair/hats/tops/pets, gated in every facing and pose over the roster, saved
+    members and hundreds of random looks plus a pairwise sweep (`docs/characters.md`).
+  - *Interiors*: all eight rooms rebuilt with generated art and composed into zones; per-object
+    animations (espresso steam, koi, fireplace, clock, arcade screens…); seats per cushion with
+    correct depth at every angle; furniture blocks walking; NPC staff (Juno the barista brews and
+    hands over coffee; receptionist, arcade attendant, librarian).
+  - *Town*: 76×76 valley — generated exteriors on exact footprints, props with finished art, organic
+    lake shore, plaza, park; one world clock for day/night on every client.
+
 ## Important decisions
 - Custom Canvas2D renderer over Phaser/PixiJS (see ARCHITECTURE.md).
 - JSON-file persistence behind a repository for zero-setup dev; Postgres schema is the target.
@@ -45,7 +60,7 @@
 - Discord flows are implemented against the documented API but not exercised against a live
   server in this environment (no credentials here). Demo provider covers the UX.
 - Single-process realtime + JSON store (no horizontal scaling yet).
-- Procedural placeholder art; no sprite sheets yet. Emoji rendering depends on the OS font.
+- Emoji rendering depends on the OS font.
 - Mobile works (pointer events, responsive panels) but is not yet designed for.
 
 ## Next actions
@@ -54,7 +69,7 @@
 3. `PostgresPersistence` + Redis fan-out for multi-instance hubs; per-visibility directory caching.
 4. Real calendar provider (Google) behind `CalendarProvider`.
 5. Browser-level smoke tests (Playwright) for enter → knock → jump → party.
-6. Sprite-sheet art pipeline behind `sprites/registry.ts`; day/night ambience.
+6. Slack integration (preferred over Discord going forward); company design packages / themes.
 
 ## Multi-tenant hosting (Discord) — Minglewood Cloud
 - Control plane built in Lovable ("Minglewood Cloud"), live at https://minglewood-cloud.lovable.app:
