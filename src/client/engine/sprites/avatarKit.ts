@@ -900,7 +900,10 @@ function drawHeld(P: Pix, F: Frame, L: FullLoadout) {
       for (let k = 0; k < 4; k++) P.set(x + 2, y - 8 - k, c);
       break;
     case 'held.laptop':
-      paint(P, M().rrect(x - 6, y - 2, x + 5, y + 1, 1), [201, 206, 214]);
+      // a closed laptop tucked against the side: a silver slab with a darker hinge edge and a small logo
+      paint(P, M().rrect(x - 2, y - 8, x + 3, y + 3, 1), [201, 206, 214]);
+      for (let yy = y - 7; yy <= y + 2; yy++) P.set(x - 1, yy, [150, 156, 168]);
+      P.set(x + 1, y - 3, WHITE);
       break;
     case 'held.book':
       paint(P, M().rrect(x - 2, y - 6, x + 4, y + 1, 1), c);
