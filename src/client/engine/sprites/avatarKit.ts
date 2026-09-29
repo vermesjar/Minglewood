@@ -695,12 +695,18 @@ function drawTorso(P: Pix, F: Frame, L: FullLoadout) {
   if (map) {
     const m = placed(map, [TORSO_ORIGIN.x, TORSO_ORIGIN.y + dy], [0, dy]);
     let t = tint;
-    if (L.top === 'top.apron' && F.view === 'front') {
-      // the tee around the bib takes the accent colour (same tone, recoloured)
+    if (L.top === 'top.apron') {
+      // Two colours: the apron in topColor, the tee around it in topAccent (same tone, recoloured). In front
+      // the bib is a region; from behind the apron is just its straps and ties, drawn in the deep tone.
       const tee = hx(L.topAccent);
-      const bib = (x: number, y: number) => y >= F.shoulderY + 4 && x >= F.hx - 6 && x <= F.hx + 7;
+      const deep = mix(c, LINE, 0.55);
       const k = (col: RGB) => lum(col) / Math.max(0.01, lum(c));
-      t = (x, y, col) => (bib(x, y) ? col : (tee.map((v) => Math.min(255, v * Math.min(1.25, k(col)))) as RGB));
+      const asTee = (col: RGB) => tee.map((v) => Math.min(255, v * Math.min(1.25, k(col)))) as RGB;
+      const apron =
+        F.view === 'front'
+          ? (x: number, y: number) => y >= F.shoulderY + 4 && x >= F.hx - 6 && x <= F.hx + 7
+          : (_x: number, _y: number, col: RGB) => Math.abs(col[0] - deep[0]) + Math.abs(col[1] - deep[1]) + Math.abs(col[2] - deep[2]) < 6;
+      t = (x, y, col) => (apron(x, y, col) ? (F.view === 'front' ? col : c) : asTee(col));
     }
     paintMap(P, m.x, m.y, m.rows, c, t);
     drawPrint(P, F, L);
