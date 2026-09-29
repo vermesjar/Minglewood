@@ -384,6 +384,12 @@ export function rugTexture(variant: string): { base: string; border: string; acc
       return { base: '#1f3f5c', border: '#152b40', accent: '#4fe3f0' };
     case 'sage':
       return { base: '#8fae8a', border: '#6d8d68', accent: '#f4efe0' };
+    case 'slate':
+      return { base: '#4f5d6e', border: '#394453', accent: '#9fe3e0' };
+    case 'forest':
+      return { base: '#2f5a44', border: '#1f4032', accent: '#d9a441' };
+    case 'oat':
+      return { base: '#e8d9bd', border: '#c9b28c', accent: '#c96f5a' };
     default:
       return { base: '#c96f5a', border: '#a8543f', accent: '#fff4c9' };
   }

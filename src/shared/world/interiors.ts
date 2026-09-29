@@ -399,7 +399,8 @@ export function buildInteriors(): SceneDef[] {
       ambient: 'bright',
     },
     [
-      { sprite: 'rug', x: 10, y: 6, w: 5, d: 5, flat: true, variant: 'teal' },
+      // The desk pod on a slate rug.
+      { id: 'eng-pod-rug', sprite: 'rug', x: 2, y: 2, w: 8, d: 6, flat: true, variant: 'slate' },
       ...engDesks,
       {
         sprite: 'whiteboard',
@@ -437,23 +438,63 @@ export function buildInteriors(): SceneDef[] {
       },
       { sprite: 'bookshelf', x: 13, y: 0, facing: 'sw', variant: 'birch2' },
       { sprite: 'server-rack', x: 15, y: 0, facing: 'sw', label: 'The Toaster (retired build server)' },
-      // the lounge: beanbags round a side table
-      { sprite: 'beanbag', x: 11, y: 8, variant: 'orange', actions: sit },
-      { sprite: 'beanbag', x: 13, y: 8, variant: 'purple', actions: sit },
-      { sprite: 'table-low', x: 12, y: 8, w: 1, d: 1, variant: 'side' },
-      { sprite: 'beanbag', x: 12, y: 9, variant: 'cyan', actions: sit },
-      plant(15, 10, 'b'),
-      plant(1, 1),
-      plant(10, 1),
       { id: 'eng-shelf3', sprite: 'bookshelf', x: 14, y: 0, facing: 'sw', variant: 'birch' },
-      { id: 'eng-lamp', sprite: 'lamp', x: 14, y: 7, actions: [{ kind: 'toggle', label: 'Switch the lamp' }] },
-      // a coffee corner by the door (the café's table and chairs)
-      { id: 'eng-cafe-table', sprite: 'table-round', x: 4, y: 10 },
-      { id: 'eng-cafe-chair-1', ...chair(3, 10, 'se', 'cafe') },
-      { id: 'eng-cafe-chair-2', ...chair(5, 10, 'nw', 'cafe') },
-      { id: 'eng-cafe-chair-3', ...chair(4, 11, 'ne', 'cafe') },
-      plant(0, 11),
-      plant(9, 7, 'b'),
+      plant(10, 1),
+      { id: 'eng-poster', sprite: 'poster', variant: 'ship', wall: 'right', x: 5, y: 0, label: 'Ship it' },
+      // The kitchenette in the back corner: fridge, the café's counter with a machine of its own, water, fruit.
+      { id: 'eng-fridge', sprite: 'fridge', x: 0, y: 0, facing: 'se', label: 'Fridge' },
+      ...[1, 2].map((y): Obj => ({ id: `eng-counter-${y}`, sprite: 'counter', x: 0, y, facing: 'se', variant: 'cafe', label: 'Kitchenette' })),
+      {
+        id: 'eng-espresso',
+        sprite: 'espresso',
+        x: 0,
+        y: 1,
+        z: COUNTER_TOP,
+        facing: 'se',
+        label: 'Espresso machine',
+        actions: [{ kind: 'vend', item: 'coffee', label: 'Get a coffee' }],
+      },
+      { id: 'eng-fruit', sprite: 'fruit-bowl', x: 0, y: 2, z: COUNTER_TOP, label: 'Fruit bowl' },
+      { id: 'eng-water', sprite: 'water-cooler', x: 1, y: 0, label: 'Water cooler' },
+      // The pairing station against the left wall, a rolling whiteboard beside it.
+      { id: 'eng-pair-desk', sprite: 'desk', x: 0, y: 6, w: 1, d: 2, facing: 'se', label: 'Pairing station' },
+      { id: 'eng-pair-chair-1', ...chair(1, 6, 'nw', 'office') },
+      { id: 'eng-pair-chair-2', ...chair(1, 7, 'nw', 'office') },
+      { id: 'eng-pair-board', sprite: 'whiteboard-stand', x: 0, y: 8, facing: 'se', label: 'Pairing board' },
+      // The meeting nook by the door, under the build dashboard.
+      {
+        id: 'eng-dashboard',
+        sprite: 'dashboard',
+        wall: 'left',
+        x: 0,
+        y: 10,
+        d: 2,
+        label: 'Build status',
+        actions: [{ kind: 'info', title: 'Build status', body: 'Main is green. The nightly Aurora build finished in 11 minutes; one flaky test is quarantined.' }],
+      },
+      { id: 'eng-meet-rug', sprite: 'rug', x: 1, y: 9, w: 4, d: 3, flat: true, variant: 'teal' },
+      { id: 'eng-meet-table', sprite: 'table-low', x: 2, y: 10, w: 1, d: 2 },
+      { id: 'eng-meet-sofa', sprite: 'couch', variant: 'blue', x: 3, y: 10, w: 1, d: 2, facing: 'nw', actions: sit },
+      { id: 'eng-meet-chair', sprite: 'armchair', variant: 'mustard', x: 2, y: 9, facing: 'sw', actions: sit },
+      { id: 'eng-meet-lamp', sprite: 'lamp', x: 4, y: 9, actions: [{ kind: 'toggle', label: 'Switch the lamp' }] },
+      // The lounge: a sofa and a coffee table anchor the beanbags.
+      { id: 'eng-lounge-rug', sprite: 'rug', x: 10, y: 6, w: 5, d: 5, flat: true, variant: 'teal' },
+      { id: 'eng-lounge-sofa', sprite: 'couch', variant: 'green', x: 11, y: 6, w: 2, d: 1, facing: 'sw', actions: sit },
+      { id: 'eng-lamp', sprite: 'lamp', x: 13, y: 6, actions: [{ kind: 'toggle', label: 'Switch the lamp' }] },
+      { id: 'eng-lounge-table', sprite: 'table-low', x: 11, y: 7, w: 2, d: 1 },
+      { sprite: 'beanbag', x: 11, y: 8, variant: 'orange', actions: sit },
+      { sprite: 'beanbag', x: 12, y: 8, variant: 'purple', actions: sit },
+      { sprite: 'beanbag', x: 13, y: 7, variant: 'cyan', actions: sit },
+      { id: 'eng-lounge-side', sprite: 'table-low', x: 10, y: 7, w: 1, d: 1, variant: 'side' },
+      plant(15, 10, 'b'),
+      // A second, smaller pod at the front for the platform team.
+      { id: 'eng-pod2-rug', sprite: 'rug', x: 5, y: 8, w: 4, d: 4, flat: true, variant: 'slate' },
+      { id: 'eng-pod2-desk-1', sprite: 'desk', x: 6, y: 9, w: 2, d: 1, facing: 'ne' },
+      { id: 'eng-pod2-desk-2', sprite: 'desk', x: 6, y: 10, w: 2, d: 1, facing: 'sw' },
+      { id: 'eng-pod2-chair-1', ...chair(6, 8, 'sw', 'office') },
+      { id: 'eng-pod2-chair-2', ...chair(7, 8, 'sw', 'office') },
+      { id: 'eng-pod2-chair-3', ...chair(6, 11, 'ne', 'office') },
+      { id: 'eng-pod2-chair-4', ...chair(7, 11, 'ne', 'office') },
     ],
   );
 
@@ -672,26 +713,42 @@ export function buildInteriors(): SceneDef[] {
         variant: i % 2 ? 'b' : 'a',
       })),
       { sprite: 'window', wall: 'right', x: 5, y: 0, w: 2 },
-      // Fireside: two green wingbacks in an L round the hearth, clear of the fire so it stays in view.
+      // Wren's stacks: an ivy stand in the corner, returns piled at the end of the shelves.
+      { id: 'focus-ivy', sprite: 'plant', variant: 'ivy', x: 0, y: 0 },
+      { id: 'focus-returns', sprite: 'book-stack', x: 4, y: 1, label: 'Returns' },
+      // Fireside: two green wingbacks in an L round the hearth, a lamp-lit side table between them.
       { sprite: 'rug', x: 9, y: 1, w: 3, d: 2, flat: true, variant: 'cream' },
       { sprite: 'fireplace', x: 10, y: 0, w: 1, d: 1, facing: 'sw', label: 'Fireplace', actions: [{ kind: 'toggle', label: 'Light the fire' }] },
       { sprite: 'armchair', x: 9, y: 1, facing: 'se', variant: 'green', actions: sit },
       { sprite: 'armchair', x: 10, y: 2, facing: 'ne', variant: 'green', actions: sit },
-      // The window nook.
+      { id: 'focus-fire-table', sprite: 'side-table', variant: 'walnut', x: 9, y: 2, actions: [{ kind: 'toggle', label: 'Switch the lamp' }] },
+      { id: 'focus-fern-1', sprite: 'plant', variant: 'fern', x: 11, y: 0 },
+      // The window nook: a rust wingback and a banker's lamp.
       { sprite: 'armchair', x: 5, y: 1, facing: 'sw', variant: 'rust', actions: sit },
-      { sprite: 'lamp', x: 6, y: 1 },
-      // The study table: two walnut desks side by side.
+      { id: 'focus-nook-table', sprite: 'side-table', variant: 'walnut', x: 6, y: 1, actions: [{ kind: 'toggle', label: 'Switch the lamp' }] },
+      // The study table on a forest rug, the old globe at its end.
+      { id: 'focus-study-rug', sprite: 'rug', x: 1, y: 3, w: 6, d: 4, flat: true, variant: 'forest' },
       { sprite: 'desk', x: 2, y: 4, w: 2, d: 1, facing: 'sw', variant: 'wood' },
       { sprite: 'desk', x: 4, y: 4, w: 2, d: 1, facing: 'sw', variant: 'wood' },
       chair(2, 5, 'ne'),
       chair(3, 5, 'ne'),
       chair(4, 5, 'ne'),
       chair(5, 5, 'ne'),
-      // A reading circle round a marble side table.
-      { sprite: 'rug', x: 8, y: 6, w: 3, d: 3, flat: true, variant: 'cream' },
+      { id: 'focus-globe', sprite: 'globe-stand', x: 6, y: 4, label: 'The old globe' },
+      // The reading circle: three wingbacks and an ottoman round the marble table, on a big forest rug.
+      { id: 'focus-circle-rug', sprite: 'rug', x: 7, y: 5, w: 5, d: 5, flat: true, variant: 'forest' },
       { sprite: 'armchair', x: 8, y: 7, facing: 'se', variant: 'rust', actions: sit },
       { sprite: 'table-round', x: 9, y: 7 },
       { sprite: 'armchair', x: 10, y: 7, facing: 'nw', variant: 'rust', actions: sit },
+      { id: 'focus-circle-chair', sprite: 'armchair', x: 9, y: 6, facing: 'sw', variant: 'green', actions: sit },
+      { id: 'focus-ottoman', sprite: 'ottoman', variant: 'green', x: 9, y: 8, actions: sit },
+      { sprite: 'lamp', x: 8, y: 6 },
+      { id: 'focus-circle-books', sprite: 'book-stack', x: 10, y: 8 },
+      // A second nook by the door: two wingbacks and a side table.
+      { id: 'focus-nook2-rug', sprite: 'rug', x: 1, y: 7, w: 4, d: 3, flat: true, variant: 'cream' },
+      { id: 'focus-nook2-chair-1', sprite: 'armchair', x: 2, y: 8, facing: 'se', variant: 'green', actions: sit },
+      { id: 'focus-nook2-table', sprite: 'side-table', variant: 'walnut', x: 3, y: 8, actions: [{ kind: 'toggle', label: 'Switch the lamp' }] },
+      { id: 'focus-nook2-chair-2', sprite: 'armchair', x: 4, y: 8, facing: 'nw', variant: 'rust', actions: sit },
       {
         sprite: 'sign-quiet',
         wall: 'left',
@@ -706,10 +763,10 @@ export function buildInteriors(): SceneDef[] {
           },
         ],
       },
+      // Plants in the corners only.
       plant(11, 9, 'b'),
-      plant(7, 9),
       plant(0, 9, 'b'),
-      { id: 'focus-dragonlamp', sprite: 'heirloom-dragonlamp', x: 11, y: 4, facing: 'sw', label: 'Jade Dragon Lamp — a gift from our Singapore customers', actions: [{ kind: 'toggle', label: 'Switch the lamp' }] },
+      { id: 'focus-dragonlamp', sprite: 'heirloom-dragonlamp', x: 11, y: 3, facing: 'sw', label: 'Jade Dragon Lamp — a gift from our Singapore customers', actions: [{ kind: 'toggle', label: 'Switch the lamp' }] },
     ],
   );
 
@@ -820,7 +877,6 @@ export function buildInteriors(): SceneDef[] {
       ambient: 'bright',
     },
     [
-      { sprite: 'rug', x: 5, y: 5, w: 5, d: 4, flat: true, variant: 'mustard' },
       {
         sprite: 'moodboard',
         wall: 'right',
@@ -839,38 +895,61 @@ export function buildInteriors(): SceneDef[] {
       { sprite: 'swatches', wall: 'right', x: 7, y: 0, w: 3, label: 'Color swatches' },
       { sprite: 'window', wall: 'left', x: 0, y: 2, d: 2 },
       { id: 'design-window-2', sprite: 'window', wall: 'right', x: 10, y: 0, w: 2 },
-      // Two desks facing the moodboard.
+      // Two desks facing the moodboard; a plant corner beside them.
       { sprite: 'desk', x: 1, y: 1, w: 2, d: 1, facing: 'sw', variant: 'light' },
       { id: 'design-desk-2', sprite: 'desk', x: 3, y: 1, w: 2, d: 1, facing: 'sw', variant: 'light' },
       chair(1, 2, 'ne', 'office'),
       chair(2, 2, 'ne', 'office'),
       { id: 'design-chair-3', ...chair(3, 2, 'ne', 'office') },
       { id: 'design-chair-4', ...chair(4, 2, 'ne', 'office') },
-      // Under the swatches: the plan chest and a jacket in progress.
+      { id: 'design-fiddle', sprite: 'plant', variant: 'fiddle', x: 0, y: 0 },
+      { id: 'design-snake', sprite: 'plant', variant: 'snake', x: 0, y: 1 },
+      { id: 'design-pothos', sprite: 'plant', variant: 'pothos', x: 6, y: 1 },
+      // The making corner under the swatches: plan chest, a jacket in progress, the easels.
       { id: 'design-plan-chest', sprite: 'plan-chest', x: 7, y: 0, facing: 'sw', label: 'Plan chest' },
       { id: 'design-dress-form', sprite: 'dress-form', x: 9, y: 1, facing: 'sw', label: 'Jacket in progress' },
-      // Easels by the window.
-      { sprite: 'easel', x: 1, y: 4, facing: 'se' },
-      { sprite: 'easel', x: 1, y: 5, facing: 'se', variant: 'b' },
-      // The big worktable on the rug.
+      { sprite: 'easel', x: 9, y: 3, facing: 'sw' },
+      { sprite: 'easel', x: 10, y: 3, facing: 'sw', variant: 'b' },
+      plant(11, 3, 'b'),
+      // The crit wall: work pinned up for review, drafting stools on an oat rug.
+      {
+        id: 'design-pinup',
+        sprite: 'pinup',
+        wall: 'left',
+        x: 0,
+        y: 4,
+        d: 3,
+        label: 'Crit wall',
+        actions: [{ kind: 'info', title: 'Crit wall', body: 'Thursday crit at three. Pin up what you have — half-finished is the point.' }],
+      },
+      { id: 'design-crit-rug', sprite: 'rug', x: 1, y: 4, w: 3, d: 3, flat: true, variant: 'oat' },
+      { id: 'design-crit-stool-1', sprite: 'stool', variant: 'drafting', x: 2, y: 4, facing: 'nw', actions: sit },
+      { id: 'design-crit-stool-2', sprite: 'stool', variant: 'drafting', x: 2, y: 5, facing: 'nw', actions: sit },
+      { id: 'design-crit-stool-3', sprite: 'stool', variant: 'drafting', x: 2, y: 6, facing: 'nw', actions: sit },
+      // The big worktable on the mustard rug.
+      { sprite: 'rug', x: 5, y: 4, w: 5, d: 3, flat: true, variant: 'mustard' },
       { sprite: 'table-long', x: 6, y: 5, w: 3, d: 2, facing: 'sw', variant: 'light', label: 'Worktable' },
       { sprite: 'stool', x: 5, y: 5, actions: sit },
       { sprite: 'stool', x: 5, y: 6, actions: sit },
       { sprite: 'stool', x: 9, y: 5, actions: sit },
       { sprite: 'stool', x: 9, y: 6, actions: sit },
-      // The crit corner under the arc lamp.
+      // Materials by the door.
+      { id: 'design-materials', sprite: 'materials-shelf', x: 0, y: 9, facing: 'se', label: 'Materials' },
+      { id: 'design-paper', sprite: 'paper-bin', x: 1, y: 9, label: 'Paper rolls' },
+      // The lounge: the sage sofa, a coffee table and the mustard armchairs under the arc lamp.
+      { id: 'design-print', sprite: 'print', variant: 'poster', wall: 'right', x: 6, y: 0, label: 'Print' },
+      { id: 'design-lounge-rug', sprite: 'rug', x: 6, y: 7, w: 6, d: 3, flat: true, variant: 'oat' },
       { id: 'design-arc-lamp', sprite: 'lamp-arc', x: 11, y: 7, actions: [{ kind: 'toggle', label: 'Switch the lamp' }] },
-      { id: 'design-crit-1', sprite: 'armchair', variant: 'mustard', x: 9, y: 8, facing: 'se', actions: sit },
-      { id: 'design-crit-table', sprite: 'table-round', x: 10, y: 8 },
-      { id: 'design-crit-2', sprite: 'armchair', variant: 'mustard', x: 11, y: 8, facing: 'nw', actions: sit },
-      plant(11, 3, 'b'),
-      plant(0, 9, 'b'),
-      { id: 'design-pothos', sprite: 'plant', variant: 'pothos', x: 6, y: 1 },
+      { id: 'design-sofa', sprite: 'couch', variant: 'green', x: 7, y: 8, w: 1, d: 2, facing: 'se', actions: sit },
+      { id: 'design-lounge-table', sprite: 'table-low', x: 8, y: 8, w: 1, d: 2 },
+      { id: 'design-crit-1', sprite: 'armchair', variant: 'mustard', x: 9, y: 8, facing: 'nw', actions: sit },
+      { id: 'design-crit-2', sprite: 'armchair', variant: 'mustard', x: 9, y: 9, facing: 'nw', actions: sit },
+      { id: 'design-crit-table', sprite: 'table-round', x: 11, y: 8 },
       {
         id: 'design-globe',
         sprite: 'heirloom-globe',
-        x: 3,
-        y: 8,
+        x: 11,
+        y: 9,
         label: 'The Crystal Globe',
         actions: [{ kind: 'info', title: 'The Crystal Globe', body: 'Marks the day Northstar had teammates on every continent except Antarctica. (We’re working on it.)' }],
       },

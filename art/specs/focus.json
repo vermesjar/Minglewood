@@ -208,6 +208,100 @@
           "prompt": "A small oval brass plaque on a dark walnut mount, slightly wider than tall, engraved with a simple finger-to-lips 'shh' silhouette and tiny leaves around the edge (no letters)."
         }
       ]
+    },
+    {
+      "name": "nooks",
+      "grid": "3x2",
+      "items": [
+        {
+          "key": "side-table.walnut",
+          "facing": "se",
+          "also_facings": [
+            "nw"
+          ],
+          "w": 1,
+          "d": 1,
+          "h": 26,
+          "width": 34,
+          "fill": 0.4,
+          "extra": {
+            "light": {
+              "x": 18,
+              "y": 8,
+              "r": 34
+            }
+          },
+          "prompt": "A small round dark walnut side table on a turned pedestal holding a brass banker's lamp with a green glass shade glowing warmly, a teacup and a small stack of books."
+        },
+        {
+          "key": "globe-stand",
+          "facing": "se",
+          "also_facings": [
+            "nw"
+          ],
+          "w": 1,
+          "d": 1,
+          "h": 44,
+          "width": 36,
+          "fill": 0.4,
+          "prompt": "An antique floor globe: a parchment-colored world globe in a brass meridian ring, on a carved dark walnut tripod stand."
+        },
+        {
+          "key": "plant.fern",
+          "facing": "se",
+          "also_facings": [
+            "nw"
+          ],
+          "w": 1,
+          "d": 1,
+          "h": 34,
+          "width": 40,
+          "fill": 0.45,
+          "prompt": "A lush Boston fern with long arching fronds spilling over a woven wicker basket planter."
+        },
+        {
+          "key": "plant.ivy",
+          "facing": "se",
+          "also_facings": [
+            "nw"
+          ],
+          "w": 1,
+          "d": 1,
+          "h": 46,
+          "width": 34,
+          "fill": 0.4,
+          "prompt": "A tall slim dark walnut plant stand holding a glazed green pot of trailing ivy that cascades down to the floor."
+        },
+        {
+          "key": "ottoman.green",
+          "facing": "se",
+          "also_facings": [
+            "nw"
+          ],
+          "w": 1,
+          "d": 1,
+          "h": 14,
+          "width": 36,
+          "fill": 0.55,
+          "extra": {
+            "seat": 9
+          },
+          "prompt": "A round bottle-green velvet ottoman footstool with deep button tufting and short turned walnut feet."
+        },
+        {
+          "key": "book-stack",
+          "facing": "se",
+          "also_facings": [
+            "nw"
+          ],
+          "w": 1,
+          "d": 1,
+          "h": 16,
+          "width": 26,
+          "fill": 0.35,
+          "prompt": "A tidy tall stack of old leather-bound books on the floor in deep red, green and brown, a pair of reading glasses resting on top."
+        }
+      ]
     }
   ]
 }

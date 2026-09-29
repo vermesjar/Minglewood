@@ -530,6 +530,29 @@
         40
       ]
     },
+    "book-stack": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "se": {
+          "file": "book-stack.se.png",
+          "anchor": [
+            13,
+            4
+          ]
+        },
+        "nw": {
+          "file": "book-stack.nw.png",
+          "anchor": [
+            13,
+            4
+          ]
+        }
+      }
+    },
     "bookshelf.a": {
       "footprint": [
         1,
@@ -1151,6 +1174,25 @@
         4
       ]
     },
+    "dashboard": {
+      "footprint": [
+        2,
+        1
+      ],
+      "fit": "anchor",
+      "file": "dashboard.png",
+      "anchor": [
+        0,
+        0
+      ],
+      "wall": {
+        "v": [
+          22,
+          46
+        ],
+        "margin": 0.06
+      }
+    },
     "desk": {
       "footprint": [
         2,
@@ -1575,6 +1617,52 @@
         "margin": 0.04
       }
     },
+    "fridge": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "sw": {
+          "file": "fridge.sw.png",
+          "anchor": [
+            32,
+            65
+          ]
+        },
+        "ne": {
+          "file": "fridge.ne.png",
+          "anchor": [
+            32,
+            68
+          ]
+        }
+      }
+    },
+    "fruit-bowl": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "se": {
+          "file": "fruit-bowl.se.png",
+          "anchor": [
+            14,
+            -2
+          ]
+        },
+        "nw": {
+          "file": "fruit-bowl.nw.png",
+          "anchor": [
+            14,
+            -2
+          ]
+        }
+      }
+    },
     "gazebo": {
       "footprint": [
         3,
@@ -1586,6 +1674,29 @@
         96,
         190
       ]
+    },
+    "globe-stand": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "se": {
+          "file": "globe-stand.se.png",
+          "anchor": [
+            18,
+            40
+          ]
+        },
+        "nw": {
+          "file": "globe-stand.nw.png",
+          "anchor": [
+            18,
+            40
+          ]
+        }
+      }
     },
     "grinder": {
       "footprint": [
@@ -1958,6 +2069,29 @@
         54
       ]
     },
+    "materials-shelf": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "sw": {
+          "file": "materials-shelf.sw.png",
+          "anchor": [
+            32,
+            81
+          ]
+        },
+        "ne": {
+          "file": "materials-shelf.ne.png",
+          "anchor": [
+            32,
+            81
+          ]
+        }
+      }
+    },
     "menu-board": {
       "footprint": [
         2,
@@ -2026,6 +2160,53 @@
         56,
         86
       ]
+    },
+    "ottoman.green": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "se": {
+          "file": "ottoman.green.se.png",
+          "anchor": [
+            18,
+            10
+          ]
+        },
+        "nw": {
+          "file": "ottoman.green.nw.png",
+          "anchor": [
+            18,
+            10
+          ]
+        }
+      },
+      "seat": 9
+    },
+    "paper-bin": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "se": {
+          "file": "paper-bin.se.png",
+          "anchor": [
+            14,
+            36
+          ]
+        },
+        "nw": {
+          "file": "paper-bin.nw.png",
+          "anchor": [
+            14,
+            36
+          ]
+        }
+      }
     },
     "parts-rack": {
       "footprint": [
@@ -2123,6 +2304,25 @@
         59
       ]
     },
+    "pinup": {
+      "footprint": [
+        3,
+        1
+      ],
+      "fit": "anchor",
+      "file": "pinup.png",
+      "anchor": [
+        0,
+        0
+      ],
+      "wall": {
+        "v": [
+          16,
+          48
+        ],
+        "margin": 0.05
+      }
+    },
     "plan-chest": {
       "footprint": [
         1,
@@ -2170,6 +2370,75 @@
         68
       ]
     },
+    "plant.fern": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "se": {
+          "file": "plant.fern.se.png",
+          "anchor": [
+            20,
+            16
+          ]
+        },
+        "nw": {
+          "file": "plant.fern.nw.png",
+          "anchor": [
+            20,
+            16
+          ]
+        }
+      }
+    },
+    "plant.fiddle": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "se": {
+          "file": "plant.fiddle.se.png",
+          "anchor": [
+            20,
+            50
+          ]
+        },
+        "nw": {
+          "file": "plant.fiddle.nw.png",
+          "anchor": [
+            20,
+            50
+          ]
+        }
+      }
+    },
+    "plant.ivy": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "se": {
+          "file": "plant.ivy.se.png",
+          "anchor": [
+            17,
+            33
+          ]
+        },
+        "nw": {
+          "file": "plant.ivy.nw.png",
+          "anchor": [
+            17,
+            33
+          ]
+        }
+      }
+    },
     "plant.pothos": {
       "footprint": [
         1,
@@ -2181,6 +2450,29 @@
         17,
         19
       ]
+    },
+    "plant.snake": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "se": {
+          "file": "plant.snake.se.png",
+          "anchor": [
+            14,
+            38
+          ]
+        },
+        "nw": {
+          "file": "plant.snake.nw.png",
+          "anchor": [
+            14,
+            38
+          ]
+        }
+      }
     },
     "planter.brass": {
       "footprint": [
@@ -2300,6 +2592,44 @@
         "x": 21,
         "y": 20,
         "r": 26
+      }
+    },
+    "poster.ship": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "poster.ship.png",
+      "anchor": [
+        0,
+        0
+      ],
+      "wall": {
+        "v": [
+          20,
+          46
+        ],
+        "margin": 0.14
+      }
+    },
+    "print.poster": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "print.poster.png",
+      "anchor": [
+        0,
+        0
+      ],
+      "wall": {
+        "v": [
+          20,
+          46
+        ],
+        "margin": 0.14
       }
     },
     "prize-counter": {
@@ -2465,6 +2795,34 @@
         }
       }
     },
+    "side-table.walnut": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "se": {
+          "file": "side-table.walnut.se.png",
+          "anchor": [
+            17,
+            35
+          ]
+        },
+        "nw": {
+          "file": "side-table.walnut.nw.png",
+          "anchor": [
+            17,
+            35
+          ]
+        }
+      },
+      "light": {
+        "x": 18,
+        "y": 8,
+        "r": 34
+      }
+    },
     "sign-quiet": {
       "footprint": [
         1,
@@ -2572,6 +2930,30 @@
         18,
         38
       ],
+      "seat": 17
+    },
+    "stool.drafting": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "se": {
+          "file": "stool.drafting.se.png",
+          "anchor": [
+            14,
+            25
+          ]
+        },
+        "nw": {
+          "file": "stool.drafting.nw.png",
+          "anchor": [
+            14,
+            25
+          ]
+        }
+      },
       "seat": 17
     },
     "stool.neon": {
@@ -2905,6 +3287,29 @@
         "r": 30
       }
     },
+    "water-cooler": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "se": {
+          "file": "water-cooler.se.png",
+          "anchor": [
+            15,
+            54
+          ]
+        },
+        "nw": {
+          "file": "water-cooler.nw.png",
+          "anchor": [
+            15,
+            54
+          ]
+        }
+      }
+    },
     "whiteboard": {
       "footprint": [
         3,
@@ -2922,6 +3327,29 @@
           48
         ],
         "margin": 0.08
+      }
+    },
+    "whiteboard-stand": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "sw": {
+          "file": "whiteboard-stand.sw.png",
+          "anchor": [
+            25,
+            40
+          ]
+        },
+        "ne": {
+          "file": "whiteboard-stand.ne.png",
+          "anchor": [
+            25,
+            44
+          ]
+        }
       }
     },
     "workbench": {

@@ -213,6 +213,119 @@
           "prompt": "The light oak worktable from the reference, seen from the other side."
         }
       ]
+    },
+    {
+      "name": "crit",
+      "grid": "3x2",
+      "items": [
+        {
+          "key": "materials-shelf",
+          "facing": "sw",
+          "w": 1,
+          "d": 1,
+          "h": 52,
+          "width": 60,
+          "fit": "diamond",
+          "prompt": "A tall open light-oak shelving unit full of design materials: folded fabric bolts in terracotta, mustard and sage, rolls of paper, jars of brushes and markers, paint tins, a stack of swatch books and a small trailing plant on top. Its open front faces along the red arrow."
+        },
+        {
+          "key": "materials-shelf",
+          "facing": "ne",
+          "w": 1,
+          "d": 1,
+          "h": 52,
+          "width": 60,
+          "fit": "diamond",
+          "prompt": "The SAME light-oak materials shelf seen from behind: its plain oak back panel with the trailing plant on top."
+        },
+        {
+          "key": "stool.drafting",
+          "facing": "se",
+          "also_facings": [
+            "nw"
+          ],
+          "w": 1,
+          "d": 1,
+          "h": 24,
+          "width": 28,
+          "fill": 0.35,
+          "extra": {
+            "seat": 17
+          },
+          "prompt": "A tall drafting stool with a round mustard-yellow cushioned seat, a chrome gas lift and a ring footrest on a five-star base."
+        },
+        {
+          "key": "plant.snake",
+          "facing": "se",
+          "also_facings": [
+            "nw"
+          ],
+          "w": 1,
+          "d": 1,
+          "h": 34,
+          "width": 28,
+          "fill": 0.35,
+          "prompt": "A tall snake plant with upright variegated green-and-yellow leaves in a round terracotta pot."
+        },
+        {
+          "key": "plant.fiddle",
+          "facing": "se",
+          "also_facings": [
+            "nw"
+          ],
+          "w": 1,
+          "d": 1,
+          "h": 56,
+          "width": 40,
+          "fill": 0.4,
+          "prompt": "A tall fiddle-leaf fig tree with big glossy leaves in a woven seagrass basket."
+        },
+        {
+          "key": "paper-bin",
+          "facing": "se",
+          "also_facings": [
+            "nw"
+          ],
+          "w": 1,
+          "d": 1,
+          "h": 30,
+          "width": 28,
+          "fill": 0.35,
+          "prompt": "A tall woven basket holding big rolls of drawing paper and tracing paper standing upright, one roll slightly unfurled."
+        }
+      ]
+    },
+    {
+      "name": "wall2",
+      "kind": "wall",
+      "grid": "2x1",
+      "size": "1536x1024",
+      "items": [
+        {
+          "key": "pinup",
+          "span": 3,
+          "wall": {
+            "v": [
+              16,
+              48
+            ],
+            "margin": 0.05
+          },
+          "prompt": "A wide crit wall, about 3 : 1: a pale grey felt pin-up board in a light oak frame covered in pinned printouts of app screens and layouts in terracotta, mustard and sage, sticky notes, a few red circles and arrows drawn on them, and a row of little brass pins (no readable text)."
+        },
+        {
+          "key": "print.poster",
+          "span": 1,
+          "wall": {
+            "v": [
+              20,
+              46
+            ],
+            "margin": 0.14
+          },
+          "prompt": "A framed modernist art print, portrait 2:3, in a thin light oak frame: bold overlapping circles and arches in terracotta, mustard, sage and ink plum on cream paper."
+        }
+      ]
     }
   ]
 }
