@@ -4,6 +4,7 @@ import { CATEGORIES, heightClass, ROOM_KINDS, THEMES } from '@shared/models';
 import { estimate, humanizeKey, lab, NAME_MAX, type CheckResult, type Draft, type Facing, type FurnitureSpec, type Usage } from './api';
 import { drawView, drawnViews, FACINGS, footprintFor, gameAnchor, loadImg, sourceOf } from './pixels';
 import { Sandbox } from './Sandbox';
+import { SeatPanel, type SeatStatus } from './SeatPanel';
 import { Confirm, Field, RefsPanel, Takes } from './common';
 
 const ROTATION_HELP: Record<FurnitureSpec['rotation'], string> = {
@@ -21,6 +22,7 @@ export function FurnitureEditor({ id, usage, onUsage, onClose }: { id: string; u
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [checks, setChecks] = useState<CheckResult | null>(null);
+  const [seatStatus, setSeatStatus] = useState<SeatStatus>('none');
   const [confirm, setConfirm] = useState<{ view?: string; note?: string } | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout>>();
 
@@ -105,7 +107,10 @@ export function FurnitureEditor({ id, usage, onUsage, onClose }: { id: string; u
   const est = estimate(usage, 'build', f.quality, '1536x1024');
   const problems = checks?.problems ?? [];
   const placementBad = (checks?.placement ?? []).filter((p) => !p.ok);
-  const canPublish = allAccepted && !problems.length && !placementBad.length && !busy;
+  const seating = f.category === 'seating' && f.rotation !== 'flat';
+  // a seat publishes calibrated: every facing sits right (the seat standard, as scripts/seat-fit.ts checks it)
+  const seatOk = !seating || seatStatus === 'ok';
+  const canPublish = allAccepted && !problems.length && !placementBad.length && seatOk && !busy;
 
   return (
     <div className="editor">
@@ -222,8 +227,8 @@ export function FurnitureEditor({ id, usage, onUsage, onClose }: { id: string; u
         )}
         {f.category === 'seating' && (
           <div className="row">
-            <Field label="Seat height" hint="cushion above the floor, art px">
-              <input type="number" value={f.seat ?? 12} onChange={(e) => patch({ seat: Number(e.target.value) })} />
+            <Field label="Seat height" hint={f.seatCalibration?.profile ? 'from the calibration (the Seat panel)' : 'cushion above the floor, art px, until it’s calibrated'}>
+              <input type="number" value={f.seat ?? 12} disabled={!!f.seatCalibration?.profile} onChange={(e) => patch({ seat: Number(e.target.value) })} />
             </Field>
             <Field label="Sat in as">
               <select value={f.sitStyle} onChange={(e) => patch({ sitStyle: e.target.value as FurnitureSpec['sitStyle'] })}>
@@ -350,6 +355,7 @@ export function FurnitureEditor({ id, usage, onUsage, onClose }: { id: string; u
             </div>
           )}
         </section>
+        {seating && have.length > 0 && <SeatPanel draft={draft} onPatch={patch} onStatus={setSeatStatus} />}
         {have.length > 0 && <Sandbox draft={draft} version={version} onNote={setNote} />}
       </main>
 
@@ -371,6 +377,11 @@ export function FurnitureEditor({ id, usage, onUsage, onClose }: { id: string; u
                   <b>{p.facing}</b> {p.notes.length ? p.notes.join(' · ') : 'sits on its footprint, clean edges, no stray pixels'}
                 </li>
               ))}
+              {seating && (
+                <li className={seatOk ? 'good' : 'bad'}>
+                  {seatOk ? 'Seat calibrated: every facing sits right' : seatStatus === 'stale' ? 'Seat: the drawing changed; click its cushion again' : seatStatus === 'bad' ? 'Seat: some facings don’t sit right (see the Seat panel)' : 'Seat: click its cushion centre in the Seat panel'}
+                </li>
+              )}
               <li className={allAccepted ? 'good' : 'warn'}>{allAccepted ? 'Every view accepted' : `Accept: ${needed.filter((v) => !draft.views[v]?.accepted).join(', ') || '—'}`}</li>
             </ul>
           )}

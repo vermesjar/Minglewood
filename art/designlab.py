@@ -43,9 +43,12 @@ NAME_MAX = 40
 
 def views_of(f: dict) -> list:
     """The drawings a piece needs: one (radial, flat), a front and a back (mirror; just the front if it honestly
-    looks the same from behind), or four (full)."""
-    if f["rotation"] == "mirror" and f.get("sameFromBehind"):
-        return ["se"]
+    looks the same from behind), or four (full). A long mirror piece is drawn sw + ne, lying along its width
+    like every long piece in the catalog (the model draws a long piece turned se/nw along the wrong diagonal)."""
+    if f["rotation"] == "mirror":
+        long = f["footprint"][0] != f["footprint"][1]
+        front, back = ("sw", "ne") if long else ("se", "nw")
+        return [front] if f.get("sameFromBehind") else [front, back]
     return VIEWS[f["rotation"]]
 
 
@@ -203,42 +206,44 @@ def cmd_furniture_generate(a):
         for fc, v in (draft.get("views") or {}).items():
             if v.get("accepted") and fc != a.view and v.get("file"):
                 refs.insert(0, str(d / v["file"]))
-    # Views share one sheet when they share a footprint: square pieces, and a long mirror piece's front and back
-    # (both turned se/nw). A long 'full' piece's sides are drawn one at a time, each after the last.
-    groups: dict = {}
-    for fc in views:
-        fp = tuple(f["footprint"]) if f["rotation"] == "flat" else tuple(view_footprint(f, fc))
-        groups.setdefault(fp, []).append(fc)
-    runs = [(fp, None) for fp in groups] if len(groups) == 1 and not a.view else [(fp, fc) for fp, fcs in groups.items() for fc in fcs]
+    # studio.py lab-generate draws a spec's views on one sheet, each on the tiles it covers facing that way
+    # (models.ts footprintFacing), from the spec's true footprint. Its 'mirror' views are se + nw; a long mirror
+    # piece here is drawn sw + ne (lying along its width, like the catalog's long pieces), so that sheet is drawn
+    # as 'full' and only the views the piece needs are kept.
+    need = [fc or "one" for fc in views]
+    exact = views == VIEWS[f["rotation"]]
+    view = a.view or (None if exact or len(views) > 1 else views[0])
+    spec = draw_spec(draft, list(f["footprint"]), a.note, view if view != "one" else None)
+    if not exact and not (a.view and a.view in [v or "one" for v in VIEWS[f["rotation"]]]):
+        spec["rotation"] = "full"
     since = usage_rows()
-    results: dict = {}
     measured: dict = {}
-    for i, (fp, fc) in enumerate(runs):
-        view = a.view or fc
-        spec = draw_spec(draft, list(fp), a.note, view if view != "one" else None)
-        (take / f"model{i or ''}.json").write_text(json.dumps(spec, indent=2), encoding="utf-8")
-        args = ["lab-generate", "--spec", str(take / f"model{i or ''}.json"), "--out", str(take),
-                "--quality", a.quality or f.get("quality", "medium")]
-        if view:
-            args += ["--view", view]
-        for r in refs:
-            args += ["--ref", r]
-        _code, res = studio_json(args, "drawing it")
-        if res.get("error"):
-            out({"error": res["error"]}, 1)
-        got = res.get("views") or {}
-        results.update(got)
-        ent = res.get("entry") or {}
-        if "height" in ent:
-            measured["height"] = max(measured.get("height", 0), ent["height"])
-        if "base" in ent:
-            measured["base"] = ent["base"]
-        # a long 'full' piece's later sides follow the first
-        refs = [v["file"] for v in got.values()] + refs
+    run = take / "run1"
+    run.mkdir(parents=True, exist_ok=True)
+    (run / "model.json").write_text(json.dumps(spec, indent=2), encoding="utf-8")
+    args = ["lab-generate", "--spec", str(run / "model.json"), "--out", str(run),
+            "--quality", a.quality or f.get("quality", "medium")]
+    if view:
+        args += ["--view", view]
+    for r in refs:
+        args += ["--ref", r]
+    _code, res = studio_json(args, "drawing it")
+    if res.get("error"):
+        out({"error": res["error"]}, 1)
+    results = {k: v for k, v in (res.get("views") or {}).items() if k in need}
+    ent = res.get("entry") or {}
+    if "height" in ent:
+        measured["height"] = ent["height"]
+    if "base" in ent:
+        measured["base"] = ent["base"]
     if not results:
         out({"error": "the model returned no usable drawing; try again with a clearer prompt"}, 1)
     usd = spent_on(since, lambda lb: lb.startswith(f"lab/{draft['key'].replace('/', '__')}/"))
     draft.setdefault("views", {})
+    if not a.view:
+        # a whole new drawing: views the piece no longer needs (it turned differently before) go
+        need = [v or "one" for v in views_of(f)]
+        draft["views"] = {k: v for k, v in draft["views"].items() if k in need}
     for name, v in results.items():
         rel = Path(v["file"]).resolve().relative_to(d)
         draft["views"][name] = {"file": rel.as_posix(), "anchor": [int(v["anchor"][0]), int(v["anchor"][1])],
@@ -274,7 +279,10 @@ def stage(d: Path, draft: dict) -> tuple[dict, Path]:
         e["base"] = m.get("base", "centred")
     e["fit"] = "anchor"
     light_r = (f.get("light") or {}).get("r", 40) if f.get("light") else None
+    need = [v or "one" for v in views_of(f)]
     for name, v in sorted((draft.get("views") or {}).items()):
+        if name not in need:
+            continue
         img = Image.open(d / v["file"]).convert("RGBA")
         fname = f"{key}{'' if name == 'one' else '.' + name}.png"
         (sprites / fname).parent.mkdir(parents=True, exist_ok=True)
@@ -292,6 +300,48 @@ def stage(d: Path, draft: dict) -> tuple[dict, Path]:
     return e, sprites
 
 
+SEAT_CALIBRATION = HERE / "seat-calibration.json"
+
+
+def seat_fit(d: Path, draft: dict, e: dict) -> list[str]:
+    """A seat's profile, fitted on its staged drawings from the cushion centre clicked in the lab
+    (scripts/lab-seat.ts: seat-fit.ts's own maths), written into the staged entry; returns what's wrong."""
+    f = draft["furniture"]
+    if e.get("walk") != "seat":
+        return []
+    cal = f.get("seatCalibration")
+    if not cal or not cal.get("cushion"):
+        return ["calibrate the seat: click the centre of its cushion in the Seat panel"]
+    args = ["node", *studio.TSX, "scripts/lab-seat.ts", "--entries", str(d / "stage" / "entries.json"),
+            "--sprites", str(d / "stage" / "sprites"), "--key", draft["key"],
+            "--cushion", f"{cal['cushion'][0]},{cal['cushion'][1]}"]
+    if cal.get("cover"):
+        args.append("--cover")
+    r = subprocess.run(args, cwd=HERE.parent, capture_output=True, text=True, encoding="utf-8")
+    lines = [ln for ln in r.stdout.splitlines() if ln.startswith("{")]
+    res = json.loads(lines[-1]) if lines else {"error": (r.stderr or "seat fit failed").strip()[-400:]}
+    if res.get("error"):
+        return [f"seat fit: {res['error']}"]
+    for k in ("seat", "seatDepth", "backDepth", "sitStyle", "backrest"):
+        e[k] = res["profile"][k]
+    e.pop("backLine", None)
+    if res["profile"].get("backLine"):
+        e["backLine"] = res["profile"]["backLine"]
+    studio.write_atomic(d / "stage" / "entries.json", json.dumps({draft["key"]: e}, indent=2))
+    return [f"seat, facing {fc}: {p_}" for fc, ps in res["problems"].items() for p_ in ps]
+
+
+def remember_seat(draft: dict, e: dict):
+    """The calibration, where scripts/seat-fit.ts (in the gate) finds it for a seat the lab published."""
+    cal = (draft["furniture"].get("seatCalibration") or {})
+    if e.get("walk") != "seat" or not cal.get("cushion"):
+        return
+    table = json.loads(SEAT_CALIBRATION.read_text(encoding="utf-8")) if SEAT_CALIBRATION.exists() else {}
+    table[draft["key"]] = {"cushion": cal["cushion"], "sitStyle": e["sitStyle"], "backrest": e["backrest"],
+                           **({"backLine": e["backLine"]} if e.get("backLine") else {})}
+    studio.write_atomic(SEAT_CALIBRATION, json.dumps(dict(sorted(table.items())), indent=2) + "\n")
+
+
 def cmd_furniture_check(a):
     d = draft_dir(a.draft)
     draft = load(d)
@@ -300,6 +350,8 @@ def cmd_furniture_check(a):
     missing = [v for v in need if v not in (draft.get("views") or {})]
     e, sprites = stage(d, draft)
     problems = [f"draw the {', '.join(missing)} view(s)"] if missing else []
+    if not missing:
+        problems += seat_fit(d, draft, e)
     _code, res = studio_json(["check", "--entries", str(d / "stage" / "entries.json"), "--sprites", str(sprites)], "the model check")
     problems += (res.get("problems") or {}).get(draft["key"], [])
     out({"problems": problems, "entry": e, "sprites": sprites.relative_to(HERE.parent).as_posix()})
@@ -314,6 +366,9 @@ def cmd_furniture_publish(a):
     if not views or not_ok:
         out({"error": f"accept every view before publishing (not yet: {', '.join(not_ok) or 'all'})"}, 2)
     e, sprites = stage(d, draft)
+    seat = seat_fit(d, draft, e)
+    if seat:
+        out({"error": "the seat isn't calibrated or doesn't fit", "problems": seat}, 1)
     # a key already in the catalog is only replaced by its own draft: opened from the library, or published from here
     args = ["lab-publish", "--entries", str(d / "stage" / "entries.json"), "--sprites", str(sprites)]
     if draft.get("origin") == key or draft.get("published"):
@@ -322,6 +377,7 @@ def cmd_furniture_publish(a):
     if not res.get("ok"):
         problems = [p_ for ps in (res.get("problems") or {}).values() for p_ in ps]
         out({"error": res.get("error") or "the model check refuses it", "problems": problems}, 1)
+    remember_seat(draft, e)
     draft["published"] = time.strftime("%Y-%m-%dT%H:%M:%S")
     save(d, draft)
     history(d, "publish", key=key)

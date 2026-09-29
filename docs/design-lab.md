@@ -18,8 +18,11 @@ rebinding. Every write also needs the lab's own header, which a cross-site form 
 
 ## Furniture
 
-**Drafts → New furniture.** Give it a name, a catalog key (lowercase words joined by `-`, with a variant after a
-dot: `chair-bistro.sage`), a category, how it turns and a footprint. The form covers **the model spec**
+**Drafts → New furniture.** Give it a **name**, a catalog key (lowercase words joined by `-`, with a variant
+after a dot: `chair-bistro.sage`), a category, how it turns and a footprint. The name is the label in the decorate
+palette: a few words ("Steampunk espresso machine"), at most 40 characters. Left blank, it comes from the key, and
+you can change it any time in the editor. It never comes from the description. The description goes in the box
+under the key and becomes the prompt. The form covers **the model spec**
 (`src/shared/models.ts`, in prose in `docs/furniture.md`). Every field on it is one the model check (`scripts/model-check.ts`)
 requires:
 
@@ -27,9 +30,9 @@ requires:
 |---|---|
 | name, category, rooms, tags, moods | `name`, `category`, `rooms`, `tags`, `themes` |
 | footprint width × depth, height | `footprint` [width, depth] as seen facing sw, `height` (art px). The height is measured again from the drawing |
-| how it turns | `rotation`: **radial** (one drawing), **mirror** (se + nw drawn; sw and ne are their mirrors), **full** (four drawings: anything handed), **flat** (wall art). "Looks the same from behind" is `sameFromBehind` |
+| how it turns | `rotation`: **radial** (one drawing), **mirror** (a front and a back drawn: se + nw, or sw + ne for a long piece, lying along its width like the catalog's long pieces; the other two are their mirrors), **full** (four drawings: anything handed), **flat** (wall art). "Looks the same from behind" is `sameFromBehind` |
 | stands on | `layer`: the floor (`object`), a counter (`surface`, placed at the counter's z), flat (`floor`, a rug) |
-| seat height, sat in as, backrest | the seat standard's profile (`seat`, `sitStyle`, `backrest`). Only seating has one |
+| sat in as, backrest, and the **Seat** panel | the seat standard's profile (`seat`, `seatDepth`, `backDepth`, `sitStyle`, `backrest`, `backLine`), fitted from one click (below). Only seating has one |
 | surface height, lights up, action, used from | `surface`, a light point per drawing, `use: {face, actions}` |
 
 **Describe it** in the prompt (what it is, materials, colours, era; the house style block is added for you). Drop
@@ -53,6 +56,26 @@ them on their footprint whatever the anchor says). For each drawn view you can:
 standing on its footprint (the fill rule), and a complete declaration. It also runs the furniture review's per-view
 placement, stray pixels and sliced-top tests. A red dot on a view says which one.
 
+**Seat** (seating only) calibrates the seat, the same way `scripts/seat-fit.ts` calibrates the catalog's seats:
+
+1. The front drawing is shown big, as the game shows it facing se. Hover it: the yellow dots show where every
+   cushion's centre would be for the point under the pointer.
+2. Click the centre of the first cushion's top face, halfway front to back. That gives the seat height and hip
+   depth; the back views' hip depth is fitted automatically. The front drawing is the only one you click.
+3. All four facings then appear with someone sitting on every cushion, each checked against the seat standard:
+   - facing front: thighs resting on the seat, not floating over it or sunk into it;
+   - from behind: the sitter tucked into the seat, not perched on the backrest, head showing;
+   - one sitter per cushion.
+   A facing that fails is framed red and says why. Click again until all four sit right. For a beanbag or a sofa
+   upholstered all in one colour, tick "the whole seat wraps its sitter" (seen from behind, all of it covers
+   them).
+
+The calibration is saved with the draft. A new drawing, a redraw or a nudge makes it stale, and you click again.
+**Publish stays disabled until every facing sits right.** The server checks it again on the staged drawings before
+it publishes (`scripts/lab-seat.ts`). When the seat is published, its cushion point goes into
+`art/seat-calibration.json`, which `scripts/seat-fit.ts` (in the gate) reads, so a lab seat passes the gate
+without anyone calibrating it by hand.
+
 **Try it in game** is a real room drawn by the game's renderer from the draft's own sprites. The published catalog
 is untouched: the lab serves a copy of the manifest with the draft swapped in. You can:
 
@@ -63,7 +86,8 @@ is untouched: the lab serves a copy of the manifest with the draft swapped in. Y
 
 Counter pieces stand on a counter.
 
-**Publish to catalog** is enabled once every view is accepted and the checks pass. It goes through
+**Publish to catalog** is enabled once every view is accepted, the checks pass and, for a seat, every facing
+sits right. It goes through
 `studio.py lab-publish`: the model check runs again on the staged entry, and then, under the manifest lock, the
 drawings are copied to `public/art/sprites` and the entry is written to `public/art/manifest.json`. After that it's in
 the decorate palette. The lab won't overwrite a key that's already in the catalog unless the draft was opened from

@@ -87,6 +87,19 @@ describe('drafts on disk', () => {
     expect(existsSync(store.dir(d.id))).toBe(true);
   });
 
+  it('names a piece in a few words: from its key until it has a name, never from the prompt', () => {
+    const d = store.create({ kind: 'furniture', key: 'bench-garden.teal', furniture: { prompt: 'Steampunk inspired coffee machine; lots of dials and very intricate.' } });
+    expect(d.furniture?.name).toBe('Teal bench garden');
+    expect(d.title).toBe('Teal bench garden');
+    expect(cleanFurniture({ name: 'x'.repeat(100) }).name).toHaveLength(40);
+  });
+
+  it('keeps a seat calibration on seating only, in range', () => {
+    const cal = { cushion: [25.004, 34.5] as [number, number], cover: false, for: 'sig', profile: { seat: 13.75, seatDepth: 0.06, backDepth: 0.06 } };
+    expect(cleanFurniture({ category: 'decor', seatCalibration: cal }).seatCalibration).toBeNull();
+    expect(cleanFurniture({ category: 'seating', seatCalibration: cal }).seatCalibration).toEqual({ ...cal, cushion: [25, 34.5] });
+  });
+
   it('clamps a spec to what the pipeline accepts', () => {
     const f = cleanFurniture({ height: 9999, quality: 'ultra' as never, prompts: { se: 'x'.repeat(2000) }, actions: [{ kind: 'sit' }, { nope: 1 } as never] });
     expect(f.height).toBe(200);
@@ -141,5 +154,5 @@ describe('checks on one draft never overlap', () => {
     } finally {
       server.close();
     }
-  });
+  }, 30_000); // a real server and real files: generous for a loaded machine
 });

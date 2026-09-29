@@ -24,11 +24,15 @@ export const FACINGS: Facing[] = ['se', 'sw', 'ne', 'nw'];
 /** Turning a piece clockwise, as the R key does. */
 export const TURN: Record<Facing, Facing> = { se: 'sw', sw: 'nw', nw: 'ne', ne: 'se' };
 
-/** The drawings a piece needs (art/designlab.py views_of, studio.py lab-generate): a mirror piece's front is se. */
-export function drawnViews(f: Pick<FurnitureSpec, 'rotation' | 'sameFromBehind'>): string[] {
+/**
+ * The drawings a piece needs (art/designlab.py views_of): a mirror piece's front and back are se + nw, or
+ * sw + ne for a long piece (drawn lying along its width, like every long piece in the catalog).
+ */
+export function drawnViews(f: Pick<FurnitureSpec, 'rotation' | 'sameFromBehind' | 'footprint'>): string[] {
   if (f.rotation === 'radial' || f.rotation === 'flat') return ['one'];
   if (f.rotation === 'full') return ['se', 'sw', 'ne', 'nw'];
-  return f.sameFromBehind ? ['se'] : ['se', 'nw'];
+  const [front, back] = f.footprint[0] !== f.footprint[1] ? ['sw', 'ne'] : ['se', 'nw'];
+  return f.sameFromBehind ? [front] : [front, back];
 }
 
 /** The tiles a piece covers facing `facing` (models.ts footprintFacing): [width, depth] facing sw/ne, else turned. */
@@ -43,7 +47,9 @@ export function sourceOf(f: Pick<FurnitureSpec, 'sameFromBehind'>, have: string[
   if (have.includes(facing)) return { view: facing, mirrored: false };
   if (have.includes(MIRROR[facing])) return { view: MIRROR[facing], mirrored: true };
   // a mirror piece that looks the same from behind: its one front drawing serves every side
-  if (f.sameFromBehind && have.includes('se')) return { view: 'se', mirrored: facing === 'sw' || facing === 'nw' };
+  const front = have.includes('se') ? 'se' : have.includes('sw') ? 'sw' : null;
+  // (art.ts: its partner facing mirrors it; the back facings, having no drawing or partner, show it as is)
+  if (f.sameFromBehind && front) return { view: front, mirrored: facing === MIRROR[front] };
   return null;
 }
 

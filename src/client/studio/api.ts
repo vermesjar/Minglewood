@@ -25,6 +25,13 @@ export interface FurnitureSpec {
   seat: number | null;
   sitStyle: 'chair' | 'stool' | 'lounge' | 'floor';
   backrest: boolean;
+  /** The seat standard's calibration: the cushion centre clicked in the front drawing (seatLab.ts), for which drawing, and what it gave. */
+  seatCalibration: {
+    cushion: [number, number];
+    cover: boolean;
+    for: string;
+    profile?: { seat: number; seatDepth: number; backDepth: number; backLine?: Partial<Record<'ne' | 'nw', Array<[number, number]>>> };
+  } | null;
   surface: number | null;
   light: { x: number; y: number; r?: number } | null;
   wallV?: [number, number];

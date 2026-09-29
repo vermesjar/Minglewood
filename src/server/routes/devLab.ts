@@ -258,6 +258,11 @@ export interface FurnitureSpec {
   seat: number | null;
   sitStyle: 'chair' | 'stool' | 'lounge' | 'floor';
   backrest: boolean;
+  /**
+   * The seat standard's calibration (src/client/studio/seatLab.ts): the cushion centre clicked in the front
+   * drawing as the game resolves it facing se, which drawing that was (`for`), and the profile it gave.
+   */
+  seatCalibration: SeatCalibration | null;
   surface: number | null;
   light: { x: number; y: number; r?: number } | null;
   wallV?: [number, number];
@@ -314,6 +319,7 @@ function defaultFurniture(): FurnitureSpec {
     seat: null,
     sitStyle: 'chair',
     backrest: true,
+    seatCalibration: null,
     surface: null,
     light: null,
     actions: [],
@@ -365,6 +371,7 @@ export function cleanFurniture(f: Partial<FurnitureSpec>): FurnitureSpec {
     seat: category !== 'seating' ? null : f.seat === null || f.seat === undefined || (f.seat as unknown) === '' ? 12 : num(f.seat, 0, 60, 12),
     sitStyle: (['chair', 'stool', 'lounge', 'floor'] as const).includes(f.sitStyle as never) ? (f.sitStyle as FurnitureSpec['sitStyle']) : 'chair',
     backrest: f.backrest === undefined ? true : !!f.backrest,
+    seatCalibration: category === 'seating' ? cleanSeatCalibration(f.seatCalibration) : null,
     surface: f.surface === null || f.surface === undefined || (f.surface as unknown) === '' ? null : num(f.surface, 0, 80, 20),
     light,
     wallV: rotation === 'flat' ? [num(f.wallV?.[0], 0, 60, 18), num(f.wallV?.[1], 1, 62, 47)] : undefined,
@@ -378,6 +385,28 @@ export function cleanFurniture(f: Partial<FurnitureSpec>): FurnitureSpec {
     prompts,
     quality: f.quality === 'high' || f.quality === 'low' ? f.quality : 'medium',
     colors: num(f.colors, 8, 64, d.colors),
+  };
+}
+
+export interface SeatCalibration {
+  cushion: [number, number];
+  cover: boolean;
+  for: string;
+  profile?: { seat: number; seatDepth: number; backDepth: number; backLine?: Record<string, Array<[number, number]>> };
+}
+
+function cleanSeatCalibration(c: unknown): SeatCalibration | null {
+  const v = c as Partial<SeatCalibration> | null | undefined;
+  if (!v || !Array.isArray(v.cushion)) return null;
+  const n = (x: unknown) => Math.round(num(x, -4000, 4000, 0) * 100) / 100;
+  const p = v.profile;
+  const line = (l: unknown) => (Array.isArray(l) ? l.slice(0, 64).map((pt) => [n((pt as number[])[0]), n((pt as number[])[1])] as [number, number]) : undefined);
+  const backLine = p?.backLine && typeof p.backLine === 'object' ? Object.fromEntries(Object.entries(p.backLine).filter(([k]) => k === 'ne' || k === 'nw').map(([k, l]) => [k, line(l) ?? []])) : undefined;
+  return {
+    cushion: [n(v.cushion[0]), n(v.cushion[1])],
+    cover: !!v.cover,
+    for: str(v.for, 400),
+    ...(p ? { profile: { seat: n(p.seat), seatDepth: n(p.seatDepth), backDepth: n(p.backDepth), ...(backLine && Object.keys(backLine).length ? { backLine } : {}) } } : {}),
   };
 }
 
@@ -645,7 +674,10 @@ export function devLabRoutes(root = resolve(ART, 'drafts'), opts: { run?: typeof
       const d = store.read(req.params.id);
       const b = req.body as Partial<Draft>;
       if (typeof b.title === 'string') d.title = b.title.slice(0, 80);
-      if (b.furniture && d.kind === 'furniture') d.furniture = cleanFurniture({ ...d.furniture, ...b.furniture });
+      if (b.furniture && d.kind === 'furniture') {
+        d.furniture = cleanFurniture({ ...d.furniture, ...b.furniture });
+        if (d.furniture.name) d.title = d.furniture.name; // a furniture draft goes by its catalog name
+      }
       if (b.part && d.kind === 'part') d.part = cleanPart({ ...d.part, ...b.part });
       if (b.views)
         for (const [k, v] of Object.entries(b.views)) {
@@ -813,7 +845,7 @@ export function devLabRoutes(root = resolve(ART, 'drafts'), opts: { run?: typeof
       if (d.kind === 'furniture' && d.furniture) {
         const f = d.furniture;
         const e: Record<string, unknown> = { name: f.name, category: f.category, footprint: f.footprint, height: f.height, fit: 'anchor', rotation: f.rotation };
-        if (f.seat !== null) Object.assign(e, { seat: f.seat, sitStyle: f.sitStyle, backrest: f.backrest });
+        if (f.seat !== null) Object.assign(e, { seat: f.seat, sitStyle: f.sitStyle, backrest: f.backrest, ...(f.seatCalibration?.profile ?? {}) });
         if (f.surface !== null) e.surface = f.surface;
         if (f.light) e.light = f.light;
         if (f.rotation === 'flat') e.wall = { v: f.wallV ?? [18, 47], margin: 0.08 };
