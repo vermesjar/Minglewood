@@ -554,3 +554,25 @@ console.log(`${people.length} characters, ${total} issue(s) → ${OUT}/`);
   );
   sheet.save('art/review/assets/bodies.png');
 }
+
+/* ------------------------------------------------------------------ held items close-up */
+{
+  const held = [...ITEM_BY_ID.values()].filter((i) => i.slot === 'held' && !i.id.endsWith('.none')).map((i) => i.id);
+  const z = 5;
+  const HC = [22, 22, 48, 70];
+  const frames = [
+    ['se', 'stand'],
+    ['se', 'walk1'],
+    ['sw', 'stand'],
+  ] as const;
+  const cw = HC[2] * z + 4;
+  const ch = HC[3] * z + 4;
+  const sheet = new Sheet(cw * held.length, ch * frames.length, BG);
+  held.forEach((h, col) =>
+    frames.forEach(([f, p], row) => {
+      const look = { held: h, heldColor: '#c98f4a', top: 'top.tee', topColor: '#3f8fd8', hair: 'hair.short' } as AvatarLoadout;
+      sheet.paste(renderAvatarLayers(look, f, p).px, col * cw + 2, row * ch + 2, z, HC);
+    }),
+  );
+  sheet.save('art/review/assets/held-close.png');
+}

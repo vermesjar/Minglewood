@@ -913,6 +913,25 @@ function drawHeld(P: Pix, F: Frame, L: FullLoadout) {
       paint(P, M().poly([[x - 2, y - 3], [x + 3, y - 3], [x + 0.5, y + 3]]), [232, 179, 90]);
       paint(P, M().ellipse(x + 0.5, y - 5, 2.8, 2.6), c);
       break;
+    case 'held.popcorn':
+      // a striped carton brimming with popcorn
+      paint(P, M().poly([[x - 3, y - 6], [x + 4, y - 6], [x + 3, y + 1], [x - 2, y + 1]]), (px) => ((px - x + 8) % 2 ? [236, 72, 72] : WHITE));
+      paint(P, M().ellipse(x - 1, y - 7, 2, 1.6).ellipse(x + 2, y - 7, 2, 1.6).ellipse(x + 0.5, y - 9, 2, 1.6), [255, 236, 170], { flat: true });
+      break;
+    case 'held.soda':
+      // a cup with a domed lid and a striped straw
+      paint(P, M().poly([[x - 2, y - 6], [x + 3, y - 6], [x + 2, y + 1], [x - 1, y + 1]]), c);
+      paint(P, M().rrect(x - 3, y - 8, x + 4, y - 5, 1), WHITE, { flat: true });
+      for (let k = 0; k < 4; k++) P.set(x + 1 + (k > 1 ? 1 : 0), y - 9 - k, k % 2 ? WHITE : [236, 72, 72]);
+      break;
+    case 'held.plush':
+      // a little teddy prize: round ears, a muzzle, button eyes
+      paint(P, M().ellipse(x + 0.5, y - 2, 4, 4).ellipse(x + 0.5, y - 9, 3.6, 3.3).ellipse(x - 2.6, y - 12, 1.6, 1.6).ellipse(x + 3.6, y - 12, 1.6, 1.6), c);
+      P.set(x - 1, y - 10, LINE);
+      P.set(x + 2, y - 10, LINE);
+      P.stamp(x, y - 8, ['mm'], { m: mix(c, WHITE, 0.55) });
+      P.stamp(x, y - 3, ['bb'], { b: mix(c, WHITE, 0.35) });
+      break;
     case 'held.balloon':
       // floats above and beside the head, on a string that leans out from the hand
       // the string leans well out from the hand so it never runs along the head
