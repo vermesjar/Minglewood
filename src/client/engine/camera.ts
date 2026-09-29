@@ -10,6 +10,17 @@ export class Camera {
   maxZoom = 4;
   bounds = { l: -1000, t: -1000, r: 1000, b: 1000 };
   lastManual = 0;
+  private shake = 0;
+
+  /** A tiny impact nudge (high fives). */
+  kick(px: number) {
+    this.shake = Math.max(this.shake, px);
+  }
+
+  shakeOffset(): [number, number] {
+    if (this.shake < 0.2) return [0, 0];
+    return [(Math.random() - 0.5) * this.shake, (Math.random() - 0.5) * this.shake];
+  }
 
   toScreen(ax: number, ay: number, vw: number, vh: number): [number, number] {
     return [(ax - this.x) * this.zoom + vw / 2, (ay - this.y) * this.zoom + vh / 2];
@@ -51,6 +62,7 @@ export class Camera {
   }
 
   update(dt: number, reducedMotion: boolean) {
+    this.shake = reducedMotion ? 0 : this.shake * Math.pow(0.002, dt);
     const k = reducedMotion ? 1 : 1 - Math.pow(0.0008, dt);
     this.zoom += (this.tzoom - this.zoom) * k;
     this.x += (this.tx - this.x) * k;

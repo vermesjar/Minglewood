@@ -11,6 +11,7 @@ import { STATUS_META } from '@shared/presence';
 import { buildingForRoom, getScene, TOWN_ID } from '@shared/world';
 import { isSeat, terrainAt } from '@shared/world/scene';
 import type { Tile } from '@shared/world/pathfinding';
+import { distanceToObject, interactionFor } from '@shared/world/interactions';
 import { daysSince } from '@shared/serendipity';
 import type { SimProfile } from '@shared/seed/northstar';
 import type { OrgHub } from '../realtime/orgHub';
@@ -164,6 +165,12 @@ export class LifeSim {
       npc.nextIdle = now + (settled ? rand(60_000, 180_000) : rand(15_000, 60_000));
       const scene = getScene(a.sceneId);
       if (!scene) return;
+      const party = this.hub.activeEvents(now).some((e) => e.roomId === a.sceneId && e.decor === 'balloons');
+      if (party && Math.random() < 0.35) {
+        this.hub.emote(npc.id, 'dance');
+        return;
+      }
+      if (!settled && Math.random() < (scene.kind === 'interior' ? 0.3 : 0.22) && this.planPlay(npc)) return;
       if (scene.kind === 'interior') {
         if (!a.sittingOn || Math.random() < 0.4) npc.plan.push({ kind: 'sit' });
         else if (Math.random() < 0.3) this.hub.emote(npc.id, pick(['laugh', 'idea', 'thumbs', 'clap'] as const));
@@ -235,6 +242,31 @@ export class LifeSim {
     npc.plan = steps;
   }
 
+  /** Wander over to something fun nearby and use it (coin in the fountain, a round of arcade…). */
+  private planPlay(npc: NpcState): boolean {
+    const a = this.hub.actor(npc.id);
+    const scene = a && this.hub.scene(a.sceneId);
+    const grid = a && this.hub.grid(a.sceneId);
+    if (!a || !scene || !grid) return false;
+    const props = scene.objects.filter((o) => {
+      const it = interactionFor(o);
+      return it && it.fx !== 'light' && (scene.kind === 'interior' || distanceToObject(o, a.x, a.y) < 12);
+    });
+    if (!props.length) return false;
+    const o = pick(props);
+    const it = interactionFor(o)!;
+    const spot = this.hub.freeNear(a.sceneId, grid, o.x + Math.floor((o.w ?? 1) / 2), o.y + (o.d ?? 1));
+    if (distanceToObject(o, spot.x, spot.y) > it.reach) return false;
+    npc.plan.push(
+      { kind: 'walk', to: [spot.x, spot.y] },
+      { kind: 'wait', ms: rand(300, 900) },
+      { kind: 'do', fn: () => this.hub.interact(npc.id, o.id) },
+      { kind: 'wait', ms: rand(2500, 6000) },
+    );
+    if (scene.kind === 'interior') npc.plan.push({ kind: 'sit' });
+    return true;
+  }
+
   private randomSpotNear(sceneId: string, x: number, y: number, r: number): Tile | undefined {
     const grid = this.hub.grid(sceneId);
     const scene = getScene(sceneId);
@@ -273,6 +305,10 @@ export class LifeSim {
         const listener = ids.find((i) => i !== speaker);
         if (listener && Math.random() < 0.5) {
           setTimeout(() => this.hub.emote(listener, pick(['laugh', 'thumbs', 'heart', 'clap'] as const)), 1800);
+        } else if (listener && Math.random() < 0.3) {
+          // Two coworkers agreeing loudly.
+          setTimeout(() => this.hub.emote(speaker, 'highfive', listener), 2000);
+          setTimeout(() => this.hub.emote(listener, 'highfive', speaker), 2700);
         }
       }
     }
@@ -352,7 +388,27 @@ export class LifeSim {
   }
 
   private onEmote(memberId: string, emote: string, sceneId: string, targetId?: string) {
-    if (this.npcs.has(memberId) || emote !== 'wave') return;
+    if (this.npcs.has(memberId)) return;
+    const buddy = targetId ? this.npcs.get(targetId) : undefined;
+    if (buddy && this.hub.actor(buddy.id)?.sceneId === sceneId) {
+      if (emote === 'highfive') {
+        setTimeout(() => this.hub.emote(buddy.id, 'highfive', memberId), rand(600, 1300));
+        return;
+      }
+      if (emote === 'plane') {
+        setTimeout(() => {
+          this.hub.emote(buddy.id, 'laugh');
+          if (Math.random() < 0.6) setTimeout(() => this.hub.emote(buddy.id, 'plane', memberId), rand(900, 1800));
+        }, rand(900, 1400));
+        return;
+      }
+    }
+    if (emote === 'dance') {
+      const partner = [...this.npcs.values()].find((n) => this.hub.actor(n.id)?.sceneId === sceneId && STATUS_META[this.hub.presenceOf(n.id).status].interruptible);
+      if (partner && Math.random() < 0.7) setTimeout(() => this.hub.emote(partner.id, 'dance'), rand(800, 2000));
+      return;
+    }
+    if (emote !== 'wave') return;
     const target = targetId && this.npcs.get(targetId);
     const responders = target
       ? [target]

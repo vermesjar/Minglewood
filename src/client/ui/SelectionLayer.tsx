@@ -1,4 +1,5 @@
 import { STATUS_META } from '@shared/presence';
+import { interactionFor } from '@shared/world/interactions';
 import { game } from '../app/game';
 import { setState, useStore } from '../app/store';
 import { AvatarCanvas, Popover, StatusDot, formatDate, formatTime, localTime, tenureLabel, timeAgo } from './common';
@@ -111,6 +112,22 @@ function ProfileCard({ id, x, y }: { id: string; x: number; y: number }) {
             {sameRoom && (
               <button className="btn" onClick={() => game.emote('wave', id)}>
                 👋 Wave
+              </button>
+            )}
+            {sameRoom && (
+              <button className="btn" onClick={() => {
+                  close();
+                  game.emote('highfive', id);
+                }} title="Walk over and hold up a high five">
+                🙌 High five
+              </button>
+            )}
+            {sameRoom && (
+              <button className="btn" onClick={() => {
+                  close();
+                  game.emote('plane', id);
+                }} title="Fold a paper plane and toss it their way">
+                ✈️ Paper plane
               </button>
             )}
             <button className="btn primary" disabled={!reachable} onClick={() => game.knock(id, 'chat')} title={STATUS_META[status].interruptible ? 'Ask if they have a minute' : 'They’ll see it when they’re free'}>
@@ -243,6 +260,17 @@ function ObjectCard({ sceneId, objectId, x, y }: { sceneId: string; objectId: st
         <div className="info-card">
           <h3>{title}</h3>
           <p>{info.body}</p>
+          {interactionFor(o) && (
+            <button
+              className="btn primary full"
+              onClick={() => {
+                close();
+                game.useProp(o);
+              }}
+            >
+              {interactionFor(o)!.emoji} {interactionFor(o)!.verb}
+            </button>
+          )}
           {info.kind === 'activity' && (
             <button className="btn full" disabled title="Coming soon">
               🕹️ Launch together in Discord — coming soon

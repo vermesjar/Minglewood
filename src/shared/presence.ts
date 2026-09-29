@@ -72,6 +72,9 @@ export const EMOTES = {
   laugh: { emoji: '😄', label: 'Laugh' },
   coffee: { emoji: '☕', label: 'Coffee?' },
   idea: { emoji: '💡', label: 'Idea' },
+  highfive: { emoji: '🙌', label: 'High five' },
+  dance: { emoji: '💃', label: 'Dance' },
+  plane: { emoji: '✈️', label: 'Paper plane' },
 } as const;
 export type EmoteId = keyof typeof EMOTES;
 export const EMOTE_IDS = Object.keys(EMOTES) as EmoteId[];

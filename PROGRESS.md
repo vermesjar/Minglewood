@@ -68,3 +68,15 @@
 - 2026-09-29: LIVE end-to-end. Discord app configured, Minglewood Cloud secrets set, game server on
   https://minglewood.onrender.com. First install ("Minglewood Test") created its world within a minute; the
   installer signed in via Discord and landed as admin. Bot intentionally has only View Channels.
+
+## A living world (2026-09-29)
+- Day/night from the viewer's clock with real lighting (lamps, lit windows, fireplaces, neon rooms,
+  people glow at night, lighthouse beam, fireflies, stars), date-seeded seasonal weather.
+- Wildlife: birds that flush when you approach, butterflies, fish, falling leaves; Biscuit the town
+  cat walks the same rounds for everyone (server-time schedule) and can be petted.
+- 20 interactive props with shared outcomes (fountain wishes, arcade high scores, jukebox tracks,
+  fireplace, lamps, coffee/cake/books you carry, plants, mail, rocket countdown…).
+- Social play: two-person high fives (combo), paper planes, dancing (+ disco), idle life (people
+  face whoever they're with, glance around, Zzz when away), gathering glow, footstep dust, door puffs,
+  busier chimneys for busier buildings. Simulated coworkers play, dance and return high fives.
+- Opt-in synthesized sound; reduced-motion and always-day preferences. Tests: 57 passing.

@@ -78,6 +78,24 @@ decorations (`shared/world/decor.ts`). The same composition feeds the server's w
 client's renderer, and `placementProblem` (shared) guarantees decorations never block the door or
 a seat — validated on the server, previewed on the client.
 
+### A living world (ambience, props, play)
+Three layers, each cheap and each optional:
+- **Ambience** (`client/engine/ambience.ts`), purely cosmetic and local: time of day from the
+  viewer's clock drives a multiply-blend light map with punched-through lights (lamps, windows,
+  fireplaces, neon) plus bloom; seasonal weather is a pure function of the date (3-hour blocks), so
+  everyone sees the same sky; birds that flush when people walk close, butterflies, fireflies, fish,
+  falling leaves. Biscuit the cat's rounds are a pure function of *server* time, so every client
+  sees the same cat in the same place without any network traffic.
+- **Props** (`shared/world/interactions.ts`): one catalog maps sprite kinds to a verb, reach and
+  effect. The hub validates reach and rate, rolls the outcome once (`rollInteraction`) and
+  broadcasts it, so the whole scene sees the same wish count, high score or jukebox track. Prop
+  state is in memory only (resets on restart) and never about work.
+- **Play between people**: high fives are a two-hand handshake in the hub (the second 🙌 within 10 s
+  completes a `combo`), paper planes are targeted emotes rendered as projectiles, dancing is an
+  emote with a local animation. Simulated coworkers use all of it, so a demo world plays too.
+Respecting the room: sound is off by default, reduced motion disables ambient motion, and
+"keep the town in daylight" opts out of the clock.
+
 ### Multi-tenant hosting (Minglewood Cloud)
 Installs and durable state live in a control plane built on Lovable Cloud (Postgres + server
 routes): `organizations`, `org_state`, `install_events`. The game server syncs tenants
@@ -113,7 +131,8 @@ a visual world builder. Objects can carry `eventDecor` (appear only during event
 - `app/store.ts` — tiny external store; local-only memory (quests, greeted, dismissed) never leaves
   the browser.
 - `engine/` — `WorldView` (loop, input, overlays), `ground.ts` (per-pixel terrain, walls),
-  `depth.ts`, `effects.ts` (particles, ducks, clouds, lighthouse), `sprites/*`.
+  `depth.ts`, `effects.ts` (particles, emitters, ducks, clouds), `ambience.ts` (light, weather,
+  wildlife, the cat), `sfx.ts` (tiny WebAudio kit), `sprites/*`.
 - `ui/` — top bar, sidebar (events, suggestions, places, quests), room panel (conversation
   binding, people, history), profile/object cards, search palette, people directory, wardrobe,
   profile & privacy, onboarding + tour. `admin/` — the admin console.

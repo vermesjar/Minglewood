@@ -32,6 +32,10 @@ export interface Prefs {
   highContrast: boolean;
   showAllNames: boolean;
   sidebarOpen: boolean;
+  /** Little synthesized sound effects (off by default). */
+  sound?: boolean;
+  /** Keep the town in daylight instead of following my clock. */
+  alwaysDay?: boolean;
 }
 
 export interface State {

@@ -14,6 +14,9 @@ import type { SceneObject } from '@shared/world/scene';
 import { isSeat } from '@shared/world/scene';
 import { WalkGrid } from '@shared/world/walkGrid';
 import { findPath, type Tile } from '@shared/world/pathfinding';
+import { distanceToObject, interactionFor } from '@shared/world/interactions';
+import type { PropState } from '@shared/world/interactions';
+import { setSoundEnabled } from '../engine/sfx';
 import { WorldView, type BuildingBadge } from '../engine/WorldView';
 import { api, ApiError, setActivityTransport } from './api';
 import { Realtime } from './socket';
@@ -36,7 +39,7 @@ class Game {
   rt: Realtime | null = null;
   meId = '';
   private grids = new Map<string, WalkGrid>();
-  private lastScene: { sceneId: string; occupants: Occupant[] } | null = null;
+  private lastScene: { sceneId: string; occupants: Occupant[]; props?: Record<string, PropState> } | null = null;
   private sceneWaiters = new Map<string, Array<() => void>>();
   private arrival: { goal: Tile; then: () => void; started: number } | null = null;
   private ownPath: string | null = null;
@@ -131,7 +134,7 @@ class Game {
       nameOf: (id) => getState().membersById.get(id)?.displayName ?? 'Someone',
     });
     this.applyPrefs();
-    if (this.lastScene) this.loadScene(this.lastScene.sceneId, this.lastScene.occupants);
+    if (this.lastScene) this.loadScene(this.lastScene.sceneId, this.lastScene.occupants, this.lastScene.props);
     this.keyHandler = (e) => this.onKey(e);
     window.addEventListener('keydown', this.keyHandler);
   }
@@ -160,7 +163,10 @@ class Game {
     if (!this.world) return;
     this.world.reducedMotion = p.reducedMotion;
     this.world.effects.reducedMotion = p.reducedMotion;
+    this.world.ambience.reducedMotion = p.reducedMotion;
+    this.world.ambience.alwaysDay = !!p.alwaysDay;
     this.world.showAllNames = p.showAllNames;
+    setSoundEnabled(!!p.sound);
   }
 
   async signOut() {
@@ -180,15 +186,20 @@ class Game {
         this.rt!.send({ t: 'enter', sceneId: getState().sceneId ?? this.initialScene });
         break;
       case 'scene':
-        this.loadScene(m.sceneId, m.occupants);
+        this.loadScene(m.sceneId, m.occupants, m.props);
         break;
       case 'joined':
         if (m.sceneId !== getState().sceneId) break;
         w?.upsert(m.occupant);
         setState((s) => ({ occupants: { ...s.occupants, [m.occupant.memberId]: m.occupant } }));
+        if (m.sceneId === TOWN_ID) {
+          const door = this.buildingDoorNear(m.occupant.x, m.occupant.y);
+          if (door) w?.doorPuff(door);
+        } else w?.arrivalPuff(m.occupant.memberId);
         if (m.occupant.memberId !== this.meId) this.announce(`${this.name(m.occupant.memberId)} arrived`);
         break;
       case 'left':
+        if (m.sceneId === TOWN_ID && m.toSceneId && m.toSceneId !== TOWN_ID) w?.doorPuff(m.toSceneId);
         w?.remove(m.memberId);
         setState((s) => {
           const o = { ...s.occupants };
@@ -209,7 +220,14 @@ class Game {
         });
         break;
       case 'emote':
-        w?.emote(m.memberId, m.emote);
+        w?.emote(m.memberId, m.emote, m.targetId);
+        break;
+      case 'interacted':
+        w?.propFx(m.objectId, m.memberId, m.result);
+        break;
+      case 'combo':
+        w?.combo(m.a, m.b);
+        if (m.a === this.meId || m.b === this.meId) this.greet(m.a === this.meId ? m.b : m.a);
         break;
       case 'said':
         w?.say(m.memberId, m.text);
@@ -255,7 +273,7 @@ class Game {
         setState((s) => (s.boot ? { boot: { ...s.boot, artifacts: m.artifacts } } : {}));
         const cur = getState().sceneId;
         const added = m.added ? m.artifacts.find((a) => a.id === m.added) : undefined;
-        if (added && cur === added.sceneId && this.lastScene) this.loadScene(cur, Object.values(getState().occupants));
+        if (added && cur === added.sceneId && this.lastScene) this.loadScene(cur, Object.values(getState().occupants), this.lastScene.props);
         if (added) {
           const room = getState().boot?.rooms.find((r) => r.id === added.sceneId);
           toast(`🏺 New in ${room?.name ?? 'town'}: “${added.title}”`, 'celebrate', { label: 'Go see it', run: () => this.showArtifact(added.id) }, 12000);
@@ -264,7 +282,7 @@ class Game {
       }
       case 'decor': {
         setState((s) => (s.boot ? { boot: { ...s.boot, decorations: m.decorations } } : {}));
-        if (getState().sceneId === m.roomId && this.lastScene) this.loadScene(m.roomId, Object.values(getState().occupants));
+        if (getState().sceneId === m.roomId && this.lastScene) this.loadScene(m.roomId, Object.values(getState().occupants), this.lastScene.props);
         if (m.by && m.by !== this.meId && getState().sceneId === m.roomId) toast(`🌿 ${this.name(m.by).split(' ')[0]} just redecorated`, 'social', undefined, 3500);
         break;
       }
@@ -281,8 +299,8 @@ class Game {
     }
   }
 
-  private loadScene(sceneId: string, occupants: Occupant[]) {
-    this.lastScene = { sceneId, occupants };
+  private loadScene(sceneId: string, occupants: Occupant[], props?: Record<string, PropState>) {
+    this.lastScene = { sceneId, occupants, props };
     const prev = getState().sceneId;
     setState({
       sceneId,
@@ -303,6 +321,8 @@ class Game {
         festiveRooms,
         bannerText: ev ? ev.title : undefined,
         party: !!ev && ev.decor === 'balloons',
+        grid: this.grid(sceneId),
+        props,
       });
       this.refreshBadges();
     }
@@ -563,7 +583,48 @@ class Game {
       }
     }
     if (kinds.has('artifact')) this.quest('artifact');
+    // Props you can use: walk over and do it. Things with a story still open their card.
+    if (interactionFor(o) && !kinds.has('info') && !kinds.has('activity') && !kinds.has('link') && !kinds.has('artifact')) {
+      setState({ selection: null });
+      this.useProp(o);
+      return;
+    }
     setState({ selection: { kind: 'object', sceneId, objectId: o.id, x: p.x, y: p.y } });
+  }
+
+  /** Walk within reach of a prop, then use it. */
+  useProp(o: SceneObject) {
+    const it = interactionFor(o);
+    const sceneId = getState().sceneId;
+    const me = this.world?.actorTile(this.meId);
+    if (!it || !sceneId || !me) return;
+    const send = () => this.rt?.send({ t: 'interact', objectId: o.id });
+    if (distanceToObject(o, me[0], me[1]) <= it.reach && !this.world?.isMoving(this.meId)) {
+      send();
+      return;
+    }
+    const grid = this.grid(sceneId);
+    if (!grid) return;
+    const spots: Tile[] = [];
+    const r = Math.ceil(it.reach);
+    for (let y = o.y - r; y < o.y + (o.d ?? 1) + r; y++) {
+      for (let x = o.x - r; x < o.x + (o.w ?? 1) + r; x++) {
+        if (grid.walkable(x, y) && distanceToObject(o, x, y) <= it.reach) spots.push([x, y]);
+      }
+    }
+    spots.sort((a, b) => Math.hypot(a[0] - me[0], a[1] - me[1]) - Math.hypot(b[0] - me[0], b[1] - me[1]));
+    for (const spot of spots.slice(0, 4)) {
+      if (this.walkTo(spot, send)) return;
+    }
+  }
+
+  /** Which building's door is right next to this spot (someone just came out of it). */
+  private buildingDoorNear(x: number, y: number): string | undefined {
+    for (const r of getState().boot?.rooms ?? []) {
+      const d = buildingForRoom(r.id)?.door;
+      if (d && Math.abs(d.x - x) <= 2 && Math.abs(d.y - y) <= 2) return r.id;
+    }
+    return undefined;
   }
 
   private onObjectActivate(o: SceneObject) {
@@ -576,6 +637,17 @@ class Game {
   emote(emote: EmoteId, targetId?: string) {
     const occ = getState().occupants;
     const t = targetId && occ[targetId] ? targetId : undefined;
+    if (emote === 'highfive' && t && t !== this.meId) {
+      const me = this.world?.actorTile(this.meId);
+      const them = this.world?.actorTile(t);
+      if (me && them && Math.hypot(me[0] - them[0], me[1] - them[1]) > 1.6) {
+        const sceneId = getState().sceneId;
+        const grid = sceneId ? this.grid(sceneId) : null;
+        const spot = grid?.nearestWalkable(them[0] + 1, them[1], 2);
+        const go = () => this.rt?.send({ t: 'emote', emote, targetId: t });
+        if (spot && this.walkTo([spot.x, spot.y], go)) return;
+      }
+    }
     this.rt?.send({ t: 'emote', emote, targetId: t });
     if (emote === 'wave' && t && t !== this.meId) {
       this.greet(t);

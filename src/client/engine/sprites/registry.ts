@@ -4,7 +4,7 @@
  */
 import type { SceneObject } from '@shared/world/scene';
 import type { Sprite } from './painter';
-import { buildingSprite, festiveOverlay } from './buildings';
+import { buildingSprite, festiveOverlay, windowLightsOverlay } from './buildings';
 import {
   balloonsSprite,
   boatSprite,
@@ -158,5 +158,12 @@ export function festiveFor(o: SceneObject): Sprite | null {
   if (!o.building) return null;
   const k = `festive:${o.id}`;
   if (!cache.has(k)) cache.set(k, festiveOverlay(o.building, o.w ?? 1, o.d ?? 1));
+  return cache.get(k)!;
+}
+
+export function windowLightsFor(o: SceneObject): Sprite | null {
+  if (!o.building) return null;
+  const k = `lights:${o.id}`;
+  if (!cache.has(k)) cache.set(k, windowLightsOverlay(o.building, o.w ?? 1, o.d ?? 1, o.id.length));
   return cache.get(k)!;
 }

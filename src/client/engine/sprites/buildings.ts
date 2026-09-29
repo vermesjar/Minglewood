@@ -260,3 +260,35 @@ export function festiveOverlay(spec: BuildingSpec, w: number, d: number): Sprite
   }
   return P.finish({ outline: false });
 }
+
+/**
+ * Warm light in the windows, for evenings and busy buildings. Same geometry and anchor as the
+ * building so it can be layered on top with additive blending. A few windows stay dark.
+ */
+export function windowLightsOverlay(spec: BuildingSpec, w: number, d: number, seed = 1): Sprite {
+  const P = makePainter(spec, w, d);
+  const H = spec.wallH;
+  const rand = rng(seed * 104729);
+  const floors = spec.floors ?? 1;
+  const floorH = (H - 4) / floors;
+  const doorU = spec.doorAt + 0.5;
+  const doorPlane = spec.doorFace === 'left' ? d : w;
+  const warm = ['#ffd98a', '#ffe7a8', '#ffc978'];
+  for (const face of ['left', 'right'] as const) {
+    const len = face === 'left' ? w : d;
+    const plane = face === 'left' ? d : w;
+    for (let f = 0; f < floors; f++) {
+      const z0 = 3 + f * floorH + (f === 0 ? 7 : 5);
+      const wh = Math.max(6, Math.min(11, floorH - 11));
+      for (let u = 0.5; u < len; u += 1) {
+        if (f === 0 && face === spec.doorFace && Math.abs(u - doorU) < 0.9) continue;
+        if (rand() < 0.22) continue;
+        const col = warm[Math.floor(rand() * warm.length)];
+        P.faceRect(face, plane, u - 0.18, z0, 0.36, wh, col);
+        P.faceRect(face, plane, u - 0.02, z0, 0.04, wh, '#b8864a');
+      }
+    }
+  }
+  P.faceRect(spec.doorFace, doorPlane, doorU - 0.2, 10, 0.4, 7, '#ffe7a8');
+  return P.finish({ outline: false });
+}

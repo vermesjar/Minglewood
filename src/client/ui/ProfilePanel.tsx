@@ -123,6 +123,14 @@ export function ProfilePanel() {
               <input type="checkbox" checked={prefs.showAllNames} onChange={pref('showAllNames')} />
               <span>Always show everyone’s names</span>
             </label>
+            <label className="check">
+              <input type="checkbox" checked={!!prefs.sound} onChange={pref('sound')} />
+              <span>Little sound effects (coins, high fives, music)</span>
+            </label>
+            <label className="check">
+              <input type="checkbox" checked={!!prefs.alwaysDay} onChange={pref('alwaysDay')} />
+              <span>Keep the town in daylight (don’t follow my clock)</span>
+            </label>
           </section>
         </div>
         <div className="row end">

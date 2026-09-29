@@ -21,6 +21,7 @@ import { isSeat } from '@shared/world/scene';
 import { WalkGrid } from '@shared/world/walkGrid';
 import { findPath, isValidPath, positionAlong, type Tile } from '@shared/world/pathfinding';
 import { sanitizeLoadout } from '@shared/avatar';
+import { distanceToObject, interactionFor, rollInteraction, type PropState } from '@shared/world/interactions';
 import type { Store } from '../store/store';
 
 export interface HubClient {
@@ -55,6 +56,7 @@ export type HubEvents = {
   entered: [memberId: string, sceneId: string, via: Occupant['via']];
   emote: [memberId: string, emote: EmoteId, sceneId: string, targetId?: string];
   said: [memberId: string, text: string, sceneId: string];
+  interacted: [memberId: string, objectId: string, sceneId: string];
   knock: [knock: Knock];
 };
 
@@ -74,6 +76,10 @@ export class OrgHub extends EventEmitter<HubEvents> {
   private beforeQuiet = new Map<string, Pick<PresenceState, 'status' | 'note'>>();
   private directoryDirty = true;
   private timer: NodeJS.Timeout;
+  /** Live prop state per scene (wish counts, jukebox track, lamps). Ephemeral by design. */
+  private props = new Map<string, Map<string, PropState>>();
+  private lastInteract = new Map<string, number>();
+  private pendingHighFive = new Map<string, { targetId: string; at: number }>();
 
   constructor(
     readonly orgId: string,
@@ -269,7 +275,7 @@ export class OrgHub extends EventEmitter<HubEvents> {
     for (const c of this.clients.values()) {
       if (c.memberId === memberId) {
         c.sceneId = sceneId;
-        c.send({ t: 'scene', sceneId, occupants: this.actorsIn(sceneId).map((x) => this.occupant(x)) });
+        c.send({ t: 'scene', sceneId, occupants: this.actorsIn(sceneId).map((x) => this.occupant(x)), props: this.propsOf(sceneId) });
       }
     }
     this.toScene(sceneId, { t: 'joined', sceneId, occupant: this.occupant(actor) });
@@ -432,15 +438,55 @@ export class OrgHub extends EventEmitter<HubEvents> {
   emote(memberId: string, emote: EmoteId, targetId?: string) {
     const a = this.actors.get(memberId);
     if (!a) return;
-    this.toScene(a.sceneId, { t: 'emote', memberId, emote, targetId });
-    if (targetId && targetId !== memberId) {
-      const from = this.member(memberId);
-      const target = this.actors.get(targetId);
-      if (from && target?.sceneId === a.sceneId && emote === 'wave') {
-        this.toMember(targetId, { t: 'toast', text: `${from.displayName.split(' ')[0]} waved at you 👋`, tone: 'social' });
+    if (targetId === memberId) targetId = undefined;
+    const target = targetId ? this.actors.get(targetId) : undefined;
+    const from = this.member(memberId);
+    const first = from?.displayName.split(' ')[0] ?? 'Someone';
+    // A high five needs two hands: the second one within a few seconds completes it.
+    if (emote === 'highfive' && targetId && target?.sceneId === a.sceneId) {
+      const waiting = this.pendingHighFive.get(targetId);
+      if (waiting && waiting.targetId === memberId && Date.now() - waiting.at < 10_000) {
+        this.pendingHighFive.delete(targetId);
+        this.toScene(a.sceneId, { t: 'combo', kind: 'highfive', a: targetId, b: memberId });
+        this.emit('emote', memberId, emote, a.sceneId, targetId);
+        return;
       }
+      this.pendingHighFive.set(memberId, { targetId, at: Date.now() });
+      this.toMember(targetId, { t: 'toast', text: `${first} is holding up a high five 🙌 — click them and high-five back!`, tone: 'social' });
+    }
+    this.toScene(a.sceneId, { t: 'emote', memberId, emote, targetId: target?.sceneId === a.sceneId ? targetId : undefined });
+    if (from && targetId && target?.sceneId === a.sceneId) {
+      if (emote === 'wave') this.toMember(targetId, { t: 'toast', text: `${first} waved at you 👋`, tone: 'social' });
+      if (emote === 'plane') this.toMember(targetId, { t: 'toast', text: `✈️ A paper plane from ${first} landed on your head`, tone: 'social' });
     }
     this.emit('emote', memberId, emote, a.sceneId, targetId);
+  }
+
+  propsOf(sceneId: string): Record<string, PropState> {
+    return Object.fromEntries(this.props.get(sceneId) ?? []);
+  }
+
+  /** Poke a prop. Reach and rate are checked here; the outcome is shared with the whole scene. */
+  interact(memberId: string, objectId: string): boolean {
+    const a = this.actors.get(memberId);
+    if (!a) return false;
+    const o = this.scene(a.sceneId)?.objects.find((x) => x.id === objectId);
+    const it = o && interactionFor(o);
+    if (!o || !it) return false;
+    const now = Date.now();
+    if (now - (this.lastInteract.get(memberId) ?? 0) < 900) return false;
+    const pos = this.position(a, now);
+    if (distanceToObject(o, Math.round(pos.x), Math.round(pos.y)) > it.reach + 0.6) return false;
+    this.lastInteract.set(memberId, now);
+    let scene = this.props.get(a.sceneId);
+    if (!scene) this.props.set(a.sceneId, (scene = new Map()));
+    const state = scene.get(objectId) ?? {};
+    scene.set(objectId, state);
+    const name = this.member(memberId)?.displayName.split(' ')[0] ?? 'Someone';
+    const result = rollInteraction(o, state, name, now);
+    this.toScene(a.sceneId, { t: 'interacted', memberId, objectId, result });
+    this.emit('interacted', memberId, objectId, a.sceneId);
+    return true;
   }
 
   say(memberId: string, text: string): boolean {

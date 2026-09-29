@@ -13,16 +13,23 @@ interface Particle {
   size: number;
   color: string;
   gravity: number;
-  kind: 'square' | 'circle' | 'heart';
+  kind: 'square' | 'circle' | 'heart' | 'note' | 'star' | 'ring';
   spin?: number;
 }
 
+export type BurstKind = 'confetti' | 'hearts' | 'sparkle' | 'dust' | 'water' | 'paint' | 'notes' | 'sparks' | 'stars' | 'gold' | 'crumbs' | 'smoke';
+
 interface Emitter {
-  kind: 'spray' | 'smoke' | 'steam' | 'fire' | 'confetti' | 'glow';
+  kind: 'spray' | 'smoke' | 'steam' | 'fire' | 'confetti' | 'glow' | 'music';
   x: number;
   y: number;
   acc: number;
   rate: number;
+  /** Object or room this emitter belongs to, so props and occupancy can tune it. */
+  id?: string;
+  base?: number;
+  color?: string;
+  boostUntil?: number;
 }
 
 interface Duck {
@@ -88,7 +95,8 @@ export class Effects {
       const cx = o.x + (o.w ?? 1) / 2;
       const cy = o.y + (o.d ?? 1) / 2;
       if (o.sprite === 'fountain') this.emitters.push({ kind: 'spray', ...at(cx, cy, 24), acc: 0, rate: 26 });
-      if (o.sprite === 'fireplace') this.emitters.push({ kind: 'fire', ...at(cx, cy + 0.4, 4), acc: 0, rate: 14 });
+      if (o.sprite === 'fireplace') this.emitters.push({ kind: 'fire', ...at(cx, cy + 0.4, 4), acc: 0, rate: 14, base: 14, id: o.id });
+      if (o.sprite === 'speaker') this.emitters.push({ kind: 'music', ...at(cx, cy, 26), acc: 0, rate: 0.9, base: 0.9, id: o.id, color: '#9b6bd6' });
       if (o.sprite === 'counter') this.emitters.push({ kind: 'steam', ...at(o.x + 2.6, o.y + 0.5, 30), acc: 0, rate: 3 });
       if (o.sprite === 'lighthouse') this.lighthouse = at(cx, cy, 46);
       if (o.building?.extras.includes('chimney')) {
@@ -97,7 +105,7 @@ export class Effects {
         const d = o.d ?? 1;
         const rh = b.roofStyle === 'flat' ? 5 : Math.round(Math.min(w, d) * 7 + 6);
         const chy = b.roofStyle === 'gable' && w >= d ? d * 0.3 : d * 0.35;
-        this.emitters.push({ kind: 'smoke', ...at(o.x + w * 0.72 + 0.22, o.y + chy + 0.22, b.wallH + rh * 1.1 + 8), acc: 0, rate: 2.2 });
+        this.emitters.push({ kind: 'smoke', ...at(o.x + w * 0.72 + 0.22, o.y + chy + 0.22, b.wallH + rh * 1.1 + 8), acc: 0, rate: 1.2, base: 1.2, id: o.roomId });
       }
     }
     if (opts.party && scene.kind === 'interior') {
@@ -115,8 +123,71 @@ export class Effects {
     }
   }
 
-  burst(x: number, y: number, kind: 'confetti' | 'hearts' | 'sparkle', n = 24) {
+  /** Chimneys puff harder when a building is busy. */
+  setOccupancy(counts: Map<string, number>) {
+    for (const e of this.emitters) {
+      if (e.kind === 'smoke' && e.id) e.rate = (e.base ?? 1) + Math.min(4, (counts.get(e.id) ?? 0) * 0.9);
+    }
+  }
+
+  /** A speaker's current track (null = silence). */
+  setMusic(id: string, color: string | null) {
+    const e = this.emitters.find((x) => x.id === id && x.kind === 'music');
+    if (!e) return;
+    e.color = color ?? e.color;
+    e.rate = color ? (e.base ?? 1) : 0;
+  }
+
+  /** Temporarily multiply an emitter (a stoked fire). */
+  boost(id: string, until: number) {
+    const e = this.emitters.find((x) => x.id === id);
+    if (e) e.boostUntil = until;
+  }
+
+  ring(x: number, y: number, color = 'rgba(255,255,255,0.8)', size = 6, max = 0.9) {
+    this.particles.push({ x, y, vx: 0, vy: 0, life: 0, max, size, color, gravity: 0, kind: 'ring' });
+  }
+
+  burst(x: number, y: number, kind: BurstKind, n = 24, color?: string) {
     if (this.reducedMotion) n = Math.min(n, 6);
+    const r = Math.random;
+    const push = (p: Partial<Particle>) =>
+      this.particles.push({ x, y, vx: 0, vy: 0, life: 0, max: 1, size: 1, color: '#fff', gravity: 0, kind: 'square', ...p });
+    if (kind !== 'confetti' && kind !== 'hearts' && kind !== 'sparkle') {
+      for (let i = 0; i < n; i++) {
+        const a = r() * Math.PI * 2;
+        switch (kind) {
+          case 'dust':
+            push({ x: x + (r() - 0.5) * 6, vx: (r() - 0.5) * 14, vy: -4 - r() * 6, max: 0.5 + r() * 0.3, size: 1.5 + r(), color: 'rgba(214,196,168,0.7)', gravity: 6, kind: 'circle' });
+            break;
+          case 'smoke':
+            push({ x: x + (r() - 0.5) * 10, vx: (r() - 0.5) * 16, vy: -10 - r() * 10, max: 1 + r() * 0.6, size: 2 + r() * 2, color: 'rgba(235,230,222,0.7)', gravity: -4, kind: 'circle' });
+            break;
+          case 'water':
+            push({ vx: Math.cos(a) * (10 + r() * 20), vy: -30 - r() * 30, max: 0.7 + r() * 0.3, size: 1, color: r() > 0.4 ? '#8fd3ff' : '#e8f7ff', gravity: 140 });
+            break;
+          case 'paint':
+            push({ vx: Math.cos(a) * (20 + r() * 40), vy: Math.sin(a) * 20 - 30, max: 0.9 + r() * 0.5, size: 2, color: color ?? CONFETTI[i % CONFETTI.length], gravity: 110 });
+            break;
+          case 'notes':
+            push({ x: x + (r() - 0.5) * 10, vx: (r() - 0.5) * 16, vy: -14 - r() * 12, max: 1.6 + r() * 0.6, size: 1, color: color ?? '#9b6bd6', gravity: -2, kind: 'note', spin: r() * 6 });
+            break;
+          case 'sparks':
+            push({ x: x + (r() - 0.5) * 12, vx: (r() - 0.5) * 40, vy: -40 - r() * 50, max: 0.6 + r() * 0.6, size: 1, color: r() > 0.5 ? '#ffd23f' : '#ff8a3d', gravity: 60 });
+            break;
+          case 'stars':
+            push({ vx: Math.cos(a) * (30 + r() * 30), vy: Math.sin(a) * (30 + r() * 30) - 20, max: 0.7 + r() * 0.4, size: 2, color: r() > 0.3 ? '#fff4b0' : '#ffffff', gravity: 30, kind: 'star' });
+            break;
+          case 'gold':
+            push({ vx: Math.cos(a) * (8 + r() * 24), vy: -20 - r() * 30, max: 1 + r() * 0.5, size: 1, color: r() > 0.5 ? '#ffd23f' : '#fff4b0', gravity: 40, kind: r() > 0.6 ? 'star' : 'square' });
+            break;
+          case 'crumbs':
+            push({ vx: (r() - 0.5) * 30, vy: -20 - r() * 20, max: 0.6, size: 1, color: r() > 0.5 ? '#f7d9a8' : '#e24c9c', gravity: 120 });
+            break;
+        }
+      }
+      return;
+    }
     for (let i = 0; i < n; i++) {
       const a = Math.random() * Math.PI * 2;
       const sp = 20 + Math.random() * 50;
@@ -138,8 +209,9 @@ export class Effects {
   update(dt: number) {
     this.t += dt;
     if (!this.reducedMotion) {
+      const now = Date.now();
       for (const e of this.emitters) {
-        e.acc += dt * e.rate;
+        e.acc += dt * e.rate * (e.boostUntil && now < e.boostUntil ? 3.2 : 1);
         while (e.acc > 1) {
           e.acc -= 1;
           this.emit(e);
@@ -177,6 +249,9 @@ export class Effects {
         break;
       case 'confetti':
         this.particles.push({ x: e.x + (r() - 0.5) * 260, y: e.y - r() * 20, vx: (r() - 0.5) * 10, vy: 12 + r() * 10, life: 0, max: 5, size: 2, color: CONFETTI[Math.floor(r() * CONFETTI.length)], gravity: 2, kind: 'square', spin: r() * 6 });
+        break;
+      case 'music':
+        this.particles.push({ x: e.x + (r() - 0.5) * 8, y: e.y, vx: (r() - 0.5) * 8, vy: -10 - r() * 6, life: 0, max: 2.2, size: 1, color: e.color ?? '#9b6bd6', gravity: -1, kind: 'note', spin: r() * 6 });
         break;
       case 'glow':
         break;
@@ -217,7 +292,26 @@ export class Effects {
       const a = 1 - p.life / p.max;
       ctx.globalAlpha = Math.max(0, Math.min(1, a * 1.5));
       ctx.fillStyle = p.color;
-      if (p.kind === 'circle') {
+      if (p.kind === 'ring') {
+        const k = p.life / p.max;
+        ctx.strokeStyle = p.color;
+        ctx.lineWidth = 1;
+        ctx.globalAlpha = Math.max(0, 1 - k);
+        ctx.beginPath();
+        ctx.ellipse(p.x, p.y, p.size * (0.4 + k * 1.4), p.size * (0.2 + k * 0.7), 0, 0, Math.PI * 2);
+        ctx.stroke();
+      } else if (p.kind === 'note') {
+        const x = Math.round(p.x + Math.sin(p.life * 3 + (p.spin ?? 0)) * 3);
+        const y = Math.round(p.y);
+        ctx.fillRect(x, y, 2, 2);
+        ctx.fillRect(x + 1, y - 4, 1, 4);
+        ctx.fillRect(x + 2, y - 4, 1, 1);
+      } else if (p.kind === 'star') {
+        const x = Math.round(p.x);
+        const y = Math.round(p.y);
+        ctx.fillRect(x - 1, y, 3, 1);
+        ctx.fillRect(x, y - 1, 1, 3);
+      } else if (p.kind === 'circle') {
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.size * (1 + p.life * 0.4), 0, Math.PI * 2);
         ctx.fill();
