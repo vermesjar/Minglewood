@@ -10,7 +10,7 @@ import type { AvatarLoadout } from '@shared/domain/types';
 import type { Facing } from '@shared/world/scene';
 import { normalizeLoadout, type FullLoadout } from '@shared/avatar';
 import { makeCanvas, type Sprite } from './painter';
-import { drawAvatarV2 } from './avatarKit';
+import { drawAvatarV2, type Expression } from './avatarKit';
 import type { Pose } from './avatarFrame';
 import { H, W } from './pixkit';
 
@@ -33,9 +33,11 @@ export const AVATAR_CROPS = {
   full: { x: 0, y: 0, w: W, h: H },
 };
 
-export function drawAvatarCanvas(input: AvatarLoadout, facing: Facing, pose: Pose): HTMLCanvasElement {
+export type { Expression } from './avatarKit';
+
+export function drawAvatarCanvas(input: AvatarLoadout, facing: Facing, pose: Pose, expr?: Expression): HTMLCanvasElement {
   const view = facing === 'se' || facing === 'sw' ? 'front' : 'back';
-  const P = drawAvatarV2(input, view, pose);
+  const P = drawAvatarV2(input, view, pose, expr);
   const c = makeCanvas(W, H);
   const ctx = c.getContext('2d', { willReadFrequently: true })!;
   const img = ctx.createImageData(W, H);
@@ -62,11 +64,15 @@ export function avatarKey(L: AvatarLoadout): string {
     .join('|');
 }
 
-export function avatarSprite(L: AvatarLoadout, facing: Facing, pose: Pose): Sprite {
-  const key = `${avatarKey(L)}|${facing}|${pose}`;
+/**
+ * The sprite for a look, facing and pose. `expr` is a momentary expression the world can flash on top: a
+ * blink every few seconds when idle, the mouth moving while a speech bubble is up.
+ */
+export function avatarSprite(L: AvatarLoadout, facing: Facing, pose: Pose, expr?: Expression): Sprite {
+  const key = `${avatarKey(L)}|${facing}|${pose}|${expr ?? ''}`;
   let s = cache.get(key);
   if (!s) {
-    const canvas = drawAvatarCanvas(L, facing, pose);
+    const canvas = drawAvatarCanvas(L, facing, pose, expr);
     const data = canvas.getContext('2d', { willReadFrequently: true })!.getImageData(0, 0, W, H).data;
     const mask = new Uint8Array(W * H);
     for (let i = 0; i < mask.length; i++) mask[i] = data[i * 4 + 3] ? 1 : 0;

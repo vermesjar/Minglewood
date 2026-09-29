@@ -242,8 +242,10 @@ function drawHeadBase(P: Pix, F: Frame, L: FullLoadout) {
   }
 }
 
-function drawFace(P: Pix, F: Frame, L: FullLoadout) {
+function drawFace(P: Pix, F: Frame, L: FullLoadout, expr?: Expression) {
   if (F.view !== 'front') return;
+  if (expr === 'blink') L = { ...L, eyes: 'eyes.blink' };
+  if (expr === 'talk') L = { ...L, mouth: L.mouth === 'mouth.o' ? 'mouth.neutral' : 'mouth.talk' };
   // 'blank' (internal): the bare head template the face art is generated on
   if (L.eyes === 'eyes.blank') return;
   const { skin } = skinTones(L);
@@ -265,6 +267,7 @@ function drawFace(P: Pix, F: Frame, L: FullLoadout) {
     lashes: ['kb', 'wk', 'wk'],
     happy: ['.c.', 'c.c'],
     sleepy: ['bb', 'wk'],
+    blink: ['..', '..', 'cc'],
     wink: ['.b', 'wk', 'wk'],
     sparkle: ['.b', 'kw', 'kk'],
   };
@@ -274,6 +277,7 @@ function drawFace(P: Pix, F: Frame, L: FullLoadout) {
     lashes: ['bk', 'wk', 'wk'],
     happy: ['.c.', 'c.c'],
     sleepy: ['bb', 'wk'],
+    blink: ['..', '..', 'cc'],
     wink: ['..', '..', 'cc'],
     sparkle: ['b.', 'kw', 'kk'],
   };
@@ -332,6 +336,7 @@ function drawFace(P: Pix, F: Frame, L: FullLoadout) {
     smirk: ['....m', '.mmm.'],
     o: ['.m.', 'mdm', '.m.'],
     tongue: ['m...m', '.mmm.', '..tt.'],
+    talk: ['.mmm.', '.mdm.', '..m..'],
   };
   const gm = USE_GENERATED_MOUTHS ? FACES.mouth[L.mouth.replace('mouth.', '')] : undefined;
   if (gm) {
@@ -871,7 +876,10 @@ export const LAYER = {
   outline: 19,
 } as const;
 
-export function drawAvatarV2(input: AvatarLoadout, view: View, requested: Pose): Pix {
+/** A momentary expression layered on the look: a blink, or the mouth open mid-sentence. */
+export type Expression = 'blink' | 'talk';
+
+export function drawAvatarV2(input: AvatarLoadout, view: View, requested: Pose, expr?: Expression): Pix {
   const L = normalizeLoadout(input);
   const wheelchair = L.mobility === 'mob.wheelchair';
   const pose: Pose = wheelchair && requested !== 'wave' ? 'sit' : requested;
@@ -907,7 +915,7 @@ export function drawAvatarV2(input: AvatarLoadout, view: View, requested: Pose):
   on(LAYER.neck);
   drawNeckwear(P, F, L);
   on(LAYER.face);
-  drawFace(P, F, L);
+  drawFace(P, F, L, expr);
   on(LAYER.hair);
   if (!coversHair) drawHair(P, F, L, 'front');
   on(LAYER.hat);
