@@ -156,7 +156,7 @@ if (oi > 0) {
   people = people.filter((p) => want.some((w) => p.name.toLowerCase().startsWith(w) || p.id === w));
 }
 const BG: [number, number, number] = [232, 220, 198];
-const CROP = [14, 8, 60, 102]; // the figure plus room for hair, hats and a balloon
+const CROP = [2, 8, 74, 102]; // the figure plus room for hair, hats, a balloon and a pet at the feet
 const Z = 4;
 const report: string[] = ['# Character review', ''];
 let total = 0;
