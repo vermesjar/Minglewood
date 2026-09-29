@@ -388,7 +388,14 @@ function drawFace(P: Pix, F: Frame, L: FullLoadout, expr?: Expression) {
     });
     return;
   }
-  P.stamp(mx - 2, my, mouths[L.mouth.replace('mouth.', '')] ?? mouths.smile, { m: mc, w: WHITE, t: [226, 104, 124], d: mix(mc, LINE, 0.5) });
+  const shape = mouths[L.mouth.replace('mouth.', '')] ?? mouths.smile;
+  P.stamp(mx - 2, my, shape, { m: mc, w: WHITE, t: [226, 104, 124], d: mix(mc, LINE, 0.5) });
+  // On deep skin a dark line alone disappears: a warm lower-lip highlight under the mouth keeps it readable.
+  if (lum(skin) < 0.32 && !bearded && L.mouth !== 'mouth.tongue') {
+    const lip = mix(skin, [236, 150, 130], 0.4);
+    const below = my + shape.length;
+    for (let c = 1; c < 4; c++) if (!P.get(mx - 2 + c, below)?.every((v, k) => Math.abs(v - mc[k]) < 2)) P.set(mx - 2 + c, below, lip);
+  }
 }
 
 /** Facial hair on the lower face, tinted from the hair colour; drawn under the mouth. */
