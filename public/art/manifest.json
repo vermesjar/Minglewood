@@ -1,0 +1,294 @@
+{
+  "scale": 2,
+  "sprites": {
+    "armchair.mustard": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "se": {
+          "file": "armchair.mustard.se.png",
+          "anchor": [
+            33,
+            42
+          ]
+        },
+        "nw": {
+          "file": "armchair.mustard.nw.png",
+          "anchor": [
+            33,
+            40
+          ]
+        }
+      }
+    },
+    "cake-stand": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "cake-stand.png",
+      "anchor": [
+        17,
+        18
+      ]
+    },
+    "chair.cafe": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "se": {
+          "file": "chair.cafe.se.png",
+          "anchor": [
+            24,
+            55
+          ]
+        },
+        "nw": {
+          "file": "chair.cafe.nw.png",
+          "anchor": [
+            24,
+            48
+          ]
+        }
+      }
+    },
+    "couch.green": {
+      "footprint": [
+        2,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "sw": {
+          "file": "couch.green.sw.png",
+          "anchor": [
+            32,
+            39
+          ]
+        },
+        "ne": {
+          "file": "couch.green.ne.png",
+          "anchor": [
+            32,
+            40
+          ]
+        }
+      }
+    },
+    "cups": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "cups.png",
+      "anchor": [
+        17,
+        4
+      ]
+    },
+    "espresso": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "sw": {
+          "file": "espresso.sw.png",
+          "anchor": [
+            23,
+            24
+          ]
+        },
+        "ne": {
+          "file": "espresso.ne.png",
+          "anchor": [
+            23,
+            24
+          ]
+        }
+      }
+    },
+    "frame.lake": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "frame.lake.png",
+      "anchor": [
+        0,
+        0
+      ],
+      "wall": {
+        "v": [
+          22,
+          45
+        ],
+        "margin": 0.14
+      }
+    },
+    "jar": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "jar.png",
+      "anchor": [
+        11,
+        26
+      ]
+    },
+    "lamp": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "lamp.png",
+      "anchor": [
+        20,
+        60
+      ],
+      "light": {
+        "x": 28,
+        "y": 17,
+        "r": 44
+      }
+    },
+    "menu-board": {
+      "footprint": [
+        2,
+        1
+      ],
+      "fit": "anchor",
+      "file": "menu-board.png",
+      "anchor": [
+        0,
+        0
+      ],
+      "wall": {
+        "v": [
+          18,
+          47
+        ],
+        "margin": 0.14
+      }
+    },
+    "pastry-case": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "sw": {
+          "file": "pastry-case.sw.png",
+          "anchor": [
+            28,
+            39
+          ]
+        },
+        "ne": {
+          "file": "pastry-case.ne.png",
+          "anchor": [
+            28,
+            40
+          ]
+        }
+      }
+    },
+    "plant.a": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "plant.a.png",
+      "anchor": [
+        31,
+        47
+      ]
+    },
+    "plant.b": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "plant.b.png",
+      "anchor": [
+        27,
+        68
+      ]
+    },
+    "register": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "sw": {
+          "file": "register.sw.png",
+          "anchor": [
+            18,
+            19
+          ]
+        },
+        "ne": {
+          "file": "register.ne.png",
+          "anchor": [
+            18,
+            18
+          ]
+        }
+      }
+    },
+    "stool": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "stool.png",
+      "anchor": [
+        18,
+        38
+      ]
+    },
+    "table-low": {
+      "footprint": [
+        2,
+        1
+      ],
+      "fit": "anchor",
+      "file": "table-low.png",
+      "anchor": [
+        32,
+        19
+      ]
+    },
+    "table-round": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "table-round.png",
+      "anchor": [
+        30,
+        45
+      ]
+    }
+  }
+}

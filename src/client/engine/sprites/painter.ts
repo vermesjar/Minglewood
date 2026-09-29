@@ -17,6 +17,20 @@ export interface Sprite {
   mask: Uint8Array;
   /** Pre-rendered hover highlight (bright outline). */
   highlight?: HTMLCanvasElement;
+  /** Canvas pixels per art pixel: 1 for classic sprites, 2 for the hi-res art (64 px per floor tile). */
+  scale?: number;
+}
+
+/** Draws a sprite with its anchor at art-space (x, y), at its own pixel density. */
+export function blit(c: CanvasRenderingContext2D, s: Sprite, x: number, y: number, canvas: HTMLCanvasElement = s.canvas, inset = 0) {
+  const k = s.scale ?? 1;
+  c.drawImage(canvas, x - (s.ax + inset) / k, y - (s.ay + inset) / k, canvas.width / k, canvas.height / k);
+}
+
+/** Sprite size in art pixels. */
+export function spriteSize(s: Sprite): { w: number; h: number } {
+  const k = s.scale ?? 1;
+  return { w: s.canvas.width / k, h: s.canvas.height / k };
 }
 
 export type P3 = [number, number, number];
@@ -34,11 +48,13 @@ export class IsoPainter {
   readonly ox: number;
   readonly oy: number;
 
-  constructor(fw: number, fd: number, height: number, pad = 3, extraW = 0) {
+  /** `scale` 2 paints at the hi-res density (64 px per floor tile) while coordinates stay in art px. */
+  constructor(fw: number, fd: number, height: number, pad = 3, extraW = 0, readonly scale = 1) {
     const w = (fw + fd) * 16 + pad * 2 + extraW * 2;
     const h = (fw + fd) * 8 + height + pad * 2;
-    this.canvas = makeCanvas(w, h);
+    this.canvas = makeCanvas(w * scale, h * scale);
     this.ctx = this.canvas.getContext('2d')!;
+    this.ctx.scale(scale, scale);
     this.ox = fd * 16 + pad + extraW;
     this.oy = height + pad;
   }
@@ -123,12 +139,15 @@ export class IsoPainter {
   /** Raw screen-space pixel rect relative to the footprint origin projection of (x,y,z). */
   px(x: number, y: number, z: number, dx: number, dy: number, w: number, h: number, fill: string) {
     const [sx, sy] = this.p(x, y, z);
+    const k = this.scale;
     this.ctx.fillStyle = fill;
-    this.ctx.fillRect(Math.round(sx + dx), Math.round(sy + dy), w, h);
+    this.ctx.fillRect(Math.round((sx + dx) * k) / k, Math.round((sy + dy) * k) / k, w, h);
   }
 
   finish(opts: { outline?: boolean; outlineColor?: string } = {}): Sprite {
-    return finishSprite(this.canvas, this.ox, this.oy, opts);
+    const s = finishSprite(this.canvas, this.ox * this.scale, this.oy * this.scale, opts);
+    if (this.scale !== 1) s.scale = this.scale;
+    return s;
   }
 }
 

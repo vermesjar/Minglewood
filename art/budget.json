@@ -1,0 +1,1 @@
+{ "totalUsd": 15, "note": "Hard cap on image-API spend for the world-polish pass. studio.py refuses to call the API past it." }

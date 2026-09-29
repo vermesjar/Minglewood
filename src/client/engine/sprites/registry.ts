@@ -4,6 +4,8 @@
  */
 import type { SceneObject } from '@shared/world/scene';
 import type { Sprite } from './painter';
+import { artSprite } from './art';
+import { counterModule } from './modular';
 import { buildingSprite, festiveOverlay } from './buildings';
 import {
   balloonsSprite,
@@ -52,6 +54,8 @@ import {
 const cache = new Map<string, Sprite | null>();
 
 function build(o: SceneObject): Sprite | null {
+  const art = artSprite(o);
+  if (art) return art;
   const w = o.w ?? 1;
   const d = o.d ?? 1;
   const f = o.facing ?? 'se';
@@ -103,7 +107,7 @@ function build(o: SceneObject): Sprite | null {
     case 'table-long':
       return tableLongSprite(w, d, o.variant);
     case 'counter':
-      return counterSprite(w, d);
+      return (w === 1 && d === 1 && o.variant ? counterModule(f, o.variant) : null) ?? counterSprite(w, d);
     case 'reception':
       return receptionSprite(w, d);
     case 'desk':
@@ -146,6 +150,11 @@ function build(o: SceneObject): Sprite | null {
 function key(o: SceneObject): string {
   if (o.sprite === 'building') return `building:${o.id}`;
   return `${o.sprite}|${o.w ?? 1}|${o.d ?? 1}|${o.facing ?? ''}|${o.variant ?? ''}`;
+}
+
+/** Forget built sprites (after new art has loaded). */
+export function clearSpriteCache() {
+  cache.clear();
 }
 
 export function spriteFor(o: SceneObject): Sprite | null {

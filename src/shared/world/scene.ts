@@ -33,7 +33,12 @@ export type ObjectAction =
   | { kind: 'artifact'; artifactId: string }
   | { kind: 'info'; title: string; body: string }
   | { kind: 'activity'; label: string; body: string }
-  | { kind: 'link'; label: string; body: string };
+  | { kind: 'link'; label: string; body: string }
+  /** Hands you something to carry around (a coffee from the espresso machine). */
+  | { kind: 'vend'; item: string; label: string };
+
+/** Height of a counter's top surface in art px — things stacked on a counter rest at this z. */
+export const COUNTER_TOP = 20.5;
 
 export type BuildingExtra =
   | 'awning'
@@ -82,6 +87,8 @@ export interface SceneObject {
   wall?: 'left' | 'right';
   facing?: Facing;
   variant?: string;
+  /** Resting height in art px when stacked on something (an espresso machine on a counter). */
+  z?: number;
   label?: string;
   actions?: ObjectAction[];
   /** Only rendered while an event with this decor is active in the linked room. */

@@ -16,6 +16,8 @@ import { WalkGrid } from '@shared/world/walkGrid';
 import { findPath, type Tile } from '@shared/world/pathfinding';
 import { heldDelta, KEY_DIRS, planHeldWalk, type ScreenDir } from '@shared/world/heldWalk';
 import { WorldView, type BuildingBadge } from '../engine/WorldView';
+import { loadArt } from '../engine/sprites/art';
+import { clearSpriteCache } from '../engine/sprites/registry';
 import { api, ApiError, setActivityTransport } from './api';
 import { Realtime } from './socket';
 import { getState, loadLocal, persistLocal, setState, toast } from './store';
@@ -79,7 +81,7 @@ class Game {
         const config = await api<PublicConfig>('/config');
         setState({ config });
       }
-      const boot = await api<Bootstrap>('/bootstrap');
+      const [boot] = await Promise.all([api<Bootstrap>('/bootstrap'), this.artReady]);
       this.begin(boot);
     } catch (e) {
       if (e instanceof ApiError && (e.status === 401 || e.status === 403)) {
@@ -95,6 +97,8 @@ class Game {
   }
 
   private startAttempts = 0;
+  /** Finished art (public/art) loads alongside the bootstrap; procedural sprites fill any gaps. */
+  private artReady = loadArt().then(clearSpriteCache);
   private activityStarted = false;
 
   begin(boot: Bootstrap) {

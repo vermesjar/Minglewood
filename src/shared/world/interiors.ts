@@ -3,7 +3,7 @@
  * y=0 "right"), the exit door on the left wall. Furniture is data — a future editor
  * (and team decoration) manipulates these lists.
  */
-import type { Facing, InteriorTheme, SceneDef, SceneObject } from './scene';
+import { COUNTER_TOP, type Facing, type InteriorTheme, type SceneDef, type SceneObject } from './scene';
 
 type Obj = Omit<SceneObject, 'id'> & { id?: string };
 
@@ -68,22 +68,39 @@ export function buildInteriors(): SceneDef[] {
     },
     [
       { sprite: 'rug', x: 7, y: 6, w: 5, d: 4, flat: true, variant: 'terracotta' },
-      { sprite: 'counter', x: 2, y: 1, w: 6, d: 1, variant: 'cafe', label: 'Espresso bar' },
+      // A modular bar: six counter segments with the café's things standing on top.
+      ...[2, 3, 4, 5, 6, 7].map((x): Obj => ({ sprite: 'counter', x, y: 1, facing: 'sw', variant: 'cafe', label: 'Espresso bar' })),
+      { sprite: 'pastry-case', x: 2, y: 1, z: COUNTER_TOP, facing: 'sw', label: 'Pastry case' },
+      { sprite: 'cake-stand', x: 3, y: 1, z: COUNTER_TOP, label: 'Cake of the day' },
+      {
+        sprite: 'espresso',
+        x: 4,
+        y: 1,
+        z: COUNTER_TOP,
+        facing: 'sw',
+        label: 'Espresso machine',
+        actions: [{ kind: 'vend', item: 'coffee', label: 'Get a coffee' }],
+      },
+      { sprite: 'cups', x: 5, y: 1, z: COUNTER_TOP },
+      { sprite: 'register', x: 6, y: 1, z: COUNTER_TOP, facing: 'sw' },
+      { sprite: 'jar', x: 7, y: 1, z: COUNTER_TOP, label: 'Biscotti' },
+      { sprite: 'stool', x: 6, y: 2, actions: sit },
+      { sprite: 'stool', x: 7, y: 2, actions: sit },
       { sprite: 'menu-board', wall: 'right', x: 3, y: 0, w: 2, label: 'Today: oat flat white' },
       { sprite: 'window', wall: 'right', x: 8, y: 0, w: 2 },
       { sprite: 'window', wall: 'left', x: 0, y: 2, d: 2 },
       { sprite: 'frame', wall: 'left', x: 0, y: 5, variant: 'lake' },
       { sprite: 'table-round', x: 4, y: 4 },
-      chair(3, 4, 'se'),
-      chair(5, 4, 'nw'),
-      chair(4, 5, 'ne'),
+      chair(3, 4, 'se', 'cafe'),
+      chair(5, 4, 'nw', 'cafe'),
+      chair(4, 5, 'ne', 'cafe'),
       { sprite: 'table-round', x: 8, y: 3 },
-      chair(7, 3, 'se'),
-      chair(9, 3, 'nw'),
-      chair(8, 4, 'ne'),
+      chair(7, 3, 'se', 'cafe'),
+      chair(9, 3, 'nw', 'cafe'),
+      chair(8, 4, 'ne', 'cafe'),
       { sprite: 'table-round', x: 4, y: 8 },
-      chair(3, 8, 'se'),
-      chair(5, 8, 'nw'),
+      chair(3, 8, 'se', 'cafe'),
+      chair(5, 8, 'nw', 'cafe'),
       { sprite: 'couch', x: 8, y: 9, w: 2, d: 1, facing: 'ne', variant: 'green', actions: sit },
       { sprite: 'table-low', x: 8, y: 7, w: 2, d: 1 },
       { sprite: 'armchair', x: 11, y: 7, facing: 'nw', variant: 'mustard', actions: sit },

@@ -12,11 +12,14 @@ import { positionAlong, type Tile } from '@shared/world/pathfinding';
 import { Camera } from './camera';
 import { behind, rectsOverlap, topoSort, type Box, type ScreenRect } from './depth';
 import { Effects } from './effects';
-import { renderInteriorGround, renderOutdoorGround, type GroundLayer } from './ground';
+import { renderOutdoorGround, type GroundLayer } from './ground';
+import { renderInteriorShell, type InteriorLayer } from './interior';
+import { skyAt, windowView, type Sky } from './weather';
+import { artLight } from './sprites/art';
 import { INK_CSS, PAPER, UI_FONT, pill, roundRect, speechBubble } from './overlays';
 import { AVATAR_CROPS, avatarSprite, usesWheelchair, type Pose } from './sprites/avatar';
 import { festiveFor, spriteFor } from './sprites/registry';
-import { highlightOf, type Sprite } from './sprites/painter';
+import { blit, highlightOf, spriteSize, type Sprite } from './sprites/painter';
 
 export interface BuildingBadge {
   name: string;
@@ -78,7 +81,9 @@ export class WorldView {
   private vw = 0;
   private vh = 0;
   private scene: SceneDef | null = null;
-  private ground: GroundLayer | null = null;
+  private ground: GroundLayer | InteriorLayer | null = null;
+  /** Scratch layer for the room's dimness with lamp-shaped holes. */
+  private shade: HTMLCanvasElement | null = null;
   private statics: Static[] = [];
   private actors = new Map<string, ActorView>();
   private meId = '';
@@ -164,7 +169,7 @@ export class WorldView {
     this.ground =
       scene.kind === 'outdoor'
         ? renderOutdoorGround(scene)
-        : renderInteriorGround(scene, { activeDecor: opts.activeDecor, bannerText: opts.bannerText });
+        : renderInteriorShell(scene, { theme: scene.interior!, activeDecor: opts.activeDecor, bannerText: opts.bannerText });
     const statics: Static[] = [];
     this.stageBoxes = [];
     for (const o of scene.objects) {
@@ -176,16 +181,17 @@ export class WorldView {
       if (o.eventDecor && !opts.activeDecor.has(o.eventDecor)) continue;
       const sprite = spriteFor(o);
       if (!sprite) continue;
-      const p = isoToScreen(o.x, o.y);
-      const dx = p.x - sprite.ax;
-      const dy = p.y - sprite.ay;
+      const p = isoToScreen(o.x, o.y, o.z ?? 0);
+      const size = spriteSize(sprite);
+      const dx = p.x - sprite.ax / (sprite.scale ?? 1);
+      const dy = p.y - sprite.ay / (sprite.scale ?? 1);
       statics.push({
         obj: o,
         sprite,
         dx,
         dy,
-        box: footprint(o),
-        rect: { l: dx, t: dy, r: dx + sprite.canvas.width, b: dy + sprite.canvas.height },
+        box: { ...footprint(o), z: o.z ?? 0 },
+        rect: { l: dx, t: dy, r: dx + size.w, b: dy + size.h },
         festive: o.building && o.roomId && this.festiveRooms.has(o.roomId) ? festiveFor(o) : null,
       });
     }
@@ -527,7 +533,22 @@ export class WorldView {
     const ty = dpr * (vh / 2 - this.camera.y * z);
     c.setTransform(s, 0, 0, s, Math.round(tx), Math.round(ty));
     c.imageSmoothingEnabled = false;
-    c.drawImage(this.ground.canvas, this.ground.minX, this.ground.minY);
+    const sky = skyAt();
+    const shell = 'windows' in this.ground ? this.ground : null;
+    if (shell) this.drawWindowViews(c, shell, sky);
+    const gk = shell?.scale ?? 1;
+    c.drawImage(this.ground.canvas, this.ground.minX, this.ground.minY, this.ground.canvas.width / gk, this.ground.canvas.height / gk);
+    if (shell) {
+      // Sunlight through the windows follows the weather; passing clouds make it breathe a little.
+      c.save();
+      c.globalCompositeOperation = 'screen';
+      const breathe = sky.weather === 'clouds' ? 0.8 + 0.2 * Math.sin(performance.now() / 2600) : 1;
+      c.globalAlpha = Math.min(1, sky.sun * breathe);
+      if (c.globalAlpha > 0.02) c.drawImage(shell.sun, shell.minX, shell.minY, shell.sun.width / gk, shell.sun.height / gk);
+      c.globalAlpha = sky.lamp;
+      c.drawImage(shell.light, shell.minX, shell.minY, shell.light.width / gk, shell.light.height / gk);
+      c.restore();
+    }
 
     // hover tile + destination marker
     if (this.hoverTile && !this.hover) this.diamond(this.hoverTile[0], this.hoverTile[1], 'rgba(255,255,255,0.35)', 1);
@@ -568,8 +589,10 @@ export class WorldView {
     for (const d of order) {
       if ('obj' in d) {
         const hovered = this.hover?.kind === 'object' && this.hover.id === d.obj.id;
-        if (hovered) c.drawImage(highlightOf(d.sprite), d.dx - 2, d.dy - 2);
-        else c.drawImage(d.sprite.canvas, d.dx, d.dy);
+        const ox = d.dx + d.sprite.ax / (d.sprite.scale ?? 1);
+        const oy = d.dy + d.sprite.ay / (d.sprite.scale ?? 1);
+        if (hovered) blit(c, d.sprite, ox, oy, highlightOf(d.sprite), 2);
+        else blit(c, d.sprite, ox, oy);
         if (d.festive) c.drawImage(d.festive.canvas, d.dx, d.dy);
       } else {
         this.drawActor(d);
@@ -582,18 +605,19 @@ export class WorldView {
       if (sprite) {
         const p = isoToScreen(g.obj.x, g.obj.y);
         c.globalAlpha = g.valid ? 0.75 : 0.35;
-        c.drawImage(sprite.canvas, p.x - sprite.ax, p.y - sprite.ay);
+        blit(c, sprite, p.x, p.y);
         c.globalAlpha = 1;
       }
     }
     this.effects.drawOver(c);
+    if (shell) this.drawAmbience(c, sky, s, Math.round(tx), Math.round(ty));
 
     // X-ray: faint silhouettes where buildings hide people, so nobody gets lost behind a roof.
     for (const d of order) {
       if ('obj' in d) continue;
       const sprite = avatarSprite(d.occ.avatar, d.facing, this.pose(d));
       c.globalAlpha = d.occ.memberId === this.meId ? 0.5 : 0.28;
-      c.drawImage(sprite.canvas, Math.round(d.sx - sprite.ax), Math.round(d.sy - sprite.ay));
+      blit(c, sprite, Math.round(d.sx), Math.round(d.sy));
     }
     c.globalAlpha = 1;
 
@@ -658,11 +682,11 @@ export class WorldView {
     const c = this.ctx;
     const sprite = avatarSprite(a.occ.avatar, a.facing, this.pose(a));
     const hovered = this.hover?.kind === 'actor' && this.hover.id === a.occ.memberId;
-    const x = Math.round(a.sx - sprite.ax);
-    const y = Math.round(a.sy - sprite.ay);
+    const x = Math.round(a.sx);
+    const y = Math.round(a.sy);
     if (a.occ.via === 'provider') c.globalAlpha = 0.72;
-    if (hovered) c.drawImage(highlightOf(sprite), x - 2, y - 2);
-    else c.drawImage(sprite.canvas, x, y);
+    if (hovered) blit(c, sprite, x, y, highlightOf(sprite), 2);
+    else blit(c, sprite, x, y);
     c.globalAlpha = 1;
   }
 
@@ -736,6 +760,97 @@ export class WorldView {
         c.globalAlpha = 1;
       }
     }
+  }
+
+  /** The live view outside each window, painted before the room so it shows through the glass. */
+  private drawWindowViews(c: CanvasRenderingContext2D, shell: InteriorLayer, sky: Sky) {
+    const t = performance.now() / 1000;
+    shell.windows.forEach((w, i) => {
+      const view = windowView(w, `${this.scene?.id}:${i}`, t, sky);
+      c.save();
+      if (w.face === 'right') c.transform(16, 8, 0, -1, 0, 0);
+      else c.transform(-16, 8, 0, -1, 0, 0);
+      c.translate(w.u0, w.v1);
+      c.scale((w.u1 - w.u0) / view.width, -(w.v1 - w.v0) / view.height);
+      c.imageSmoothingEnabled = false;
+      c.drawImage(view, 0, 0);
+      c.restore();
+    });
+  }
+
+  /**
+   * Time of day and weather over the room. Dusk, night and rain dim the room; every lamp cuts a warm pool
+   * out of that dimness (so it visibly lights the floor, furniture and people near it), then glows.
+   */
+  private drawAmbience(c: CanvasRenderingContext2D, sky: Sky, s: number, tx: number, ty: number) {
+    const tint: Record<string, [string, number] | undefined> = {
+      night: ['#6f79bd', 0.7],
+      dusk: ['#f2b89a', 0.45],
+      dawn: ['#ffd2bf', 0.25],
+    };
+    let mood = tint[sky.phase];
+    if (!mood && sky.weather === 'rain') mood = ['#b9c0d6', 0.4];
+    else if (!mood && (sky.weather === 'clouds' || sky.weather === 'snow')) mood = ['#dfe2ec', 0.22];
+    const now = performance.now();
+    const flicker = 0.95 + 0.05 * Math.sin(now / 170) * Math.sin(now / 530);
+    const lamps = this.statics
+      .filter((st) => st.obj.sprite === 'lamp')
+      .map((st) => {
+        const L = artLight(st.obj) ?? { dx: 0, dy: -30, r: 22 };
+        const p = isoToScreen(st.obj.x, st.obj.y, st.obj.z ?? 0);
+        return { x: p.x + L.dx, y: p.y + L.dy, fx: p.x + L.dx * 0.5, fy: p.y + 12, r: L.r };
+      });
+    if (mood) {
+      const W = this.canvas.width;
+      const H = this.canvas.height;
+      if (!this.shade || this.shade.width !== W || this.shade.height !== H) {
+        this.shade = document.createElement('canvas');
+        this.shade.width = W;
+        this.shade.height = H;
+      }
+      const l = this.shade.getContext('2d')!;
+      l.setTransform(1, 0, 0, 1, 0, 0);
+      l.globalCompositeOperation = 'source-over';
+      l.clearRect(0, 0, W, H);
+      l.fillStyle = mood[0];
+      l.fillRect(0, 0, W, H);
+      l.globalCompositeOperation = 'destination-out';
+      l.setTransform(s, 0, 0, s, tx, ty);
+      for (const p of lamps) {
+        const R = 78;
+        const g = l.createRadialGradient(p.fx, p.fy - 6, 2, p.fx, p.fy - 6, R);
+        const a = Math.min(1, sky.lamp * flicker);
+        g.addColorStop(0, `rgba(0,0,0,${0.95 * a})`);
+        g.addColorStop(0.45, `rgba(0,0,0,${0.6 * a})`);
+        g.addColorStop(1, 'rgba(0,0,0,0)');
+        l.fillStyle = g;
+        l.fillRect(p.fx - R, p.fy - 6 - R, R * 2, R * 2);
+      }
+      c.save();
+      c.setTransform(1, 0, 0, 1, 0, 0);
+      c.globalCompositeOperation = 'multiply';
+      c.globalAlpha = mood[1];
+      c.drawImage(this.shade, 0, 0);
+      c.restore();
+    }
+    // Warm light: a broad spill over everything nearby, and a bright core at the shade.
+    c.save();
+    c.globalCompositeOperation = 'lighter';
+    for (const p of lamps) {
+      const k = sky.lamp * flicker;
+      const spill = c.createRadialGradient(p.fx, p.fy - 10, 2, p.fx, p.fy - 10, 64);
+      spill.addColorStop(0, `rgba(255,170,90,${0.2 * k})`);
+      spill.addColorStop(1, 'rgba(255,150,80,0)');
+      c.fillStyle = spill;
+      c.fillRect(p.fx - 64, p.fy - 74, 128, 128);
+      const core = c.createRadialGradient(p.x, p.y, 1, p.x, p.y, p.r);
+      core.addColorStop(0, `rgba(255,236,190,${0.75 * k})`);
+      core.addColorStop(0.35, `rgba(255,196,120,${0.32 * k})`);
+      core.addColorStop(1, 'rgba(255,170,90,0)');
+      c.fillStyle = core;
+      c.fillRect(p.x - p.r, p.y - p.r, p.r * 2, p.r * 2);
+    }
+    c.restore();
   }
 
   private drawBadges() {
@@ -837,8 +952,9 @@ export class WorldView {
         const o = d.obj;
         const interactive = !!(o.actions?.length || o.building || o.artifactId);
         if (!interactive) continue;
-        const px = Math.floor(ax - d.dx);
-        const py = Math.floor(ay - d.dy);
+        const k = d.sprite.scale ?? 1;
+        const px = Math.floor((ax - d.dx) * k);
+        const py = Math.floor((ay - d.dy) * k);
         const w = d.sprite.canvas.width;
         if (px < 0 || py < 0 || px >= w || py >= d.sprite.canvas.height) continue;
         if (d.sprite.mask[py * w + px]) return { kind: 'object', obj: o };

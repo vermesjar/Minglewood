@@ -10,6 +10,8 @@ export interface Box {
   y0: number;
   x1: number;
   y1: number;
+  /** Resting height (art px): things stacked on a counter share its footprint and draw after it. */
+  z?: number;
 }
 
 export interface ScreenRect {
@@ -44,6 +46,10 @@ export function topoSort<T extends { box: Box; rect: ScreenRect }>(items: T[]): 
       } else if (ba && !ab) {
         out[j].push(i);
         indeg[i]++;
+      } else if (!ab && !ba && (a.box.z ?? 0) !== (b.box.z ?? 0)) {
+        const [lo, hi] = (a.box.z ?? 0) < (b.box.z ?? 0) ? [i, j] : [j, i];
+        out[lo].push(hi);
+        indeg[hi]++;
       }
     }
   }

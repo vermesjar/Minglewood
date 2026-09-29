@@ -1,0 +1,140 @@
+/**
+ * Image-backed sprites: the finished art from `art/studio.py` (public/art/manifest.json +
+ * public/art/sprites/*.png), drawn at 2× density (64 px per floor tile). Anything without art falls
+ * back to the procedural painter, so art can land one object at a time.
+ */
+import type { Facing, SceneObject } from '@shared/world/scene';
+import { makeCanvas, type Sprite } from './painter';
+
+interface ArtFile {
+  file: string;
+  /** Image pixel of the footprint's back corner (tile x0,y0 at floor level). */
+  anchor?: [number, number];
+}
+
+interface ArtEntry {
+  file?: string;
+  anchor?: [number, number];
+  /** Per-facing art; a missing facing is the mirror of its partner (se↔sw, ne↔nw). */
+  facings?: Partial<Record<Facing, ArtFile>>;
+  footprint: [number, number];
+  /** anchor: exact anchors from the construction guide (the default for generated art).
+   *  diamond: art fills the footprint (left edge = left corner, bottom = front corner).
+   *  stand: the art's bottom-centre stands on the footprint's centre. */
+  fit?: 'anchor' | 'diamond' | 'stand';
+  pad?: number;
+  /** Wall-mounted flat art: painted into the wall texture between v0..v1 art px above the floor. */
+  wall?: { v: [number, number]; margin?: number };
+  /** A light source in the sprite (image px): lamps glow here. */
+  light?: { x: number; y: number; r?: number };
+}
+
+interface Manifest {
+  scale: number;
+  sprites: Record<string, ArtEntry>;
+}
+
+const MIRROR: Record<Facing, Facing> = { se: 'sw', sw: 'se', ne: 'nw', nw: 'ne' };
+
+let manifest: Manifest | null = null;
+const images = new Map<string, HTMLImageElement>();
+
+function loadImage(src: string): Promise<HTMLImageElement | null> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
+}
+
+/** Fetch the manifest and every image once, before the first scene is built. Never throws. */
+export async function loadArt(base = ''): Promise<void> {
+  try {
+    const res = await fetch(`${base}/art/manifest.json`, { cache: 'no-cache' });
+    if (!res.ok) return;
+    const m = (await res.json()) as Manifest;
+    const files = new Set<string>();
+    for (const e of Object.values(m.sprites)) {
+      if (e.file) files.add(e.file);
+      for (const f of Object.values(e.facings ?? {})) if (f) files.add(f.file);
+    }
+    const bust = `?v=${Date.now().toString(36)}`;
+    await Promise.all(
+      [...files].map(async (f) => {
+        const img = await loadImage(`${base}/art/sprites/${f}${import.meta.env.DEV ? bust : ''}`);
+        if (img) images.set(f, img);
+      }),
+    );
+    manifest = m;
+  } catch {
+    manifest = null;
+  }
+}
+
+function entryFor(o: SceneObject): ArtEntry | null {
+  if (!manifest) return null;
+  return (o.variant ? manifest.sprites[`${o.sprite}.${o.variant}`] : undefined) ?? manifest.sprites[o.sprite] ?? null;
+}
+
+/** Flat wall art for a wall-mounted object, if it has been drawn. */
+export function wallArt(o: SceneObject): { img: HTMLImageElement; v: [number, number]; margin?: number } | null {
+  const e = entryFor(o);
+  if (!e?.wall || !e.file) return null;
+  const img = images.get(e.file);
+  return img ? { img, v: e.wall.v, margin: e.wall.margin } : null;
+}
+
+/** Where a lamp's light comes from, relative to the sprite's anchor, in art px. */
+export function artLight(o: SceneObject): { dx: number; dy: number; r: number } | null {
+  const e = entryFor(o);
+  if (!e?.light || !manifest) return null;
+  const rec = e.file ? { anchor: e.anchor } : Object.values(e.facings ?? {})[0];
+  const [ax, ay] = rec?.anchor ?? [0, 0];
+  const S = manifest.scale;
+  return { dx: (e.light.x - ax) / S, dy: (e.light.y - ay) / S, r: (e.light.r ?? 40) / S };
+}
+
+/** The finished art for a scene object, or null to fall back to procedural drawing. */
+export function artSprite(o: SceneObject): Sprite | null {
+  const e = entryFor(o);
+  if (!e || !manifest) return null;
+  const facing = o.facing ?? 'se';
+  let rec: ArtFile | undefined = e.file ? { file: e.file, anchor: e.anchor } : undefined;
+  let mirror = false;
+  if (e.facings) {
+    rec = e.facings[facing];
+    if (!rec && e.facings[MIRROR[facing]]) {
+      rec = e.facings[MIRROR[facing]];
+      mirror = true;
+    }
+    rec ??= Object.values(e.facings)[0];
+  }
+  const img = rec ? images.get(rec.file) : undefined;
+  if (!rec || !img) return null;
+  const S = manifest.scale;
+  const canvas = makeCanvas(img.width, img.height);
+  const ctx = canvas.getContext('2d')!;
+  if (mirror) {
+    ctx.translate(img.width, 0);
+    ctx.scale(-1, 1);
+  }
+  ctx.drawImage(img, 0, 0);
+  const data = ctx.getImageData(0, 0, img.width, img.height).data;
+  const mask = new Uint8Array(img.width * img.height);
+  for (let i = 0; i < mask.length; i++) mask[i] = data[i * 4 + 3] > 0 ? 1 : 0;
+  let ax: number;
+  let ay: number;
+  if (rec.anchor) {
+    [ax, ay] = rec.anchor;
+    // Mirroring swaps the footprint's axes; its back corner stays the top vertex, reflected.
+    if (mirror) ax = img.width - ax;
+  } else {
+    const w = o.w ?? 1;
+    const d = o.d ?? 1;
+    const bottom = img.height - (e.pad ?? 0);
+    ax = e.fit === 'stand' ? img.width / 2 - (w - d) * 8 * S : d * 16 * S;
+    ay = e.fit === 'stand' ? bottom - (w + d) * 4 * S : bottom - (w + d) * 8 * S;
+  }
+  return { canvas, ax, ay, mask, scale: S };
+}

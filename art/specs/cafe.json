@@ -1,0 +1,327 @@
+{
+  "name": "cafe",
+  "tile": 200,
+  "colors": 28,
+  "quality": "medium",
+  "mood": "Tidewater Caf\u00e9, a lakeside neighbourhood caf\u00e9 at golden morning light. Warm honey oak, polished brass, white Carrara marble, mustard and sage velvet, terracotta and glossy green plants. Cozy, precious, a little old-world European.",
+  "sheets": [
+    {
+      "name": "seats",
+      "grid": "3x2",
+      "items": [
+        {
+          "key": "chair.cafe",
+          "facing": "se",
+          "w": 1,
+          "d": 1,
+          "h": 32,
+          "prompt": "A classic bentwood caf\u00e9 chair in warm honey oak: a curved hoop backrest with a second inner hoop, a round woven cane seat, four slightly splayed legs joined by a bentwood ring.",
+          "width": 48,
+          "fill": 0.55
+        },
+        {
+          "key": null,
+          "facing": "nw",
+          "w": 1,
+          "d": 1,
+          "h": 32,
+          "prompt": "The SAME bentwood caf\u00e9 chair in warm honey oak (curved double-hoop backrest, round woven cane seat, splayed legs with a ring)."
+        },
+        {
+          "key": "table-round",
+          "w": 1,
+          "d": 1,
+          "h": 22,
+          "prompt": "A round bistro table: white Carrara marble top with fine grey veins and a thin polished brass edge band, a single fluted brass pedestal on a round stepped brass foot. The round top reads as an ellipse exactly twice as wide as it is tall.",
+          "width": 60,
+          "fill": 0.35
+        },
+        {
+          "key": "armchair.mustard",
+          "facing": "se",
+          "w": 1,
+          "d": 1,
+          "h": 28,
+          "prompt": "A plush mustard-yellow velvet club armchair with rolled arms, deep button tufting on the curved back, a thick seat cushion with piping, short turned walnut legs.",
+          "width": 66,
+          "fill": 0.85
+        },
+        {
+          "key": "armchair.mustard",
+          "facing": "nw",
+          "w": 1,
+          "d": 1,
+          "h": 28,
+          "prompt": "The SAME mustard-yellow velvet club armchair (rolled arms, curved tufted back, piping, turned walnut legs).",
+          "width": 66,
+          "fill": 0.85
+        },
+        {
+          "key": "lamp",
+          "w": 1,
+          "d": 1,
+          "h": 60,
+          "prompt": "A tall brass floor lamp: a round weighted brass base, a slim polished pole with a small knuckle joint, a softly curved neck and a pleated cream silk shade glowing warmly from inside.",
+          "width": 40,
+          "fill": 0.3,
+          "extra": {
+            "light": {
+              "x": 28,
+              "y": 17,
+              "r": 44
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "chair-back",
+      "grid": "1x1",
+      "size": "1024x1024",
+      "tile": 320,
+      "refs": [
+        "out/cafe/seats/chair.cafe.se.raw.png"
+      ],
+      "note": "The second reference image shows this exact chair from the front. Draw the SAME chair turned around so we look at it from directly BEHIND: the outside of the curved double-hoop backrest is nearest to us, in front, covering most of the round cane seat, which is only glimpsed behind it. Same wood, same proportions, same pixel style.",
+      "items": [
+        {
+          "key": "chair.cafe",
+          "facing": "nw",
+          "w": 1,
+          "d": 1,
+          "h": 32,
+          "width": 48,
+          "fill": 0.55,
+          "prompt": "The bentwood caf\u00e9 chair from the reference, in warm honey oak, seen from behind."
+        }
+      ]
+    },
+    {
+      "name": "lounge",
+      "grid": "3x2",
+      "items": [
+        {
+          "key": "couch.green",
+          "facing": "sw",
+          "w": 2,
+          "d": 1,
+          "h": 28,
+          "prompt": "A deep sage-green velvet Chesterfield sofa for two: rolled arms, button-tufted back, two plump seat cushions with piping, short turned walnut legs.",
+          "width": 100,
+          "fill": 0.9,
+          "fit": "diamond"
+        },
+        {
+          "key": "couch.green",
+          "facing": "ne",
+          "w": 2,
+          "d": 1,
+          "h": 28,
+          "prompt": "The SAME sage-green velvet Chesterfield two-seater sofa (rolled arms, tufted back, turned walnut legs).",
+          "width": 100,
+          "fill": 0.9,
+          "fit": "diamond"
+        },
+        {
+          "key": "table-low",
+          "w": 2,
+          "d": 1,
+          "h": 14,
+          "prompt": "A low rectangular walnut coffee table with rounded corners and tapered legs; on top a small brass tray with two white cups of cappuccino, a folded newspaper and a little vase with one yellow flower.",
+          "width": 92,
+          "fill": 0.8,
+          "fit": "diamond"
+        },
+        {
+          "key": "plant.a",
+          "w": 1,
+          "d": 1,
+          "h": 46,
+          "prompt": "A lush monstera plant with big glossy split leaves in a round terracotta pot with a lighter rim; two leaves spill over the rim.",
+          "width": 62,
+          "fill": 0.45
+        },
+        {
+          "key": "plant.b",
+          "w": 1,
+          "d": 1,
+          "h": 62,
+          "prompt": "A tall fiddle-leaf fig tree with large violin-shaped glossy leaves on a slim trunk, in a tall glazed deep-teal ceramic pot with a gloss highlight.",
+          "width": 54,
+          "fill": 0.45
+        },
+        {
+          "key": "stool",
+          "w": 1,
+          "d": 1,
+          "h": 26,
+          "prompt": "A round bar stool: oak seat with a brass footring and three slim black-iron legs.",
+          "width": 36,
+          "fill": 0.4
+        }
+      ]
+    },
+    {
+      "name": "wall",
+      "kind": "wall",
+      "grid": "2x1",
+      "size": "1536x1024",
+      "items": [
+        {
+          "key": "menu-board",
+          "span": 2,
+          "wall": {
+            "v": [
+              18,
+              47
+            ],
+            "margin": 0.14
+          },
+          "prompt": "A caf\u00e9 chalkboard menu, very slightly wider than tall (about 1.1 : 1), in a thick carved honey-oak frame with small brass corner caps. On the dark green-black slate: a hand-drawn chalk border of little vines, a steaming coffee cup and a croissant doodle at the top, then four neat lines of chalk 'handwriting' as abstract squiggles (NOT real letters), with tiny price-like dots on the right, one line in warm yellow chalk. Soft chalk dust smudges."
+        },
+        {
+          "key": "frame.lake",
+          "span": 1,
+          "wall": {
+            "v": [
+              22,
+              45
+            ],
+            "margin": 0.14
+          },
+          "prompt": "A small oil painting in portrait orientation (about 2 : 3) in an ornate gilded frame with bright gold glints: a calm lake at morning with a pine-covered far shore, a tiny red rowing boat, soft pink-and-gold clouds reflected in the water."
+        }
+      ]
+    },
+    {
+      "name": "counter",
+      "grid": "3x2",
+      "note": "All six objects belong to one matching caf\u00e9 set. The counter segments are MODULAR: exactly one floor tile long, designed to sit in a row of identical segments, so their left and right ends are plain straight cuts of the same panelling and marble (no end caps, no rounded ends).",
+      "items": [
+        {
+          "key": null,
+          "facing": "sw",
+          "w": 1,
+          "d": 1,
+          "h": 34,
+          "width": 64,
+          "fit": "diamond",
+          "prompt": "ONE modular segment of a caf\u00e9 bar counter, exactly one floor tile long and one tile deep: a front of vertical honey-oak tongue-and-groove panelling with a slim brass kick rail near the floor, a thick white Carrara marble countertop with a rounded front edge. Nothing on top."
+        },
+        {
+          "key": null,
+          "facing": "ne",
+          "w": 1,
+          "d": 1,
+          "h": 34,
+          "width": 64,
+          "fit": "diamond",
+          "prompt": "The SAME modular caf\u00e9 counter segment seen from the barista's side: the back of the honey-oak counter with an open shelf holding stacked white cups and two small drawers with brass pulls, under the same white marble top. Nothing on top."
+        },
+        {
+          "key": "espresso",
+          "facing": "sw",
+          "w": 1,
+          "d": 1,
+          "h": 22,
+          "width": 46,
+          "fill": 0.3,
+          "prompt": "A compact, gleaming two-group espresso machine in chrome and polished brass with a domed brass top where little white cups are warming, two portafilters with wooden handles, a steam wand and a round pressure gauge. Its front (portafilters) faces along the red arrow."
+        },
+        {
+          "key": "espresso",
+          "facing": "ne",
+          "w": 1,
+          "d": 1,
+          "h": 22,
+          "width": 46,
+          "fill": 0.3,
+          "prompt": "The SAME chrome-and-brass espresso machine seen from behind: its polished back panel with a small brass maker's plate (no text), the domed brass top with little cups, the tip of a steam wand."
+        },
+        {
+          "key": "pastry-case",
+          "facing": "sw",
+          "w": 1,
+          "d": 1,
+          "h": 20,
+          "width": 56,
+          "fill": 0.35,
+          "prompt": "A small curved-glass pastry display case with a brass frame and base: two croissants, a lemon tart with a mint leaf and three pink macarons on two little shelves. The curved glass front faces along the red arrow."
+        },
+        {
+          "key": "pastry-case",
+          "facing": "ne",
+          "w": 1,
+          "d": 1,
+          "h": 20,
+          "width": 56,
+          "fill": 0.35,
+          "prompt": "The SAME curved-glass pastry case seen from the back (the server's side): a flat glass back with a little brass sliding door, the pastries seen through the glass."
+        }
+      ]
+    },
+    {
+      "name": "countertop",
+      "grid": "3x2",
+      "note": "Small objects that stand ON a caf\u00e9 counter; same set, same materials.",
+      "items": [
+        {
+          "key": "register",
+          "facing": "sw",
+          "w": 1,
+          "d": 1,
+          "h": 16,
+          "width": 36,
+          "fill": 0.3,
+          "prompt": "An antique brass cash register with ornate scrollwork, round typewriter-style keys and a small drawer; its keys face along the red arrow. No text or numbers."
+        },
+        {
+          "key": "register",
+          "facing": "ne",
+          "w": 1,
+          "d": 1,
+          "h": 16,
+          "width": 36,
+          "fill": 0.3,
+          "prompt": "The SAME antique brass cash register seen from behind: the smooth ornate brass back, the top of the display flag."
+        },
+        {
+          "key": "cups",
+          "w": 1,
+          "d": 1,
+          "h": 12,
+          "width": 34,
+          "fill": 0.3,
+          "prompt": "A neat little stack of white porcelain coffee cups on saucers next to a small tower of three saucers, with a silver milk jug."
+        },
+        {
+          "key": "jar",
+          "w": 1,
+          "d": 1,
+          "h": 14,
+          "width": 22,
+          "fill": 0.25,
+          "prompt": "A tall glass apothecary jar with a round brass lid, full of golden biscotti."
+        },
+        {
+          "key": "cake-stand",
+          "w": 1,
+          "d": 1,
+          "h": 16,
+          "width": 34,
+          "fill": 0.3,
+          "prompt": "A white porcelain cake stand under a glass dome, holding a pink layer cake with one slice cut out."
+        },
+        {
+          "key": null,
+          "w": 1,
+          "d": 1,
+          "h": 10,
+          "width": 20,
+          "fill": 0.25,
+          "prompt": "A small glass tip jar with a few coins and a folded note, and a tiny potted succulent beside it."
+        }
+      ]
+    }
+  ]
+}

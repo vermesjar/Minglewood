@@ -1,7 +1,7 @@
 /** Builds the HTTP + realtime server. `index.ts` runs it; tests create isolated instances. */
 import express from 'express';
 import { createServer, type Server } from 'node:http';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { DEMO_CALENDAR } from '@shared/seed/northstar';
 import { MockCalendarProvider } from '@shared/calendar';
@@ -141,6 +141,20 @@ export async function createApp(opts: AppOptions): Promise<App> {
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     next();
   });
+  if (!config.isProd) {
+    // Dev only: the sprite lab posts rendered PNGs here so art can be reviewed from disk (art/review/).
+    app.post('/api/dev/snapshot', express.raw({ type: 'image/png', limit: '40mb' }), (req, res) => {
+      const name = String(req.query.name ?? '').replace(/[^a-z0-9._-]/gi, '');
+      if (!name || !Buffer.isBuffer(req.body)) {
+        res.status(400).json({ error: 'name and a PNG body are required' });
+        return;
+      }
+      const dir = resolve(process.cwd(), 'art/review');
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(resolve(dir, `${name}.png`), req.body);
+      res.json({ ok: true, path: `art/review/${name}.png` });
+    });
+  }
   app.use('/api/auth', authRoutes(ctx));
   app.use('/api/admin', adminRoutes(ctx, () => startGateway()));
   app.use('/api', apiRoutes(ctx));

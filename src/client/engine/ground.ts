@@ -264,7 +264,7 @@ function rect(c: CanvasRenderingContext2D, u: number, v: number, du: number, dv:
 }
 
 /** Draw a wall-mounted item in face space; returns its interactive v-range. */
-function drawWallItem(c: CanvasRenderingContext2D, o: SceneObject, u0: number, span: number, ctx: InteriorRenderContext): [number, number] {
+export function drawWallItem(c: CanvasRenderingContext2D, o: SceneObject, u0: number, span: number, ctx: InteriorRenderContext): [number, number] {
   const u1 = u0 + span;
   const mid = (u0 + u1) / 2;
   switch (o.sprite) {
