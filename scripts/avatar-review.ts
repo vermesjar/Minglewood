@@ -521,3 +521,36 @@ console.log(`${people.length} characters, ${total} issue(s) → ${OUT}/`);
   );
   sheet.save('art/review/assets/shoes-close.png');
 }
+
+/* ------------------------------------------------------------------ body bases side by side */
+{
+  const outfits: AvatarLoadout[] = [
+    { top: 'top.tee', topColor: '#e0503f', bottom: 'bottom.jeans', hair: 'hair.bob', hairColor: '#3b2518' },
+    { top: 'top.hoodie', topColor: '#2bb3a3', bottom: 'bottom.joggers', hair: 'hair.messy', hairColor: '#5a3825' },
+    { top: 'top.shirt', topColor: '#f4efe6', bottom: 'bottom.chinos', bottomColor: '#3a3a46', hair: 'hair.long', hairColor: '#d9a35b', neck: 'neck.tie', neckColor: '#1f2a44' },
+    { top: 'top.blazer', topColor: '#1f2a44', bottom: 'bottom.skirt', bottomColor: '#3a3a46', hair: 'hair.bun', hairColor: '#1f1612' },
+    { top: 'top.overalls', topColor: '#3f8fd8', bottom: 'bottom.jeans', hair: 'hair.pigtails', hairColor: '#b8432e', topPattern: 'pat.solid' },
+    { top: 'top.flannel', topColor: '#b8432e', bottom: 'bottom.cargo', bottomColor: '#6b7a4a', hair: 'hair.short', hairColor: '#8a5a32' },
+    { top: 'top.dress', topColor: '#9b6bd6', hair: 'hair.wavy', hairColor: '#3b2518' },
+    { top: 'top.raincoat', topColor: '#f2c14e', bottom: 'bottom.jeans', hair: 'hair.curly', hairColor: '#1f1612' },
+  ] as AvatarLoadout[];
+  const frames = [
+    ['se', 'stand'],
+    ['ne', 'stand'],
+    ['se', 'walk1'],
+    ['se', 'sit'],
+  ] as const;
+  const z = 3;
+  const cw = CROP[2] * z + 4;
+  const ch = CROP[3] * z + 4;
+  const sheet = new Sheet(cw * frames.length * 2, ch * outfits.length, BG);
+  outfits.forEach((o, row) =>
+    (['body.a', 'body.b'] as const).forEach((body, bi) =>
+      frames.forEach(([f, p], fi) => {
+        const r = renderAvatarLayers({ ...o, body }, f, p);
+        sheet.paste(r.px, (bi * frames.length + fi) * cw + 2, row * ch + 2, z, CROP);
+      }),
+    ),
+  );
+  sheet.save('art/review/assets/bodies.png');
+}

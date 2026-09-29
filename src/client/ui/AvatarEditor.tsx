@@ -42,6 +42,7 @@ const CATEGORIES: Category[] = [
     label: 'Body',
     icon: '🙂',
     sections: [
+      { kind: 'items', title: 'Body type', slot: 'body', field: 'body', crop: 'body' },
       { kind: 'colors', title: 'Skin tone', field: 'skin', palette: SKIN_TONES, extra: { label: 'Just for fun', palette: FANTASY_SKIN } },
     ],
   },

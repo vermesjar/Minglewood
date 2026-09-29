@@ -145,6 +145,8 @@ export interface AvatarLoadout {
   pet?: string;
   petColor?: string;
   mobility?: string;
+  /** Body base ('body.a' straight, 'body.b' softer). */
+  body?: string;
 }
 
 /** A saved look people can switch to — "vibe of the day". */

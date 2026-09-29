@@ -113,6 +113,7 @@ export const loadoutSchema = z.object({
   pet: idStr.optional(),
   petColor: hex.optional(),
   mobility: idStr.optional(),
+  body: idStr.optional(),
 });
 
 export const outfitsSchema = z

@@ -10,6 +10,11 @@
  * ne); sw/nw are mirrors.
  */
 export type Pose = 'stand' | 'walk1' | 'walk2' | 'sit' | 'wave' | 'work';
+/**
+ * Body bases: 'a' straight (squarer shoulders), 'b' softer (narrower shoulders, a defined waist). The same
+ * head, face anchors and legs; parts conform to whichever torso the frame gives them.
+ */
+export type Body = 'a' | 'b';
 export type View = 'front' | 'back';
 export type Pt = [number, number];
 
@@ -58,12 +63,13 @@ export interface Frame {
   heelNear?: boolean;
   heelFar?: boolean;
   sitting: boolean;
+  body: Body;
 }
 
 const CX = 45;
 
 /** Upper body, identical across poses except for a vertical shift. */
-function upper(view: View, dy: number) {
+function upper(view: View, dy: number, body: Body) {
   const x0 = CX - 11;
   const y0 = 36 + dy;
   const head: [number, number, number, number] = [x0, y0, x0 + 22, y0 + 22];
@@ -92,21 +98,32 @@ function upper(view: View, dy: number) {
     shoulderY: sY,
     waistY: wY,
     hipY: wY + 6,
-    torso: [
-      [CX - 8, sY],
-      [CX + 9, sY],
-      [CX + 11, sY + 3],
-      [CX + 9, wY],
-      [CX - 8, wY],
-      [CX - 10, sY + 3],
-    ] as Pt[],
+    torso: (body === 'b'
+      ? [
+          [CX - 6, sY],
+          [CX + 7, sY],
+          [CX + 9, sY + 3],
+          [CX + 7, sY + 11],
+          [CX + 8, wY],
+          [CX - 7, wY],
+          [CX - 6, sY + 11],
+          [CX - 8, sY + 3],
+        ]
+      : [
+          [CX - 8, sY],
+          [CX + 9, sY],
+          [CX + 11, sY + 3],
+          [CX + 9, wY],
+          [CX - 8, wY],
+          [CX - 10, sY + 3],
+        ]) as Pt[],
   };
 }
 
-export function frameFor(view: View, pose: Pose): Frame {
+export function frameFor(view: View, pose: Pose, body: Body = 'a'): Frame {
   const sitting = pose === 'sit';
   const dy = sitting ? 6 : pose === 'walk1' || pose === 'walk2' ? 1 : 0;
-  const U = upper(view, dy);
+  const U = upper(view, dy, body);
   const s = U.shoulderY;
   // Arms hang straight with hands at the hips; they swing opposite the legs when walking.
   let armNear: Limb = { a: [CX - 9, s + 3], m: [CX - 10, s + 10], b: [CX - 10, s + 17] };
@@ -127,6 +144,12 @@ export function frameFor(view: View, pose: Pose): Frame {
   } else if (sitting) {
     armNear = { a: [CX - 9, s + 3], m: [CX - 9, s + 11], b: [CX - 3, s + 16] };
     armFar = { a: [CX + 10, s + 3], m: [CX + 11, s + 10], b: [CX + 10, s + 15] };
+  }
+  if (body === 'b') {
+    // narrower shoulders: the arms hang two pixels further in
+    const shift = (l: Limb, d: number): Limb => ({ a: [l.a[0] + d, l.a[1]], m: [l.m[0] + d, l.m[1]], b: [l.b[0] + d, l.b[1]] });
+    armNear = shift(armNear, 2);
+    armFar = shift(armFar, -2);
   }
   const hand = (l: Limb, dx = 0): Pt => [l.b[0] + dx, l.b[1] + 2];
   // Legs: short, straight; a stride when walking; thighs forward when sitting.
@@ -155,6 +178,7 @@ export function frameFor(view: View, pose: Pose): Frame {
   return {
     view,
     pose,
+    body,
     ...U,
     armNear,
     armFar,

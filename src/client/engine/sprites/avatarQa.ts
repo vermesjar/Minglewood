@@ -17,7 +17,7 @@
 import type { AvatarLoadout } from '@shared/domain/types';
 import type { Facing } from '@shared/world/scene';
 import { ITEM_BY_ID, normalizeLoadout } from '@shared/avatar';
-import { LAYER, drawAvatarV2, headMaskOf } from './avatarKit';
+import { LAYER, bodyOf, drawAvatarV2, headMaskOf } from './avatarKit';
 import { frameFor, type Frame, type Pose } from './avatarFrame';
 import { H, M, W, type Mask } from './pixkit';
 
@@ -116,7 +116,7 @@ export function lintAvatar(look: AvatarLoadout, facing: Facing, pose: Pose, r = 
   const view = facing === 'se' || facing === 'sw' ? 'front' : 'back';
   const mirrored = facing === 'sw' || facing === 'nw';
   // the same frame the kit draws with (a wheelchair user waves from the sitting frame)
-  const F = frameFor(view, L.mobility === 'mob.wheelchair' ? 'sit' : pose);
+  const F = frameFor(view, L.mobility === 'mob.wheelchair' ? 'sit' : pose, bodyOf(L));
   const Z = zonesFor(F);
   const at = (x: number, y: number) => (y * W + (mirrored ? W - 1 - x : x)) as number;
   const issues: Issue[] = [];

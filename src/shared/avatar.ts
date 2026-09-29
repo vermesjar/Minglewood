@@ -22,7 +22,8 @@ export type AvatarSlot =
   | 'topPattern'
   | 'held'
   | 'pet'
-  | 'mobility';
+  | 'mobility'
+  | 'body';
 
 export interface AvatarItem {
   id: string;
@@ -126,6 +127,7 @@ const slotPrefix: Record<AvatarSlot, string> = {
   held: 'held',
   pet: 'pet',
   mobility: 'mob',
+  body: 'body',
 };
 
 export const AVATAR_ITEMS: AvatarItem[] = [
@@ -294,6 +296,8 @@ export const AVATAR_ITEMS: AvatarItem[] = [
   I('mobility', 'none', 'None'),
   I('mobility', 'wheelchair', 'Wheelchair'),
   I('mobility', 'cane', 'Cane'),
+  I('body', 'a', 'Straight'),
+  I('body', 'b', 'Soft'),
 ];
 
 export const ITEM_BY_ID = new Map(AVATAR_ITEMS.map((i) => [i.id, i]));
@@ -343,6 +347,7 @@ export const DEFAULT_LOADOUT: FullLoadout = {
   pet: 'pet.none',
   petColor: '#e8a15a',
   mobility: 'mob.none',
+  body: 'body.a',
 };
 
 /** Maps looks saved before the catalog grew (single "accessory" slot) onto the new slots. */
@@ -389,6 +394,7 @@ const SLOT_FIELDS: Array<[keyof FullLoadout, AvatarSlot]> = [
   ['held', 'held'],
   ['pet', 'pet'],
   ['mobility', 'mobility'],
+  ['body', 'body'],
 ];
 
 const COLOR_FIELDS: Array<keyof FullLoadout> = [
@@ -501,6 +507,7 @@ export function randomLoadout(
         facialHair: base.facialHair,
         faceDetail: base.faceDetail,
         mobility: base.mobility,
+        body: base.body,
       }
     : {
         skin: pick(SKIN_TONES),
@@ -514,6 +521,7 @@ export function randomLoadout(
         facialHair: noneOr('facialHair', 0.2),
         faceDetail: noneOr('faceDetail', 0.3),
         mobility: base.mobility,
+        body: id('body'),
       };
   const top = id('top');
   return sanitizeLoadout(

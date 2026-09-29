@@ -8,7 +8,7 @@
  */
 import type { AvatarLoadout } from '@shared/domain/types';
 import { ITEM_BY_ID, normalizeLoadout, type FullLoadout } from '@shared/avatar';
-import { frameFor, type Frame, type Pose, type View } from './avatarFrame';
+import { frameFor, type Body, type Frame, type Pose, type View } from './avatarFrame';
 import { GOLD, H, LINE, M, PINK, PLUM, Pix, W, WHITE, hx, lightOf, lineOf, lum, mix, outline, paint, shadowOf, type RGB } from './pixkit';
 import TOP_LIB from './topLib.json';
 import HAT_LIB from './hatLib.json';
@@ -695,6 +695,69 @@ function drawShoes(P: Pix, F: Frame, L: FullLoadout) {
   }
 }
 
+/** The loadout's body base ('body.b' → 'b'; anything else is the default straight base). */
+export function bodyOf(L: FullLoadout): Body {
+  return L.body === 'body.b' ? 'b' : 'a';
+}
+
+/** Each row's [left, right] extent of a torso outline. */
+function torsoRows(F: Frame): Map<number, [number, number]> {
+  const m = M().poly(F.torso);
+  const rows = new Map<number, [number, number]>();
+  for (let y = 0; y < H; y++) {
+    let l = -1;
+    let r = -1;
+    for (let x = 0; x < W; x++)
+      if (m.has(x, y)) {
+        if (l < 0) l = x;
+        r = x;
+      }
+    if (l >= 0) rows.set(y, [l, r]);
+  }
+  return rows;
+}
+
+/**
+ * The mesh warp for body bases: a garment drawn on base A's torso is remapped row by row onto another torso,
+ * each row's span stretched from A's outline to the target's (nearest pixel), so pockets, plackets and
+ * prints stay put relative to the body. Rows above or below the torso keep the nearest torso row's warp.
+ */
+function warpToTorso(m: { x: number; y: number; rows: string[] }, from: Frame, to: Frame) {
+  const A = torsoRows(from);
+  const B = torsoRows(to);
+  const ys = [...A.keys()];
+  const near = (y: number) => ys.reduce((best, k) => (Math.abs(k - y) < Math.abs(best - y) ? k : best), ys[0]);
+  const out: string[] = [];
+  let minX = Infinity;
+  const cells: Array<[number, number, string]> = [];
+  m.rows.forEach((row, r) => {
+    const y = m.y + r;
+    const k = near(y);
+    const [al, ar] = A.get(k)!;
+    const [bl, br] = B.get(k) ?? A.get(k)!;
+    const sx = (br - bl) / Math.max(1, ar - al);
+    // map every target column back to a source column (inverse, so no gaps)
+    const src = (x: number) => Math.round(al + (x - bl) / sx);
+    const x0 = Math.floor(bl + (m.x - al) * sx);
+    const x1 = Math.ceil(bl + (m.x + row.length - 1 - al) * sx);
+    for (let x = x0; x <= x1; x++) {
+      const c = row[src(x) - m.x];
+      if (c && c !== '.') {
+        cells.push([x, r, c]);
+        minX = Math.min(minX, x);
+      }
+    }
+  });
+  if (!cells.length) return m;
+  for (const [x, r, c] of cells) {
+    const row = (out[r] ??= '');
+    const i = x - minX;
+    out[r] = row.padEnd(i, '.').slice(0, i) + c + row.slice(i + 1);
+  }
+  for (let r = 0; r < m.rows.length; r++) out[r] ??= '.';
+  return { x: minX, y: m.y, rows: out };
+}
+
 /** Catalog tops drawn on a generated base garment (plus a print where they have one). */
 const TOP_ALIAS: Record<string, string> = {
   'aurora-tee': 'tee',
@@ -718,7 +781,8 @@ function drawTorso(P: Pix, F: Frame, L: FullLoadout) {
   const map = (TOPS[id] ?? TOPS[TOP_ALIAS[id] ?? ''])?.[F.view];
   const dy = F.shoulderY - 58;
   if (map) {
-    const m = placed(map, [TORSO_ORIGIN.x, TORSO_ORIGIN.y + dy], [0, dy]);
+    const m0 = placed(map, [TORSO_ORIGIN.x, TORSO_ORIGIN.y + dy], [0, dy]);
+    const m = F.body === 'a' ? m0 : warpToTorso(m0, frameFor(F.view, F.pose, 'a'), F);
     let t = tint;
     if (L.top === 'top.apron') {
       // Two colours: the apron in topColor, the tee around it in topAccent (same tone, recoloured). In front
@@ -974,9 +1038,10 @@ export function drawAvatarV2(input: AvatarLoadout, view: View, requested: Pose, 
   const L = normalizeLoadout(input);
   const wheelchair = L.mobility === 'mob.wheelchair';
   const pose: Pose = wheelchair && requested !== 'wave' ? 'sit' : requested;
-  let F = frameFor(view, pose);
+  const body = bodyOf(L);
+  let F = frameFor(view, pose, body);
   if (wheelchair && pose === 'wave') {
-    const sit = frameFor(view, 'sit');
+    const sit = frameFor(view, 'sit', body);
     F = { ...sit, pose: 'wave', armNear: F.armNear, handNear: F.handNear };
   }
   const coversHair = !!ITEM_BY_ID.get(L.headwear)?.coversHair;

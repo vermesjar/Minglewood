@@ -36,6 +36,10 @@ const PAIRS: Array<[keyof FullLoadout, string, keyof FullLoadout, string]> = [
   ['held', 'held', 'mobility', 'mobility'],
   ['top', 'top', 'mobility', 'mobility'],
   ['hair', 'hair', 'top', 'top'],
+  ['top', 'top', 'body', 'body'],
+  ['bottom', 'bottom', 'body', 'body'],
+  ['hair', 'hair', 'body', 'body'],
+  ['neck', 'neck', 'body', 'body'],
 ];
 const POSES: Pose[] = ['stand', 'walk1', 'sit', 'wave'];
 const lines: string[] = ['# Pairwise sweep', ''];
