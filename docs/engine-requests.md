@@ -1,5 +1,12 @@
 # Engine requests from the world / exteriors pass
 
+Status (round 2): all items below are done — ducks on real water, emitter-driven smoke / spray / blink / beam,
+the outdoor night pass (tint, lamp pools, window glow), animated water (ripple frames cross-faded in
+WorldView.drawWaterMotion), tree sway, 2× town ground (streamed: flat coat → 1× detail → 2× swap, cached per
+scene), label placement on each building's own roof, off-screen culling, and the linter tolerances.
+Kept for the record:
+
+
 The town was rebuilt at real scale (76×76, buildings sized around ~40 px people) with generated exterior art
 conformed to exact footprints (`art/town_conform.py`) and 2× props (`art/specs/town-props.json`). The data the
 engine needs is already published in `public/art/manifest.json`; these hooks make it live. Files named are

@@ -201,7 +201,7 @@ export function buildInteriors(): SceneDef[] {
         id: 'hq-5',
         sprite: 'frame',
         wall: 'right',
-        x: 10,
+        x: 4,
         y: 0,
         variant: 'lisbon',
         artifactId: 'art-lisbon',
@@ -211,7 +211,7 @@ export function buildInteriors(): SceneDef[] {
         id: 'hq-6',
         sprite: 'frame',
         wall: 'right',
-        x: 12,
+        x: 2,
         y: 0,
         variant: 'team',
         artifactId: 'art-series-a',
@@ -237,7 +237,7 @@ export function buildInteriors(): SceneDef[] {
         sprite: 'bulletin',
         wall: 'left',
         x: 0,
-        y: 5,
+        y: 4,
         d: 2,
         label: 'New faces board',
         actions: [
@@ -320,13 +320,11 @@ export function buildInteriors(): SceneDef[] {
       { id: 'hq-bench-2', sprite: 'bench', variant: 'navy', x: 8, y: 10, w: 2, d: 1, facing: 'ne', actions: sit },
       { id: 'hq-topiary-5', sprite: 'planter', variant: 'brass', x: 4, y: 10 },
       { id: 'hq-topiary-6', sprite: 'planter', variant: 'brass', x: 10, y: 10 },
-      plant(1, 1, 'b'),
-      plant(13, 0, 'b'),
       {
         id: 'hq-aquarium',
         sprite: 'heirloom-aquarium',
         x: 0,
-        y: 10,
+        y: 7,
         w: 1,
         d: 2,
         facing: 'se',
@@ -334,7 +332,7 @@ export function buildInteriors(): SceneDef[] {
         actions: [{ kind: 'info', title: 'The Koi Aquarium', body: 'Every fish is named after a product codename. The black moor is Aurora. Nobody knows who named the snail.' }],
       },
       { id: 'hq-window', sprite: 'window', wall: 'left', x: 0, y: 0, d: 2 },
-      { id: 'hq-clock', sprite: 'clock-grand', x: 0, y: 4, facing: 'se', label: 'The grandfather clock' },
+      { id: 'hq-clock', sprite: 'clock-grand', x: 13, y: 0, facing: 'sw', label: 'The grandfather clock' },
     ],
   );
 
@@ -454,7 +452,7 @@ export function buildInteriors(): SceneDef[] {
       { id: 'eng-cafe-chair-1', ...chair(3, 10, 'se', 'cafe') },
       { id: 'eng-cafe-chair-2', ...chair(5, 10, 'nw', 'cafe') },
       { id: 'eng-cafe-chair-3', ...chair(4, 11, 'ne', 'cafe') },
-      plant(1, 11),
+      plant(0, 11),
       plant(9, 7, 'b'),
     ],
   );
@@ -518,7 +516,7 @@ export function buildInteriors(): SceneDef[] {
       { id: 'launch-stanchion-1', sprite: 'stanchion', x: 9, y: 2 },
       { id: 'launch-stanchion-2', sprite: 'stanchion', x: 11, y: 2 },
       { id: 'launch-bell', sprite: 'heirloom-bell', x: 10, y: 4, label: 'The Launch Bell — ring it when something ships', actions: [{ kind: 'ring', label: 'Ring the bell' }] },
-      plant(11, 1, 'b'),
+      plant(11, 5, 'b'),
       // The maker corner under the board: workbench, stools, a rack of spare parts.
       { id: 'launch-workbench', sprite: 'workbench', x: 2, y: 1, w: 2, d: 1, facing: 'sw', label: 'Workbench' },
       { id: 'launch-stool-1', sprite: 'stool', x: 2, y: 2, actions: sit },
@@ -539,19 +537,17 @@ export function buildInteriors(): SceneDef[] {
       { id: 'launch-star-map', sprite: 'star-map', wall: 'left', x: 0, y: 4, d: 2, label: 'Star map' },
       { id: 'launch-patches', sprite: 'mission-patches', wall: 'left', x: 0, y: 8, label: 'Mission patches' },
       // A coffee corner by the door: two segments of the café's counter with a machine of its own.
-      ...[8, 9].map((y): Obj => ({ sprite: 'counter', x: 0, y, facing: 'se', variant: 'cafe', label: 'Coffee corner' })),
+      { id: 'launch-counter', sprite: 'counter', x: 0, y: 9, facing: 'se', variant: 'cafe', label: 'Coffee corner' },
       {
         id: 'launch-espresso',
         sprite: 'espresso',
         x: 0,
-        y: 8,
+        y: 9,
         z: COUNTER_TOP,
         facing: 'se',
         label: 'Espresso machine',
         actions: [{ kind: 'vend', item: 'coffee', label: 'Get a coffee' }],
       },
-      { id: 'launch-cups', sprite: 'cups', x: 0, y: 9, z: COUNTER_TOP, label: 'Mugs' },
-      plant(0, 6, 'b'),
       { id: 'launch-bench', sprite: 'bench', variant: 'navy', x: 3, y: 9, w: 2, d: 1, facing: 'ne', actions: sit },
       { id: 'launch-bench-table', sprite: 'table-low', x: 5, y: 9, w: 1, d: 1, variant: 'side' },
       // The break corner for the long nights before a launch.
@@ -641,7 +637,7 @@ export function buildInteriors(): SceneDef[] {
       { sprite: 'balloons', x: 14, y: 4, eventDecor: 'balloons', variant: 'b', solid: false },
       { sprite: 'balloons', x: 15, y: 11, eventDecor: 'balloons', variant: 'c', solid: false },
       // Coats by the door.
-      { id: 'events-coat-rack', sprite: 'coat-rack', x: 0, y: 11, label: 'Coat rack' },
+      { id: 'events-coat-rack', sprite: 'coat-rack', x: 0, y: 9, label: 'Coat rack' },
       // Lanterns light the walk from the door to the stage.
       { id: 'events-lantern-4', sprite: 'lantern-floor', x: 2, y: 9, actions: [{ kind: 'toggle', label: 'Switch the lantern' }] },
       { id: 'events-lantern-5', sprite: 'lantern-floor', x: 12, y: 7, actions: [{ kind: 'toggle', label: 'Switch the lantern' }] },
@@ -668,7 +664,7 @@ export function buildInteriors(): SceneDef[] {
     },
     [
       // A wall of walnut shelving either side of the window.
-      ...[1, 2, 3, 4, 7, 8].map((x, i) => ({
+      ...[1, 2, 3, 4, 8, 9].map((x, i) => ({
         sprite: 'bookshelf',
         x,
         y: 0,
@@ -712,7 +708,7 @@ export function buildInteriors(): SceneDef[] {
       },
       plant(11, 9, 'b'),
       plant(7, 9),
-      plant(1, 9, 'b'),
+      plant(0, 9, 'b'),
       { id: 'focus-dragonlamp', sprite: 'heirloom-dragonlamp', x: 11, y: 4, facing: 'sw', label: 'Jade Dragon Lamp — a gift from our Singapore customers', actions: [{ kind: 'toggle', label: 'Switch the lamp' }] },
     ],
   );
@@ -776,7 +772,7 @@ export function buildInteriors(): SceneDef[] {
         id: 'arcade-vending',
         sprite: 'vending-machine',
         x: 0,
-        y: 5,
+        y: 9,
         facing: 'se',
         label: 'Snack machine',
         actions: [{ kind: 'vend', item: 'soda', label: 'Get a soda' }],
@@ -785,7 +781,7 @@ export function buildInteriors(): SceneDef[] {
         id: 'arcade-prizes',
         sprite: 'prize-counter',
         x: 1,
-        y: 8,
+        y: 5,
         w: 1,
         d: 2,
         facing: 'se',
@@ -805,7 +801,6 @@ export function buildInteriors(): SceneDef[] {
       { sprite: 'beanbag', x: 10, y: 9, variant: 'pink', actions: sit },
       { id: 'arcade-beanbag-3', sprite: 'beanbag', x: 8, y: 8, variant: 'purple', actions: sit },
       plant(11, 5),
-      plant(5, 0, 'b'),
     ],
   );
 
@@ -868,8 +863,8 @@ export function buildInteriors(): SceneDef[] {
       { id: 'design-crit-1', sprite: 'armchair', variant: 'mustard', x: 9, y: 8, facing: 'se', actions: sit },
       { id: 'design-crit-table', sprite: 'table-round', x: 10, y: 8 },
       { id: 'design-crit-2', sprite: 'armchair', variant: 'mustard', x: 11, y: 8, facing: 'nw', actions: sit },
-      plant(11, 1, 'b'),
-      plant(1, 9, 'b'),
+      plant(11, 3, 'b'),
+      plant(0, 9, 'b'),
       { id: 'design-pothos', sprite: 'plant', variant: 'pothos', x: 6, y: 1 },
       {
         id: 'design-globe',
@@ -883,7 +878,7 @@ export function buildInteriors(): SceneDef[] {
   );
 
   // The prize counter's attendant works the lane behind it.
-  arcade.staff = [{ x: 0, y: 8, w: 1, d: 2 }];
+  arcade.staff = [{ x: 0, y: 5, w: 1, d: 2 }];
   arcade.npcs = [
     {
       id: 'attendant',
@@ -910,8 +905,8 @@ export function buildInteriors(): SceneDef[] {
         accessory: 'acc.none',
       },
       spots: [
-        { x: 0, y: 8, facing: 'se' },
-        { x: 0, y: 9, facing: 'se', doing: 'work' },
+        { x: 0, y: 5, facing: 'se' },
+        { x: 0, y: 6, facing: 'se', doing: 'work' },
       ],
       serves: 'prize-counter',
       greeting: ['Welcome to Pixel Pier!', 'Tickets? Prizes are this way!', 'High score to beat is on cabinet two.'],

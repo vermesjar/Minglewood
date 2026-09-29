@@ -423,6 +423,13 @@ export class WorldView {
       a.occ.path = undefined;
       a.occ.pathStartedAt = undefined;
     }
+    // settled where their walk was going (the server ends the last step when someone orders on arrival)
+    const end = a.occ.path?.[a.occ.path.length - 1];
+    if (end && end[0] === patch.x && end[1] === patch.y) {
+      a.occ.path = undefined;
+      a.occ.pathStartedAt = undefined;
+      a.moving = false;
+    }
     if (patch.x !== undefined && patch.y !== undefined && !a.occ.path) {
       a.x = patch.x;
       a.y = patch.y;
@@ -705,6 +712,8 @@ export class WorldView {
     const gk = this.ground.scale ?? 1;
     c.drawImage(this.ground.canvas, this.ground.minX, this.ground.minY, this.ground.canvas.width / gk, this.ground.canvas.height / gk);
     if ('water' in this.ground && this.ground.water) this.drawWaterMotion(c, this.ground.water);
+    // a town ground still streaming in fills in where the camera is first
+    if (outdoor && 'pending' in this.ground && this.ground.pending) this.ground.focusY = this.camera.y;
     if (shell) {
       // Sunlight through the windows follows the weather; passing clouds make it breathe a little.
       c.save();

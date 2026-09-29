@@ -12,6 +12,7 @@ import { WalkGrid } from '@shared/world/walkGrid';
 import { buildSeed } from '@shared/seed/northstar';
 import { WorldView } from '../engine/WorldView';
 import { findPath } from '@shared/world/pathfinding';
+import { groundStats } from '../engine/ground';
 import { loadArt } from '../engine/sprites/art';
 import { clearSpriteCache } from '../engine/sprites/registry';
 import { setSkyOverride, type Sky } from '../engine/weather';
@@ -175,4 +176,28 @@ export function paths() {
       res.push({ from, to: b.roomId!, ms: +(performance.now() - t0).toFixed(2), steps: p ? p.length : -1 });
     }
   return { worst: Math.max(...res.map((r) => r.ms)), unreachable: res.filter((r) => r.steps < 0), res };
+}
+
+/**
+ * The ground's total CPU cost and its slice sizes (ms), measured by finishing it synchronously in slices of
+ * the same budget the live scheduler uses — hidden tabs throttle timers, so this is the honest number.
+ */
+export async function groundCost() {
+  await ready;
+  const { view } = setup({ w: 1920, h: 1080 });
+  const scene = { ...getScene(TOWN_ID)!, id: `town-cost-${Date.now()}` };
+  (view as unknown as { loadScene: WorldView['loadScene'] }).loadScene(scene, [], { meId: '', activeDecor: new Set(), festiveRooms: new Set(), party: false });
+  const flat = groundStats.flat;
+  const t0 = performance.now();
+  view.ground?.finishNow?.();
+  const total = performance.now() - t0;
+  view.destroy();
+  return {
+    flatCoat: Math.round(flat),
+    totalCpu: Math.round(total),
+    detail1x: Math.round(groundStats.raster),
+    water: Math.round(groundStats.water),
+    crisp2x: Math.round(groundStats.raster2),
+    longestSlice: +groundStats.longestSlice.toFixed(1),
+  };
 }

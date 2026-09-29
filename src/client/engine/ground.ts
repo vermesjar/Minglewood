@@ -38,6 +38,8 @@ export interface GroundLayer {
   done?: Promise<void>;
   /** Finish the remaining work synchronously (review renders). */
   finishNow?: () => void;
+  /** Where the camera is (art-space y), so the ground streams in there first. */
+  focusY?: number;
 }
 
 /** The travelling ripple on open water at phase `ph` (radians); crests where it exceeds ~1.4. */
@@ -94,15 +96,15 @@ const isPaved = (c: string) => c === 'p' || c === 'P' || c === 'd';
 /** Hashed lattice values, cached per seed (value noise reads each one thousands of times). */
 const LAT = 160;
 const LAT_OFF = 8;
-const lattices = new Map<number, Float32Array>();
+const lattices: Array<Float32Array | undefined> = [];
 function lattice(x: number, y: number, seed: number): number {
   const ix = x + LAT_OFF;
   const iy = y + LAT_OFF;
-  if (ix < 0 || iy < 0 || ix >= LAT || iy >= LAT) return hash2(x, y, seed);
-  let a = lattices.get(seed);
+  if (ix < 0 || iy < 0 || ix >= LAT || iy >= LAT || seed < 0 || seed > 255) return hash2(x, y, seed);
+  let a = lattices[seed];
   if (!a) {
     a = new Float32Array(LAT * LAT).fill(-1);
-    lattices.set(seed, a);
+    lattices[seed] = a;
   }
   const i = iy * LAT + ix;
   let v = a[i];
@@ -249,7 +251,7 @@ function waterColor(depth: number, s: Sample): RGB {
  */
 const outdoorCache = new Map<string, { key: string; layer: GroundLayer }>();
 /** How long the last town ground took to build (ms): the terrain raster and the lake's ripple frames. */
-export const groundStats = { raster: 0, water: 0 };
+export const groundStats = { raster: 0, raster2: 0, water: 0, longestSlice: 0, flat: 0 };
 
 export function renderOutdoorGround(scene: SceneDef, scale = 1): GroundLayer {
   let sig = 0;
@@ -257,13 +259,83 @@ export function renderOutdoorGround(scene: SceneDef, scale = 1): GroundLayer {
   const key = `${scale}|${scene.width}x${scene.height}|${scene.objects.length}|${sig}|${scene.tiles.join('').length}`;
   const hit = outdoorCache.get(scene.id);
   if (hit && hit.key === key) return hit.layer;
-  const layer = rasterizeOutdoor(scene, scale);
+  const layer = streamOutdoor(scene, scale);
   outdoorCache.set(scene.id, { key, layer });
   return layer;
 }
 
-function rasterizeOutdoor(scene: SceneDef, scale: number): GroundLayer {
+/**
+ * The town's ground, built without ever stalling a frame: a flat coat of tile colours at once; then the
+ * detailed raster at art density, band by band nearest the camera first; then the lake's ripple frames; then
+ * (for `scale` 2) the crisp 2× raster, built off to the side and swapped in whole when it's done. Each piece
+ * of work is a few-ms slice between frames.
+ */
+function streamOutdoor(scene: SceneDef, scale: number): GroundLayer {
   const t0 = performance.now();
+  const lo = rasterizeOutdoor(scene, 1, true);
+  const layer: GroundLayer = { canvas: lo.canvas, minX: lo.minX, minY: lo.minY, wallHits: [], scale: 1, pending: true };
+  groundStats.flat = performance.now() - t0;
+  groundStats.raster = 0;
+  groundStats.raster2 = 0;
+  groundStats.water = 0;
+  groundStats.longestSlice = 0;
+  let hi: ReturnType<typeof rasterizeOutdoor> | null = null;
+  let water: ReturnType<typeof waterMotionJob> | null = null;
+  const jobs: Array<(budget: number) => boolean> = [
+    (b) => {
+      const t = performance.now();
+      const done = lo.step(b, layer.focusY);
+      groundStats.raster += performance.now() - t;
+      return done;
+    },
+    (b) => {
+      const t = performance.now();
+      water ??= lo.water();
+      const done = water.step(b);
+      groundStats.water += performance.now() - t;
+      if (done) layer.water = water.result();
+      return done;
+    },
+  ];
+  if (scale > 1)
+    jobs.push((b) => {
+      const t = performance.now();
+      hi ??= rasterizeOutdoor(scene, scale, false);
+      const done = hi.step(b, layer.focusY);
+      groundStats.raster2 += performance.now() - t;
+      if (done) {
+        layer.canvas = hi.canvas;
+        layer.scale = scale;
+      }
+      return done;
+    });
+  let job = 0;
+  /** Up to `budget` ms of the remaining work; true once everything is done. */
+  const step = (budget: number): boolean => {
+    const start = performance.now();
+    while (job < jobs.length && performance.now() - start < budget) {
+      if (jobs[job](Math.max(1, budget - (performance.now() - start)))) job++;
+    }
+    groundStats.longestSlice = Math.max(groundStats.longestSlice, performance.now() - start);
+    if (job < jobs.length) return false;
+    layer.pending = false;
+    return true;
+  };
+  layer.finishNow = () => {
+    while (!step(7));
+  };
+  // one slice per macrotask, yielding to the event loop in between so frames and input keep flowing
+  layer.done = new Promise<void>((resolve) => {
+    const run = () => {
+      if (step(7)) resolve();
+      else setTimeout(run, 0);
+    };
+    setTimeout(run, 0);
+  });
+  return layer;
+}
+
+function rasterizeOutdoor(scene: SceneDef, scale: number, flatCoat: boolean) {
   const { width: W, height: H } = scene;
   const S = scale;
   const minX = -H * 16 - 8;
@@ -274,7 +346,9 @@ function rasterizeOutdoor(scene: SceneDef, scale: number): GroundLayer {
   const ch = Math.ceil((maxY - minY) * S);
   const canvas = makeCanvas(cw, ch);
   const ctx = canvas.getContext('2d')!;
-  const T = (x: number, y: number) => terrainAt(scene, x, y);
+  const flatTiles: string[] = [];
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) flatTiles.push(scene.tiles[y]?.[x] ?? ' ');
+  const T = (x: number, y: number) => (x < 0 || y < 0 || x >= W || y >= H ? ' ' : flatTiles[y * W + x]);
   // Natural edges (water, sand, grass) are drawn from a smoothed field, not tile by tile, so shores curve;
   // streets, the plaza and the pier keep their crisp tile edges. Only tiles near water pay for it.
   const natural = (c: string) => c === 'w' || c === 'W' || c === 's' || c === 'g' || c === 'h' || c === 'm';
@@ -401,17 +475,16 @@ function rasterizeOutdoor(scene: SceneDef, scale: number): GroundLayer {
       smp.py = Math.floor((ay - minY) * 2);
       smp.sx = sx;
       smp.sy = sy;
-      const g = { x: gx0, y: gy0 };
       if (isLand(c)) {
         rgb = landColor(c, smp, T, fountain);
         if (c === 's' && wet[ty * W + tx]) {
           // the wet band just above the waterline
-          const w2 = classAt(g.x + 0.22, g.y + 0.22);
-          if (isWater(w2) || isWater(classAt(g.x - 0.18, g.y + 0.18)) || isWater(classAt(g.x + 0.18, g.y - 0.18))) rgb = PAL.wetSand;
+          const w2 = classAt(gx0 + 0.22, gy0 + 0.22);
+          if (isWater(w2) || isWater(classAt(gx0 - 0.18, gy0 + 0.18)) || isWater(classAt(gx0 + 0.18, gy0 - 0.18))) rgb = PAL.wetSand;
         }
         // a soft shadow line where grass meets sand or a path, for readability
-        const ex = frac(g.x);
-        const ey = frac(g.y);
+        const ex = frac(gx0);
+        const ey = frac(gy0);
         if ((c === 'g' || c === 'h' || c === 'm') && (ex > 0.95 || ey > 0.95)) {
           const n = ex > 0.95 ? T(tx + 1, ty) : T(tx, ty + 1);
           if (n === 's') rgb = shade(rgb, 0.92);
@@ -514,76 +587,51 @@ function rasterizeOutdoor(scene: SceneDef, scale: number): GroundLayer {
   };
 
   // A flat first coat, instantly: every tile its terrain's base colour, so the town is there from the first
-  // frame while the detailed raster streams in over it, band by band, from the middle out.
-  ctx.save();
-  ctx.scale(S, S);
-  ctx.translate(-minX, -minY);
-  const flat: Record<string, RGB> = { g: PAL.grass, h: PAL.grass2, m: PAL.meadow, p: PAL.path, P: PAL.plaza, s: PAL.sand, w: PAL.water, W: PAL.deep, d: PAL.dock };
-  for (let y = 0; y < H; y++)
-    for (let x = 0; x < W; x++) {
-      const col = flat[T(x, y)] ?? PAL.grass;
-      ctx.fillStyle = `rgb(${col[0]},${col[1]},${col[2]})`;
-      ctx.beginPath();
-      ctx.moveTo((x - y) * 16, (x + y) * 8 - 0.5);
-      ctx.lineTo((x + 1 - y) * 16 + 0.5, (x + 1 + y) * 8);
-      ctx.lineTo((x - y) * 16, (x + y + 2) * 8 + 0.5);
-      ctx.lineTo((x - y - 1) * 16 - 0.5, (x + y + 1) * 8);
-      ctx.closePath();
-      ctx.fill();
-    }
-  ctx.restore();
+  // frame while the detailed raster streams in over it.
+  if (flatCoat) {
+    ctx.save();
+    ctx.scale(S, S);
+    ctx.translate(-minX, -minY);
+    const flat: Record<string, RGB> = { g: PAL.grass, h: PAL.grass2, m: PAL.meadow, p: PAL.path, P: PAL.plaza, s: PAL.sand, w: PAL.water, W: PAL.deep, d: PAL.dock };
+    for (let y = 0; y < H; y++)
+      for (let x = 0; x < W; x++) {
+        const col = flat[T(x, y)] ?? PAL.grass;
+        ctx.fillStyle = `rgb(${col[0]},${col[1]},${col[2]})`;
+        ctx.beginPath();
+        ctx.moveTo((x - y) * 16, (x + y) * 8 - 0.5);
+        ctx.lineTo((x + 1 - y) * 16 + 0.5, (x + 1 + y) * 8);
+        ctx.lineTo((x - y) * 16, (x + y + 2) * 8 + 0.5);
+        ctx.lineTo((x - y - 1) * 16 - 0.5, (x + y + 1) * 8);
+        ctx.closePath();
+        ctx.fill();
+      }
+    ctx.restore();
+  }
 
-  const BAND = 48;
-  const bands: number[] = [];
-  for (let y = 0; y < ch; y += BAND) bands.push(y);
-  bands.sort((a, b) => Math.abs(a + BAND / 2 - ch / 2) - Math.abs(b + BAND / 2 - ch / 2));
+  // ~20k pixels a band, so one slice stays a few ms whatever the scale; the band nearest the camera goes next
+  const BAND = Math.max(2, Math.floor(20000 / cw));
+  const todo: number[] = [];
+  for (let y = 0; y < ch; y += BAND) todo.push(y);
   const buf = new ImageData(cw, BAND);
-  let next = 0;
-  let rasterMs = 0;
-  const layer: GroundLayer = { canvas, minX, minY, wallHits: [], scale: S };
-  const water = waterMotionJob(scene, classAt, shoreAt, minX, minY);
-  /** Do up to `budget` ms of the remaining work; true once everything is done. */
-  const step = (budget: number): boolean => {
+  /** Up to `budget` ms of bands; true once all are done. `focusY`: the camera's art-space y. */
+  const step = (budget: number, focusY?: number): boolean => {
     const start = performance.now();
-    while (next < bands.length && performance.now() - start < budget) {
-      const ya = bands[next++];
+    while (todo.length && performance.now() - start < budget) {
+      const fy = focusY === undefined ? ch / 2 : (focusY - minY) * S;
+      let best = 0;
+      for (let i = 1; i < todo.length; i++) if (Math.abs(todo[i] + BAND / 2 - fy) < Math.abs(todo[best] + BAND / 2 - fy)) best = i;
+      const ya = todo[best];
+      todo[best] = todo[todo.length - 1];
+      todo.pop();
       const yb = Math.min(ch, ya + BAND);
-      const t = performance.now();
       buf.data.fill(0);
       rasterRows(ya, yb, buf.data);
-      // keep the flat coat where the raster leaves nothing (outside the diamond, it's all transparent anyway)
       ctx.putImageData(buf, 0, ya, 0, 0, cw, yb - ya);
       shadowRows(ya, yb);
-      rasterMs += performance.now() - t;
     }
-    if (next < bands.length) return false;
-    groundStats.raster = rasterMs;
-    if (!layer.water) {
-      const t = performance.now();
-      const doneWater = water.step(Math.max(1, budget - (performance.now() - start)));
-      groundStats.water += performance.now() - t;
-      if (!doneWater) return false;
-      layer.water = water.result();
-    }
-    layer.pending = false;
-    return true;
+    return todo.length === 0;
   };
-  groundStats.raster = 0;
-  groundStats.water = 0;
-  layer.pending = true;
-  layer.finishNow = () => {
-    while (!step(1e9));
-  };
-  layer.done = new Promise<void>((resolve) => {
-    const ch2 = new MessageChannel();
-    ch2.port1.onmessage = () => {
-      if (step(8)) resolve();
-      else ch2.port2.postMessage(0);
-    };
-    ch2.port2.postMessage(0);
-  });
-  void t0;
-  return layer;
+  return { canvas, minX, minY, step, water: () => waterMotionJob(scene, classAt, shoreAt, minX, minY) };
 }
 
 /**

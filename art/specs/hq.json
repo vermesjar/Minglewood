@@ -158,10 +158,10 @@
           "span": 3,
           "wall": {
             "v": [
-              14,
-              50
+              28,
+              57
             ],
-            "margin": 0.1
+            "margin": 0.06
           },
           "prompt": "A wide company emblem wall, about 2.3 : 1: vertical navy-blue wood slats with a large polished brass five-pointed star emblem in the centre, glowing softly with a warm halo, small brass pin lights along the top. No letters."
         },

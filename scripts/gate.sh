@@ -5,4 +5,6 @@ npm run typecheck
 npm run lint
 npm test
 npm run avatars:sweep
+npx tsx --tsconfig tsconfig.json scripts/room-map.ts --quiet
+npm run furniture:review
 echo "gate: all green"
