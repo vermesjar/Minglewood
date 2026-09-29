@@ -97,7 +97,11 @@ export class OrgHub extends EventEmitter<HubEvents> {
   ) {
     super();
     this.rebuildGrids();
-    this.npcs = new NpcDirector({ scene: (id) => this.scene(id), toScene: (sceneId, msg) => this.toScene(sceneId, msg) });
+    this.npcs = new NpcDirector({
+      scene: (id) => this.scene(id),
+      toScene: (sceneId, msg) => this.toScene(sceneId, msg),
+      nameOf: (id) => this.member(id)?.displayName,
+    });
     this.timer = setInterval(() => this.tick(), 1000);
   }
 

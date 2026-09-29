@@ -14,6 +14,7 @@
 import type { NpcState, ServerMsg } from '@shared/protocol';
 import type { Facing, NpcDef, SceneDef, SceneObject } from '@shared/world/scene';
 import { WALK_SPEED, type Tile } from '@shared/world/pathfinding';
+import { carryMeta } from '@shared/carry';
 
 /** How long making an order takes, once they're at the machine. */
 export const BREW_MS = 1600;
@@ -45,6 +46,8 @@ interface Live {
 interface Host {
   scene(id: string): SceneDef | undefined;
   toScene(sceneId: string, msg: ServerMsg): void;
+  /** A member's display name (NPCs call people by their first name). */
+  nameOf?(memberId: string): string | undefined;
 }
 
 const walkMs = (path: Tile[]) => {
@@ -205,7 +208,10 @@ export class NpcDirector {
       this.host.toScene(sceneId, { t: 'moment', sceneId, objectId: job.machine.id, what: 'brew', by: `npc:${n.def.id}` });
     });
     this.later(walk + BREW_MS, () => {
-      this.update(sceneId, n, { id: n.def.id, x: spot.x, y: spot.y, facing: spot.facing, doing: 'serve', holding: job.item });
+      // the hand-over, said out loud so the whole room sees who got what
+      const first = (this.host.nameOf?.(job.forId) ?? '').split(' ')[0];
+      const line = carryMeta(job.item)?.handOff.replace('{name}', first || 'friend');
+      this.update(sceneId, n, { id: n.def.id, x: spot.x, y: spot.y, facing: spot.facing, doing: 'serve', holding: job.item, say: line });
       job.done();
     });
     this.later(walk + BREW_MS + HANDOFF_MS, () => {

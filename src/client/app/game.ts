@@ -658,15 +658,9 @@ class Game {
    * says so as they hand it over, the item pops up over your head with a sparkle, and a toast confirms it; the
    * action bar then shows what you're holding until you put it down.
    */
+  /** Something landed in your hands (the maker's hand-over line comes from the server, for the whole room). */
   private handedOver(item: string) {
     const meta = carryMeta(item);
-    const first = this.name(this.meId).split(' ')[0];
-    const scene = getState().sceneId ? this.scene(getState().sceneId!) : undefined;
-    const maker = scene?.npcs?.find((n) => {
-      const machine = n.serves ? scene.objects.find((o) => o.sprite === n.serves) : undefined;
-      return machine?.actions?.some((a) => a.kind === 'vend' && a.item === item);
-    });
-    if (maker && meta) this.world?.say(`npc:${maker.id}`, meta.handOff.replace('{name}', first));
     this.world?.gotItem(this.meId, meta?.emoji ?? '✨');
     toast(meta?.got ?? 'Enjoy!', 'social', { label: 'Put down', run: () => this.putDown() }, 4500);
   }
