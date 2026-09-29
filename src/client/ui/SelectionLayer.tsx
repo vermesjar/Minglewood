@@ -52,7 +52,7 @@ function ProfileCard({ id }: { id: string; x: number; y: number }) {
       <div className="profile">
         <div className="infostand-head">
           <div className="infostand-avatar" style={{ background: `${dept?.color ?? '#ccc'}33` }}>
-            <AvatarCanvas loadout={m.avatar} scale={2} />
+            <AvatarCanvas loadout={m.avatar} crop="bust" scale={2} />
           </div>
           <div className="infostand-who">
             <h3>

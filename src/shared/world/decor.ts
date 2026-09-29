@@ -24,6 +24,8 @@ export interface DecorItem {
   variant?: string;
   facing?: SceneObject['facing'];
   sit?: boolean;
+  /** A precious showpiece earned by a company milestone. */
+  heirloom?: boolean;
 }
 
 export const DECOR_CATALOG: DecorItem[] = [
@@ -39,6 +41,13 @@ export const DECOR_CATALOG: DecorItem[] = [
   { id: 'easel', name: 'Easel', sprite: 'easel', variant: 'b', facing: 'se' },
   { id: 'balloons', name: 'Balloons', sprite: 'balloons', variant: 'b' },
   { id: 'arcade', name: 'Arcade cabinet', sprite: 'arcade-cabinet', variant: 'cyan', facing: 'sw' },
+  // Heirlooms: the jewelry of a company's world.
+  { id: 'heirloom-throne', name: 'Founders’ Throne', sprite: 'heirloom-throne', facing: 'sw', sit: true, heirloom: true },
+  { id: 'heirloom-dragonlamp', name: 'Jade Dragon Lamp', sprite: 'heirloom-dragonlamp', facing: 'sw', heirloom: true },
+  { id: 'heirloom-gold', name: 'Gold Reserve', sprite: 'heirloom-gold', heirloom: true },
+  { id: 'heirloom-globe', name: 'Crystal Globe', sprite: 'heirloom-globe', heirloom: true },
+  { id: 'heirloom-bell', name: 'Launch Bell', sprite: 'heirloom-bell', heirloom: true },
+  { id: 'heirloom-trophy', name: 'Keystone Trophy', sprite: 'heirloom-trophy', heirloom: true },
 ];
 
 export const DECOR_BY_ID = new Map(DECOR_CATALOG.map((d) => [d.id, d]));

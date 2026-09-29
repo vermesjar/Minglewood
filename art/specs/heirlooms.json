@@ -1,0 +1,179 @@
+{
+  "name": "heirlooms",
+  "tile": 200,
+  "colors": 36,
+  "quality": "high",
+  "mood": "HEIRLOOMS \u2014 the jewelry of a company's world: rare showpieces earned by milestones. The richest materials and the strongest contrast in any room: gleaming gold with bright white specular glints, deep jewel-toned velvet, polished lacquer, carved jade, crystal. Precious, grand, a little theatrical, never tacky. Each is an ORIGINAL design grounded in a real decorative tradition (Art Deco, Qing jade carving, Victorian brass) and must not resemble any furniture from an existing video game.",
+  "sheets": [
+    {
+      "name": "hall",
+      "grid": "3x2",
+      "items": [
+        {
+          "key": "heirloom-throne",
+          "facing": "se",
+          "w": 1,
+          "d": 1,
+          "h": 44,
+          "width": 64,
+          "fill": 0.7,
+          "prompt": "The Founders' Throne: an Art Deco armchair-throne with a tall fan-shaped back carved as a gilded sunburst with stepped rays, deep peacock-blue velvet seat and back panel with button tufting, gilded lion-paw feet, gold ball finials, a tiny engraved brass plaque on the front rail.",
+          "extra": {
+            "seat": 14
+          }
+        },
+        {
+          "key": null,
+          "facing": "nw",
+          "w": 1,
+          "d": 1,
+          "h": 44,
+          "width": 64,
+          "fill": 0.7,
+          "prompt": "The SAME Art Deco Founders' Throne seen from behind: the back of the tall gilded sunburst fan with its stepped rays, peacock-blue velvet back panel, gold ball finials, gilded lion-paw feet."
+        },
+        {
+          "key": "heirloom-dragonlamp",
+          "facing": "se",
+          "w": 1,
+          "d": 1,
+          "h": 52,
+          "width": 50,
+          "fill": 0.35,
+          "prompt": "The Jade Dragon Lamp: a carved translucent green jade dragon with fine scales and flowing whiskers coiled around a slim gilded pillar, its claw raised holding a glowing pearl-white paper lantern that radiates warm light, on a round carved rosewood base with gold trim.",
+          "extra": {
+            "light": {
+              "x": 40,
+              "y": 27,
+              "r": 46
+            }
+          }
+        },
+        {
+          "key": "heirloom-dragonlamp",
+          "facing": "nw",
+          "w": 1,
+          "d": 1,
+          "h": 52,
+          "width": 50,
+          "fill": 0.35,
+          "prompt": "The SAME jade dragon lamp seen from behind: the dragon's carved jade back and tail coiled around the gilded pillar, the glowing pearl-white lantern held above, the carved rosewood base.",
+          "extra": {
+            "light": {
+              "x": 40,
+              "y": 27,
+              "r": 46
+            }
+          }
+        },
+        {
+          "key": "heirloom-gold",
+          "w": 1,
+          "d": 1,
+          "h": 26,
+          "width": 50,
+          "fill": 0.45,
+          "prompt": "The Gold Reserve: a neat stepped pyramid of seven gleaming gold ingots with stamped faces (no text) on a black lacquer and walnut display plinth, with dazzling white glints on the gold."
+        },
+        {
+          "key": "heirloom-globe",
+          "w": 1,
+          "d": 1,
+          "h": 40,
+          "width": 44,
+          "fill": 0.35,
+          "prompt": "The Crystal Globe: a clear crystal world globe with softly frosted continents, held in a brass armillary cradle of rings, on a slim turned walnut pedestal with a round gilded foot; light refracts through the crystal."
+        }
+      ]
+    },
+    {
+      "name": "grand",
+      "grid": "3x2",
+      "items": [
+        {
+          "key": "heirloom-piano",
+          "facing": "sw",
+          "w": 2,
+          "d": 2,
+          "h": 34,
+          "width": 124,
+          "fit": "diamond",
+          "prompt": "A black lacquered concert grand piano with its lid propped open showing the golden harp and strings inside, gold-rimmed curved body, ivory and black keys facing along the red arrow, turned legs with brass casters, a small velvet bench in front of the keys."
+        },
+        {
+          "key": "heirloom-piano",
+          "facing": "ne",
+          "w": 2,
+          "d": 2,
+          "h": 34,
+          "width": 124,
+          "fit": "diamond",
+          "prompt": "The SAME black lacquered grand piano seen from the curved tail side (the keys face away from us): the long curved glossy black body, the propped-open lid showing the golden harp, turned legs with brass casters."
+        },
+        {
+          "key": "heirloom-bell",
+          "w": 1,
+          "d": 1,
+          "h": 40,
+          "width": 48,
+          "fill": 0.5,
+          "prompt": "The Launch Bell: a big polished brass ship's bell hanging from a carved oak A-frame gallows with brass fittings and a braided white rope with a tassel; the bell gleams with bright glints."
+        },
+        {
+          "key": "heirloom-trophy",
+          "w": 1,
+          "d": 1,
+          "h": 38,
+          "width": 42,
+          "fill": 0.4,
+          "prompt": "The Keystone Trophy: a tall gold two-handled trophy cup with engraved laurels on a stepped white-and-grey Carrara marble plinth with a small gold plaque (no text)."
+        },
+        {
+          "key": "heirloom-aquarium",
+          "facing": "sw",
+          "w": 2,
+          "d": 1,
+          "h": 34,
+          "width": 96,
+          "fit": "diamond",
+          "prompt": "A Victorian aquarium: a long glass tank framed in ornate polished brass with a domed brass hood, clear blue water with orange-and-white koi and a black moor goldfish, swaying green plants, pebbles and a little stone arch, standing on a carved mahogany cabinet with brass feet. Its long glass side faces along the red arrow."
+        },
+        {
+          "key": "heirloom-aquarium",
+          "facing": "ne",
+          "w": 2,
+          "d": 1,
+          "h": 34,
+          "width": 96,
+          "fit": "diamond",
+          "prompt": "The SAME brass-framed Victorian aquarium on its carved mahogany cabinet, seen from the other long side: the same koi, goldfish, plants and stone arch through the glass."
+        }
+      ]
+    },
+    {
+      "name": "throne-back",
+      "grid": "1x1",
+      "size": "1024x1024",
+      "tile": 300,
+      "refs": [
+        "out/heirlooms/hall/heirloom-throne.se.raw.png"
+      ],
+      "note": "The second reference image is this exact throne from the front. Draw the SAME throne turned fully around so we look at it from directly BEHIND: the outside of the tall gilded sunburst back is nearest to us and hides the seat completely; we see the plain peacock-blue velvet back panel framed by gold rays, the gold ball finials, and the gilded lion-paw feet at the bottom. Same materials, proportions and pixel style.",
+      "items": [
+        {
+          "key": "heirloom-throne",
+          "facing": "nw",
+          "w": 1,
+          "d": 1,
+          "h": 44,
+          "width": 64,
+          "fill": 0.7,
+          "prompt": "The Art Deco Founders' Throne from the reference, seen from behind.",
+          "extra": {
+            "seat": 14
+          }
+        }
+      ]
+    }
+  ]
+}

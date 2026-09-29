@@ -640,6 +640,7 @@ export class WorldView {
         c.globalAlpha = 1;
       }
     }
+    this.drawGlints(c);
     this.effects.drawOver(c);
     if (shell) this.drawAmbience(c, sky, s, Math.round(tx), Math.round(ty));
 
@@ -798,6 +799,51 @@ export class WorldView {
     }
   }
 
+  private glintCanvas: HTMLCanvasElement | null = null;
+
+  /**
+   * Heirlooms catch the light: every few seconds a bright diagonal glint sweeps across each one, and now
+   * and then it gives off a little sparkle.
+   */
+  private drawGlints(c: CanvasRenderingContext2D) {
+    const t = performance.now() / 1000;
+    for (const st of this.statics) {
+      if (!st.obj.sprite.startsWith('heirloom')) continue;
+      const seed = (st.obj.x * 7 + st.obj.y * 13) % 10;
+      const period = 7 + (seed % 3);
+      const phase = ((t + seed * 1.3) % period) / 0.9; // 0..1 during the sweep
+      const sp = st.sprite;
+      const k = sp.scale ?? 1;
+      const w = sp.canvas.width;
+      const h = sp.canvas.height;
+      if (!this.reducedMotion && phase < 1) {
+        if (!this.glintCanvas) this.glintCanvas = document.createElement('canvas');
+        const g = this.glintCanvas;
+        g.width = w;
+        g.height = h;
+        const gc = g.getContext('2d')!;
+        const pos = -h + phase * (w + h * 2);
+        const grad = gc.createLinearGradient(pos, 0, pos + h * 0.6, h * 0.6);
+        grad.addColorStop(0, 'rgba(255,255,240,0)');
+        grad.addColorStop(0.5, 'rgba(255,252,225,0.75)');
+        grad.addColorStop(1, 'rgba(255,255,240,0)');
+        gc.fillStyle = grad;
+        gc.fillRect(0, 0, w, h);
+        gc.globalCompositeOperation = 'destination-in';
+        gc.drawImage(sp.canvas, 0, 0);
+        c.save();
+        c.globalCompositeOperation = 'lighter';
+        c.drawImage(g, st.dx, st.dy, w / k, h / k);
+        c.restore();
+      }
+      if (!this.reducedMotion && Math.random() < 0.004) {
+        const x = st.dx + (0.3 + Math.random() * 0.4) * (w / k);
+        const y = st.dy + (0.15 + Math.random() * 0.4) * (h / k);
+        this.effects.burst(x, y, 'sparkle', 3);
+      }
+    }
+  }
+
   /** The live view outside each window, painted before the room so it shows through the glass. */
   private drawWindowViews(c: CanvasRenderingContext2D, shell: InteriorLayer, sky: Sky) {
     const t = performance.now() / 1000;
@@ -830,7 +876,7 @@ export class WorldView {
     const now = performance.now();
     const flicker = 0.95 + 0.05 * Math.sin(now / 170) * Math.sin(now / 530);
     const lamps = this.statics
-      .filter((st) => st.obj.sprite === 'lamp' && this.isOn(st.obj.id))
+      .filter((st) => (st.obj.sprite === 'lamp' || !!artLight(st.obj)) && this.isOn(st.obj.id))
       .map((st) => {
         const L = artLight(st.obj) ?? { dx: 0, dy: -30, r: 22 };
         const p = isoToScreen(st.obj.x, st.obj.y, st.obj.z ?? 0);

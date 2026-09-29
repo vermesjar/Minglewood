@@ -22,17 +22,18 @@ const W = 88;
 const H = 112;
 /** Canvas pixels per art pixel. */
 const DENSITY = 2;
+export const AVATAR_DENSITY = DENSITY;
 export const AVATAR_ANCHOR = { x: 44, y: 104 };
 
 /** Crop rectangles (canvas px) for UI previews. */
 export const AVATAR_CROPS = {
-  head: { x: 22, y: 8, w: 46, h: 44 },
-  face: { x: 27, y: 14, w: 38, h: 36 },
-  bust: { x: 18, y: 8, w: 52, h: 62 },
-  torso: { x: 20, y: 44, w: 48, h: 40 },
-  legs: { x: 20, y: 70, w: 48, h: 38 },
+  head: { x: 27, y: 14, w: 36, h: 36 },
+  face: { x: 31, y: 18, w: 30, h: 30 },
+  bust: { x: 23, y: 12, w: 44, h: 48 },
+  torso: { x: 25, y: 44, w: 40, h: 34 },
+  legs: { x: 25, y: 68, w: 40, h: 38 },
   /** The person without the extra padding (pets and umbrellas may be clipped). */
-  body: { x: 16, y: 6, w: 58, h: 102 },
+  body: { x: 17, y: 8, w: 56, h: 100 },
   full: { x: 0, y: 0, w: W, h: H },
 };
 
@@ -205,9 +206,8 @@ function paint(P: Pix, m: Mask, color: RGB | ((x: number, y: number) => RGB), o:
       const t = ((x - cx) / hw) * 0.6 + ((y - cy) / hh) * 0.55;
       let c = base;
       if (o.edge !== false && (!m.has(x + 1, y) || !m.has(x, y + 1))) c = deepOf(base);
-      else if (o.rim !== false && (!m.has(x - 1, y) || !m.has(x, y - 1))) c = lightOf(base);
-      else if (!o.flat && t > 0.42 - bias) c = shadowOf(base);
-      else if (!o.flat && t < -0.62) c = lightOf(base);
+      else if (o.rim === true && (!m.has(x - 1, y) || !m.has(x, y - 1))) c = lightOf(base);
+      else if (!o.flat && t > 0.38 - bias) c = shadowOf(base);
       P.set(x, y, c);
     }
 }
@@ -234,7 +234,7 @@ function outline(P: Pix) {
         acc[2] += src[i + 2];
       }
       const avg: RGB = [acc[0] / n.length, acc[1] / n.length, acc[2] / n.length];
-      P.set(x, y, mix(avg, PLUM, 0.72));
+      P.set(x, y, mix(avg, [26, 18, 30], 0.8));
     }
 }
 
@@ -253,96 +253,101 @@ interface Body {
   hy: number;
   rx: number;
   ry: number;
-  /** Torso outline (shoulders → waist). */
+  /** Torso centre line and outline (shoulders → waist). */
+  cx: number;
   torso: Array<[number, number]>;
   shoulderY: number;
   waistY: number;
   hipY: number;
-  /** Arms: shoulder → hand; hand centre. */
   armNear: Limb;
   armFar: Limb;
   handNear: [number, number];
   handFar: [number, number];
-  /** Legs: hip → knee → ankle. */
   legs: Array<{ hip: [number, number]; knee: [number, number]; ankle: [number, number]; heel?: boolean }>;
   sitting: boolean;
 }
 
+/**
+ * Social-pixel proportions: about 3.4 heads tall (head 24 × 25 on an 84 px figure), a squarish grown-up
+ * head on a short neck, narrow shoulders, legs a little longer than the torso.
+ */
 function bodyFor(view: View, pose: Pose): Body {
   const sitting = pose === 'sit';
   const walk = pose === 'walk1' ? 1 : pose === 'walk2' ? -1 : 0;
-  const dy = sitting ? 9 : walk ? 1 : 0;
-  // Chibi but grown-up: a big head (~38% of height) sitting right on real shoulders.
-  const hxC = 45;
-  const hyC = 33 + dy;
-  const sY = 51 + dy;
-  const wY = 72 + dy;
+  const dy = sitting ? 8 : walk ? 1 : 0;
+  const cx = 45;
+  const hx = 45;
+  const hy = 33 + dy;
+  const sY = 49 + dy;
+  const wY = 69 + dy;
+  const hipY = 76 + dy;
   const torso: Array<[number, number]> = [
-    [31, sY],
-    [59, sY],
-    [62, sY + 4],
-    [58, wY],
-    [32, wY],
-    [28, sY + 4],
+    [cx - 10, sY],
+    [cx + 10, sY],
+    [cx + 12, sY + 3],
+    [cx + 10, wY],
+    [cx - 10, wY],
+    [cx - 12, sY + 3],
   ];
-  // Arms swing opposite the legs.
-  const swingN = walk * -4;
-  const swingF = walk * 4;
-  let handNear: [number, number] = [29 + swingN, 75 + dy];
-  let handFar: [number, number] = [61 + swingF, 74 + dy];
-  let armNear: Limb = { a: [31, sY + 4], b: [29 + swingN * 0.8, 70 + dy] };
-  let armFar: Limb = { a: [59, sY + 4], b: [61 + swingF * 0.8, 69 + dy] };
+  const swingN = walk * -3;
+  const swingF = walk * 3;
+  let armNear: Limb = { a: [cx - 10, sY + 3], b: [cx - 12 + swingN * 0.8, 65 + dy] };
+  let armFar: Limb = { a: [cx + 10, sY + 3], b: [cx + 12 + swingF * 0.8, 64 + dy] };
+  let handNear: [number, number] = [cx - 12 + swingN, 69 + dy];
+  let handFar: [number, number] = [cx + 12 + swingF, 68 + dy];
   if (sitting) {
-    handNear = [44, 82];
-    handFar = [56, 81];
-    armNear = { a: [31, sY + 4], b: [39, 78] };
-    armFar = { a: [59, sY + 4], b: [56, 76] };
+    armNear = { a: [cx - 10, sY + 3], b: [cx - 5, 74] };
+    armFar = { a: [cx + 10, sY + 3], b: [cx + 9, 72] };
+    handNear = [cx - 2, 77];
+    handFar = [cx + 10, 76];
   }
   if (pose === 'wave') {
-    armNear = { a: [31, sY + 3], b: [23, 41 + dy] };
-    handNear = [22, 37 + dy];
+    armNear = { a: [cx - 10, sY + 2], b: [cx - 17, 39 + dy] };
+    handNear = [cx - 18, 35 + dy];
   }
-  const hipY = 79 + dy;
   let legs: Body['legs'];
   if (sitting && view === 'back') {
-    // facing away: the knees point into the room, mostly hidden by the body
     legs = [
-      { hip: [38, 84], knee: [52, 80], ankle: [54, 90] },
-      { hip: [50, 83], knee: [62, 78], ankle: [63, 88] },
+      { hip: [cx - 6, 82], knee: [cx + 6, 78], ankle: [cx + 8, 88] },
+      { hip: [cx + 4, 81], knee: [cx + 14, 77], ankle: [cx + 15, 87] },
     ];
   } else if (sitting) {
     legs = [
-      { hip: [38, 84], knee: [54, 89], ankle: [55, 99] },
-      { hip: [50, 83], knee: [62, 87], ankle: [63, 97] },
+      { hip: [cx - 6, 82], knee: [cx + 8, 86], ankle: [cx + 9, 98] },
+      { hip: [cx + 4, 81], knee: [cx + 15, 85], ankle: [cx + 16, 97] },
     ];
   } else if (walk === 1) {
     legs = [
-      { hip: [39, hipY], knee: [42, 89], ankle: [45, 98] },
-      { hip: [51, hipY], knee: [49, 89], ankle: [45, 96], heel: true },
+      { hip: [cx - 5, hipY], knee: [cx - 2, 87], ankle: [cx, 98] },
+      { hip: [cx + 5, hipY], knee: [cx + 3, 87], ankle: [cx, 96], heel: true },
     ];
   } else if (walk === -1) {
     legs = [
-      { hip: [39, hipY], knee: [37, 89], ankle: [34, 96], heel: true },
-      { hip: [51, hipY], knee: [54, 89], ankle: [57, 98] },
+      { hip: [cx - 5, hipY], knee: [cx - 7, 87], ankle: [cx - 10, 96], heel: true },
+      { hip: [cx + 5, hipY], knee: [cx + 7, 87], ankle: [cx + 10, 98] },
     ];
   } else {
     legs = [
-      { hip: [39, hipY], knee: [39, 89], ankle: [39, 98] },
-      { hip: [51, hipY], knee: [51, 89], ankle: [51, 98] },
+      { hip: [cx - 5, hipY], knee: [cx - 5, 87], ankle: [cx - 5, 98] },
+      { hip: [cx + 5, hipY], knee: [cx + 5, 87], ankle: [cx + 5, 98] },
     ];
   }
-  return { view, pose, hx: hxC, hy: hyC, rx: 17.5, ry: 16.5, torso, shoulderY: sY, waistY: wY, hipY, armNear, armFar, handNear, handFar, legs, sitting };
+  return { view, pose, hx, hy, rx: 12, ry: 12.5, cx, torso, shoulderY: sY, waistY: wY, hipY, armNear, armFar, handNear, handFar, legs, sitting };
 }
 
 function headMask(B: Body): Mask {
-  if (B.view === 'back') return M().ellipse(B.hx, B.hy, B.rx, B.ry);
-  // soft, full cheeks toward the side we face
-  return M().ellipse(B.hx, B.hy, B.rx, B.ry).ellipse(B.hx + 2, B.hy + 5, B.rx - 2, B.ry - 5);
+  const { hx, hy, rx, ry } = B;
+  if (B.view === 'back') return M().ellipse(hx, hy - 1, rx, ry - 0.5).rrect(hx - rx + 1, hy - 2, hx + rx - 1, hy + ry, 7);
+  // a rounded crown over a squarer jaw, turned a touch toward the side we face
+  return M()
+    .ellipse(hx, hy - 2, rx, ry - 1.5)
+    .rrect(hx - rx + 1, hy - 3, hx + rx, hy + ry, 7)
+    .ellipse(hx + 2, hy + 5, rx - 3, ry - 6);
 }
 
 /** The face window a hairstyle leaves open (front view). `top` lowers the hairline (bangs). */
 function faceWindow(B: Body, top = 0, left = 0): Mask {
-  return M().ellipse(B.hx + 3 + left * 0.5, B.hy + 5 + top * 0.5, B.rx - 3 - left * 0.5, B.ry - 4.5 - top * 0.5);
+  return M().ellipse(B.hx + 2 + left * 0.4, B.hy + 4 + top * 0.5, B.rx - 2.5 - left * 0.4, B.ry - 3.5 - top * 0.5);
 }
 
 /* ================================================================== hair */
@@ -357,65 +362,70 @@ interface HairShapes {
 function hairShapes(style: string, B: Body): HairShapes | null {
   const { hx: x, hy: y, rx, ry } = B;
   const back = B.view === 'back';
-  const cap = (grow = 1.5, down = 4) => M().ellipse(x, y - 1, rx + grow, ry + grow * 0.6).band(0, y + (back ? Math.max(down, 2) + 10 : down));
+  const cap = (grow = 1.2, down = 2) =>
+    M()
+      .ellipse(x, y - 2, rx + grow, ry + grow * 0.5)
+      .band(0, y + (back ? Math.max(down, 2) + 8 : down));
   const win = (top = 0, left = 0) => faceWindow(B, top, left);
-  const bumps = (m: Mask, r: number, cy: number, span: number, n: number, ry2 = r) => {
+  const bumps = (m: Mask, r: number, cy: number, span: number, n: number) => {
     for (let i = 0; i <= n; i++) {
       const a = Math.PI + (i / n) * Math.PI;
-      m.ellipse(x + Math.cos(a) * span, cy + Math.sin(a) * span * 0.9, r, ry2);
+      m.ellipse(x + Math.cos(a) * span, cy + Math.sin(a) * span * 0.9, r, r);
     }
     return m;
   };
   const long = (to: number, wave = 0) => {
-    const m = M().ellipse(x - 1, y, rx + 2.5, ry + 1);
+    const m = M().ellipse(x - 1, y - 1, rx + 2, ry + 0.5);
     m.poly([
-      [x - rx - 3, y],
-      [x + rx - 2, y],
-      [x + rx - 1 + wave, to],
-      [x - rx - 4 - wave, to],
+      [x - rx - 2, y - 2],
+      [x + rx - 1, y - 2],
+      [x + rx + wave, to],
+      [x - rx - 3 - wave, to],
     ]);
-    if (wave) for (let yy = y + 6; yy < to; yy += 6) m.ellipse(x - rx - 3 + ((yy / 6) % 2) * 2, yy, 3, 3).ellipse(x + rx - 1 - ((yy / 6) % 2) * 2, yy, 3, 3);
+    if (wave) for (let yy = y + 4; yy < to; yy += 5) m.ellipse(x - rx - 2 + ((yy / 5) % 2) * 1.5, yy, 2.4, 2.4).ellipse(x + rx - ((yy / 5) % 2) * 1.5, yy, 2.4, 2.4);
     return m;
   };
   switch (style) {
     case 'none':
       return null;
     case 'buzz':
-      return { front: back ? cap(0.6, 8) : cap(0.6, 0).cut(win(-2)) };
+      return { front: back ? cap(0.4, 6) : cap(0.4, -2).cut(win(-2)) };
     case 'short':
     case 'crop': {
-      const m = cap(style === 'crop' ? 1 : 1.6, 2);
-      if (!back) m.cut(win(style === 'crop' ? -1 : 0));
-      if (!back) m.ellipse(x - rx + 2, y + 3, 2.5, 5); // sideburn
+      const m = cap(style === 'crop' ? 0.8 : 1.3, 1);
+      if (!back) {
+        m.cut(win(style === 'crop' ? -1 : 0));
+        m.ellipse(x - rx + 1.5, y + 2, 2, 4); // sideburn
+      }
       return { front: m };
     }
     case 'pixie': {
-      const m = cap(1.8, 3);
+      const m = cap(1.4, 2);
       if (!back) {
         m.cut(win(2));
         m.poly([
-          [x - 6, y - 12],
-          [x + 12, y - 9],
-          [x + 14, y - 3],
-          [x + 2, y - 5],
+          [x - 5, y - 10],
+          [x + 9, y - 7],
+          [x + 10, y - 2],
+          [x + 1, y - 4],
         ]);
       }
       return { front: m };
     }
     case 'sidepart':
     case 'swoop': {
-      const m = cap(2, 3);
+      const m = cap(1.5, 2);
       if (!back) {
         m.cut(win(style === 'swoop' ? 3 : 1));
         if (style === 'swoop')
           m.poly([
-            [x - 10, y - 13],
-            [x + 16, y - 11],
-            [x + 17, y - 1],
-            [x + 8, y - 6],
-            [x - 2, y - 8],
+            [x - 8, y - 11],
+            [x + 12, y - 9],
+            [x + 13, y - 1],
+            [x + 6, y - 5],
+            [x - 2, y - 6],
           ]);
-        else m.ellipse(x + 6, y - 11, 11, 5);
+        else m.ellipse(x + 4, y - 9, 8, 3.5);
       }
       return { front: m };
     }
@@ -423,125 +433,117 @@ function hairShapes(style: string, B: Body): HairShapes | null {
     case 'mohawk': {
       const m =
         style === 'mohawk'
-          ? M().ellipse(x - 1, y - ry - 1, 4, 8).ellipse(x - 1, y - ry + 4, 4.5, 6)
-          : M().ellipse(x + 2, y - ry + 3, rx - 1, 7).ellipse(x + 8, y - ry + 6, 9, 5);
+          ? M().ellipse(x - 1, y - ry - 1, 3, 6).ellipse(x - 1, y - ry + 3, 3.5, 4.5)
+          : M().ellipse(x + 1, y - ry + 2, rx - 1, 5).ellipse(x + 6, y - ry + 4, 7, 3.5);
       if (!back && style === 'undercut') m.cut(win(-1));
       return { front: m };
     }
     case 'curlyshort':
     case 'curly': {
       const big = style === 'curly';
-      const m = bumps(cap(2, big ? 8 : 2), big ? 5 : 4, y - 2, rx + (big ? 1 : 0), 9);
-      if (big) m.ellipse(x - rx, y + 6, 5, 7).ellipse(x + rx - 1, y + 5, 4, 6);
+      const m = bumps(cap(1.5, big ? 6 : 1), big ? 3.8 : 3, y - 3, rx + (big ? 0.5 : 0), 9);
+      if (big) m.ellipse(x - rx, y + 4, 3.5, 5).ellipse(x + rx - 1, y + 3, 3, 4.5);
       if (!back) m.cut(win(big ? 1 : 0));
       return { front: m };
     }
     case 'afro': {
-      const m = bumps(M().ellipse(x - 1, y - 4, rx + 7, ry + 5), 5, y - 4, rx + 6, 12);
+      const m = bumps(M().ellipse(x - 1, y - 4, rx + 5, ry + 3.5), 3.6, y - 4, rx + 4.5, 12);
       if (!back) m.cut(win(1));
       return { front: m };
     }
     case 'bob':
     case 'bangs': {
-      const m = M().ellipse(x - 1, y, rx + 2.5, ry + 1).rect(x - rx - 3, y, x + rx + 1, y + 12);
-      m.band(0, y + 13);
+      const m = M().ellipse(x - 1, y - 1, rx + 2, ry + 0.5).rect(x - rx - 2, y - 1, x + rx + 1, y + 8);
+      m.band(0, y + 9);
       if (!back) m.cut(win(style === 'bangs' ? 5 : 1));
-      if (!back && style === 'bangs') m.cut(M().rect(x - 2, y + 1, x + 14, y + 14));
+      if (!back && style === 'bangs') m.cut(M().rect(x - 1, y + 1, x + 10, y + 11));
       return { front: m };
     }
     case 'mullet': {
-      const m = cap(1.6, 2);
+      const m = cap(1.3, 1);
       if (!back) m.cut(win(0));
       const tail = M().poly([
-        [x - rx - 1, y],
-        [x - rx + 8, y],
-        [x - rx + 9, y + 24],
-        [x - rx - 3, y + 22],
+        [x - rx - 1, y - 1],
+        [x - rx + 6, y - 1],
+        [x - rx + 7, y + 17],
+        [x - rx - 2, y + 15],
       ]);
-      return { front: m, behind: tail };
+      return { front: back ? m.add(tail) : m, behind: back ? undefined : tail };
     }
     case 'long':
     case 'wavy': {
-      const behind = long(y + 36, style === 'wavy' ? 1 : 0);
-      const m = cap(2.5, 4);
+      const behind = long(y + 26, style === 'wavy' ? 1 : 0);
+      const m = cap(2, 3);
       if (!back) {
         m.cut(win(1));
-        m.ellipse(x - rx + 1, y + 8, 4, 12);
+        m.ellipse(x - rx + 1, y + 6, 3, 9);
       } else m.add(behind);
       return { front: m, behind: back ? undefined : behind };
     }
     case 'ponytail': {
-      const m = cap(1.8, 3);
+      const m = cap(1.4, 2);
       if (!back) m.cut(win(0));
-      const tail = M().ellipse(x - rx - 2, y - 2, 5, 5).capsule(x - rx - 4, y + 2, x - rx - 6, y + 22, 4);
-      return { front: m, behind: back ? undefined : tail, ...(back ? { front: m.add(tail) } : {}) };
+      const tail = M().ellipse(x - rx - 1, y - 3, 3.5, 3.5).capsule(x - rx - 3, y, x - rx - 4, y + 16, 3);
+      return back ? { front: m.add(tail) } : { front: m, behind: tail };
     }
     case 'pigtails': {
-      const m = cap(1.8, 3);
+      const m = cap(1.4, 2);
       if (!back) m.cut(win(1));
-      const tails = M().capsule(x - rx - 3, y + 2, x - rx - 5, y + 20, 4).capsule(x + rx + 2, y + 1, x + rx + 4, y + 18, 3.5);
-      m.add(tails);
+      m.capsule(x - rx - 2, y, x - rx - 4, y + 14, 3).capsule(x + rx + 1, y, x + rx + 3, y + 13, 2.6);
       return { front: m };
     }
     case 'bun':
     case 'spacebuns': {
-      const m = cap(1.6, 3);
+      const m = cap(1.3, 2);
       if (!back) m.cut(win(0));
-      if (style === 'bun') m.ellipse(x - 1, y - ry - 4, 7, 6);
-      else m.ellipse(x - 10, y - ry + 1, 5.5, 5.5).ellipse(x + 11, y - ry + 2, 5.5, 5.5);
+      if (style === 'bun') m.ellipse(x - 1, y - ry - 3, 5, 4.5);
+      else m.ellipse(x - 8, y - ry + 1, 4, 4).ellipse(x + 8, y - ry + 1.5, 4, 4);
       return { front: m };
     }
     case 'braids': {
-      const m = cap(1.8, 3);
+      const m = cap(1.4, 2);
       if (!back) m.cut(win(1));
-      const b = M();
-      for (let k = 0; k < 5; k++) {
-        b.ellipse(x - rx - 1, y + 4 + k * 5, 3.5, 3);
-        b.ellipse(x + rx, y + 3 + k * 5, 3, 3);
-      }
-      m.add(b);
+      for (let k = 0; k < 5; k++) m.ellipse(x - rx - 1, y + 2 + k * 4, 2.6, 2.2).ellipse(x + rx, y + 1 + k * 4, 2.2, 2.2);
       return { front: m };
     }
     case 'locs': {
-      const m = cap(2.5, 4);
+      const m = cap(2, 3);
       if (!back) m.cut(win(1));
       const behind = M();
-      for (let k = -3; k <= 3; k++) behind.capsule(x + k * 5, y - 4, x + k * 5.5, y + 26 - Math.abs(k) * 2, 2.6);
-      return { front: back ? m.add(behind) : m, behind: back ? undefined : behind };
+      for (let k = -3; k <= 3; k++) behind.capsule(x + k * 3.6, y - 4, x + k * 4, y + 19 - Math.abs(k) * 1.5, 2);
+      return back ? { front: m.add(behind) } : { front: m, behind };
     }
     default: {
-      const m = cap(1.6, 2);
+      const m = cap(1.3, 1);
       if (!back) m.cut(win(0));
       return { front: m };
     }
   }
 }
 
-/** Hair shading adds a lighter strand band and optional two-tone tips. */
+/** Hair: flat two-tone with a few strand lines, a small shine, optional two-tone tips. */
 function paintHair(P: Pix, m: Mask, L: FullLoadout, strands: boolean) {
   const base = hx(L.hairColor);
   const tip = L.hairHighlight ? hx(L.hairHighlight) : null;
   const b = m.bbox();
   if (!b) return;
-  const [, y0, , y1] = b;
+  const [x0, y0, x1, y1] = b;
   paint(P, m, (x, y) => {
     let c = base;
     if (tip) {
       const k = (y - y0) / Math.max(1, y1 - y0);
-      if (y1 - y0 > 34 ? k > 0.68 : k < 0.2) c = mix(base, tip, 0.8);
+      if (y1 - y0 > 26 ? k > 0.66 : k < 0.22) c = mix(base, tip, 0.8);
     }
-    if (strands && (x * 3 + y) % 11 === 0) c = shadowOf(c);
+    if (strands && (x * 3 + y) % 9 === 0) c = shadowOf(c);
     return c;
   });
-  // shine: a soft highlight on the crown, toward the light
-  const [x0, , x1] = b;
-  const shine = M().ellipse(x0 + (x1 - x0) * 0.36, y0 + 6, Math.max(3, (x1 - x0) * 0.16), 2.4).keep(m);
-  const shineIn = M().ellipse(x0 + (x1 - x0) * 0.36, y0 + 6, Math.max(2, (x1 - x0) * 0.16) - 1.5, 1.2).keep(m);
-  for (let y = 0; y < H; y++)
-    for (let x = 0; x < W; x++) {
-      if (!shine.has(x, y) || !m.has(x, y - 1) || !m.has(x - 1, y)) continue;
-      P.set(x, y, shineIn.has(x, y) ? lightOf(lightOf(base)) : lightOf(base));
-    }
+  // a small shine on the crown, toward the light
+  const sx = x0 + (x1 - x0) * 0.34;
+  const sy = y0 + 4;
+  for (let x = Math.round(sx - 3); x <= sx + 2; x++) {
+    const y = Math.round(sy + Math.abs(x - sx) * 0.4);
+    if (m.has(x, y) && m.has(x, y - 1) && m.has(x - 1, y)) P.set(x, y, lightOf(base));
+  }
 }
 
 /* ================================================================== face */
@@ -549,91 +551,88 @@ function paintHair(P: Pix, m: Mask, L: FullLoadout, strands: boolean) {
 function drawFace(P: Pix, B: Body, L: FullLoadout) {
   const skin = hx(L.skin);
   const x = B.hx;
-  const y = B.hy;
-  const dark: RGB = mix(PLUM, [20, 12, 22], 0.3);
+  const ey = B.hy; // middle row of the eyes
+  const dark: RGB = [34, 24, 38];
   const iris = hx(L.eyeColor);
-  const irisC = lum(iris) < 0.25 ? dark : iris;
-  const ey = y + 3;
-  const en = x - 5; // near eye (left)
-  const ef = x + 8; // far eye (right, foreshortened)
-  const pal: Record<string, RGB> = { c: irisC, k: dark, w: WHITE, p: PINK };
+  const pal: Record<string, RGB> = { k: dark, c: lum(iris) < 0.25 ? dark : iris, w: WHITE };
   const eyes = L.eyes.replace('eyes.', '');
-  const eyeNear: Record<string, string[]> = {
-    dot: ['.kkk.', 'kwwck', 'kwcck', 'kccck', 'kccwk', '.kkk.'],
-    wide: ['.kkk.', 'kwwck', 'kwwck', 'kccck', 'kccck', 'kccwk', '.kkk.'],
-    lashes: ['k.....', '.kkkk.', '.kwwck', '.kwcck', '.kccck', '.kccwk', '..kkk.'],
-    happy: ['.kkk.', 'k...k', 'k...k'],
-    sleepy: ['kkkkk', 'kccck', '.kkk.'],
-    wink: ['.kkk.', 'kwwck', 'kwcck', 'kccck', 'kccwk', '.kkk.'],
-    sparkle: ['.kkk.', 'kwkwk', 'kkwck', 'kccck', 'kcwck', '.kkk.'],
+  // Small, simple eyes: expression lives in the brows and mouth.
+  const near: Record<string, string[]> = {
+    dot: ['kk', 'kc', 'kk'],
+    wide: ['wk', 'kc', 'kk'],
+    lashes: ['k..', '.kk', '.kc', '.kk'],
+    happy: ['.k.', 'k.k'],
+    sleepy: ['kk'],
+    wink: ['kk', 'kc', 'kk'],
+    sparkle: ['wk', 'kc', 'kw'],
   };
-  const eyeFar: Record<string, string[]> = {
-    dot: ['.kk.', 'wwck', 'wcck', 'ccck', 'ccwk', '.kk.'],
-    wide: ['.kk.', 'wwck', 'wwck', 'ccck', 'ccck', 'ccwk', '.kk.'],
-    lashes: ['....k', '.kkk.', 'wwck.', 'wcck.', 'ccck.', 'ccwk.', '.kk..'],
-    happy: ['.kk.', 'k..k', 'k..k'],
-    sleepy: ['kkkk', 'ccck', '.kk.'],
-    wink: ['.kk.', 'k..k', '....'],
-    sparkle: ['.kk.', 'wkwk', 'kwck', 'ccck', 'cwck', '.kk.'],
+  const far: Record<string, string[]> = {
+    dot: ['kk', 'ck', 'kk'],
+    wide: ['wk', 'ck', 'kk'],
+    lashes: ['..k', 'kk.', 'ck.', 'kk.'],
+    happy: ['.k.', 'k.k'],
+    sleepy: ['kk'],
+    wink: ['.k.', 'k.k'],
+    sparkle: ['wk', 'ck', 'kw'],
   };
-  const near = eyeNear[eyes] ?? eyeNear.dot;
-  const far = eyeFar[eyes] ?? eyeFar.dot;
-  const eyeTop = ey - Math.floor(near.length / 2);
-  P.stamp(en - 2, eyeTop, near, pal);
-  P.stamp(ef - 2, eyeTop + Math.round((near.length - far.length) / 2), far, pal);
-  // brows
-  const brow = mix(hx(L.hairColor), dark, 0.35);
-  const by = eyeTop - 3;
+  const n = near[eyes] ?? near.dot;
+  const f = far[eyes] ?? far.dot;
+  const top = (rows: string[]) => ey - Math.floor(rows.length / 2) - (rows[0].includes('.') && rows.length > 3 ? 1 : 0);
+  P.stamp(x - 5 - (n[0].length > 2 ? 1 : 0), top(n), n, pal);
+  P.stamp(x + 4, top(f), f, pal);
+  // brows carry the personality
+  const brow = mix(hx(L.hairColor), dark, 0.4);
+  const by = ey - 4;
   if (L.brows === 'brows.bold') {
-    P.stamp(en - 3, by - 1, ['bbbb..', '.bbbbb'], { b: brow });
-    P.stamp(ef - 2, by - 1, ['bbbb', 'bbb.'], { b: brow });
+    P.stamp(x - 6, by - 1, ['bbb.', '.bbb'], { b: brow });
+    P.stamp(x + 3, by - 1, ['.bbb', 'bbb.'], { b: brow });
   } else if (L.brows !== 'brows.none') {
-    P.stamp(en - 2, by, ['.bbb.'], { b: brow });
-    P.stamp(ef - 2, by, ['bbb'], { b: brow });
+    P.stamp(x - 6, by, ['bbb'], { b: brow });
+    P.stamp(x + 4, by, ['bb'], { b: brow });
   }
-  // nose: a single shade pixel
-  P.set(x + 6, y + 8, shadowOf(skin));
-  // cheeks: always a little warmth, a proper blush when chosen
-  const warm = mix(skin, [255, 120, 140], 0.18);
-  const blush = mix(skin, [255, 110, 130], 0.5);
-  const cheek = L.faceDetail === 'fd.blush' || eyes === 'happy' ? blush : warm;
-  P.stamp(en - 3, y + 9, ['bbb'], { b: cheek });
-  P.stamp(ef + 1, y + 9, ['bb'], { b: cheek });
+  // nose
+  P.set(x + 2, ey + 3, shadowOf(skin));
+  P.set(x + 2, ey + 4, mix(skin, PLUM, 0.18));
+  if (L.faceDetail === 'fd.blush') {
+    const blush = mix(skin, [255, 110, 130], 0.45);
+    P.stamp(x - 7, ey + 3, ['bb'], { b: blush });
+    P.set(x + 6, ey + 3, blush);
+  }
   if (L.faceDetail === 'fd.freckles') {
-    const fr = mix(skin, [120, 70, 40], 0.35);
-    P.stamp(en - 3, y + 6, ['f.f', '.f.'], { f: fr });
-    P.stamp(ef, y + 6, ['f.', '.f'], { f: fr });
+    const fr = mix(skin, [120, 70, 40], 0.4);
+    P.stamp(x - 7, ey + 3, ['f.f', '.f.'], { f: fr });
+    P.stamp(x + 5, ey + 3, ['f.', '.f'], { f: fr });
   }
-  if (L.faceDetail === 'fd.mole') P.set(x + 9, y + 10, mix(skin, dark, 0.7));
-  if (L.faceDetail === 'fd.bandaid') P.stamp(x + 3, y + 5, ['tttt', 'tdtt', 'tttt'], { t: [236, 196, 150], d: [200, 150, 110] });
+  if (L.faceDetail === 'fd.mole') P.set(x + 5, ey + 7, mix(skin, dark, 0.7));
+  if (L.faceDetail === 'fd.bandaid') P.stamp(x - 8, ey + 2, ['ttt', 'tdt'], { t: [236, 196, 150], d: [200, 150, 110] });
   // facial hair
   const fh = L.facialHair.replace('fh.', '');
   const hairC = hx(L.hairColor);
   if (fh === 'beard') {
-    const m = M().ellipse(x + 2, y + 9, B.rx - 3, 7.5).cut(M().rect(0, 0, W, y + 5)).keep(headMask(B).add(M().ellipse(x + 2, y + 12, 12, 6)));
-    paint(P, m, hairC, { rim: false });
+    const m = M()
+      .ellipse(x + 1, B.hy + 7, B.rx - 2, 6.5)
+      .cut(M().rect(0, 0, W, B.hy + 3))
+      .keep(headMask(B).add(M().ellipse(x + 1, B.hy + 10, 8, 4)));
+    paint(P, m, hairC);
   } else if (fh === 'goatee') {
-    paint(P, M().ellipse(x + 4, y + 13, 3.5, 3), hairC, { rim: false });
+    paint(P, M().ellipse(x + 1, ey + 9, 2.5, 2), hairC);
   } else if (fh === 'stubble') {
-    const m = M().ellipse(x + 2, y + 9, B.rx - 3, 7).cut(M().rect(0, 0, W, y + 6)).keep(headMask(B));
-    const s = mix(skin, hairC, 0.45);
+    const m = M().ellipse(x + 1, B.hy + 7, B.rx - 2, 6).cut(M().rect(0, 0, W, B.hy + 4)).keep(headMask(B));
+    const s = mix(skin, hairC, 0.4);
     for (let yy = 0; yy < H; yy++) for (let xx = 0; xx < W; xx++) if (m.has(xx, yy) && (xx + yy) % 2 === 0) P.set(xx, yy, s);
   }
-  if (fh === 'mustache' || fh === 'beard') P.stamp(x + 1, y + 10, ['.mmmmm.', 'mm...mm'], { m: fh === 'beard' ? shadowOf(hairC) : hairC });
+  if (fh === 'mustache' || fh === 'beard') P.stamp(x - 2, ey + 5, ['mmmmmm'], { m: fh === 'beard' ? shadowOf(hairC) : hairC });
   // mouth
-  const mouthC = mix(skin, [70, 20, 40], 0.62);
-  const mx = x + 2;
-  const my = y + 11;
-  const mpal: Record<string, RGB> = { m: mouthC, w: WHITE, t: [236, 110, 130], d: [120, 30, 50] };
+  const mouthC = mix(skin, [70, 20, 40], 0.65);
   const mouths: Record<string, string[]> = {
-    smile: ['m....m', '.mmmm.'],
-    grin: ['mmmmmm', 'mwwwwm', '.mttm.'],
-    neutral: ['.mmmm.'],
-    smirk: ['.....m', 'mmmmm.'],
-    o: ['.mm.', 'mddm', '.mm.'],
-    tongue: ['m....m', '.mmmm.', '..tt..'],
+    smile: ['m..m', '.mm.'],
+    grin: ['mmmm', 'mwwm', '.mm.'],
+    neutral: ['mmm'],
+    smirk: ['...m', 'mmm.'],
+    o: ['.m.', 'm.m', '.m.'],
+    tongue: ['m..m', '.mt.'],
   };
-  P.stamp(mx, my, mouths[L.mouth.replace('mouth.', '')] ?? mouths.smile, mpal);
+  P.stamp(x - 1, ey + 6, mouths[L.mouth.replace('mouth.', '')] ?? mouths.smile, { m: mouthC, w: WHITE, t: [236, 110, 130] });
 }
 
 /* ================================================================== clothes */
@@ -661,32 +660,31 @@ function patternFn(L: FullLoadout, base: RGB, top: string): (x: number, y: numbe
     let c = base;
     switch (pat) {
       case 'pat.stripes':
-        if (y % 6 < 2) c = acc;
+        if (y % 5 < 2) c = acc;
         break;
       case 'pat.dots':
-        if (x % 5 === 1 && y % 5 === 1) c = acc;
-        else if (x % 5 === 2 && y % 5 === 1) c = acc;
+        if (x % 4 === 1 && y % 4 === 1) c = acc;
         break;
       case 'pat.check':
-        if ((Math.floor(x / 3) + Math.floor(y / 3)) % 2) c = mix(base, acc, 0.4);
+        if ((Math.floor(x / 2) + Math.floor(y / 2)) % 2) c = mix(base, acc, 0.4);
         break;
       case 'pat.flannel': {
-        const a = x % 8 < 3;
-        const b = y % 8 < 3;
+        const a = x % 6 < 2;
+        const b = y % 6 < 2;
         if (a && b) c = mix(base, PLUM, 0.45);
         else if (a || b) c = mix(base, PLUM, 0.22);
-        if (x % 8 === 6 || y % 8 === 6) c = mix(c, acc, 0.35);
+        if (x % 6 === 4 || y % 6 === 4) c = mix(c, acc, 0.35);
         break;
       }
       case 'pat.stars':
-        if ((x * 7 + y * 13) % 29 === 0 || ((x - 1) * 7 + y * 13) % 29 === 0) c = acc;
+        if ((x * 7 + y * 13) % 23 === 0) c = acc;
         break;
       case 'pat.hearts':
-        if ((x * 5 + y * 11) % 31 === 0) c = [226, 76, 120];
+        if ((x * 5 + y * 11) % 23 === 0) c = [226, 76, 120];
         break;
     }
     if (knit && x % 3 === 0) c = mix(c, PLUM, 0.1);
-    if (top === 'top.puffer' && y % 6 === 0) c = shadowOf(c);
+    if (top === 'top.puffer' && y % 5 === 0) c = shadowOf(c);
     return c;
   };
 }
@@ -696,13 +694,6 @@ function topColorFor(L: FullLoadout): RGB {
   return hx(L.topColor);
 }
 
-function sleeveMask(arm: Limb, long: boolean, puffy: boolean): Mask {
-  const r = puffy ? 5.8 : 5;
-  if (long) return M().capsule(arm.a[0], arm.a[1], arm.b[0], arm.b[1], r);
-  const mid: [number, number] = [arm.a[0] + (arm.b[0] - arm.a[0]) * 0.42, arm.a[1] + (arm.b[1] - arm.a[1]) * 0.42];
-  return M().capsule(arm.a[0], arm.a[1], mid[0], mid[1], r + 0.4);
-}
-
 function drawArm(P: Pix, B: Body, L: FullLoadout, near: boolean) {
   const arm = near ? B.armNear : B.armFar;
   const hand = near ? B.handNear : B.handFar;
@@ -710,26 +701,26 @@ function drawArm(P: Pix, B: Body, L: FullLoadout, near: boolean) {
   const top = L.top;
   const long = LONG_SLEEVES.has(top);
   const bare = top === 'top.tank';
-  // skin arm underneath (short sleeves and tank tops)
-  if (!long) paint(P, M().capsule(arm.a[0], arm.a[1], arm.b[0], arm.b[1], 4.2), skin, { rim: false });
+  const shade = near ? 0 : 0.25;
+  if (!long) paint(P, M().capsule(arm.a[0], arm.a[1], arm.b[0], arm.b[1], 3.1), skin, { shade });
   if (!bare) {
     const base = topColorFor(L);
-    const sleeve = sleeveMask(arm, long, top === 'top.puffer');
-    const fn = patternFn(L, base, top);
-    paint(P, sleeve, fn, { shade: near ? 0 : 0.25 });
+    const r = top === 'top.puffer' ? 4.4 : 3.7;
+    const sleeve = long
+      ? M().capsule(arm.a[0], arm.a[1], arm.b[0], arm.b[1], r)
+      : M().capsule(arm.a[0], arm.a[1], arm.a[0] + (arm.b[0] - arm.a[0]) * 0.4, arm.a[1] + (arm.b[1] - arm.a[1]) * 0.4, r + 0.3);
+    paint(P, sleeve, patternFn(L, base, top), { shade });
     if (long) {
-      // cuff
-      // a slim cuff band just above the hand
-      const cuff = M().capsule(arm.b[0], arm.b[1], arm.b[0], arm.b[1], 5).band(Math.round(arm.b[1]) + 1, Math.round(arm.b[1]) + 3);
+      const cy = Math.round(arm.b[1]);
+      const cuff = M().capsule(arm.b[0], arm.b[1], arm.b[0], arm.b[1], r).band(cy + 1, cy + 3).keep(sleeve);
       const cuffC = top === 'top.shirt' || top === 'top.blazer' ? mix(hx(L.topAccent), base, 0.35) : shadowOf(base);
-      paint(P, cuff.keep(sleeve), cuffC, { rim: false, edge: false });
+      paint(P, cuff, cuffC, { edge: false, flat: true });
     }
   }
-  // mitten hand
   const [hx0, hy0] = hand;
-  const h = M().ellipse(hx0, hy0, 4.3, 4.5);
-  if (B.pose === 'wave' && near) h.ellipse(hx0 - 4, hy0 + 1, 1.8, 2.6); // thumb out
-  paint(P, h, skin);
+  const h = M().ellipse(hx0, hy0, 3.2, 3.4);
+  if (B.pose === 'wave' && near) h.ellipse(hx0 - 3, hy0 + 1, 1.4, 2); // thumb out
+  paint(P, h, skin, { shade });
 }
 
 function drawTorso(P: Pix, B: Body, L: FullLoadout) {
@@ -738,109 +729,108 @@ function drawTorso(P: Pix, B: Body, L: FullLoadout) {
   const acc = hx(L.topAccent);
   const skin = hx(L.skin);
   const back = B.view === 'back';
-  const puffer = top === 'top.puffer';
+  const cx = B.cx;
+  const sy = B.shoulderY;
+  const wy = B.waistY;
   const t = M().poly(B.torso);
-  if (puffer) t.ellipse(B.hx - 1, B.shoulderY + 6, 16, 8);
+  if (top === 'top.puffer') t.ellipse(cx, sy + 5, 13, 6);
   const full = ITEM_BY_ID.get(top)?.fullLength;
   if (full) {
-    // dress / long coat: flare to the knee
-    const hem = B.sitting ? B.hipY + 8 : 94;
+    const hem = B.sitting ? B.hipY + 7 : 91;
     t.poly([
-      [32, B.waistY - 2],
-      [57, B.waistY - 2],
-      [B.sitting ? 62 : 60, hem],
-      [B.sitting ? 34 : 29, hem],
+      [cx - 10, wy - 2],
+      [cx + 10, wy - 2],
+      [cx + (B.sitting ? 16 : 13), hem],
+      [cx - (B.sitting ? 11 : 13), hem],
     ]);
   }
-  const fn = patternFn(L, base, top);
-  paint(P, t, fn);
-  const cx = B.hx - 1;
-  const sy = B.shoulderY;
+  paint(P, t, patternFn(L, base, top));
   if (back) {
-    if (top === 'top.hoodie' || top === 'top.northstar-hoodie' || top === 'top.raincoat') paint(P, M().ellipse(cx, sy + 3, 9, 6), shadowOf(base));
+    if (top === 'top.hoodie' || top === 'top.northstar-hoodie' || top === 'top.raincoat') paint(P, M().ellipse(cx, sy + 2, 7, 4.5), shadowOf(base));
     return;
   }
-  // necklines and fronts
+  const inside = (m: Mask) => m.keep(t);
   switch (top) {
     case 'top.tee':
     case 'top.aurora-tee':
     case 'top.jersey':
-      paint(P, M().ellipse(cx + 2, sy, 5, 3.5), skin, { rim: false });
-      P.stamp(cx - 4, sy + 2, ['.aaaaaaaaa.'], { a: shadowOf(base) });
-      if (top === 'top.aurora-tee') P.stamp(cx, sy + 9, ['..w..', '.wrw.', '.www.', 'wwwww', '.o.o.'], { w: WHITE, r: [224, 80, 63], o: [255, 138, 61] });
+      paint(P, inside(M().ellipse(cx + 1, sy, 4, 2.5)), skin, { edge: false });
+      if (top === 'top.aurora-tee') P.stamp(cx - 1, sy + 6, ['.w.', 'wrw', 'www', '.o.'], { w: WHITE, r: [224, 80, 63], o: [255, 138, 61] });
       if (top === 'top.jersey') {
-        P.stamp(cx - 3, sy + 1, ['a.......a', '.a.....a.', '..aaaaa..'], { a: acc });
-        for (let y = sy + 10; y < sy + 13; y++) for (let x = 33; x < 57; x++) if (t.has(x, y)) P.set(x, y, acc);
+        P.stamp(cx - 3, sy, ['a.....a', '.a...a.', '..aaa..'], { a: acc });
+        for (let y = sy + 8; y < sy + 10; y++) for (let x = cx - 12; x < cx + 13; x++) if (t.has(x, y)) P.set(x, y, acc);
       }
       break;
     case 'top.tank':
-      paint(P, M().ellipse(cx + 2, sy + 1, 8, 5), skin, { rim: false });
+      paint(P, inside(M().ellipse(cx + 1, sy + 1, 6, 4)), skin, { edge: false });
       break;
     case 'top.hoodie':
     case 'top.northstar-hoodie':
-      // hood gathered round the neck, drawstrings, kangaroo pocket
-      paint(P, M().ellipse(cx + 1, sy - 1, 11, 4.5).cut(M().ellipse(cx + 2, sy - 2, 5, 3)), shadowOf(base), { rim: false });
-      P.stamp(cx, sy + 2, ['a...a', 'a...a', 'a...a', 'o...o'], { a: WHITE, o: shadowOf(WHITE) });
-      paint(P, M().rrect(cx - 7, B.waistY - 9, cx + 11, B.waistY - 2, 2), shadowOf(base), { rim: false });
-      if (top === 'top.northstar-hoodie') P.stamp(cx + 1, sy + 8, ['..g..', 'ggggg', '.ggg.', 'g...g'], { g: GOLD });
+      paint(P, M().ellipse(cx + 1, sy - 1, 8, 3).cut(M().ellipse(cx + 1, sy - 2, 4, 2)), shadowOf(base));
+      P.stamp(cx - 1, sy + 2, ['w...w', 'w...w', 'o...o'], { w: WHITE, o: shadowOf(WHITE) });
+      paint(P, inside(M().rrect(cx - 6, wy - 7, cx + 8, wy - 2, 2)), shadowOf(base), { flat: true });
+      if (top === 'top.northstar-hoodie') P.stamp(cx - 1, sy + 6, ['.g.', 'ggg', 'g.g'], { g: GOLD });
       break;
     case 'top.shirt':
     case 'top.flannel': {
       const col = top === 'top.shirt' ? lightOf(base) : shadowOf(base);
-      P.stamp(cx - 3, sy - 1, ['cc.....cc', '.ccc.ccc.', '...c.c...'], { c: col });
-      for (let y = sy + 3; y < B.waistY - 1; y += 4) P.set(cx + 2, y, top === 'top.shirt' ? acc : WHITE);
-      for (let y = sy + 2; y < B.waistY; y++) P.set(cx + 1, y, shadowOf(base));
+      P.stamp(cx - 3, sy - 1, ['cc...cc', '.cc.cc.'], { c: col });
+      for (let y = sy + 2; y < wy; y++) P.set(cx + 1, y, shadowOf(base));
+      for (let y = sy + 3; y < wy - 1; y += 4) P.set(cx + 2, y, top === 'top.shirt' ? acc : WHITE);
       break;
     }
     case 'top.sweater':
-    case 'top.turtleneck': {
-      if (top === 'top.turtleneck') paint(P, M().rrect(cx - 4, sy - 7, cx + 8, sy + 2, 2), mix(base, PLUM, 0.1));
-      else paint(P, M().ellipse(cx + 2, sy, 5, 3), skin, { rim: false });
-      // ribbed hem
-      for (let y = B.waistY - 3; y < B.waistY; y++) for (let x = 30; x < 60; x++) if (t.has(x, y)) P.set(x, y, x % 2 ? shadowOf(base) : base);
+    case 'top.turtleneck':
+      if (top === 'top.turtleneck') paint(P, M().rrect(cx - 4, sy - 5, cx + 6, sy + 2, 2), mix(base, PLUM, 0.08));
+      else paint(P, inside(M().ellipse(cx + 1, sy, 4, 2.5)), skin, { edge: false });
+      for (let y = wy - 3; y < wy; y++) for (let x = cx - 12; x < cx + 13; x++) if (t.has(x, y)) P.set(x, y, x % 2 ? shadowOf(base) : base);
       break;
-    }
     case 'top.cardigan':
     case 'top.blazer':
     case 'top.labcoat':
     case 'top.kimono': {
-      // open front showing the shirt underneath
       const inner = top === 'top.labcoat' ? hx(L.topAccent) : acc;
-      const v = M().poly([
-        [cx - 3, sy - 1],
-        [cx + 7, sy - 1],
-        [cx + 4, B.waistY - (top === 'top.kimono' ? 6 : 1)],
-        [cx + 1, B.waistY - (top === 'top.kimono' ? 6 : 1)],
-      ]);
-      paint(P, v.keep(t), inner, { rim: false });
+      const bottom = wy - (top === 'top.kimono' ? 5 : 1);
+      const v = inside(
+        M().poly([
+          [cx - 2, sy - 1],
+          [cx + 5, sy - 1],
+          [cx + 3, bottom],
+          [cx + 1, bottom],
+        ]),
+      );
+      paint(P, v, inner, { edge: false });
       if (top === 'top.blazer' || top === 'top.labcoat') {
-        P.stamp(cx - 4, sy, ['ll.......', '.ll...ll.', '..ll.ll..', '...lll...'], { l: shadowOf(base) });
-        P.set(cx + 8, sy + 7, acc); // pocket square
-        if (top === 'top.labcoat') P.stamp(cx + 7, sy + 6, ['b', 'b', 'b'], { b: [63, 143, 216] });
+        P.stamp(cx - 3, sy, ['l.....', '.l...l', '..l.l.', '...l..'], { l: shadowOf(base) });
+        P.set(cx + 7, sy + 5, acc);
+        if (top === 'top.labcoat') P.stamp(cx + 6, sy + 4, ['b', 'b'], { b: [63, 143, 216] });
       }
-      if (top === 'top.kimono') for (let x = 30; x < 60; x++) for (let y = B.waistY - 5; y < B.waistY - 2; y++) if (t.has(x, y)) P.set(x, y, acc);
-      if (top === 'top.cardigan') for (let y = sy + 4; y < B.waistY - 1; y += 4) P.set(cx + 5, y, lightOf(acc));
+      if (top === 'top.kimono') for (let x = cx - 12; x < cx + 13; x++) for (let y = wy - 4; y < wy - 2; y++) if (t.has(x, y)) P.set(x, y, acc);
+      if (top === 'top.cardigan') for (let y = sy + 3; y < wy - 1; y += 4) P.set(cx + 4, y, lightOf(acc));
       break;
     }
     case 'top.puffer':
-      paint(P, M().rrect(cx - 5, sy - 5, cx + 9, sy + 2, 3), base);
-      for (let y = sy; y < B.waistY; y++) P.set(cx + 2, y, deepOf(base));
+      paint(P, M().rrect(cx - 4, sy - 4, cx + 6, sy + 2, 2), base);
+      for (let y = sy; y < wy; y++) P.set(cx + 1, y, deepOf(base));
       break;
     case 'top.overalls':
-      paint(P, M().poly(B.torso).band(0, sy + 6), acc, { rim: false });
-      paint(P, M().rrect(cx - 7, sy + 6, cx + 11, B.waistY, 2), base);
-      P.stamp(cx - 6, sy, ['s..............s', 's..............s', 's..............s', 's..............s', 's..............s', 's..............s'], { s: shadowOf(base) });
-      P.stamp(cx - 6, sy + 6, ['g', '.', '.', '.'], { g: GOLD });
-      P.stamp(cx + 10, sy + 6, ['g'], { g: GOLD });
-      paint(P, M().rrect(cx - 2, sy + 10, cx + 6, sy + 15, 1), shadowOf(base), { rim: false });
+      paint(P, M().poly(B.torso).band(0, sy + 5), acc);
+      paint(P, M().rrect(cx - 6, sy + 5, cx + 8, wy, 2), base);
+      for (let y = sy; y < sy + 5; y++) {
+        P.set(cx - 5, y, shadowOf(base));
+        P.set(cx + 7, y, shadowOf(base));
+      }
+      P.set(cx - 5, sy + 5, GOLD);
+      P.set(cx + 7, sy + 5, GOLD);
+      paint(P, M().rrect(cx - 2, sy + 8, cx + 4, sy + 12, 1), shadowOf(base), { flat: true });
       break;
     case 'top.dress':
-      paint(P, M().ellipse(cx + 2, sy, 6, 3.5), skin, { rim: false });
-      for (let x = 30; x < 60; x++) for (let y = B.waistY - 2; y < B.waistY; y++) if (t.has(x, y)) P.set(x, y, acc);
+      paint(P, inside(M().ellipse(cx + 1, sy, 5, 3)), skin, { edge: false });
+      for (let x = cx - 12; x < cx + 13; x++) for (let y = wy - 2; y < wy; y++) if (t.has(x, y)) P.set(x, y, acc);
       break;
     case 'top.raincoat':
-      paint(P, M().rrect(cx - 5, sy - 5, cx + 9, sy + 2, 3), base);
-      for (let y = sy + 3; y < 92; y += 5) P.stamp(cx + 2, y, ['kk'], { k: deepOf(base) });
+      paint(P, M().rrect(cx - 4, sy - 4, cx + 6, sy + 2, 2), base);
+      for (let y = sy + 3; y < 90; y += 5) P.stamp(cx + 1, y, ['kk'], { k: deepOf(base) });
       break;
   }
 }
@@ -850,44 +840,41 @@ function drawLegs(P: Pix, B: Body, L: FullLoadout) {
   const pants = hx(L.bottomColor);
   const bottom = L.bottom;
   const full = ITEM_BY_ID.get(L.top)?.fullLength;
-  const cover = bottom === 'bottom.shorts' ? 0.42 : bottom === 'bottom.skirt' ? 0.5 : bottom === 'bottom.longskirt' ? 1 : 1;
-  const tight = bottom === 'bottom.leggings';
-  const r = tight ? 4.2 : bottom === 'bottom.cargo' || bottom === 'bottom.joggers' ? 5.6 : 5.2;
-  // far leg first
-  const order = [...B.legs].reverse();
+  const skirt = bottom === 'bottom.skirt' || bottom === 'bottom.longskirt';
+  const shorts = bottom === 'bottom.shorts';
+  const r = bottom === 'bottom.leggings' ? 3.4 : bottom === 'bottom.cargo' || bottom === 'bottom.joggers' ? 4.6 : 4.2;
+  const cx = B.cx;
+  const order = [...B.legs].reverse(); // far leg first
   for (const [i, leg] of order.entries()) {
     const far = i === 0;
-    const bare = M().capsule(leg.hip[0], leg.hip[1], leg.knee[0], leg.knee[1], 4.2).capsule(leg.knee[0], leg.knee[1], leg.ankle[0], leg.ankle[1], 3.8);
-    paint(P, bare, skin, { rim: false, shade: far ? 0.3 : 0 });
-    if (bottom === 'bottom.skirt' || bottom === 'bottom.longskirt' || full) continue;
+    const shade = far ? 0.3 : 0;
+    const bare = M().capsule(leg.hip[0], leg.hip[1], leg.knee[0], leg.knee[1], 3.4).capsule(leg.knee[0], leg.knee[1], leg.ankle[0], leg.ankle[1], 3);
+    paint(P, bare, skin, { shade });
+    if (skirt || full) continue;
     const pm = M().capsule(leg.hip[0], leg.hip[1], leg.knee[0], leg.knee[1], r);
-    if (cover > 0.5) pm.capsule(leg.knee[0], leg.knee[1], leg.ankle[0], leg.ankle[1] - (bottom === 'bottom.joggers' ? 2 : 0), r - 0.4);
-    else pm.band(0, Math.round(leg.hip[1] + (leg.knee[1] - leg.hip[1]) * 0.9));
-    paint(P, pm, pants, { shade: far ? 0.3 : 0 });
-    if (bottom === 'bottom.jeans') {
-      // rolled cuff and outer seam
-      const cuff = M().capsule(leg.ankle[0], leg.ankle[1] - 2, leg.ankle[0], leg.ankle[1] - 1, r).keep(pm);
-      paint(P, cuff, lightOf(pants), { rim: false });
-    }
-    if (bottom === 'bottom.joggers') paint(P, M().capsule(leg.ankle[0], leg.ankle[1] - 3, leg.ankle[0], leg.ankle[1] - 1, r - 1.2), shadowOf(pants), { rim: false });
-    if (bottom === 'bottom.cargo' && !far) paint(P, M().rrect(leg.knee[0] - 5, leg.knee[1] - 7, leg.knee[0] - 1, leg.knee[1] - 1, 1), shadowOf(pants), { rim: false });
-    if (bottom === 'bottom.chinos') for (let y = Math.round(leg.hip[1] + 2); y < leg.ankle[1] - 2; y++) P.set(Math.round(leg.hip[0] + ((leg.ankle[0] - leg.hip[0]) * (y - leg.hip[1])) / (leg.ankle[1] - leg.hip[1])) + 1, y, shadowOf(pants));
+    if (shorts) pm.band(0, Math.round(leg.hip[1] + (leg.knee[1] - leg.hip[1]) * 0.85));
+    else pm.capsule(leg.knee[0], leg.knee[1], leg.ankle[0], leg.ankle[1] - (bottom === 'bottom.joggers' ? 2 : 0), r - 0.3);
+    paint(P, pm, pants, { shade });
+    if (bottom === 'bottom.jeans') paint(P, M().capsule(leg.ankle[0], leg.ankle[1] - 2, leg.ankle[0], leg.ankle[1] - 1, r).keep(pm), lightOf(pants), { flat: true, edge: false });
+    if (bottom === 'bottom.joggers') paint(P, M().capsule(leg.ankle[0], leg.ankle[1] - 3, leg.ankle[0], leg.ankle[1] - 1, r - 1), shadowOf(pants), { flat: true });
+    if (bottom === 'bottom.cargo' && !far) paint(P, M().rrect(leg.knee[0] - 4, leg.knee[1] - 6, leg.knee[0], leg.knee[1] - 1, 1), shadowOf(pants), { flat: true });
   }
-  // hips / waistband
-  if (!full && bottom !== 'bottom.skirt' && bottom !== 'bottom.longskirt') {
-    const hips = B.sitting ? M().rrect(33, B.hipY - 6, 58, B.hipY + 5, 4) : M().rrect(33, B.waistY - 1, 57, B.hipY + 4, 3);
+  if (!full && !skirt) {
+    const hips = B.sitting ? M().rrect(cx - 11, B.hipY - 5, cx + 11, B.hipY + 5, 4) : M().rrect(cx - 10, B.waistY - 1, cx + 10, B.hipY + 4, 3);
     paint(P, hips, pants);
-    if (bottom === 'bottom.joggers') P.stamp(44, B.waistY + 1, ['w.w', 'w.w'], { w: WHITE });
+    // belt line
+    for (let x = cx - 10; x < cx + 10; x++) if (hips.has(x, B.waistY)) P.set(x, B.waistY, shadowOf(pants));
   }
-  if (bottom === 'bottom.skirt' || bottom === 'bottom.longskirt') {
-    const hem = bottom === 'bottom.longskirt' ? (B.sitting ? B.hipY + 14 : 99) : B.sitting ? B.hipY + 8 : 91;
+  if (skirt) {
+    const long = bottom === 'bottom.longskirt';
+    const hem = long ? (B.sitting ? B.hipY + 13 : 98) : B.sitting ? B.hipY + 7 : 88;
     const sk = M().poly([
-      [34, B.waistY - 1],
-      [56, B.waistY - 1],
-      [B.sitting ? 64 : 60, hem],
-      [B.sitting ? 34 : 29, hem],
+      [cx - 10, B.waistY - 1],
+      [cx + 10, B.waistY - 1],
+      [cx + (B.sitting ? 17 : 13), hem],
+      [cx - (B.sitting ? 10 : 13), hem],
     ]);
-    paint(P, sk, (x) => (x % 5 === 0 ? shadowOf(pants) : pants));
+    paint(P, sk, (x) => (x % 4 === 0 ? shadowOf(pants) : pants));
   }
 }
 
@@ -897,51 +884,44 @@ function drawShoes(P: Pix, B: Body, L: FullLoadout) {
   const back = B.view === 'back';
   const order = [...B.legs].reverse();
   for (const [i, leg] of order.entries()) {
-    const far = i === 0;
+    const shade = i === 0 ? 0.25 : 0;
     const [ax, ay] = leg.ankle;
     const toe = back ? -1 : 1;
-    const x0 = ax - 4;
-    const y0 = ay - 1;
-    const tall = kind === 'boots' ? 7 : kind === 'rainboots' ? 10 : kind === 'hightops' ? 5 : 0;
-    const shoe = M().rrect(x0 - (toe < 0 ? 3 : 0), y0, x0 + 9 + (toe > 0 ? 3 : 0), y0 + 6, 3);
-    if (tall) shoe.rect(ax - 4, y0 - tall, ax + 4, y0 + 2);
-    if (leg.heel) shoe.rect(0, 0, W, 0);
-    const soleY = y0 + 5;
-    let upper = c;
-    if (kind === 'slippers') upper = lightOf(c);
+    const x0 = ax - 3 - (toe < 0 ? 2 : 0);
+    const x1 = ax + 4 + (toe > 0 ? 2 : 0);
+    const y0 = ay;
+    const tall = kind === 'boots' ? 5 : kind === 'rainboots' ? 8 : kind === 'hightops' ? 3 : 0;
+    const shoe = M().rrect(x0, y0, x1, y0 + 5, 2);
+    if (tall) shoe.rect(ax - 3, y0 - tall, ax + 4, y0 + 2);
     if (kind === 'sandals') {
-      paint(P, M().rrect(x0, y0 + 1, x0 + 11, y0 + 6, 2), hx(L.skin), { rim: false });
-      P.stamp(x0 + 2, y0 + 2, ['cccccc', '.....c'], { c });
-      P.stamp(x0, soleY, ['sssssssssss'], { s: [120, 80, 50] });
+      paint(P, M().rrect(x0, y0 + 1, x1, y0 + 5, 2), hx(L.skin), { shade });
+      P.stamp(x0 + 1, y0 + 2, ['cccc'], { c });
+      P.stamp(x0, y0 + 4, ['ssssssss'], { s: [120, 80, 50] });
       continue;
     }
-    paint(P, shoe, upper, { shade: far ? 0.25 : 0 });
-    // soles and details
+    paint(P, shoe, kind === 'slippers' ? lightOf(c) : c, { shade });
+    const soleY = y0 + 4;
     const soleC: RGB = kind === 'sneakers' || kind === 'hightops' || kind === 'skates' ? WHITE : kind === 'heels' || kind === 'loafers' ? [58, 40, 42] : deepOf(c);
-    for (let x = 0; x < W; x++) if (shoe.has(x, soleY)) P.set(x, soleY, soleC);
-    if (kind === 'sneakers' || kind === 'hightops') P.stamp(x0 + (toe > 0 ? 3 : 2), y0 + 2, ['wwww'], { w: WHITE });
-    if (kind === 'hightops') P.stamp(ax - 2, y0 - 4, ['w.w', '.w.', 'w.w'], { w: WHITE });
-    if (kind === 'rainboots') P.stamp(ax - 3, y0 - 8, ['l', 'l', 'l', 'l', 'l'], { l: lightOf(lightOf(c)) });
-    if (kind === 'heels') P.stamp(x0 + (toe > 0 ? 1 : 9), y0 + 6, ['k', 'k'], { k: [58, 40, 42] });
-    if (kind === 'loafers') P.stamp(x0 + (toe > 0 ? 6 : 2), y0 + 1, ['gg'], { g: GOLD });
-    if (kind === 'skates')
-      for (const wx of [x0 + 1, x0 + 5, x0 + 9]) paint(P, M().ellipse(wx, y0 + 7, 1.6, 1.6), [255, 138, 61], { rim: false });
-    if (kind === 'slippers') for (let x = x0; x < x0 + 12; x += 2) P.set(x, y0, WHITE);
+    for (let x = x0; x < x1; x++) if (shoe.has(x, soleY)) P.set(x, soleY, soleC);
+    if (kind === 'sneakers' || kind === 'hightops') P.stamp(ax - 1, y0 + 1, ['www'], { w: WHITE });
+    if (kind === 'hightops') P.stamp(ax - 1, y0 - 2, ['w.w'], { w: WHITE });
+    if (kind === 'rainboots') P.stamp(ax - 2, y0 - 6, ['l', 'l', 'l', 'l'], { l: lightOf(lightOf(c)) });
+    if (kind === 'heels') P.stamp(toe > 0 ? x0 : x1 - 1, y0 + 5, ['k'], { k: [58, 40, 42] });
+    if (kind === 'loafers') P.stamp(ax, y0 + 1, ['gg'], { g: GOLD });
+    if (kind === 'skates') for (const wx of [x0 + 1, x0 + 4, x0 + 7]) P.set(wx, y0 + 6, [255, 138, 61]);
+    if (kind === 'slippers') for (let x = x0; x < x1; x += 2) P.set(x, y0, WHITE);
   }
 }
 
-/* ================================================================== head, hair, hats, glasses */
+/* ================================================================== head, hats, glasses, neckwear */
 
 function drawHead(P: Pix, B: Body, L: FullLoadout) {
   const skin = hx(L.skin);
-  // neck, shaded under the chin
-  paint(P, M().rrect(B.hx - 5, B.hy + 13, B.hx + 5, B.shoulderY + 2, 2), shadowOf(skin), { rim: false });
-  const head = headMask(B);
-  paint(P, head, skin, { shade: -0.05 });
+  paint(P, M().rrect(B.hx - 4, B.hy + 9, B.hx + 5, B.shoulderY + 2, 2), shadowOf(skin), { flat: true });
+  paint(P, headMask(B), skin, { shade: -0.1 });
   if (B.view === 'front') {
-    // ear on the near side
-    paint(P, M().ellipse(B.hx - B.rx + 1, B.hy + 3, 2.6, 3.4), skin, { rim: false });
-    P.set(B.hx - B.rx + 1, B.hy + 3, shadowOf(skin));
+    paint(P, M().ellipse(B.hx - B.rx + 1, B.hy + 1, 2, 3), skin, { flat: true });
+    P.set(B.hx - B.rx + 1, B.hy + 1, shadowOf(skin));
   }
 }
 
@@ -954,176 +934,172 @@ function drawHeadwear(P: Pix, B: Body, L: FullLoadout) {
   const dir = back ? -1 : 1;
   const top = y - ry;
   switch (hat) {
-    case 'beanie': {
-      const m = M().ellipse(x, y - 3, rx + 2, ry - 1).band(0, y - 4);
-      paint(P, m, (px) => (px % 3 === 0 ? shadowOf(c) : c));
-      paint(P, M().rrect(x - rx - 2, y - 7, x + rx + 2, y - 2, 2), lightOf(c));
-      paint(P, M().ellipse(x - 1, top - 3, 4, 3.5), WHITE);
+    case 'beanie':
+      paint(P, M().ellipse(x, y - 3, rx + 1.5, ry - 1).band(0, y - 4), (px) => (px % 3 === 0 ? shadowOf(c) : c));
+      paint(P, M().rrect(x - rx - 1.5, y - 7, x + rx + 1.5, y - 3, 2), lightOf(c));
+      paint(P, M().ellipse(x - 1, top - 2, 3, 2.6), WHITE);
       break;
-    }
     case 'cap':
     case 'capback': {
       const d = hat === 'cap' ? dir : -dir;
-      paint(P, M().ellipse(x, y - 4, rx + 1.5, ry - 2).band(0, y - 4), c);
-      paint(P, M().ellipse(x + d * (rx + 2), y - 5, 10, 3).band(y - 6, H), shadowOf(c));
-      P.set(x - 1, top - 1, lightOf(c));
+      paint(P, M().ellipse(x, y - 4, rx + 1, ry - 2).band(0, y - 4), c);
+      paint(P, M().ellipse(x + d * (rx + 1), y - 5, 7, 2.2).band(y - 6, H), shadowOf(c));
       break;
     }
     case 'bucket':
-      paint(P, M().ellipse(x, y - 6, rx - 1, ry - 4).band(0, y - 4), c);
-      paint(P, M().ellipse(x, y - 4, rx + 6, 4.5), shadowOf(c));
+      paint(P, M().ellipse(x, y - 5, rx - 1, ry - 3.5).band(0, y - 4), c);
+      paint(P, M().ellipse(x, y - 4, rx + 4, 3.4), shadowOf(c));
       break;
     case 'beret':
-      paint(P, M().ellipse(x - 3 * dir, top + 3, rx + 3, 5.5), c);
-      P.set(x - 3 * dir, top - 3, shadowOf(c));
+      paint(P, M().ellipse(x - 2 * dir, top + 3, rx + 2, 4), c);
+      P.set(x - 2 * dir, top - 1, shadowOf(c));
       break;
     case 'headband':
-      paint(P, M().ellipse(x, y - 2, rx + 1, ry).band(y - 9, y - 5), c, { rim: false });
+      paint(P, M().ellipse(x, y - 2, rx + 1, ry).band(y - 8, y - 5), c, { flat: true });
       break;
     case 'bow':
-      paint(P, M().ellipse(x - 8, top + 1, 6, 4.5).ellipse(x + 4, top - 1, 6, 4.5), c);
-      paint(P, M().ellipse(x - 2, top, 2.5, 2.5), shadowOf(c));
+      paint(P, M().ellipse(x - 6, top + 1, 4.5, 3.4).ellipse(x + 3, top, 4.5, 3.4), c);
+      paint(P, M().ellipse(x - 1.5, top + 0.5, 2, 2), shadowOf(c));
       break;
     case 'catears':
-      paint(P, M().poly([[x - 13, top + 5], [x - 11, top - 5], [x - 4, top + 2]]).poly([[x + 4, top + 1], [x + 11, top - 6], [x + 14, top + 5]]), c);
-      P.stamp(x - 11, top - 1, ['p', 'pp'], { p: PINK });
+      paint(P, M().poly([[x - 10, top + 4], [x - 8, top - 4], [x - 3, top + 2]]).poly([[x + 3, top + 1], [x + 8, top - 5], [x + 10, top + 4]]), c);
+      P.stamp(x - 8, top - 1, ['p', 'pp'], { p: PINK });
       break;
     case 'flowers': {
       const cols: RGB[] = [PINK, GOLD, [159, 220, 255], WHITE];
-      for (let k = 0; k < 7; k++) {
-        const a = Math.PI * (1.05 + (k / 6) * 0.9);
+      for (let k = 0; k < 6; k++) {
+        const a = Math.PI * (1.08 + (k / 5) * 0.84);
         const fx = x + Math.cos(a) * (rx + 0.5);
         const fy = y - 2 + Math.sin(a) * (ry - 1);
-        paint(P, M().ellipse(fx, fy, 2.6, 2.4), cols[k % cols.length], { rim: false });
+        paint(P, M().ellipse(fx, fy, 2, 1.9), cols[k % cols.length], { flat: true });
         P.set(fx, fy, GOLD);
       }
       break;
     }
     case 'headphones':
-      paint(P, M().ellipse(x, y - 2, rx + 2.5, ry + 1.5).cut(M().ellipse(x, y - 1, rx + 0.5, ry)).band(0, y), [58, 58, 70]);
-      if (!back) paint(P, M().rrect(x - rx - 3, y - 3, x - rx + 4, y + 8, 3), c);
-      else paint(P, M().rrect(x + rx - 4, y - 3, x + rx + 3, y + 8, 3), c);
+      paint(P, M().ellipse(x, y - 2, rx + 2, ry + 1).cut(M().ellipse(x, y - 1, rx + 0.5, ry)).band(0, y), [58, 58, 70]);
+      if (!back) paint(P, M().rrect(x - rx - 2, y - 3, x - rx + 3, y + 5, 2), c);
+      else paint(P, M().rrect(x + rx - 3, y - 3, x + rx + 2, y + 5, 2), c);
       break;
     case 'cowboy':
-      paint(P, M().rrect(x - 11, top - 5, x + 11, y - 5, 4), c);
-      paint(P, M().ellipse(x, y - 5, rx + 9, 4).cut(M().ellipse(x, y - 8, rx + 4, 2.5)), shadowOf(c));
-      paint(P, M().rect(x - 11, y - 9, x + 11, y - 7), deepOf(c), { rim: false });
+      paint(P, M().rrect(x - 8, top - 4, x + 8, y - 5, 3), c);
+      paint(P, M().ellipse(x, y - 5, rx + 6, 3).cut(M().ellipse(x, y - 7.5, rx + 3, 2)), shadowOf(c));
+      paint(P, M().rect(x - 8, y - 8, x + 8, y - 6), deepOf(c), { flat: true });
       break;
     case 'crown': {
-      const m = M().rect(x - 10, top - 1, x + 10, top + 5).poly([[x - 10, top], [x - 10, top - 6], [x - 5, top]]).poly([[x - 3, top], [x, top - 8], [x + 3, top]]).poly([[x + 5, top], [x + 10, top - 6], [x + 10, top]]);
+      const m = M().rect(x - 8, top - 1, x + 8, top + 4).poly([[x - 8, top], [x - 8, top - 5], [x - 4, top]]).poly([[x - 2, top], [x, top - 6], [x + 2, top]]).poly([[x + 4, top], [x + 8, top - 5], [x + 8, top]]);
       paint(P, m, GOLD);
-      P.stamp(x - 7, top + 1, ['r....b....r'], { r: [224, 80, 63], b: [63, 143, 216] });
+      P.stamp(x - 6, top + 1, ['r.....b.....r'.slice(0, 13)], { r: [224, 80, 63], b: [63, 143, 216] });
       break;
     }
     case 'hijab': {
-      const m = M().ellipse(x, y + 1, rx + 3, ry + 3).rrect(x - rx - 2, y + 4, x + rx + 3, B.shoulderY + 8, 6);
+      const m = M().ellipse(x, y, rx + 2.5, ry + 2.5).rrect(x - rx - 2, y + 3, x + rx + 2, B.shoulderY + 6, 5);
       if (!back) m.cut(faceWindow(B, 1, 2));
       paint(P, m, c);
-      if (!back) paint(P, M().ellipse(x + 3, y + 5, B.rx - 2.5, B.ry - 3.5).cut(faceWindow(B, 1, 2)).band(0, y + 9), shadowOf(c), { rim: false });
       break;
     }
     case 'turban': {
-      const m = M().ellipse(x - 1, y - 5, rx + 3, ry - 2).band(0, y - 1);
-      if (back) m.ellipse(x, y, rx + 1.5, ry + 0.5).band(0, y + 10);
-      paint(P, m, (px, py) => ((px + py * 2) % 9 < 2 ? shadowOf(c) : c));
+      const m = M().ellipse(x - 1, y - 5, rx + 2.5, ry - 2).band(0, y - 1);
+      if (back) m.ellipse(x, y, rx + 1, ry).band(0, y + 8);
+      paint(P, m, (px, py) => ((px + py * 2) % 7 < 2 ? shadowOf(c) : c));
       break;
     }
-    case 'party': {
-      const m = M().poly([[x - 9, top + 4], [x + 3, top - 16], [x + 9, top + 4]]);
-      paint(P, m, (px, py) => ((px + py) % 6 < 3 ? c : WHITE));
-      paint(P, M().ellipse(x + 3, top - 17, 3, 3), GOLD);
+    case 'party':
+      paint(P, M().poly([[x - 7, top + 3], [x + 2, top - 12], [x + 7, top + 3]]), (px, py) => ((px + py) % 5 < 2 ? c : WHITE));
+      paint(P, M().ellipse(x + 2, top - 13, 2.2, 2.2), GOLD);
       break;
-    }
   }
 }
 
 function drawEyewear(P: Pix, B: Body, L: FullLoadout) {
   const kind = L.eyewear.replace('eye.', '');
   if (kind === 'none' || B.view === 'back') return;
-  const y = B.hy + 2;
-  const nx = B.hx - 4;
-  const fx = B.hx + 8;
+  const y = B.hy;
+  const nx = B.hx - 4.5;
+  const fx = B.hx + 4.5;
   const frame: RGB = kind === 'heart' ? [226, 76, 156] : kind === 'star' ? GOLD : [42, 32, 44];
-  const ring = (cx: number, cy: number, rx: number, ry: number, lens?: RGB, alpha = 255) => {
+  const ring = (cx: number, cy: number, rx: number, ry: number, lens?: RGB) => {
     const outer = M().ellipse(cx, cy, rx, ry);
     const inner = M().ellipse(cx, cy, rx - 1, ry - 1);
-    if (lens) for (let yy = 0; yy < H; yy++) for (let xx = 0; xx < W; xx++) if (inner.has(xx, yy)) P.set(xx, yy, lens, alpha);
-    for (let yy = 0; yy < H; yy++) for (let xx = 0; xx < W; xx++) if (outer.has(xx, yy) && !inner.has(xx, yy)) P.set(xx, yy, frame);
+    for (let yy = 0; yy < H; yy++)
+      for (let xx = 0; xx < W; xx++) {
+        if (inner.has(xx, yy) && lens) P.set(xx, yy, lens);
+        else if (outer.has(xx, yy) && !inner.has(xx, yy)) P.set(xx, yy, frame);
+      }
   };
   switch (kind) {
     case 'round':
-      ring(nx, y, 4.5, 4.5);
-      ring(fx, y, 3.5, 4.5);
+      ring(nx, y, 3.6, 3.4);
+      ring(fx, y, 3, 3.4);
       break;
     case 'square':
-      P.stamp(nx - 4, y - 3, ['fffffffff', 'f.......f', 'f.......f', 'f.......f', 'f.......f', 'fffffffff'], { f: frame });
-      P.stamp(fx - 3, y - 3, ['fffffff', 'f.....f', 'f.....f', 'f.....f', 'f.....f', 'fffffff'], { f: frame });
+      P.stamp(nx - 3, y - 2, ['fffffff', 'f.....f', 'f.....f', 'f.....f', 'fffffff'], { f: frame });
+      P.stamp(fx - 2, y - 2, ['fffff', 'f...f', 'f...f', 'f...f', 'fffff'], { f: frame });
       break;
     case 'sun':
     case '3d':
-      ring(nx, y, 4.5, 4, kind === 'sun' ? [30, 26, 40] : [224, 60, 70], 230);
-      ring(fx, y, 3.5, 4, kind === 'sun' ? [30, 26, 40] : [60, 190, 220], 230);
-      if (kind === 'sun') P.set(nx - 2, y - 2, WHITE);
+      ring(nx, y, 3.6, 3, kind === 'sun' ? [30, 26, 40] : [224, 60, 70]);
+      ring(fx, y, 3, 3, kind === 'sun' ? [30, 26, 40] : [60, 190, 220]);
+      if (kind === 'sun') P.set(nx - 1, y - 1, WHITE);
       break;
     case 'heart':
     case 'star':
-      P.stamp(nx - 4, y - 3, kind === 'heart' ? ['.ff.ff.', 'fffffff', 'fffffff', '.fffff.', '..fff..', '...f...'] : ['...f...', '..fff..', 'fffffff', '.fffff.', '.ff.ff.', 'f.....f'], { f: frame });
-      P.stamp(fx - 3, y - 3, kind === 'heart' ? ['ff.f', 'ffff', 'ffff', '.ff.', '..f.'] : ['..f.', '.fff', 'ffff', '.ff.', 'f..f'], { f: frame });
+      P.stamp(nx - 3, y - 2, kind === 'heart' ? ['ff.ff', 'fffff', '.fff.', '..f..'] : ['..f..', 'fffff', '.fff.', 'f...f'], { f: frame });
+      P.stamp(fx - 2, y - 2, kind === 'heart' ? ['f.f', 'fff', '.f.'] : ['.f.', 'fff', 'f.f'], { f: frame });
       break;
     case 'monocle':
-      ring(fx, y, 4, 4.5);
-      for (let k = 0; k < 8; k++) P.set(fx + 3 + (k % 2), y + 4 + k, GOLD_D);
+      ring(fx, y, 3.4, 3.6);
+      for (let k = 0; k < 7; k++) P.set(fx + 2 + (k % 2), y + 3 + k, GOLD_D);
       return;
     case 'goggles':
-      paint(P, M().ellipse(B.hx, y - 1, B.rx + 0.5, 2).band(y - 2, y + 1), [80, 70, 60], { rim: false });
-      ring(nx, y, 5, 4.5, [159, 220, 255], 200);
-      ring(fx, y, 4, 4.5, [159, 220, 255], 200);
+      paint(P, M().ellipse(B.hx, y - 1, B.rx + 0.5, 1.6).band(y - 2, y + 1), [80, 70, 60], { flat: true });
+      ring(nx, y, 4, 3.6, [159, 220, 255]);
+      ring(fx, y, 3.4, 3.6, [159, 220, 255]);
       return;
   }
-  // bridge and arm
-  for (let x = nx + 4; x < fx - 3; x++) P.set(x, y - 1, frame);
-  for (let x = B.hx - B.rx + 2; x < nx - 4; x++) P.set(x, y - 1, frame);
+  for (let x = Math.round(nx + 3); x < fx - 2; x++) P.set(x, y - 1, frame);
+  for (let x = B.hx - B.rx + 1; x < nx - 3; x++) P.set(x, y - 1, frame);
 }
 
 function drawNeckwear(P: Pix, B: Body, L: FullLoadout) {
   const kind = L.neck.replace('neck.', '');
   if (kind === 'none') return;
   const c = hx(L.neckColor);
-  const cx = B.hx;
+  const cx = B.cx;
   const sy = B.shoulderY;
   const back = B.view === 'back';
   switch (kind) {
     case 'scarf':
-      paint(P, M().rrect(cx - 11, sy - 5, cx + 11, sy + 2, 3), (x) => (x % 4 < 2 ? c : lightOf(c)));
-      if (!back) paint(P, M().rrect(cx - 7, sy, cx - 1, sy + 16, 2), (_x, y) => (y % 4 < 2 ? c : lightOf(c)));
+      paint(P, M().rrect(cx - 8, sy - 4, cx + 9, sy + 2, 3), (x) => (x % 4 < 2 ? c : lightOf(c)));
+      if (!back) paint(P, M().rrect(cx - 6, sy, cx - 2, sy + 12, 2), (_x, y) => (y % 4 < 2 ? c : lightOf(c)));
       break;
     case 'bowtie':
-      if (!back) paint(P, M().poly([[cx - 4, sy - 2], [cx + 1, sy + 1], [cx - 4, sy + 4]]).poly([[cx + 7, sy - 2], [cx + 2, sy + 1], [cx + 7, sy + 4]]).ellipse(cx + 1.5, sy + 1, 1.6, 1.6), c);
+      if (!back) paint(P, M().poly([[cx - 3, sy - 1], [cx + 1, sy + 1], [cx - 3, sy + 3]]).poly([[cx + 5, sy - 1], [cx + 1, sy + 1], [cx + 5, sy + 3]]).ellipse(cx + 1, sy + 1, 1.2, 1.2), c);
       break;
     case 'tie':
       if (!back) {
-        paint(P, M().ellipse(cx + 1.5, sy + 1, 2.4, 2), c);
-        paint(P, M().poly([[cx, sy + 2], [cx + 3, sy + 2], [cx + 4, sy + 17], [cx + 1.5, sy + 20], [cx - 1, sy + 17]]), c);
+        paint(P, M().ellipse(cx + 1, sy + 1, 1.8, 1.5), c);
+        paint(P, M().poly([[cx, sy + 2], [cx + 2, sy + 2], [cx + 3, sy + 14], [cx + 1, sy + 16], [cx - 1, sy + 14]]), c);
       }
       break;
     case 'necklace':
       if (!back) {
-        for (let k = -7; k <= 8; k++) P.set(cx + k, sy + 2 + Math.round((k * k) / 18), GOLD);
-        paint(P, M().ellipse(cx + 1, sy + 7, 1.8, 2), [159, 220, 255], { rim: false });
+        for (let k = -5; k <= 6; k++) P.set(cx + k, sy + 2 + Math.round((k * k) / 14), GOLD);
+        P.set(cx + 1, sy + 5, [159, 220, 255]);
       }
       break;
     case 'bandana':
-      if (!back) paint(P, M().poly([[cx - 8, sy - 1], [cx + 10, sy - 1], [cx + 1, sy + 10]]), (x, y) => ((x + y) % 5 === 0 ? WHITE : c));
-      else paint(P, M().rrect(cx - 9, sy - 3, cx + 9, sy + 1, 2), c);
+      if (!back) paint(P, M().poly([[cx - 6, sy - 1], [cx + 8, sy - 1], [cx + 1, sy + 7]]), (x, y) => ((x + y) % 4 === 0 ? WHITE : c));
+      else paint(P, M().rrect(cx - 7, sy - 3, cx + 7, sy + 1, 2), c);
       break;
     case 'lanyard':
       if (!back) {
-        for (let k = 0; k < 12; k++) {
-          P.set(cx - 5 + Math.round(k * 0.35), sy + k, c);
-          P.set(cx + 7 - Math.round(k * 0.35), sy + k, c);
+        for (let k = 0; k < 10; k++) {
+          P.set(cx - 4 + Math.round(k * 0.3), sy + k, c);
+          P.set(cx + 6 - Math.round(k * 0.3), sy + k, c);
         }
-        paint(P, M().rrect(cx - 2, sy + 11, cx + 5, sy + 19, 1), WHITE);
-        P.stamp(cx - 1, sy + 12, ['cccccc'], { c });
+        paint(P, M().rrect(cx - 2, sy + 9, cx + 4, sy + 15, 1), WHITE, { flat: true });
+        P.stamp(cx - 1, sy + 10, ['cccc'], { c });
       }
       break;
   }
@@ -1131,24 +1107,24 @@ function drawNeckwear(P: Pix, B: Body, L: FullLoadout) {
 
 function drawAccessory(P: Pix, B: Body, L: FullLoadout) {
   const back = B.view === 'back';
-  const cx = B.hx;
+  const cx = B.cx;
   const sy = B.shoulderY;
   switch (L.accessory) {
     case 'acc.flower':
-      P.stamp(back ? cx + 8 : cx - 13, B.hy - 9, ['.p.', 'pyp', '.p.'], { p: PINK, y: GOLD });
+      P.stamp(back ? B.hx + B.rx - 3 : B.hx - B.rx - 1, B.hy - 8, ['.p.', 'pyp', '.p.'], { p: PINK, y: GOLD });
       break;
     case 'acc.earrings':
-      if (!back) paint(P, M().ellipse(B.hx - B.rx + 1, B.hy + 8, 1.4, 1.6), GOLD, { rim: false });
+      if (!back) P.stamp(B.hx - B.rx, B.hy + 4, ['g', 'g'], { g: GOLD });
       break;
     case 'acc.hearing-aid':
-      P.stamp(back ? cx + B.rx - 1 : cx - B.rx - 1, B.hy + 1, ['t', 't', 't'], { t: [43, 179, 163] });
+      P.stamp(back ? B.hx + B.rx - 1 : B.hx - B.rx - 1, B.hy - 1, ['t', 't'], { t: [43, 179, 163] });
       break;
     case 'acc.star-pin':
     case 'acc.five-year-pin':
-      if (!back) P.stamp(cx - 8, sy + 5, ['.y.', 'yyy', '.y.', L.accessory === 'acc.five-year-pin' ? 'r.r' : '...'], { y: GOLD, r: [224, 80, 63] });
+      if (!back) P.stamp(cx - 7, sy + 4, ['.y.', 'yyy', L.accessory === 'acc.five-year-pin' ? 'r.r' : '.y.'], { y: GOLD, r: [224, 80, 63] });
       break;
     case 'acc.rainbow-pin':
-      if (!back) P.stamp(cx - 9, sy + 5, ['rrrr', 'y..y', 'b..b'], { r: [224, 80, 63], y: GOLD, b: [63, 143, 216] });
+      if (!back) P.stamp(cx - 8, sy + 4, ['rrr', 'y.y', 'b.b'], { r: [224, 80, 63], y: GOLD, b: [63, 143, 216] });
       break;
   }
 }
@@ -1160,37 +1136,37 @@ function drawHeld(P: Pix, B: Body, L: FullLoadout) {
   const c = hx(L.heldColor);
   switch (L.held) {
     case 'held.coffee':
-      paint(P, M().rrect(x - 2, y - 9, x + 5, y + 1, 1), WHITE);
-      paint(P, M().rect(x - 2, y - 6, x + 5, y - 2), [201, 160, 106], { rim: false });
-      paint(P, M().rrect(x - 3, y - 11, x + 6, y - 8, 1), [90, 60, 50], { rim: false });
+      paint(P, M().rrect(x - 2, y - 7, x + 3, y + 1, 1), WHITE, { flat: true });
+      paint(P, M().rect(x - 2, y - 5, x + 3, y - 2), [201, 160, 106], { flat: true, edge: false });
+      paint(P, M().rrect(x - 3, y - 9, x + 4, y - 6, 1), [90, 60, 50], { flat: true });
       break;
     case 'held.boba':
-      paint(P, M().rrect(x - 2, y - 10, x + 5, y + 1, 1), [236, 206, 170]);
-      P.stamp(x - 1, y - 2, ['k.k.k', '.k.k.'], { k: [59, 37, 24] });
-      for (let k = 0; k < 6; k++) P.set(x + 3 + (k > 3 ? 1 : 0), y - 11 - k, c);
+      paint(P, M().rrect(x - 2, y - 8, x + 3, y + 1, 1), [236, 206, 170], { flat: true });
+      P.stamp(x - 1, y - 2, ['k.k', '.k.'], { k: [59, 37, 24] });
+      for (let k = 0; k < 5; k++) P.set(x + 2 + (k > 3 ? 1 : 0), y - 9 - k, c);
       break;
     case 'held.laptop':
-      paint(P, M().rrect(x - 8, y - 3, x + 8, y + 1, 1), [201, 206, 214]);
+      paint(P, M().rrect(x - 6, y - 2, x + 6, y + 1, 1), [201, 206, 214]);
       break;
     case 'held.book':
-      paint(P, M().rrect(x - 3, y - 9, x + 5, y + 1, 1), c);
-      for (let yy = y - 8; yy < y; yy++) P.set(x + 4, yy, WHITE);
+      paint(P, M().rrect(x - 2, y - 7, x + 4, y + 1, 1), c);
+      for (let yy = y - 6; yy < y; yy++) P.set(x + 3, yy, WHITE);
       break;
     case 'held.plant':
-      paint(P, M().rrect(x - 3, y - 4, x + 4, y + 2, 1), [201, 98, 63]);
-      paint(P, M().ellipse(x - 2, y - 7, 3, 2.5).ellipse(x + 3, y - 8, 3, 2.5).ellipse(x, y - 10, 2.5, 3), [94, 156, 74]);
+      paint(P, M().rrect(x - 2, y - 3, x + 3, y + 2, 1), [201, 98, 63]);
+      paint(P, M().ellipse(x - 1, y - 5, 2.2, 1.8).ellipse(x + 2, y - 6, 2.2, 1.8).ellipse(x, y - 8, 1.8, 2.2), [94, 156, 74]);
       break;
     case 'held.icecream':
-      paint(P, M().poly([[x - 3, y - 5], [x + 4, y - 5], [x + 0.5, y + 4]]), [232, 179, 90]);
-      paint(P, M().ellipse(x + 0.5, y - 8, 4, 3.8), c.every((v) => v > 0) ? c : PINK);
+      paint(P, M().poly([[x - 2, y - 4], [x + 3, y - 4], [x + 0.5, y + 3]]), [232, 179, 90]);
+      paint(P, M().ellipse(x + 0.5, y - 6, 3, 2.8), c);
       break;
     case 'held.balloon':
-      for (let k = 0; k < 34; k++) P.set(x + (k > 20 ? -1 : 0), y - k, [142, 138, 132]);
-      paint(P, M().ellipse(x - 1, y - 42, 7, 8.5), c);
+      for (let k = 0; k < 28; k++) P.set(x + (k > 17 ? -1 : 0), y - k, [142, 138, 132]);
+      paint(P, M().ellipse(x - 1, y - 34, 5.5, 6.5), c);
       break;
     case 'held.umbrella':
-      for (let k = 0; k < 44; k++) P.set(x + 1, y - k, [58, 40, 42]);
-      paint(P, M().ellipse(x + 1, y - 44, 24, 12).band(0, y - 43), (px) => (Math.floor((px - x) / 6) % 2 ? c : lightOf(c)));
+      for (let k = 0; k < 36; k++) P.set(x + 1, y - k, [58, 40, 42]);
+      paint(P, M().ellipse(x + 1, y - 36, 19, 9).band(0, y - 35), (px) => (Math.floor((px - x) / 5) % 2 ? c : lightOf(c)));
       break;
   }
 }
@@ -1278,7 +1254,7 @@ export function drawAvatarCanvas(input: AvatarLoadout, facing: Facing, requested
   let B = bodyFor(view, wheelchair ? 'sit' : pose);
   if (wheelchair && pose === 'wave') {
     const wave = bodyFor(view, 'wave');
-    B = { ...B, pose: 'wave', armNear: { a: [32, B.shoulderY + 2], b: [24, 42 + 9] }, handNear: [23, 47] };
+    B = { ...B, pose: 'wave', armNear: { a: [B.cx - 10, B.shoulderY + 2], b: [B.cx - 17, 47] }, handNear: [B.cx - 18, 43] };
     void wave;
   }
   const P = new Pix();

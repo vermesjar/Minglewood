@@ -613,6 +613,13 @@ class Game {
     }
     const kinds = new Set(o.actions?.map((a) => a.kind));
     if (kinds.has('exit')) return this.exitToTown();
+    if (kinds.has('ring')) {
+      this.walkTo([o.x, o.y], () => {
+        this.emote('celebrate');
+        this.say('🔔 Ding ding!');
+      });
+      return;
+    }
     if (kinds.has('toggle')) {
       this.rt?.send({ t: 'toggle', objectId: o.id });
       return;

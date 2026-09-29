@@ -37,7 +37,9 @@ export type ObjectAction =
   /** Hands you something to carry around (a coffee from the espresso machine). */
   | { kind: 'vend'; item: string; label: string }
   /** Switches something on or off for everyone in the room (lamps). `on` is its starting state. */
-  | { kind: 'toggle'; label: string; on?: boolean };
+  | { kind: 'toggle'; label: string; on?: boolean }
+  /** Walk up and ring it (the launch bell): a little celebration everyone in the room sees. */
+  | { kind: 'ring'; label: string };
 
 /** Height of a counter's top surface in art px — things stacked on a counter rest at this z. */
 export const COUNTER_TOP = 20.5;

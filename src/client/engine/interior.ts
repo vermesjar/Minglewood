@@ -13,7 +13,7 @@ import { footprint } from '@shared/world/scene';
 import { hexToRgb } from './sprites/color';
 import { makeCanvas } from './sprites/painter';
 import { rugTexture } from './sprites/furniture';
-import { wallArt } from './sprites/art';
+import { artLight, wallArt } from './sprites/art';
 import { drawWallItem, WALL_H, type GroundLayer, type InteriorRenderContext, type WallHit } from './ground';
 
 /** Canvas px per art px. */
@@ -397,7 +397,7 @@ export function renderInteriorShell(scene: SceneDef, rc: InteriorRenderContext):
   // Each lamp gets its own small pool canvas so it can be switched on and off on its own.
   const POOL = 2.8;
   const lampPools = scene.objects
-    .filter((o) => o.sprite === 'lamp')
+    .filter((o) => o.sprite === 'lamp' || !!artLight(o))
     .map((o) => {
       const x = o.x + 0.5;
       const y = o.y + 0.5;

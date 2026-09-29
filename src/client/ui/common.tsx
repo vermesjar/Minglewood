@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 're
 import type { AvatarLoadout, PresenceStatus } from '@shared/domain/types';
 import type { Facing } from '@shared/world/scene';
 import { STATUS_META } from '@shared/presence';
-import { AVATAR_CROPS, avatarSprite, type Pose } from '../engine/sprites/avatar';
+import { AVATAR_CROPS, AVATAR_DENSITY, avatarSprite, type Pose } from '../engine/sprites/avatar';
 
 /** Pixel-art avatar rendered into a small canvas. `head` crops to the face. */
 export function AvatarCanvas({
@@ -25,6 +25,10 @@ export function AvatarCanvas({
   const ref = useRef<HTMLCanvasElement>(null);
   const r = AVATAR_CROPS[crop ?? (head ? 'head' : 'body')] ?? AVATAR_CROPS.full;
   const [sx, sy, sw, sh] = [r.x, r.y, r.w, r.h];
+  // Crops are in the sprite's own pixels (2 per art pixel); `scale` is per art pixel, as UI sizes were designed.
+  const k = scale / AVATAR_DENSITY;
+  const dw = Math.round(sw * k);
+  const dh = Math.round(sh * k);
   useEffect(() => {
     const c = ref.current;
     if (!c) return;
@@ -32,15 +36,15 @@ export function AvatarCanvas({
     ctx.imageSmoothingEnabled = false;
     ctx.clearRect(0, 0, c.width, c.height);
     const s = avatarSprite(loadout, facing, pose);
-    ctx.drawImage(s.canvas, sx, sy, sw, sh, 0, 0, sw * scale, sh * scale);
-  }, [loadout, scale, facing, pose, sx, sy, sw, sh]);
+    ctx.drawImage(s.canvas, sx, sy, sw, sh, 0, 0, dw, dh);
+  }, [loadout, facing, pose, sx, sy, sw, sh, dw, dh]);
   return (
     <canvas
       ref={ref}
-      width={sw * scale}
-      height={sh * scale}
+      width={dw}
+      height={dh}
       className={className}
-      style={{ imageRendering: 'pixelated', width: sw * scale, height: sh * scale }}
+      style={{ imageRendering: 'pixelated', width: dw, height: dh }}
       aria-hidden
     />
   );

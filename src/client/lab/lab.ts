@@ -11,7 +11,7 @@ import { isSeat, type Facing, type SceneObject } from '@shared/world/scene';
 import { WalkGrid } from '@shared/world/walkGrid';
 import { buildSeed } from '@shared/seed/northstar';
 import { WorldView } from '../engine/WorldView';
-import { loadArt } from '../engine/sprites/art';
+import { artCatalog, loadArt } from '../engine/sprites/art';
 import { clearSpriteCache, spriteFor } from '../engine/sprites/registry';
 import { avatarSprite, type Pose } from '../engine/sprites/avatar';
 import { blit } from '../engine/sprites/painter';
@@ -232,6 +232,58 @@ async function avatars(o: AvatarOpts = {}) {
   return snap(canvas, o.name ?? 'avatars');
 }
 
+/**
+ * The furniture catalog: every piece in all four rotations on its footprint, as an admin would see it
+ * when rearranging a room. Mirrored rotations swap a piece's footprint (a 2×1 sofa becomes 1×2).
+ */
+async function catalog(o: { name?: string; extra?: Array<{ key: string; footprint: [number, number] }> } = {}) {
+  const items = [
+    ...artCatalog().filter((e) => !e.wall),
+    ...(o.extra ?? []).map((e) => ({ ...e, facings: ['sw', 'ne'] as Facing[], wall: false })),
+  ];
+  const rots: Facing[] = ['sw', 'se', 'ne', 'nw'];
+  const Z = 2;
+  const cell = 150;
+  const cols = rots.length * 2;
+  const rows = Math.ceil(items.length / 2);
+  const W = cols * cell;
+  const H = rows * cell;
+  const canvas = freshCanvas(W, H);
+  canvas.width = W;
+  canvas.height = H;
+  const c = canvas.getContext('2d')!;
+  c.imageSmoothingEnabled = false;
+  c.fillStyle = '#2d2538';
+  c.fillRect(0, 0, W, H);
+  items.forEach((it, i) => {
+    const [sprite, variant] = it.key.split('.');
+    const authoredSwNe = it.facings.length === 0 || it.facings.some((f) => f === 'sw' || f === 'ne');
+    rots.forEach((f, r) => {
+      const swap = authoredSwNe ? f === 'se' || f === 'nw' : f === 'sw' || f === 'ne';
+      const [w, d] = swap ? [it.footprint[1], it.footprint[0]] : it.footprint;
+      const ob: SceneObject = { id: `cat-${i}-${f}`, sprite, variant, facing: f, x: 0, y: 0, w, d };
+      const cx = ((i % 2) * rots.length + r) * cell + cell / 2;
+      const cy = Math.floor(i / 2) * cell + cell - 30;
+      c.setTransform(Z, 0, 0, Z, cx, cy);
+      c.fillStyle = '#8a6a50';
+      c.beginPath();
+      c.moveTo(0, 0);
+      c.lineTo(w * 16, w * 8);
+      c.lineTo((w - d) * 16, (w + d) * 8);
+      c.lineTo(-d * 16, d * 8);
+      c.closePath();
+      c.fill();
+      const s = spriteFor(ob);
+      if (s) blit(c, s, 0, 0);
+      c.setTransform(1, 0, 0, 1, 0, 0);
+      c.fillStyle = '#f6ead6';
+      c.font = '11px system-ui';
+      c.fillText(`${it.key} ${f}`, cx - cell / 2 + 4, Math.floor(i / 2) * cell + 12);
+    });
+  });
+  return snap(canvas, o.name ?? 'catalog');
+}
+
 const ready = loadArt().then(clearSpriteCache);
 const lab = {
   ready,
@@ -249,6 +301,10 @@ const lab = {
   },
   /** Force the sky for renders, e.g. lab.sky({ phase: 'night', weather: 'rain' }); lab.sky(null) to follow the clock. */
   sky: (o: Partial<Sky> | null) => setSkyOverride(o),
+  catalog: async (o?: { name?: string; extra?: Array<{ key: string; footprint: [number, number] }> }) => {
+    await ready;
+    return catalog(o);
+  },
   reloadArt: async () => {
     await loadArt();
     clearSpriteCache();

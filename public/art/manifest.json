@@ -170,6 +170,152 @@
         15
       ]
     },
+    "heirloom-aquarium": {
+      "footprint": [
+        2,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "sw": {
+          "file": "heirloom-aquarium.sw.png",
+          "anchor": [
+            32,
+            60
+          ]
+        },
+        "ne": {
+          "file": "heirloom-aquarium.ne.png",
+          "anchor": [
+            32,
+            68
+          ]
+        }
+      }
+    },
+    "heirloom-bell": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "heirloom-bell.png",
+      "anchor": [
+        24,
+        37
+      ]
+    },
+    "heirloom-dragonlamp": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "se": {
+          "file": "heirloom-dragonlamp.se.png",
+          "anchor": [
+            25,
+            65
+          ]
+        },
+        "nw": {
+          "file": "heirloom-dragonlamp.nw.png",
+          "anchor": [
+            25,
+            59
+          ]
+        }
+      },
+      "light": {
+        "x": 40,
+        "y": 27,
+        "r": 46
+      }
+    },
+    "heirloom-globe": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "heirloom-globe.png",
+      "anchor": [
+        22,
+        47
+      ]
+    },
+    "heirloom-gold": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "heirloom-gold.png",
+      "anchor": [
+        25,
+        22
+      ]
+    },
+    "heirloom-piano": {
+      "footprint": [
+        2,
+        2
+      ],
+      "fit": "anchor",
+      "facings": {
+        "sw": {
+          "file": "heirloom-piano.sw.png",
+          "anchor": [
+            64,
+            76
+          ]
+        },
+        "ne": {
+          "file": "heirloom-piano.ne.png",
+          "anchor": [
+            64,
+            72
+          ]
+        }
+      }
+    },
+    "heirloom-throne": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "se": {
+          "file": "heirloom-throne.se.png",
+          "anchor": [
+            32,
+            66
+          ]
+        },
+        "nw": {
+          "file": "heirloom-throne.nw.png",
+          "anchor": [
+            32,
+            53
+          ]
+        }
+      },
+      "seat": 14
+    },
+    "heirloom-trophy": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "heirloom-trophy.png",
+      "anchor": [
+        21,
+        46
+      ]
+    },
     "jar": {
       "footprint": [
         1,

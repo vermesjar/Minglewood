@@ -69,6 +69,7 @@ export async function loadArt(base = ''): Promise<void> {
       }),
     );
     manifest = m;
+    lightCache.clear();
   } catch {
     manifest = null;
   }
@@ -80,6 +81,17 @@ function entryFor(o: SceneObject): ArtEntry | null {
 }
 
 /** Flat wall art for a wall-mounted object, if it has been drawn. */
+/** Every piece of finished art: key → footprint, the facings it was drawn in, and whether it hangs on a wall. */
+export function artCatalog(): Array<{ key: string; footprint: [number, number]; facings: Facing[]; wall: boolean }> {
+  if (!manifest) return [];
+  return Object.entries(manifest.sprites).map(([key, e]) => ({
+    key,
+    footprint: e.footprint,
+    facings: Object.keys(e.facings ?? {}) as Facing[],
+    wall: !!e.wall,
+  }));
+}
+
 export function wallArt(o: SceneObject): { img: HTMLImageElement; v: [number, number]; margin?: number } | null {
   const e = entryFor(o);
   if (!e?.wall || !e.file) return null;
@@ -92,14 +104,30 @@ export function artSeat(o: SceneObject): number | null {
   return entryFor(o)?.seat ?? null;
 }
 
-/** Where a lamp's light comes from, relative to the sprite's anchor, in art px. */
+/** Where a lamp's light comes from, relative to the sprite's anchor, in art px (follows mirroring). */
+const lightCache = new Map<string, { dx: number; dy: number; r: number } | null>();
+
 export function artLight(o: SceneObject): { dx: number; dy: number; r: number } | null {
+  const key = `${o.sprite}|${o.variant ?? ''}|${o.facing ?? ''}|${o.w ?? 1}|${o.d ?? 1}`;
+  if (lightCache.has(key)) return lightCache.get(key)!;
+  const r = computeLight(o);
+  lightCache.set(key, r);
+  return r;
+}
+
+function computeLight(o: SceneObject): { dx: number; dy: number; r: number } | null {
   const e = entryFor(o);
   if (!e?.light || !manifest) return null;
-  const rec = e.file ? { anchor: e.anchor } : Object.values(e.facings ?? {})[0];
-  const [ax, ay] = rec?.anchor ?? [0, 0];
+  const s = artSprite(o);
+  if (!s) return null;
   const S = manifest.scale;
-  return { dx: (e.light.x - ax) / S, dy: (e.light.y - ay) / S, r: (e.light.r ?? 40) / S };
+  const [primary] = e.file ? [{ file: e.file, anchor: e.anchor }] : Object.values(e.facings ?? {});
+  const img = primary ? images.get(primary.file) : undefined;
+  if (!img || !primary?.anchor) return null;
+  // The light is authored on the primary drawing; mirrored rotations reflect it.
+  const mirrored = s.ax !== primary.anchor[0];
+  const lx = mirrored ? img.width - e.light.x : e.light.x;
+  return { dx: (lx - s.ax) / S, dy: (e.light.y - s.ay) / S, r: (e.light.r ?? 40) / S };
 }
 
 /** The finished art for a scene object, or null to fall back to procedural drawing. */
@@ -108,7 +136,8 @@ export function artSprite(o: SceneObject): Sprite | null {
   if (!e || !manifest) return null;
   const facing = o.facing ?? 'se';
   let rec: ArtFile | undefined = e.file ? { file: e.file, anchor: e.anchor } : undefined;
-  let mirror = false;
+  // A single drawing of a non-square piece (a 2×1 table) turned 90° is its mirror image.
+  let mirror = !!e.file && e.footprint[0] !== e.footprint[1] && (o.w ?? 1) === e.footprint[1] && (o.d ?? 1) === e.footprint[0];
   if (e.facings) {
     rec = e.facings[facing];
     if (!rec && e.facings[MIRROR[facing]]) {
