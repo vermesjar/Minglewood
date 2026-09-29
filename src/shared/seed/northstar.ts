@@ -241,6 +241,9 @@ export const DEMO_CALENDAR: Array<{ memberIds: string[]; title: string; offsetMi
   { memberIds: ['m-jordan', 'm-nia', 'm-sam', 'm-ava'], title: 'Aurora stand-up', offsetMin: 50, durationMin: 15, roomId: 'launch' },
 ];
 
+/** A natural mix of body bases across the demo cast (anyone can change theirs in the wardrobe). */
+const SOFT_BODY = new Set(['m-hana', 'm-elena', 'm-sofia', 'm-mira', 'm-ines', 'm-maya', 'm-aiko', 'm-ava', 'm-priya', 'm-lena', 'm-kai', 'm-nia', 'm-zoe', 'm-rosa']);
+
 export function buildSeed(now = new Date()) {
   const today = now.toISOString().slice(0, 10);
   const members: Member[] = P.map((p) => ({
@@ -259,7 +262,7 @@ export function buildSeed(now = new Date()) {
     interests: p.interests,
     bio: p.bio,
     role: p.role ?? 'member',
-    avatar: { ...p.look, ...EXTRAS[p.id] },
+    avatar: { body: SOFT_BODY.has(p.id) ? 'body.b' : 'body.a', ...p.look, ...EXTRAS[p.id] },
     unlockedItems: p.unlocks ?? [],
     simulated: true,
     settings: { locationVisibility: 'everyone', knocksWhileFocused: false },
