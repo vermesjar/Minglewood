@@ -17,7 +17,11 @@ function loadDotEnv() {
 }
 loadDotEnv();
 
-const env = process.env;
+// Values pasted into hosting dashboards often carry a stray newline or space; Discord's gateway rejects
+// such a bot token (close code 4004) even though REST calls tolerate it.
+const env: Record<string, string | undefined> = Object.fromEntries(
+  Object.entries(process.env).map(([key, value]) => [key, value?.trim()]),
+);
 const isProd = env.NODE_ENV === 'production';
 
 let sessionSecret = env.SESSION_SECRET ?? '';
