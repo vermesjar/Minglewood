@@ -43,6 +43,11 @@ export const config = {
   sessionSecret,
   dataDir: resolve(process.cwd(), env.DATA_DIR ?? '.data'),
   demoMode: env.DEMO_MODE !== 'false',
+  /** Minglewood Cloud (Lovable Cloud edge functions base URL, e.g. https://<ref>.supabase.co/functions/v1). */
+  controlPlaneUrl: env.CONTROL_PLANE_URL ?? '',
+  serverKey: env.MINGLEWOOD_SERVER_KEY ?? '',
+  /** Where "Add to Discord" lives (the control plane's public site). */
+  installUrl: env.INSTALL_URL ?? '',
   simulateCoworkers: env.SIMULATE_COWORKERS !== 'false',
   discord: {
     clientId: env.DISCORD_CLIENT_ID ?? '',
@@ -57,3 +62,5 @@ export const config = {
 
 export const discordConfigured = () => !!(config.discord.clientId && config.discord.clientSecret);
 export const discordBotConfigured = () => !!config.discord.botToken;
+
+export const cloudConfigured = () => !!(config.controlPlaneUrl && config.serverKey);

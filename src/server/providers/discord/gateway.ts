@@ -38,6 +38,8 @@ export class DiscordVoiceGateway extends EventEmitter<{
   constructor(
     private readonly token: string,
     private readonly guildIds: () => string[],
+    /** Multi-tenant mode: forward every server the bot is in; the app decides which org it is. */
+    private readonly acceptUnknown = false,
   ) {
     super();
   }
@@ -111,11 +113,12 @@ export class DiscordVoiceGateway extends EventEmitter<{
       this.emit('ready');
     } else if (t === 'GUILD_CREATE') {
       const g = d as { id: string; voice_states?: RawVoiceState[] };
-      if (!watched.has(g.id)) return;
+      // A just-installed server may not be known yet; the app resolves it on demand.
+      if (!watched.has(g.id) && !this.acceptUnknown) return;
       for (const vs of g.voice_states ?? []) this.emit('voice', g.id, toChange(vs));
     } else if (t === 'VOICE_STATE_UPDATE') {
       const vs = d as RawVoiceState;
-      if (vs.guild_id && watched.has(vs.guild_id)) this.emit('voice', vs.guild_id, toChange(vs));
+      if (vs.guild_id && (watched.has(vs.guild_id) || this.acceptUnknown)) this.emit('voice', vs.guild_id, toChange(vs));
     }
   }
 }

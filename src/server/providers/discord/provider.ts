@@ -10,7 +10,17 @@ import type {
 import { avatarUrl, ChannelType, DiscordApiError, discordApi } from './api';
 
 /** Minimum OAuth scopes: who you are, and whether you're in the company's server. */
-export const DISCORD_LOGIN_SCOPES = ['identify', 'guilds.members.read'];
+export const DISCORD_LOGIN_SCOPES = ['identify', 'guilds', 'guilds.members.read'];
+
+export interface UserGuild {
+  id: string;
+  name: string;
+  /** Server owner or has Administrator / Manage Server — becomes a Minglewood admin. */
+  manager: boolean;
+}
+
+const ADMINISTRATOR = 0x8n;
+const MANAGE_GUILD = 0x20n;
 /** Bot install: View Channels only (1024) — enough to list channels and see voice occupancy. */
 export const DISCORD_BOT_PERMISSIONS = '1024';
 
@@ -54,6 +64,46 @@ export class DiscordProvider implements CommunicationProvider {
   }
 
   /** Exchanges a code and verifies membership of `guildId`. Never stores the access token. */
+  /** Exchange a code and return the user plus the servers they belong to. */
+  async signIn(code: string, redirectUri?: string) {
+    const tok = await discordApi.exchangeCode(config.discord.clientId, config.discord.clientSecret, code, redirectUri);
+    const [user, guilds] = await Promise.all([discordApi.me(tok.access_token), discordApi.myGuilds(tok.access_token).catch(() => [])]);
+    const userGuilds: UserGuild[] = guilds.map((g) => {
+      let perms = 0n;
+      try {
+        perms = BigInt(g.permissions ?? '0');
+      } catch {
+        perms = 0n;
+      }
+      return { id: g.id, name: g.name, manager: !!g.owner || (perms & ADMINISTRATOR) !== 0n || (perms & MANAGE_GUILD) !== 0n };
+    });
+    return { accessToken: tok.access_token, user, guilds: userGuilds };
+  }
+
+  /** Nickname and roles in one server (guilds.members.read). */
+  async memberProfile(accessToken: string, user: { id: string; username: string; global_name?: string | null; avatar?: string | null }, guildId: string): Promise<ExternalIdentityProfile> {
+    let nick: string | undefined;
+    let roles: string[] = [];
+    let workspaceMember = false;
+    try {
+      const gm = await discordApi.myGuildMember(accessToken, guildId);
+      workspaceMember = true;
+      nick = gm.nick ?? undefined;
+      roles = gm.roles;
+    } catch (e) {
+      if (!(e instanceof DiscordApiError) || e.status !== 404) throw e;
+    }
+    return {
+      externalId: user.id,
+      username: user.username,
+      displayName: nick ?? user.global_name ?? user.username,
+      avatarUrl: avatarUrl(user),
+      workspaceMember,
+      workspaceNick: nick,
+      roleIds: roles,
+    };
+  }
+
   async identify(code: string, guildId: string | undefined, redirectUri?: string): Promise<ExternalIdentityProfile & { accessToken: string }> {
     const tok = await discordApi.exchangeCode(config.discord.clientId, config.discord.clientSecret, code, redirectUri);
     const user = await discordApi.me(tok.access_token);

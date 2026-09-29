@@ -61,6 +61,9 @@ export const discordApi = {
   /** Requires the `guilds.members.read` scope. 404 when the user is not in the guild. */
   myGuildMember: (accessToken: string, guildId: string) =>
     call<DiscordGuildMember>(`/users/@me/guilds/${guildId}/member`, { auth: bearer(accessToken) }),
+  /** Requires the `guilds` scope. Includes `owner` and the user's `permissions` bitfield. */
+  myGuilds: (accessToken: string) =>
+    call<Array<DiscordGuild & { owner?: boolean; permissions?: string }>>('/users/@me/guilds', { auth: bearer(accessToken) }),
   botGuilds: (token: string) => call<DiscordGuild[]>('/users/@me/guilds', { auth: bot(token) }),
   guildChannels: (token: string, guildId: string) =>
     call<DiscordChannel[]>(`/guilds/${guildId}/channels`, { auth: bot(token) }),

@@ -2083,3 +2083,7 @@ body.rm *::after {
     max-height: none;
   }
 }
+
+.center-text {
+  text-align: center;
+}

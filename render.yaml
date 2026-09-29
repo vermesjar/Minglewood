@@ -1,0 +1,33 @@
+# Render blueprint for the Minglewood game server (one-click: Render dashboard → New → Blueprint).
+# Secrets marked `sync: false` are entered in the Render dashboard, never committed.
+services:
+  - type: web
+    name: minglewood
+    runtime: docker
+    plan: starter
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: DEMO_MODE
+        value: "true"
+      - key: SIMULATE_COWORKERS
+        value: "true"
+      - key: PUBLIC_URL
+        sync: false # e.g. https://minglewood.onrender.com
+      - key: DISCORD_REDIRECT_URI
+        sync: false # ${PUBLIC_URL}/api/auth/discord/callback
+      - key: DISCORD_CLIENT_ID
+        sync: false
+      - key: DISCORD_CLIENT_SECRET
+        sync: false
+      - key: DISCORD_BOT_TOKEN
+        sync: false
+      - key: CONTROL_PLANE_URL
+        sync: false # e.g. https://minglewood-cloud.lovable.app/api/public
+      - key: MINGLEWOOD_SERVER_KEY
+        sync: false # same value as in Minglewood Cloud
+      - key: INSTALL_URL
+        sync: false # e.g. https://minglewood-cloud.lovable.app

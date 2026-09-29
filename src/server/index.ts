@@ -1,18 +1,24 @@
 import { BRAND } from '@shared/brand';
-import { config } from './config';
+import { cloudConfigured, config } from './config';
+import { ControlPlane } from './cloud/controlPlane';
+import { CloudPersistence } from './cloud/cloudPersistence';
 import { JsonFilePersistence } from './store/jsonFile';
 import { createApp } from './app';
 
 async function main() {
+  const local = new JsonFilePersistence(config.dataDir);
+  const cloud = cloudConfigured() ? new ControlPlane(config.controlPlaneUrl, config.serverKey) : undefined;
   const app = await createApp({
-    persistence: new JsonFilePersistence(config.dataDir),
+    persistence: cloud ? new CloudPersistence(local, cloud) : local,
     simulateCoworkers: config.simulateCoworkers,
     serveClient: true,
+    demo: config.demoMode,
+    cloud,
   });
   app.server.listen(config.port, () => {
     console.log(`\n  ${BRAND.name} server on http://localhost:${config.port}`);
     console.log(
-      `  demo mode: ${config.demoMode ? 'on' : 'off'} · simulated coworkers: ${config.simulateCoworkers ? 'on' : 'off'} · discord: ${config.discord.clientId ? 'configured' : 'not configured'}\n`,
+      `  demo mode: ${config.demoMode ? 'on' : 'off'} · simulated coworkers: ${config.simulateCoworkers ? 'on' : 'off'} · discord: ${config.discord.clientId ? 'configured' : 'not configured'} · cloud: ${cloud ? 'connected' : 'off (single-org)'}\n`,
     );
   });
   const shutdown = async () => {

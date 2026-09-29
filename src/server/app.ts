@@ -19,38 +19,67 @@ import { apiRoutes } from './routes/api';
 import { authRoutes } from './routes/auth';
 import { adminRoutes } from './routes/admin';
 import type { AppContext } from './context';
+import { ORG_ID } from '@shared/seed/northstar';
+import type { ControlPlane } from './cloud/controlPlane';
+import { TenantSync } from './cloud/tenantSync';
 
 export interface AppOptions {
   persistence: Persistence;
   simulateCoworkers: boolean;
   serveClient?: boolean;
+  /** Include the Northstar Labs demo world (default true). */
+  demo?: boolean;
+  /** Minglewood Cloud: installs + tenant state. Without it, the server runs single-org. */
+  cloud?: ControlPlane;
 }
 
 export interface App {
   server: Server;
   store: Store;
   hubs: Map<string, OrgHub>;
+  ctx: AppContext;
   close(): Promise<void>;
 }
 
 export async function createApp(opts: AppOptions): Promise<App> {
   const store = new Store(opts.persistence);
-  await store.init();
+  await store.init(new Date(), { demo: opts.demo !== false });
 
   const hubs = new Map<string, OrgHub>();
-  for (const orgId of store.orgIds()) hubs.set(orgId, new OrgHub(orgId, store));
-
-  const ctx: AppContext = { store, hubs, discord: new DiscordProvider(), demo: new DemoProvider() };
-
   const sims: LifeSim[] = [];
-  if (opts.simulateCoworkers) {
-    const calendar = new MockCalendarProvider(DEMO_CALENDAR, Date.now());
-    for (const hub of hubs.values()) {
+  const calendar = new MockCalendarProvider(DEMO_CALENDAR, Date.now());
+  /** One realtime hub per company world, created the first time it's needed. */
+  const ensureHub = (orgId: string) => {
+    let hub = hubs.get(orgId);
+    if (hub) return hub;
+    hub = new OrgHub(orgId, store);
+    hubs.set(orgId, hub);
+    // Simulated coworkers only live in the demo company.
+    if (opts.simulateCoworkers && orgId === ORG_ID) {
       const sim = new LifeSim(hub, store, calendar);
       sim.start();
       sims.push(sim);
     }
-  }
+    return hub;
+  };
+  for (const orgId of store.orgIds()) ensureHub(orgId);
+
+  const tenants = opts.cloud ? new TenantSync(store, opts.cloud, (orgId) => void ensureHub(orgId)) : null;
+  await tenants?.start();
+
+  const resolveGuild = async (guildId: string): Promise<string | undefined> => {
+    const connected = store.orgForWorkspace('discord', guildId);
+    if (connected) return connected;
+    const tenant = await tenants?.forGuild(guildId).catch((e) => {
+      console.warn('[cloud] guild lookup failed:', (e as Error).message);
+      return undefined;
+    });
+    if (tenant) return tenant;
+    if (config.discord.guildId === guildId && store.hasOrg(ORG_ID)) return ORG_ID;
+    return undefined;
+  };
+
+  const ctx: AppContext = { store, hubs, discord: new DiscordProvider(), demo: new DemoProvider(), resolveGuild };
 
   // Events start and end on their own; tell clients when the set of active events changes.
   const activeKey = new Map<string, string>();
@@ -78,14 +107,16 @@ export async function createApp(opts: AppOptions): Promise<App> {
       if (config.discord.guildId && !m.size) m.set(config.discord.guildId, store.orgIds()[0]);
       return m;
     };
-    gateway = new DiscordVoiceGateway(config.discord.botToken, () => [...guildToOrg().keys()]);
+    gateway = new DiscordVoiceGateway(config.discord.botToken, () => [...guildToOrg().keys()], !!opts.cloud);
     const syncs = new Map<string, VoicePresenceSync>();
     gateway.on('voice', (guildId, change) => {
-      const orgId = guildToOrg().get(guildId);
-      const hub = orgId && hubs.get(orgId);
-      if (!hub) return;
-      if (!syncs.has(orgId)) syncs.set(orgId, new VoicePresenceSync(hub, store));
-      syncs.get(orgId)!.apply(change);
+      void (async () => {
+        const orgId = guildToOrg().get(guildId) ?? (await resolveGuild(guildId));
+        if (!orgId || !store.hasOrg(orgId)) return;
+        const hub = ensureHub(orgId);
+        if (!syncs.has(orgId)) syncs.set(orgId, new VoicePresenceSync(hub, store));
+        syncs.get(orgId)!.apply(change);
+      })();
     });
     gateway.on('ready', () => console.log('[discord] gateway ready — watching voice presence'));
     gateway.on('error', (e) => console.warn('[discord] gateway:', e.message));
@@ -127,8 +158,10 @@ export async function createApp(opts: AppOptions): Promise<App> {
     server,
     store,
     hubs,
+    ctx,
     async close() {
       clearInterval(eventTimer);
+      tenants?.stop();
       sims.forEach((s) => s.stop());
       hubs.forEach((h) => h.dispose());
       gateway?.stop();

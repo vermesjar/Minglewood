@@ -13,6 +13,7 @@ const INTERESTS = ['coffee', 'climbing', 'board games', 'film', 'hiking', 'cooki
 const ERRORS: Record<string, string> = {
   not_member: 'That Discord account isn’t a member of the company server.',
   no_guild: 'No Discord server is connected yet — an admin needs to connect one.',
+  no_install: 'Minglewood isn’t in any of your Discord servers yet. Ask a server admin to add it — it takes a minute.',
   oauth_state: 'The sign-in link expired. Please try again.',
   oauth_failed: 'Discord sign-in failed. Please try again.',
   activity_auth: 'Minglewood needs your OK in Discord to know who you are. Relaunch the Activity to try again.',
@@ -52,6 +53,8 @@ function WorldBackdrop() {
 
 export function Landing() {
   const config = useStore((s) => s.config);
+  const guild = new URLSearchParams(location.search).get('guild');
+  const discordHref = `/api/auth/discord/start${guild ? `?guild=${encodeURIComponent(guild)}` : ''}`;
   const authError = useStore((s) => s.authError);
   const inDiscord = useStore((s) => s.inDiscord);
   const [name, setName] = useState('');
@@ -153,9 +156,16 @@ export function Landing() {
           <span>or</span>
         </div>
         {config?.discord.enabled ? (
-          <a className="btn discord big" href="/api/auth/discord/start">
-            <span aria-hidden>🎮</span> Continue with Discord
-          </a>
+          <>
+            <a className="btn discord big" href={discordHref}>
+              <span aria-hidden>🎮</span> {guild ? 'Enter your company town' : 'Continue with Discord'}
+            </a>
+            {config.installUrl && (
+              <p className="muted small center-text">
+                Running a team? <a href={config.installUrl}>Add Minglewood to your Discord server</a>.
+              </p>
+            )}
+          </>
         ) : (
           <p className="muted small">
             Discord sign-in isn’t configured on this server yet. Add your app credentials to <code>.env</code> — see{' '}

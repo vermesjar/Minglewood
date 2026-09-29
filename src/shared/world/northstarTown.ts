@@ -324,12 +324,12 @@ export function buildTown(): SceneDef {
     sprite: 'signpost',
     x: 22,
     y: 24,
-    label: 'Welcome to Northstar',
+    label: 'Welcome to town',
     actions: [
       {
         kind: 'info',
-        title: 'Welcome to Northstar Labs',
-        body: 'HQ is up the lane. Coffee is by the lake. Engineering hums to the west. Lantern Hall hosts everything worth celebrating.',
+        title: 'Welcome to town',
+        body: 'HQ is up the lane. Coffee is by the lake. The studios hum to the west, and the event hall hosts everything worth celebrating.',
       },
     ],
   });

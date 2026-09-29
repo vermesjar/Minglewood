@@ -742,7 +742,7 @@ export class WorldView {
       const [sx, sy] = this.camera.toScreen(cxArt, s.dy + 8, this.vw, this.vh);
       if (sx < -200 || sx > this.vw + 200 || sy < -60 || sy > this.vh + 100) continue;
       const hovered = this.hover?.kind === 'object' && this.hover.id === o.id;
-      const label = z < 1.4 ? `${b?.emoji ?? ''} ${b?.count ?? 0}` : `${b?.emoji ?? ''} ${o.label ?? ''}`;
+      const label = z < 1.4 ? `${b?.emoji ?? ''} ${b?.count ?? 0}` : `${b?.emoji ?? ''} ${b?.name ?? o.label ?? ''}`;
       const main = pill(c, sx, sy, label, { size: z < 1.4 ? 11 : 12, bg: hovered ? '#ffffff' : PAPER });
       this.badgeRects.push({ r: main, obj: o });
       let right = main.x + main.w - 4;

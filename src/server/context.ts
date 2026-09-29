@@ -11,6 +11,8 @@ export interface AppContext {
   hubs: Map<string, OrgHub>;
   discord: DiscordProvider;
   demo: DemoProvider;
+  /** Which org a Discord server belongs to (installed tenants, or the legacy single-guild setup). */
+  resolveGuild(guildId: string): Promise<string | undefined>;
 }
 
 export interface AuthedRequest extends Request {

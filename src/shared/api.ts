@@ -47,6 +47,8 @@ export interface PublicConfig {
   brand: { name: string; tagline: string };
   demoMode: boolean;
   discord: { enabled: boolean; clientId: string | null };
+  /** "Add to Discord" page on Minglewood Cloud, when hosted. */
+  installUrl: string | null;
 }
 
 export interface Bootstrap {

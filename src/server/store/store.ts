@@ -23,6 +23,7 @@ import type {
   World,
 } from '@shared/domain/types';
 import type { Decoration } from '@shared/world/decor';
+import { tenantOrgId, tenantTemplate, type TenantInfo } from '@shared/seed/tenant';
 import {
   buildSeed,
   DEMO_BINDINGS,
@@ -49,6 +50,9 @@ export interface OrgData {
   decorations: Decoration[];
   audit: AuditEntry[];
   sim: Record<string, SimProfile>;
+  /** Event/artifact ids generated from a template (demo seed or tenant starter) — never persisted. */
+  templateIds: Set<string>;
+  tenant?: TenantInfo;
 }
 
 /** What survives a restart. Seeded demo coworkers & demo events are regenerated at boot. */
@@ -63,11 +67,14 @@ export interface PersistedOrg {
   customArtifacts?: HistoricalArtifact[];
   decorations?: Decoration[];
   audit: AuditEntry[];
+  tenant?: TenantInfo;
 }
 
 export interface Persistence {
   load(): Promise<Record<string, PersistedOrg>>;
   save(data: Record<string, PersistedOrg>): Promise<void>;
+  /** Optional lazy loading for tenants that aren't part of the initial load. */
+  loadOrg?(orgId: string): Promise<PersistedOrg | undefined>;
 }
 
 export class Store {
@@ -76,28 +83,98 @@ export class Store {
 
   constructor(private readonly persistence: Persistence) {}
 
-  async init(now = new Date()): Promise<void> {
-    const persisted = await this.persistence.load();
-    const seed = buildSeed(now);
-    const saved = persisted[ORGANIZATION.id];
-    const members = new Map<string, Member>(seed.members.map((m) => [m.id, m]));
-    for (const m of saved?.members ?? []) members.set(m.id, m);
-    this.orgs.set(ORGANIZATION.id, {
-      org: saved?.org ?? { ...ORGANIZATION },
-      world: WORLD,
-      departments: DEPARTMENTS,
-      teams: TEAMS,
-      rooms: saved?.rooms ?? ROOMS.map((r) => ({ ...r })),
-      members,
+  private persisted: Record<string, PersistedOrg> = {};
+
+  async init(now = new Date(), opts: { demo?: boolean } = {}): Promise<void> {
+    this.persisted = await this.persistence.load();
+    if (opts.demo !== false) {
+      const seed = buildSeed(now);
+      const saved = this.persisted[ORGANIZATION.id];
+      const members = new Map<string, Member>(seed.members.map((m) => [m.id, m]));
+      for (const m of saved?.members ?? []) members.set(m.id, m);
+      this.orgs.set(ORGANIZATION.id, {
+        org: saved?.org ?? { ...ORGANIZATION },
+        world: WORLD,
+        departments: DEPARTMENTS,
+        teams: TEAMS,
+        rooms: saved?.rooms ?? ROOMS.map((r) => ({ ...r })),
+        members,
+        identities: saved?.identities ?? [],
+        bindings: saved?.bindings ?? DEMO_BINDINGS.map((b) => ({ ...b })),
+        connections: saved?.connections ?? [],
+        events: [...seed.events, ...(saved?.customEvents ?? [])],
+        artifacts: [...seed.artifacts, ...(saved?.customArtifacts ?? [])],
+        decorations: saved?.decorations ?? [],
+        audit: saved?.audit ?? [],
+        sim: seed.sim,
+        templateIds: new Set([...seed.events.map((e) => e.id), ...seed.artifacts.map((a) => a.id)]),
+      });
+    }
+    // Tenants that were saved locally (single-server installs) come back at boot.
+    for (const p of Object.values(this.persisted)) if (p.tenant) this.hydrateTenant(p.tenant, p);
+  }
+
+  hasOrg(orgId: string): boolean {
+    return this.orgs.has(orgId);
+  }
+
+  /**
+   * Makes sure a company that installed Minglewood has a world. Loads its saved state (lazily,
+   * from the control plane) or creates it from the starter template. Returns the org id.
+   */
+  async ensureTenant(t: TenantInfo): Promise<{ orgId: string; created: boolean }> {
+    const orgId = tenantOrgId(t.id);
+    const existing = this.orgs.get(orgId);
+    if (existing) {
+      existing.tenant = t;
+      if (t.discordGuildId) this.connectDiscord(existing, t);
+      return { orgId, created: false };
+    }
+    const saved = this.persisted[orgId] ?? (await this.persistence.loadOrg?.(orgId));
+    this.hydrateTenant(t, saved);
+    if (!saved) this.scheduleSave();
+    return { orgId, created: !saved };
+  }
+
+  private hydrateTenant(t: TenantInfo, saved: PersistedOrg | undefined) {
+    const tpl = tenantTemplate(t);
+    const d: OrgData = {
+      org: saved?.org ?? tpl.org,
+      world: tpl.world,
+      departments: tpl.departments,
+      teams: tpl.teams,
+      rooms: saved?.rooms ?? tpl.rooms,
+      members: new Map((saved?.members ?? []).map((m) => [m.id, m])),
       identities: saved?.identities ?? [],
-      bindings: saved?.bindings ?? DEMO_BINDINGS.map((b) => ({ ...b })),
+      bindings: saved?.bindings ?? [],
       connections: saved?.connections ?? [],
-      events: [...seed.events, ...(saved?.customEvents ?? [])],
-      artifacts: [...seed.artifacts, ...(saved?.customArtifacts ?? [])],
+      events: [...tpl.events, ...(saved?.customEvents ?? [])],
+      artifacts: [...tpl.artifacts, ...(saved?.customArtifacts ?? [])],
       decorations: saved?.decorations ?? [],
       audit: saved?.audit ?? [],
-      sim: seed.sim,
-    });
+      sim: {},
+      templateIds: new Set([...tpl.events.map((e) => e.id), ...tpl.artifacts.map((a) => a.id)]),
+      tenant: t,
+    };
+    if (t.discordGuildId) this.connectDiscord(d, t);
+    this.orgs.set(tpl.org.id, d);
+  }
+
+  private connectDiscord(d: OrgData, t: TenantInfo) {
+    if (d.connections.some((c) => c.provider === 'discord' && c.externalWorkspaceId === t.discordGuildId)) return;
+    d.connections = [
+      ...d.connections.filter((c) => c.provider !== 'discord'),
+      {
+        id: `conn-${t.id.slice(0, 8)}`,
+        orgId: d.org.id,
+        provider: 'discord',
+        externalWorkspaceId: t.discordGuildId!,
+        displayName: t.name,
+        connectedAt: t.createdAt,
+        connectedBy: t.installedByDiscordUserId ?? 'installer',
+        status: 'active',
+      },
+    ];
   }
 
   orgIds(): string[] {
@@ -235,9 +312,6 @@ export class Store {
 
   async flush(): Promise<void> {
     const out: Record<string, PersistedOrg> = {};
-    const seed = buildSeed();
-    const seedEventIds = new Set(seed.events.map((e) => e.id));
-    const seedArtifactIds = new Set(seed.artifacts.map((a) => a.id));
     for (const [id, d] of this.orgs) {
       out[id] = {
         org: d.org,
@@ -246,10 +320,11 @@ export class Store {
         identities: d.identities,
         bindings: d.bindings,
         connections: d.connections,
-        customEvents: d.events.filter((e) => !seedEventIds.has(e.id)),
-        customArtifacts: d.artifacts.filter((a) => !seedArtifactIds.has(a.id)),
+        customEvents: d.events.filter((e) => !d.templateIds.has(e.id)),
+        customArtifacts: d.artifacts.filter((a) => !d.templateIds.has(a.id)),
         decorations: d.decorations,
         audit: d.audit,
+        tenant: d.tenant,
       };
     }
     await this.persistence.save(out);

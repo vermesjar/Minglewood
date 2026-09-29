@@ -51,6 +51,7 @@ export function apiRoutes(ctx: AppContext): Router {
       brand: BRAND,
       demoMode: config.demoMode,
       discord: { enabled: discordConfigured(), clientId: config.discord.clientId || null },
+      installUrl: config.installUrl || null,
     });
   });
 
