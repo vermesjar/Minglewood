@@ -24,7 +24,8 @@
     "avatars:sweep": "tsx --tsconfig tsconfig.json scripts/avatar-sweep.ts",
     "furniture:review": "tsx --tsconfig tsconfig.json scripts/furniture-review.ts",
     "slack:sim": "tsx --tsconfig tsconfig.json scripts/slack-simulate.ts",
-    "playtest": "playwright test"
+    "playtest": "playwright test",
+    "playtest:gate": "cross-env PLAYTEST_URL=http://localhost:5190 PLAYTEST_TAG=gate playwright test regressions carry late-walk --workers 2 --retries 1"
   },
   "dependencies": {
     "@discord/embedded-app-sdk": "^2.5.0",

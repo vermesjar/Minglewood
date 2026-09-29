@@ -33,7 +33,8 @@ test('search: picking a person opens their card and does not move you', async ({
   player,
   page,
 }) => {
-  await player.enter('cafe');
+  // from the Quiet Grove (Grace haunts HQ, the café and town): her card should offer to take you to her
+  await player.enter('focus');
   const before = await player.me();
   await page.keyboard.press('Control+k');
   const input = page.getByPlaceholder(/Find Maya/);
@@ -50,7 +51,9 @@ test('search: picking a person opens their card and does not move you', async ({
   await player.full('search-card');
   expect(after.sceneId, 'still in the same room').toBe(before.sceneId);
   expect(after.tile, 'not moved').toEqual(before.tile);
-  await expect(card.getByRole('button', { name: /go to|join/i })).toBeVisible();
+  // (someone in the same room as you gets no Join button — you're already there)
+  if (!(await player.occupants())['m-grace'])
+    await expect(card.getByRole('button', { name: /go to|join/i })).toBeVisible();
 });
 
 test('wardrobe: soft body, surprise me, wear it', async ({ player, page }) => {

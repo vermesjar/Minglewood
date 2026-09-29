@@ -12,7 +12,7 @@ import { getScene, TOWN_ID, buildingForRoom } from '@shared/world';
 import { livedScene } from '@shared/world/lived';
 import { DECOR_BY_ID, decorObject, placementProblem } from '@shared/world/decor';
 import type { SceneObject } from '@shared/world/scene';
-import { seatSpotAt, seatSpots, stepOffTiles, type SeatSpot } from '@shared/world/seats';
+import { seatSpotAt, seatSpots, stepOffTiles } from '@shared/world/seats';
 import { approach } from '@shared/world/interact';
 import { WalkGrid } from '@shared/world/walkGrid';
 import { findPath, type Tile } from '@shared/world/pathfinding';
@@ -38,7 +38,7 @@ export const QUESTS: Array<{ id: string; label: string; hint: string }> = [
 ];
 
 
-/** How long a sit may wait for the server before we step back off the cushion (WorldView stands you up then too). */
+/** How long you may stand on a seat's tile unseated (a sit on its way) before you're walked off it (WorldView stands you up then too). */
 const SIT_CONFIRM_MS = 1500;
 
 class Game {
@@ -150,7 +150,11 @@ class Game {
       (s) => setState({ connection: s }),
     );
     this.rt.connect();
-    if (!this.arrivalTimer) this.arrivalTimer = window.setInterval(() => this.checkArrival(), 90);
+    if (!this.arrivalTimer)
+      this.arrivalTimer = window.setInterval(() => {
+        this.checkArrival();
+        this.offSeatIfStanding();
+      }, 90);
   }
 
   /** Re-read org config (rooms, bindings, events) — e.g. after an admin edits it. */
@@ -774,8 +778,10 @@ class Game {
       const target = spots.length > 1 ? this.world?.cushionAt(o, spots, p.x, p.y) : undefined;
       if (occ?.sittingOn === o.id) {
         // Already sitting here: clicking your own cushion does nothing (stand up with the Stand up button or by
-        // walking off); clicking another free cushion of the same seat shifts you over.
-        const mine = !target || (target.x === occ.x && target.y === occ.y);
+        // walking off); clicking another free cushion of the same seat shifts you over. "Your cushion" is the
+        // one you're in or still sliding into (the store only learns it when the server confirms the shift).
+        const cur = this.world?.cushionOf(this.meId) ?? occ;
+        const mine = !target || (target.x === cur.x && target.y === cur.y);
         if (!mine) this.sitOn(o, [target.x, target.y]);
         return;
       }
@@ -837,22 +843,35 @@ class Game {
       sit();
       return;
     }
-    this.walkTo([spot.x, spot.y], () => {
-      sit();
-      // a sit the server doesn't confirm (someone took the cushion first, the walk was refused): step back
-      // off it — never left standing in the furniture
-      window.setTimeout(() => this.offUnconfirmedSeat(spot), SIT_CONFIRM_MS);
-    });
+    this.walkTo([spot.x, spot.y], sit);
   }
 
-  /** Still standing on a cushion the server never seated us on: walk off it onto the floor beside it. */
-  private offUnconfirmedSeat(spot: SeatSpot) {
+  /** Since when we've stood on a seat's tile without sitting (0: we haven't). */
+  private onSeatSince = 0;
+
+  /**
+   * Never left standing in the furniture: on a seat's tile, not sitting and not walking, for a moment (a sit
+   * the server refused or never got, someone taking the cushion first, a refused walk) — walk off it onto the
+   * floor beside it, so every screen sees you step off.
+   */
+  private offSeatIfStanding() {
     const sceneId = getState().sceneId;
+    const scene = sceneId ? this.scene(sceneId) : undefined;
     const grid = sceneId ? this.grid(sceneId) : undefined;
     const t = this.world?.actorTile(this.meId);
-    if (!grid || !t || getState().occupants[this.meId]?.sittingOn || this.world?.isMoving(this.meId)) return;
-    if (t[0] !== spot.x || t[1] !== spot.y) return;
-    const off = stepOffTiles(spot).find(([x, y]) => grid.walkable(x, y));
+    const at = scene && t && !getState().occupants[this.meId]?.sittingOn && !this.world?.isMoving(this.meId) ? seatSpotAt(scene, t[0], t[1]) : null;
+    if (!at || !grid) {
+      this.onSeatSince = 0;
+      return;
+    }
+    const now = Date.now();
+    if (!this.onSeatSince) this.onSeatSince = now;
+    if (now - this.onSeatSince < SIT_CONFIRM_MS) return;
+    this.onSeatSince = 0;
+    const off = stepOffTiles(at.spot).find(([x, y]) => grid.walkable(x, y)) ?? (() => {
+      const n = grid.nearestWalkable(at.spot.x, at.spot.y, 2);
+      return n ? ([n.x, n.y] as Tile) : undefined;
+    })();
     if (off) this.walkTo(off);
   }
 

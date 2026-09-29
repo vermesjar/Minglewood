@@ -3,7 +3,7 @@
  * limited): tests/e2e/.auth/bot-N.json holds its session cookie and the local flags a returning player has
  * (welcome seen), so every run starts in the world, not on a welcome screen.
  */
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { request, type FullConfig } from '@playwright/test';
 
 export const AUTH_DIR = 'tests/e2e/.auth';
@@ -34,7 +34,10 @@ export default async function globalSetup(config: FullConfig) {
       const ctx = await request.newContext({ baseURL, storageState: file });
       const ok = (await ctx.get('/api/bootstrap')).ok();
       await ctx.dispose();
-      if (ok) continue;
+      if (ok) {
+        welcomedOn(file, baseURL);
+        continue;
+      }
     }
     const ctx = await request.newContext({ baseURL });
     const res = await ctx.post('/api/auth/demo', {
@@ -58,4 +61,18 @@ export default async function globalSetup(config: FullConfig) {
     writeFileSync(file, JSON.stringify(state, null, 2));
     await ctx.dispose();
   }
+}
+
+/**
+ * A bot made against one server (:5173) also plays another (:5190, PLAYTEST_URL): its "welcomed" flag lives in
+ * that origin's localStorage, so copy it over — else the day-one welcome panel sits over the canvas and eats clicks.
+ */
+function welcomedOn(file: string, baseURL: string) {
+  const state = JSON.parse(readFileSync(file, 'utf8')) as { origins?: Array<{ origin: string; localStorage: Array<{ name: string; value: string }> }> };
+  const origins = state.origins ?? [];
+  if (origins.some((o) => o.origin === baseURL)) return;
+  const flags = origins.flatMap((o) => o.localStorage.filter((l) => l.name.startsWith('mw.welcomed.')));
+  if (!flags.length) return;
+  state.origins = [...origins, { origin: baseURL, localStorage: flags }];
+  writeFileSync(file, JSON.stringify(state, null, 2));
 }

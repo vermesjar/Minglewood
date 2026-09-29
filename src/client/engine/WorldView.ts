@@ -63,6 +63,8 @@ interface ActorView {
   facing: Facing;
   moving: boolean;
   walkClock: number;
+  /** A walk that reached us late, being caught up on: `debt` ms behind at `at`, paid off over `span` ms. */
+  catchUp?: { at: number; debt: number; span: number };
   bubble?: { text: string; start: number; until: number };
   emotes: Array<{ emoji: string; start: number }>;
   waveUntil: number;
@@ -145,6 +147,8 @@ const SETTLE = 2;
  * (The sitter's own client walks them off the cushion a little before this — game.ts SIT_CONFIRM_MS.)
  */
 const SIT_UNCONFIRMED_MS = 2200;
+/** Someone's walk that reaches us later than this after it began is caught up on, not jumped into. */
+const CATCH_UP_FROM_MS = 120;
 
 /**
  * Seen from behind, the part of a seat's drawing that covers its sitter — all of it but the cushion behind
@@ -510,6 +514,15 @@ export class WorldView {
     if (!a) return;
     const hasPath = 'path' in patch;
     const was = { on: a.occ.sittingOn, x: a.x, y: a.y };
+    // seated by the server while their walk to that cushion is still playing here (it reached us late): the
+    // walk finishes into the seat, instead of snapping them onto it
+    const walk = a.occ.path;
+    const end0 = walk?.[walk.length - 1];
+    if (patch.sittingOn && end0 && end0[0] === patch.x && end0[1] === patch.y && this.livePos(a).moving) {
+      const { path, pathStartedAt } = a.occ;
+      a.occ = { ...a.occ, ...patch, path, pathStartedAt };
+      return;
+    }
     a.occ = { ...a.occ, ...patch };
     if (hasPath && !patch.path) {
       a.occ.path = undefined;
@@ -535,7 +548,27 @@ export class WorldView {
     if (!a) return;
     const was = { on: a.occ.sittingOn, x: a.x, y: a.y };
     a.occ = { ...a.occ, path, pathStartedAt: startedAt, sittingOn: undefined };
+    // someone else's walk that reached us late: start it where it began and catch up briskly, never jump ahead
+    const now = this.now();
+    const late = now - startedAt;
+    a.catchUp = memberId !== this.meId && late > CATCH_UP_FROM_MS ? { at: now, debt: late, span: Math.max(500, late * 1.5) } : undefined;
     this.seatChanged(a, was);
+  }
+
+  /**
+   * How far into its walk (ms) a figure is drawn: the walk's own clock, less what's still being caught up on
+   * when it reached us late (at most ~1.7× walking pace while it catches up).
+   */
+  private walked(a: ActorView, now = this.now()): number {
+    const t = now - (a.occ.pathStartedAt ?? now);
+    const c = a.catchUp;
+    if (!c) return t;
+    const k = (now - c.at) / c.span;
+    if (k >= 1) {
+      a.catchUp = undefined;
+      return t;
+    }
+    return t - c.debt * (1 - Math.max(0, k));
   }
 
   /* ------------------------------------------------------------------ seats */
@@ -681,8 +714,10 @@ export class WorldView {
     const profile = artSeatProfile(obj);
     // (getting up to step off, the feet stay on the seat's tile until the step starts)
     const foot = this.footPoint(a, now);
-    // the hip point of the cushion under their feet: sliding along a couch, it slides with them
-    const hip = sitterPoint({ x: foot.x - 0.5, y: foot.y - 0.5, facing: s.spot.facing }, profile);
+    // the hip point: sitting down (or sliding along a couch), the cushion's under their feet and slides
+    // with them; getting up to walk away, it stays on the seat while the feet go (else a walk that reaches
+    // someone late would carry the seated figure along with it)
+    const hip = sitterPoint(s.to > 0 ? { x: foot.x - 0.5, y: foot.y - 0.5, facing: s.spot.facing } : s.spot, profile);
     const inSeat = k >= CROUCH_UNTIL;
     const u = inSeat ? (k - CROUCH_UNTIL) / (1 - CROUCH_UNTIL) : 0;
     const lift = sitterLift(profile, s.spot.facing);
@@ -753,7 +788,7 @@ export class WorldView {
   private livePos(a: ActorView): { x: number; y: number; moving: boolean } {
     const path = a.occ.path;
     if (path && a.occ.pathStartedAt !== undefined) {
-      const p = positionAlong(path, this.now() - a.occ.pathStartedAt);
+      const p = positionAlong(path, this.walked(a));
       return { x: p.x, y: p.y, moving: !p.done };
     }
     return { x: a.x, y: a.y, moving: false };
@@ -762,16 +797,26 @@ export class WorldView {
   /**
    * The cushion of a couch or bench a click (canvas CSS px) meant: the one whose seat — where you'd sit, at
    * sitting height — is drawn nearest the click. (The floor tile under the click is a tile further back than
-   * the cushion drawn there, so it picked the near cushion for half the far one's pixels.)
+   * the cushion drawn there, so it picked the near cushion for half the far one's pixels.) On the seat you're
+   * in, a click on or around your own figure is your cushion — the one you're in or still sliding into — since
+   * you're drawn over it and a click "on your seat" lands beside you; only a click clear of you picks another.
    */
   cushionAt(o: SceneObject, spots: SeatSpot[], sx: number, sy: number): SeatSpot | undefined {
     const profile = artSeatProfile(o);
+    const me = this.actors.get(this.meId);
+    const mine = me?.seat?.to === 1 && me.seat.objId === o.id ? spots.find((s) => s.x === me.seat!.spot.x && s.y === me.seat!.spot.y) : undefined;
+    if (me && mine) {
+      const [fx] = this.camera.toScreen(me.sx, me.sy, this.vw, this.vh);
+      if (Math.abs(fx - sx) <= 12 * this.camera.zoom) return mine;
+    }
     let best: { s: SeatSpot; d: number } | undefined;
     for (const s of spots) {
       const hip = sitterPoint(s, profile);
       const p = isoToScreen(hip.x, hip.y, sitterLift(profile, s.facing));
       const [x, y] = this.camera.toScreen(p.x, p.y, this.vw, this.vh);
-      const d = Math.hypot(x - sx, y - sy);
+      // across the screen only: a couch's cushions sit side by side on screen whichever way it faces, and a
+      // click high on its back or low on its skirt is still over the cushion it's above
+      const d = Math.abs(x - sx) + Math.abs(y - sy) * 0.01;
       if (!best || d < best.d) best = { s, d };
     }
     return best?.s;
@@ -782,6 +827,12 @@ export class WorldView {
     const [ax, ay] = this.camera.toWorld(sx, sy, this.vw, this.vh);
     const g = screenToIso(ax, ay);
     return [Math.floor(g.x), Math.floor(g.y)];
+  }
+
+  /** The cushion someone is in, or on their way into (sliding along a couch included). */
+  cushionOf(id: string): { x: number; y: number } | null {
+    const s = this.actors.get(id)?.seat;
+    return s && s.to === 1 ? { x: s.spot.x, y: s.spot.y } : null;
   }
 
   actorTile(id: string): Tile | null {
@@ -987,12 +1038,13 @@ export class WorldView {
     for (const a of this.actors.values()) {
       const path = a.occ.path;
       if (path && a.occ.pathStartedAt !== undefined) {
-        const p = positionAlong(path, now - a.occ.pathStartedAt);
+        const walked = this.walked(a, now);
+        const p = positionAlong(path, walked);
         a.x = p.x;
         a.y = p.y;
         a.facing = facingFrom(p.dir[0], p.dir[1], a.facing);
         a.moving = !p.done;
-        if (!p.done) this.approachSeat(a, path, now - a.occ.pathStartedAt);
+        if (!p.done) this.approachSeat(a, path, walked);
         // on the way into a seat they've turned the way it faces, their back to it
         if (a.seat?.to === 1) a.facing = a.seat.spot.facing;
         if (p.done) {
@@ -1269,7 +1321,8 @@ export class WorldView {
     // People can tuck themselves behind furniture — no see-through silhouettes. The one exception: in
     // town a whole building can swallow you, so your own avatar keeps a faint outline there.
     const me = outdoor ? order.find((d): d is ActorView => !('obj' in d) && d.occ.memberId === this.meId) : undefined;
-    if (me) {
+    // (not in a seat: its back drawn over you is the seat, and a ghost of you over it reads as see-through)
+    if (me && !this.seatOf(me)) {
       c.globalAlpha = 0.45;
       blit(c, avatarSprite(this.look(me), this.viewFacing(me), this.pose(me)), Math.round(me.sx), Math.round(me.sy));
       c.globalAlpha = 1;
@@ -1914,7 +1967,9 @@ export class WorldView {
     } catch {
       /* noop */
     }
-    if (wasDrag || this.transition) return;
+    // while the iris closes and holds, the old room (or nothing) is on screen: clicks mean nothing. Once it opens
+    // the new room is there to click on (dropping those clicks silently read as "the chair ignores me").
+    if (wasDrag || (this.transition && this.transition.phase !== 'open')) return;
     const { sx, sy, ax, ay } = this.toArt(ev);
     const hit = this.hitTest(sx, sy, ax, ay);
     if (!hit) return;

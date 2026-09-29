@@ -115,7 +115,9 @@ async function record(p: Player, memberId: string) {
       if (is < 0 || ia < 0 || is < ia) return 0;
       const d = order[is];
       // (behind it, it may cover you: only in front of it, or on it, is being covered vanishing)
-      if (Math.round(a.x) + Math.round(a.y) < d.box.x0 + d.box.y0) return 0;
+      const [wx, wy] = [Math.round(a.x), Math.round(a.y)];
+      const b = d.box;
+      if ((wy + 1 <= b.y0 && wx < b.x1) || (wx + 1 <= b.x0 && wy < b.y1)) return 0;
       const k = d.sprite.scale ?? 1;
       const cw = d.sprite.canvas.width;
       const r = a.rect;
@@ -188,6 +190,11 @@ function judge(frames: Frame[], seatTiles: Set<string>, who: string): string[] {
     const a = frames[i - 1];
     const b = frames[i];
     if (!seatish(a) && !seatish(b)) continue;
+    // (a walk that just reached this viewer late starts where it has got to by now: that's the network's
+    // clock, docs/playtest.md #5, not the seat)
+    const pa = JSON.stringify((a.raw as { path?: unknown } | undefined)?.path ?? null);
+    const pb = JSON.stringify((b.raw as { path?: unknown } | undefined)?.path ?? null);
+    if (pb !== 'null' && pa !== pb) continue;
     const d = Math.hypot(b.x - a.x, b.y - a.y);
     const allowed = 4 + 0.15 * (b.t - a.t);
     if (d / allowed > worst.ratio) worst = { ratio: d / allowed, i, d };

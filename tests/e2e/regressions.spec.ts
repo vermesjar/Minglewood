@@ -386,3 +386,67 @@ play('#7 the 1,000th Customer Bench can be sat on', async ({ player, page }) => 
   await player.shot('regress-7-plaque-bench');
   expect(r.ok, 'sat on the bench').toBe(true);
 });
+
+/**
+ * #11 · Clicking the cushion you're sitting on slides you to the other cushion (game.ts sit click → cushionAt).
+ * On a two-seater, a click on your own cushion is judged by `WorldView.cushionAt`; with you sitting on it, the
+ * seat pixels you can click around your cushion are mostly nearer the other cushion's screen point, so it reads
+ * as "the other cushion" and shifts you over. Seen on HQ's blue couch, the Engineering meeting sofa, the Design
+ * Lab sofa and the town's plaque, garden and campfire benches. (Carter: "if you're sitting and you click to sit
+ * again it throws you around".) On a single stool (Design Lab design-12) the same re-click stood the bot up.
+ */
+play('#11 clicking your own cushion on a couch or bench never moves you', async ({ player }) => {
+  // intermittent: 13 times in the 4-worker sweep, 0 of 5 alone — a guard, not a test.fail (see docs/playtest.md)
+  play.setTimeout(240_000);
+  let tried = 0;
+  for (const room of ['town', 'hq', 'design', 'eng', 'cafe', 'launch']) {
+    const scene = await player.roomScene(room);
+    if (room === 'town') {
+      // the campfire circle, where the sweep saw it on two benches
+      await player.page.evaluate(() => (window as any).__mw.walkTo([11, 66]));
+      await player.still(40_000);
+      await player.settle();
+    }
+    const occ = await player.occupants();
+    const me = await player.me();
+    for (const seat of scene.objects.filter((o: Obj) => o.actions?.some((a) => a.kind === 'sit'))) {
+      const spots = await player.seatSpots(seat.id);
+      if (
+        spots.length !== 2 ||
+        Object.entries(occ).some(([id, o]) => id !== me.id && o.sittingOn === seat.id)
+      )
+        continue;
+      // sit on the first cushion, then shift over to the second (the sweep's sequence), re-clicking each time
+      await player.reset();
+      for (const spot of spots) {
+        await player.settle();
+        const p0 = await player.objectPoint(seat.id, { x: spot.x, y: spot.y, z: 10 });
+        if (!p0) continue;
+        await player.click(p0);
+        const sat = await player.until((m) => m.sittingOn === seat.id && !m.moving, 15_000);
+        if (!sat.ok) continue;
+        const at = [sat.me.server?.x, sat.me.server?.y];
+        // (as soon as you're down, the way a player clicks again — the sweep's timing)
+        await player.page.waitForTimeout(300);
+        // click my own cushion again, the way the playthrough does
+        const mine = spots.find((s) => s.x === at[0] && s.y === at[1])!;
+        await player.settle();
+        const p1 = await player.objectPoint(seat.id, { x: mine.x, y: mine.y, z: 10 });
+        if (!p1) continue;
+        await player.click(p1);
+        await player.page.waitForTimeout(1500);
+        const again = await player.me();
+        await player.shot(`regress-11-${room}-${seat.id}-${mine.index}`);
+        expect
+          .soft(
+            [again.sittingOn, again.server?.x, again.server?.y],
+            `${room} ${seat.id}: re-clicked cushion ${mine.index}`,
+          )
+          .toEqual([seat.id, ...at]);
+        tried++;
+      }
+      if (tried >= 4) return;
+    }
+  }
+  expect(tried, 'found free two-seaters to try').toBeGreaterThan(0);
+});
