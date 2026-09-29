@@ -42,15 +42,20 @@ function freshCanvas(w: number, h: number) {
 const FACINGS: Facing[] = ['se', 'sw', 'ne', 'nw'];
 
 /** Seat kinds to test: sprite, variant, footprint along its facing (long couches). */
-const SEATS: Array<{ sprite: string; variant?: string; long?: boolean }> = [
-  { sprite: 'chair', variant: 'cafe' },
-  { sprite: 'chair', variant: 'office' },
-  { sprite: 'stool' },
-  { sprite: 'armchair', variant: 'mustard' },
-  { sprite: 'heirloom-throne' },
-  { sprite: 'couch', variant: 'green', long: true },
-  { sprite: 'beanbag', variant: 'orange' },
-];
+/** Every kind of seat that appears in any room (a new seat can never slip past the sheet). */
+const ROOMS = ['cafe', 'hq', 'eng', 'launch', 'events', 'focus', 'arcade', 'design'];
+const SEATS: Array<{ sprite: string; variant?: string; long?: boolean }> = (() => {
+  const out = new Map<string, { sprite: string; variant?: string; long?: boolean }>();
+  for (const id of ROOMS)
+    for (const o of getScene(id)?.objects ?? [])
+      if (isSeat(o)) {
+        const key = `${o.sprite}.${o.variant ?? ''}`;
+        const long = (o.w ?? 1) > 1 || (o.d ?? 1) > 1;
+        const had = out.get(key);
+        out.set(key, { sprite: o.sprite, variant: o.variant, long: long || had?.long });
+      }
+  return [...out.values()];
+})();
 
 function seatScene(): SceneDef {
   const objects: SceneObject[] = [];
@@ -272,7 +277,9 @@ async function seatSheet(o: { zoom?: number; name?: string; looks?: AvatarLoadou
     FACINGS.forEach((f, col) => {
       const across = f === 'ne' || f === 'sw';
       const seat: SceneObject = { id: `s-${row}-${col}`, sprite: s.sprite, variant: s.variant, facing: f, x: 2, y: 2, w: s.long && across ? 2 : 1, d: s.long && !across ? 2 : 1, actions: [{ kind: 'sit' }] };
-      seatCell(ctx, seat, true, col * 2 * cw, 30 + row * ch, cw, ch, zoom, looks.slice(row * 3));
+      // a different sitter per row: rotate the cast (a slice runs dry once there are more rows than people)
+      const r = (row * 3) % looks.length;
+      seatCell(ctx, seat, true, col * 2 * cw, 30 + row * ch, cw, ch, zoom, [...looks.slice(r), ...looks.slice(0, r)]);
       seatCell(ctx, seat, false, (col * 2 + 1) * cw, 30 + row * ch, cw, ch, zoom, looks);
       ctx.fillStyle = '#f6ead6';
       ctx.fillText(`${s.sprite}${s.variant ? '.' + s.variant : ''}`, col * 2 * cw + 6, 30 + row * ch + 16);
