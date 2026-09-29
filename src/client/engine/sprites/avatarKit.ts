@@ -405,6 +405,16 @@ function topColorOf(L: FullLoadout): RGB {
   return L.top === 'top.labcoat' ? [246, 244, 240] : hx(L.topColor);
 }
 
+/** A small printed motif (3×3) repeated on a 6-px grid, alternate rows offset. */
+function motif(shape: string[], ink: RGB) {
+  return (x: number, y: number, c: RGB): RGB => {
+    const row = Math.floor(y / 6);
+    const lx = (((x + (row % 2) * 3) % 6) + 6) % 6;
+    const ly = ((y % 6) + 6) % 6;
+    return lx >= 1 && lx <= 3 && ly >= 1 && ly <= 3 && shape[ly - 1][lx - 1] === 'a' ? ink : c;
+  };
+}
+
 /** Pattern overlays follow the garment's own pixels (stripes, dots, checks, stars, hearts). */
 function patternTint(L: FullLoadout): ((x: number, y: number, c: RGB) => RGB) | undefined {
   const acc = hx(L.topAccent);
@@ -412,13 +422,14 @@ function patternTint(L: FullLoadout): ((x: number, y: number, c: RGB) => RGB) | 
     case 'pat.stripes':
       return (_x, y, c) => (y % 4 < 2 ? mix(c, acc, 0.85) : c);
     case 'pat.dots':
-      return (x, y, c) => (x % 4 === 1 && y % 4 === 1 ? acc : c);
+      // polka dots, every other row offset like printed fabric
+      return (x, y, c) => ((x + (Math.floor(y / 4) % 2) * 2) % 4 === 1 && y % 4 === 1 ? acc : c);
     case 'pat.check':
       return (x, y, c) => ((Math.floor(x / 2) + Math.floor(y / 2)) % 2 ? mix(c, acc, 0.35) : c);
     case 'pat.stars':
-      return (x, y, c) => ((x * 7 + y * 13) % 23 === 0 ? acc : c);
+      return motif(['.a.', 'aaa', '.a.'], acc);
     case 'pat.hearts':
-      return (x, y, c) => ((x * 5 + y * 11) % 23 === 0 ? [226, 76, 120] : c);
+      return motif(['a.a', 'aaa', '.a.'], [226, 76, 120]);
     default:
       return undefined;
   }

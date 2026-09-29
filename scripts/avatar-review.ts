@@ -335,3 +335,41 @@ console.log(`${people.length} characters, ${total} issue(s) → ${OUT}/`);
   );
   sheet.save('art/review/assets/trousers.png');
 }
+
+/* ------------------------------------------------------------------ UI portraits */
+// The head and bust crops the UI uses (AVATAR_CROPS), for the whole roster, at 3×.
+{
+  const { AVATAR_CROPS } = await import('../src/client/engine/sprites/avatar');
+  for (const [name, crop] of [
+    ['head', AVATAR_CROPS.head],
+    ['bust', AVATAR_CROPS.bust],
+  ] as const) {
+    const cols = 12;
+    const z = 3;
+    const cw = crop.w * z + 6;
+    const ch = crop.h * z + 6;
+    const sheet = new Sheet(cw * cols, ch * Math.ceil(people.length / cols), [255, 248, 234]);
+    people.forEach((p, i) =>
+      sheet.paste(renderAvatarLayers(p.look, 'se', 'stand').px, (i % cols) * cw + 3, Math.floor(i / cols) * ch + 3, z, [crop.x, crop.y, crop.w, crop.h]),
+    );
+    sheet.save(`art/review/assets/portrait-${name}.png`);
+  }
+}
+
+/* ------------------------------------------------------------------ patterns × garments */
+{
+  const pats = ['pat.solid', 'pat.stripes', 'pat.dots', 'pat.check', 'pat.stars', 'pat.hearts'];
+  const tops = ['top.tee', 'top.hoodie', 'top.shirt', 'top.sweater', 'top.puffer', 'top.blazer'];
+  const z = 4;
+  const BC = [22, 40, 48, 50];
+  const cw = BC[2] * z + 6;
+  const ch = BC[3] * z + 6;
+  const sheet = new Sheet(cw * pats.length, ch * tops.length, BG);
+  tops.forEach((t, row) =>
+    pats.forEach((pat, col) => {
+      const look = { top: t, topColor: ['#e0503f', '#2bb3a3', '#f4efe6', '#9b6bd6', '#f2c14e', '#1f2a44'][row], topAccent: ['#f4efe6', '#1f2a44', '#e0503f', '#fff1a8', '#3f8fd8', '#f2c14e'][row], topPattern: pat, hair: 'hair.short' } as AvatarLoadout;
+      sheet.paste(renderAvatarLayers(look, 'se', 'stand').px, col * cw + 3, row * ch + 3, z, BC);
+    }),
+  );
+  sheet.save('art/review/assets/patterns.png');
+}
