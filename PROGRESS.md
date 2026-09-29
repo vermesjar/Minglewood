@@ -55,3 +55,13 @@
 4. Real calendar provider (Google) behind `CalendarProvider`.
 5. Browser-level smoke tests (Playwright) for enter → knock → jump → party.
 6. Sprite-sheet art pipeline behind `sprites/registry.ts`; day/night ambience.
+
+## Multi-tenant hosting (Discord) — Minglewood Cloud
+- Control plane built in Lovable ("Minglewood Cloud"), live at https://minglewood-cloud.lovable.app:
+  Add-to-Discord install flow, Ed25519-verified `/minglewood` + `/minglewood-activity` commands,
+  tenants + per-org world state in Lovable Cloud Postgres (RLS, server-key API), `/setup` operator page.
+- Game server: tenants synced from the cloud, each installed Discord server gets its own world
+  (housewarming party + first memory-wall artifact), Discord sign-in routes by guild, managers become admins,
+  world state persisted to the cloud. Dockerfile + render.yaml for deploy. Contract test mirrors the cloud API.
+- Remaining (operator-only, needs secrets): Discord app, Lovable secrets + republish, Render deploy,
+  register commands. See docs/HOSTING.md.
