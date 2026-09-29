@@ -95,6 +95,7 @@ export class Effects {
       const cx = o.x + (o.w ?? 1) / 2;
       const cy = o.y + (o.d ?? 1) / 2;
       if (o.sprite === 'fountain') this.emitters.push({ kind: 'spray', ...at(cx, cy, 24), acc: 0, rate: 26 });
+      if (o.sprite === 'campfire') this.emitters.push({ kind: 'fire', ...at(cx, cy, 5), acc: 0, rate: 10, base: 10, id: o.id });
       if (o.sprite === 'fireplace') this.emitters.push({ kind: 'fire', ...at(cx, cy + 0.4, 4), acc: 0, rate: 14, base: 14, id: o.id });
       if (o.sprite === 'speaker') this.emitters.push({ kind: 'music', ...at(cx, cy, 26), acc: 0, rate: 0.9, base: 0.9, id: o.id, color: '#9b6bd6' });
       if (o.sprite === 'counter') this.emitters.push({ kind: 'steam', ...at(o.x + 2.6, o.y + 0.5, 30), acc: 0, rate: 3 });
@@ -274,10 +275,10 @@ export class Effects {
       ctx.drawImage(duckSheet(), flip ? 8 : 0, 0, 8, 8, Math.round(s.x - 4), Math.round(s.y - 7 + bob), 8, 8);
     }
     // water sparkles
-    for (let i = 0; i < 18; i++) {
+    for (let i = 0; i < 26; i++) {
       const k = Math.floor(t * 2 + i * 7.3);
-      const hx = 30 + ((k * 73 + i * 131) % 15);
-      const hy = 16 + ((k * 37 + i * 91) % 28);
+      const hx = 31 + ((k * 73 + i * 131) % 19);
+      const hy = 12 + ((k * 37 + i * 91) % 37);
       const s = isoToScreen(hx + 0.5, hy + 0.5, -3);
       const ph = (t * 2 + i) % 1;
       if (ph > 0.5) continue;

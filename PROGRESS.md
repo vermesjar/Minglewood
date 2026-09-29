@@ -80,3 +80,13 @@
   face whoever they're with, glance around, Zzz when away), gathering glow, footstep dust, door puffs,
   busier chimneys for busier buildings. Simulated coworkers play, dance and return high fives.
 - Opt-in synthesized sound; reduced-motion and always-day preferences. Tests: 57 passing.
+
+## A bigger, livelier town (2026-09-29)
+- Town grows from 46×46 to 64×60 with a trail looping the whole lake: Stargazer Point, Sunny Shore
+  (beach, campfire, ice cream, fishing dock), Willow Cove (stone skipping, pier) and Meadow Commons
+  (chess, basketball, swings, hammocks, gazebo, community garden).
+- 31 prop kinds with shared outcomes, incl. fishing (rarities, daily biggest catch), stone skipping
+  (records), hoops (streaks), ping-pong rallies, piano, board games, marshmallows, ice cream.
+- Sit anywhere (X or the Sit button), 50+ outdoor seats; every room has plenty of seating and the
+  café is bigger (window bar, piano, game shelf, cozy corner). A test guarantees every seat and prop
+  is reachable. Fixed: standing up now reaches other clients.

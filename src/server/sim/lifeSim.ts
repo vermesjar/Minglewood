@@ -9,7 +9,7 @@
 import { presenceFromCalendar, type CalendarProvider } from '@shared/calendar';
 import { STATUS_META } from '@shared/presence';
 import { buildingForRoom, getScene, TOWN_ID } from '@shared/world';
-import { isSeat, terrainAt } from '@shared/world/scene';
+import { GROUND, isSeat, terrainAt } from '@shared/world/scene';
 import type { Tile } from '@shared/world/pathfinding';
 import { distanceToObject, interactionFor } from '@shared/world/interactions';
 import { daysSince } from '@shared/serendipity';
@@ -174,6 +174,10 @@ export class LifeSim {
       if (scene.kind === 'interior') {
         if (!a.sittingOn || Math.random() < 0.4) npc.plan.push({ kind: 'sit' });
         else if (Math.random() < 0.3) this.hub.emote(npc.id, pick(['laugh', 'idea', 'thumbs', 'clap'] as const));
+      } else if (Math.random() < 0.35 && this.planOutdoorSeat(npc)) {
+        return;
+      } else if (Math.random() < 0.12) {
+        this.hub.sit(npc.id, GROUND);
       } else {
         const spot = this.randomSpotNear(a.sceneId, a.x, a.y, 9);
         if (spot) npc.plan.push({ kind: 'walk', to: spot });
@@ -240,6 +244,31 @@ export class LifeSim {
       steps.push({ kind: 'walk', to: [door.x, door.y] }, { kind: 'enter', sceneId: targetSceneId }, { kind: 'sit' });
     }
     npc.plan = steps;
+  }
+
+  /** Take a bench, lounger or log near where you are. */
+  private planOutdoorSeat(npc: NpcState): boolean {
+    const a = this.hub.actor(npc.id);
+    const scene = a && this.hub.scene(a.sceneId);
+    if (!a || !scene) return false;
+    const seats = scene.objects.filter(
+      (o) => isSeat(o) && Math.hypot(o.x - a.x, o.y - a.y) < 14 && !this.hub.seatTaken(a.sceneId, o.id) && !this.reserved.has(`${a.sceneId}:${o.id}`),
+    );
+    if (!seats.length) return false;
+    const seat = pick(seats);
+    const key = `${a.sceneId}:${seat.id}`;
+    this.reserved.add(key);
+    npc.plan.push(
+      { kind: 'walk', to: [seat.x, seat.y] },
+      {
+        kind: 'do',
+        fn: () => {
+          this.reserved.delete(key);
+          this.hub.sit(npc.id, seat.id);
+        },
+      },
+    );
+    return true;
   }
 
   /** Wander over to something fun nearby and use it (coin in the fountain, a round of arcade…). */

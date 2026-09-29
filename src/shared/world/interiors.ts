@@ -54,8 +54,8 @@ export function buildInteriors(): SceneDef[] {
   const cafe = room(
     'cafe',
     'Tidewater Café',
+    16,
     12,
-    10,
     {
       floor: '#b98256',
       floorAlt: '#a87148',
@@ -91,6 +91,31 @@ export function buildInteriors(): SceneDef[] {
       plant(11, 1, 'b'),
       plant(1, 1),
       { sprite: 'lamp', x: 11, y: 9 },
+      // The window bar: stools along the lake-view windows.
+      { sprite: 'window', wall: 'right', x: 12, y: 0, w: 2 },
+      { sprite: 'counter', x: 12, y: 1, w: 3, d: 1, variant: 'bar', label: 'Window bar' },
+      { sprite: 'stool', x: 12, y: 2, actions: sit },
+      { sprite: 'stool', x: 13, y: 2, actions: sit },
+      { sprite: 'stool', x: 14, y: 2, actions: sit },
+      // A cozy corner with a piano and a board-game shelf.
+      { sprite: 'rug', x: 12, y: 8, w: 4, d: 4, flat: true, variant: 'cream' },
+      { sprite: 'couch', x: 12, y: 11, w: 2, d: 1, facing: 'ne', variant: 'rust', actions: sit },
+      { sprite: 'table-low', x: 13, y: 9, w: 1, d: 1 },
+      { sprite: 'armchair', x: 15, y: 9, facing: 'nw', variant: 'green', actions: sit },
+      { sprite: 'beanbag', x: 14, y: 11, variant: 'orange', actions: sit },
+      { id: 'cafe-piano', sprite: 'piano', x: 15, y: 5, facing: 'nw', label: 'Café piano' },
+      { sprite: 'stool', x: 14, y: 5, actions: sit },
+      { id: 'cafe-games', sprite: 'board-games', x: 15, y: 1, label: 'Board game shelf' },
+      // More tables by the door.
+      { sprite: 'table-round', x: 2, y: 10 },
+      chair(1, 10, 'se'),
+      chair(3, 10, 'nw'),
+      chair(2, 11, 'ne'),
+      { sprite: 'table-round', x: 7, y: 11 },
+      chair(6, 11, 'se'),
+      chair(8, 11, 'nw'),
+      { sprite: 'cushion', x: 10, y: 11, variant: 'c', actions: sit },
+      plant(15, 7, 'b'),
     ],
   );
 
@@ -204,6 +229,11 @@ export function buildInteriors(): SceneDef[] {
       plant(13, 1),
       plant(13, 11, 'b'),
       plant(9, 11),
+      // Waiting area and a window seat.
+      { sprite: 'couch', x: 10, y: 6, w: 1, d: 2, facing: 'nw', variant: 'blue', actions: sit },
+      { sprite: 'armchair', x: 6, y: 9, facing: 'ne', variant: 'mustard', actions: sit },
+      { sprite: 'armchair', x: 8, y: 9, facing: 'ne', variant: 'mustard', actions: sit },
+      { sprite: 'bench', x: 12, y: 7, facing: 'nw', actions: sit },
     ],
   );
 
@@ -279,6 +309,13 @@ export function buildInteriors(): SceneDef[] {
       plant(15, 11, 'b'),
       plant(1, 1),
       plant(10, 1),
+      // Lounge and a ping-pong table for brain breaks.
+      { sprite: 'couch', x: 11, y: 11, w: 2, d: 1, facing: 'ne', variant: 'green', actions: sit },
+      { sprite: 'armchair', x: 15, y: 10, facing: 'nw', variant: 'rust', actions: sit },
+      { sprite: 'beanbag', x: 15, y: 6, variant: 'cyan', actions: sit },
+      { id: 'eng-pingpong', sprite: 'ping-pong', x: 12, y: 4, w: 2, d: 1, label: 'Ping-pong table' },
+      { sprite: 'stool', x: 11, y: 5, actions: sit },
+      { sprite: 'stool', x: 14, y: 5, actions: sit },
     ],
   );
 
@@ -343,6 +380,9 @@ export function buildInteriors(): SceneDef[] {
       { sprite: 'beanbag', x: 10, y: 8, variant: 'orange', actions: sit },
       plant(11, 9, 'b'),
       plant(1, 1),
+      { sprite: 'couch', x: 1, y: 8, w: 1, d: 2, facing: 'se', variant: 'blue', actions: sit },
+      { sprite: 'beanbag', x: 9, y: 8, variant: 'purple', actions: sit },
+      { sprite: 'armchair', x: 11, y: 5, facing: 'nw', variant: 'mustard', actions: sit },
     ],
   );
 
@@ -382,6 +422,13 @@ export function buildInteriors(): SceneDef[] {
       { sprite: 'lantern-string', wall: 'right', x: 12, y: 0, w: 3 },
       plant(1, 1, 'b'),
       plant(15, 1, 'b'),
+      // Hang-out seating at the back, and a piano for the brave.
+      { sprite: 'couch', x: 3, y: 12, w: 2, d: 1, facing: 'ne', variant: 'rust', actions: sit },
+      { sprite: 'couch', x: 6, y: 12, w: 2, d: 1, facing: 'ne', variant: 'rust', actions: sit },
+      { sprite: 'beanbag', x: 10, y: 11, variant: 'pink', actions: sit },
+      { sprite: 'beanbag', x: 11, y: 12, variant: 'cyan', actions: sit },
+      { id: 'events-piano', sprite: 'piano', x: 15, y: 7, facing: 'nw', label: 'Hall piano' },
+      { sprite: 'stool', x: 14, y: 7, actions: sit },
     ],
   );
 
@@ -437,6 +484,12 @@ export function buildInteriors(): SceneDef[] {
       { sprite: 'window', wall: 'right', x: 5, y: 0, w: 2 },
       plant(11, 9, 'b'),
       plant(11, 1),
+      // Floor cushions by the fire, a reading chair by the window.
+      { sprite: 'cushion', x: 9, y: 2, variant: 'b', actions: sit },
+      { sprite: 'cushion', x: 11, y: 2, variant: 'c', actions: sit },
+      { sprite: 'armchair', x: 10, y: 7, facing: 'nw', variant: 'rust', actions: sit },
+      { sprite: 'cushion', x: 8, y: 9, variant: 'd', actions: sit },
+      { sprite: 'beanbag', x: 4, y: 9, variant: 'purple', actions: sit },
     ],
   );
 
@@ -487,6 +540,11 @@ export function buildInteriors(): SceneDef[] {
       { sprite: 'beanbag', x: 10, y: 7, variant: 'cyan', actions: sit },
       { sprite: 'beanbag', x: 9, y: 8, variant: 'pink', actions: sit },
       plant(11, 9, 'b'),
+      { sprite: 'couch', x: 10, y: 4, w: 1, d: 2, facing: 'nw', variant: 'purple', actions: sit },
+      { sprite: 'beanbag', x: 7, y: 9, variant: 'orange', actions: sit },
+      { sprite: 'stool', x: 4, y: 6, actions: sit },
+      { sprite: 'stool', x: 8, y: 5, actions: sit },
+      { id: 'arcade-games', sprite: 'board-games', x: 11, y: 1, label: 'Game night shelf' },
     ],
   );
 
@@ -537,6 +595,11 @@ export function buildInteriors(): SceneDef[] {
       plant(11, 1, 'b'),
       plant(11, 9),
       plant(1, 9, 'b'),
+      { sprite: 'couch', x: 3, y: 9, w: 2, d: 1, facing: 'ne', variant: 'green', actions: sit },
+      { sprite: 'armchair', x: 6, y: 9, facing: 'ne', variant: 'mustard', actions: sit },
+      { sprite: 'cushion', x: 10, y: 4, variant: 'a', actions: sit },
+      { sprite: 'cushion', x: 11, y: 5, variant: 'c', actions: sit },
+      { sprite: 'beanbag', x: 11, y: 7, variant: 'pink', actions: sit },
     ],
   );
 

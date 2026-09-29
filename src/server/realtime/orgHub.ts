@@ -17,7 +17,7 @@ import { STATUS_META } from '@shared/presence';
 import { allScenes, buildingForRoom, getScene, TOWN_ID } from '@shared/world';
 import { livedScene } from '@shared/world/lived';
 import type { Facing, SceneDef } from '@shared/world/scene';
-import { isSeat } from '@shared/world/scene';
+import { GROUND, isSeat } from '@shared/world/scene';
 import { WalkGrid } from '@shared/world/walkGrid';
 import { findPath, isValidPath, positionAlong, type Tile } from '@shared/world/pathfinding';
 import { sanitizeLoadout } from '@shared/avatar';
@@ -380,6 +380,14 @@ export class OrgHub extends EventEmitter<HubEvents> {
   sit(memberId: string, objectId: string): boolean {
     const a = this.actors.get(memberId);
     if (!a) return false;
+    if (objectId === GROUND) {
+      // Sit right where you are: on the grass, the sand, the floor.
+      const pos = this.position(a);
+      if (pos.moving) return false;
+      a.sittingOn = GROUND;
+      this.toScene(a.sceneId, { t: 'updated', memberId, patch: { x: a.x, y: a.y, sittingOn: GROUND, facing: a.facing, path: undefined } });
+      return true;
+    }
     const seat = this.scene(a.sceneId)?.objects.find((o) => o.id === objectId && isSeat(o));
     if (!seat || this.seatTaken(a.sceneId, objectId, memberId)) return false;
     const pos = this.position(a);
@@ -402,7 +410,8 @@ export class OrgHub extends EventEmitter<HubEvents> {
     const a = this.actors.get(memberId);
     if (!a?.sittingOn) return;
     a.sittingOn = undefined;
-    this.toScene(a.sceneId, { t: 'updated', memberId, patch: { sittingOn: undefined } });
+    // '' rather than undefined: JSON drops undefined fields, and clients must see the change.
+    this.toScene(a.sceneId, { t: 'updated', memberId, patch: { sittingOn: '' } });
   }
 
   /* ------------------------------------------------------------------ presence & social */

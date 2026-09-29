@@ -56,11 +56,9 @@ export function ActionBar() {
           aria-label="Say something to people in this room"
         />
       </form>
-      {sitting && (
-        <button className="btn small" onClick={() => game.rt?.send({ t: 'stand' })}>
-          Stand up
-        </button>
-      )}
+      <button className="btn small" onClick={() => game.toggleSit()} title={sitting ? 'Stand up (X)' : 'Sit down right here (X)'}>
+        {sitting ? 'Stand up' : '🧘 Sit'}
+      </button>
       <button
         className="icon-btn"
         onClick={() => {

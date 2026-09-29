@@ -49,6 +49,29 @@ import {
   trophyCaseSprite,
 } from './furniture';
 
+import {
+  beachUmbrellaSprite,
+  blanketSprite,
+  boardGamesSprite,
+  campfireSprite,
+  chessTableSprite,
+  cushionSprite,
+  fishingSpotSprite,
+  gardenBedSprite,
+  gazeboSprite,
+  hammockSprite,
+  hoopSprite,
+  iceCreamCartSprite,
+  logSeatSprite,
+  loungerSprite,
+  pianoSprite,
+  pingPongSprite,
+  stonePileSprite,
+  stumpSprite,
+  swingSprite,
+  telescopeSprite,
+} from './leisure';
+
 const cache = new Map<string, Sprite | null>();
 
 function build(o: SceneObject): Sprite | null {
@@ -138,6 +161,46 @@ function build(o: SceneObject): Sprite | null {
       return arcadeCabinetSprite(o.variant);
     case 'fireplace':
       return fireplaceSprite();
+    case 'lounger':
+      return loungerSprite(f, o.variant);
+    case 'beach-umbrella':
+      return beachUmbrellaSprite(v);
+    case 'campfire':
+      return campfireSprite();
+    case 'log':
+      return logSeatSprite(f);
+    case 'stump':
+      return stumpSprite();
+    case 'ice-cream-cart':
+      return iceCreamCartSprite();
+    case 'telescope':
+      return telescopeSprite();
+    case 'chess-table':
+      return chessTableSprite();
+    case 'hoop':
+      return hoopSprite();
+    case 'swing':
+      return swingSprite();
+    case 'hammock':
+      return hammockSprite();
+    case 'garden-bed':
+      return gardenBedSprite(v);
+    case 'gazebo':
+      return gazeboSprite();
+    case 'fishing-spot':
+      return fishingSpotSprite();
+    case 'stone-pile':
+      return stonePileSprite();
+    case 'blanket':
+      return blanketSprite(o.variant);
+    case 'cushion':
+      return cushionSprite(v);
+    case 'piano':
+      return pianoSprite(f);
+    case 'board-games':
+      return boardGamesSprite();
+    case 'ping-pong':
+      return pingPongSprite(w, d);
     default:
       return null;
   }

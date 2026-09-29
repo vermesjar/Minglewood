@@ -7,8 +7,8 @@ import type { BuildingSpec, SceneDef, SceneObject } from './scene';
 import { hash2, TileCanvas } from './builders';
 
 export const TOWN_ID = 'town';
-const W = 46;
-const H = 46;
+const W = 64;
+const H = 60;
 
 interface BuildingDef {
   id: string;
@@ -291,8 +291,31 @@ export function buildTown(): SceneDef {
   t.path(8, 6, 20, 6);
   // Lakeside promenade from Lantern Hall.
   t.path(21, 30, 34, 30);
-  // Café terrace.
-  t.rect(31, 17, 5, 2, 'P');
+  // Café terrace (roomy: tables spill out toward Main Street).
+  t.rect(30, 17, 7, 3, 'P');
+
+  // The loop around the lake: a north trail past Stargazer Point, down the Sunny Shore,
+  // and back along the south shore to Grove Lane and the Meadow Commons.
+  t.path(21, 6, 56, 6);
+  t.path(56, 6, 56, 54);
+  t.path(20, 44, 20, 54, 'p', 2);
+  t.path(22, 54, 56, 54);
+  // Sunny Shore: a wide sandy beach on the east side of the lake.
+  for (let y = 12; y <= 46; y++) {
+    for (let x = 51; x <= 55; x++) if (!['w', 'W'].includes(t.get(x, y))) t.set(x, y, 's');
+  }
+  // Stargazer Point lookout, the Commons court and path, and two fishing docks.
+  t.rect(50, 3, 7, 3, 'P');
+  t.rect(13, 48, 5, 3, 'P');
+  t.path(19, 52, 4, 52);
+  for (let x = 45; x <= 50; x++) {
+    t.set(x, 38, 'd');
+    t.set(x, 39, 'd');
+  }
+  for (let y = 46; y <= 51; y++) {
+    t.set(40, y, 'd');
+    t.set(41, y, 'd');
+  }
 
   const blocked = new Set<string>();
   const block = (x: number, y: number, w = 1, d = 1) => {
@@ -309,6 +332,23 @@ export function buildTown(): SceneDef {
     const id = o.id ?? `o${++n}`;
     objects.push({ ...o, id });
     block(o.x, o.y, o.w ?? 1, o.d ?? 1);
+  };
+  /** Add only on dry, unclaimed land (new areas are laid out loosely around the lake). */
+  const place = (o: Omit<SceneObject, 'id'> & { id?: string }) => {
+    for (let y = o.y; y < o.y + (o.d ?? 1); y++) {
+      for (let x = o.x; x < o.x + (o.w ?? 1); x++) {
+        if (['w', 'W', ' '].includes(t.get(x, y)) || blocked.has(`${x},${y}`)) return;
+      }
+    }
+    add(o);
+  };
+  const seat = (sprite: string, x: number, y: number, facing: SceneObject['facing'], variant?: string, extra: Partial<SceneObject> = {}) =>
+    place({ sprite, x, y, facing, variant, actions: [{ kind: 'sit' }], ...extra });
+  const info = (title: string, body: string) => [{ kind: 'info' as const, title, body }];
+  // Keep the new gathering places clear of the forest.
+  const clear = new Set<string>();
+  const clearing = (x: number, y: number, w: number, d: number) => {
+    for (let yy = y; yy < y + d; yy++) for (let xx = x; xx < x + w; xx++) clear.add(`${xx},${yy}`);
   };
 
   // Plaza: fountain, benches, flower beds.
@@ -387,13 +427,96 @@ export function buildTown(): SceneDef {
   add({ sprite: 'balloons', x: 24, y: 29, eventDecor: 'balloons', variant: 'c', solid: false });
 
   // Park furniture, picnic, boats, reeds.
-  add({ sprite: 'picnic', x: 27, y: 34, w: 2, d: 1 });
+  add({ sprite: 'picnic', x: 27, y: 34, w: 2, d: 1, facing: 'se', actions: [{ kind: 'sit' }] });
   add({ sprite: 'bench', x: 22, y: 34, facing: 'se', actions: [{ kind: 'sit' }] });
   add({ sprite: 'bench', x: 29, y: 31, facing: 'sw', actions: [{ kind: 'sit' }] });
   add({ sprite: 'boat', x: 38, y: 23, variant: 'red', solid: true });
   add({ sprite: 'boat', x: 34, y: 38, variant: 'yellow', solid: true });
   add({ sprite: 'bike-rack', x: 19, y: 29 });
   add({ sprite: 'mailbox', x: 15, y: 19 });
+
+  // More places to sit in the plaza and on the café terrace.
+  seat('bench', 22, 17, 'sw');
+  seat('bench', 17, 22, 'se');
+  seat('chair', 30, 18, 'se', 'wood');
+  seat('chair', 36, 18, 'nw', 'wood');
+  place({ sprite: 'umbrella-table', x: 33, y: 19, variant: 'teal', solid: true });
+  seat('chair', 32, 19, 'se', 'wood');
+  seat('chair', 34, 19, 'nw', 'wood');
+  // The picnic spot by the oak, and a lakeside nook on the promenade.
+  seat('blanket', 28, 36, 'se', 'red');
+  seat('lounger', 30, 33, 'se', 'coral');
+  seat('lounger', 30, 35, 'se', 'sun');
+
+  // Stargazer Point: a lookout over the lake with a telescope.
+  clearing(49, 2, 10, 7);
+  place({ id: 'telescope', sprite: 'telescope', x: 54, y: 3, label: 'Stargazer telescope' });
+  seat('bench', 51, 5, 'sw');
+  seat('bench', 53, 5, 'sw');
+  seat('blanket', 57, 4, 'sw', 'blue');
+  seat('blanket', 58, 6, 'sw', 'green');
+  place({ sprite: 'signpost', x: 50, y: 7, label: 'Stargazer Point', actions: info('Stargazer Point', 'The best view of the lake. At night the telescope finds planets; by day, herons and sailboats.') });
+
+  // Sunny Shore: loungers and umbrellas, an ice-cream cart, a campfire circle, a fishing dock.
+  clearing(50, 11, 6, 37);
+  for (const [y, v] of [[15, 'teal'], [17, 'coral'], [21, 'sun'], [23, 'blue'], [41, 'coral'], [43, 'teal']] as const) {
+    seat('lounger', 52, y, 'nw', v);
+  }
+  place({ sprite: 'beach-umbrella', x: 53, y: 16, solid: true });
+  place({ sprite: 'beach-umbrella', x: 53, y: 22, variant: 'b', solid: true });
+  place({ sprite: 'beach-umbrella', x: 53, y: 42, variant: 'c', solid: true });
+  place({ id: 'ice-cream', sprite: 'ice-cream-cart', x: 55, y: 27, label: 'Scoops on the Shore' });
+  seat('stump', 54, 26, 'sw');
+  seat('stump', 54, 28, 'ne');
+  place({ id: 'campfire', sprite: 'campfire', x: 53, y: 33, label: 'Campfire circle' });
+  seat('log', 53, 31, 'sw');
+  seat('log', 53, 35, 'ne');
+  seat('log', 51, 33, 'se');
+  seat('log', 55, 33, 'nw');
+  seat('stump', 51, 31, 'se');
+  seat('stump', 55, 35, 'nw');
+  place({ id: 'fish-east-1', sprite: 'fishing-spot', x: 45, y: 38, label: 'Fishing spot' });
+  place({ id: 'fish-east-2', sprite: 'fishing-spot', x: 45, y: 39, label: 'Fishing spot' });
+  seat('bench', 48, 38, 'nw');
+  add({ sprite: 'boat', x: 48, y: 30, variant: 'red', solid: true });
+  place({ sprite: 'signpost', x: 55, y: 13, label: 'Sunny Shore', actions: info('Sunny Shore', 'Loungers, a campfire at dusk, ice cream all day. Fishing off the dock — rumor has it there’s a golden koi.') });
+
+  // Willow Cove on the south shore: skipping stones, a little pier, benches facing the water.
+  clearing(23, 50, 28, 4);
+  place({ id: 'stones-1', sprite: 'stone-pile', x: 36, y: 51, label: 'Flat stones' });
+  place({ id: 'stones-2', sprite: 'stone-pile', x: 45, y: 51, label: 'Flat stones' });
+  place({ id: 'fish-south', sprite: 'fishing-spot', x: 40, y: 46, label: 'Fishing spot' });
+  seat('bench', 33, 52, 'ne');
+  seat('bench', 38, 52, 'ne');
+  seat('bench', 43, 52, 'ne');
+  seat('blanket', 30, 52, 'ne', 'green');
+  seat('blanket', 48, 52, 'ne', 'red');
+  add({ sprite: 'boat', x: 44, y: 47, variant: 'yellow', solid: true });
+
+  // Meadow Commons: games, a gazebo, swings and hammocks, a community garden.
+  clearing(3, 45, 17, 13);
+  place({ id: 'hoop', sprite: 'hoop', x: 15, y: 47, facing: 'sw', label: 'Commons court' });
+  for (const [cx, cy] of [[5, 47], [5, 49]]) {
+    place({ sprite: 'chess-table', x: cx, y: cy, label: 'Chess table' });
+    seat('stump', cx - 1, cy, 'se');
+    seat('stump', cx + 1, cy, 'nw');
+  }
+  place({ id: 'garden-1', sprite: 'garden-bed', x: 8, y: 46, w: 2, d: 1, label: 'Community garden' });
+  place({ id: 'garden-2', sprite: 'garden-bed', x: 8, y: 48, w: 2, d: 1, variant: 'b', label: 'Community garden' });
+  place({ sprite: 'flowerbed', x: 11, y: 46, variant: 'yellow' });
+  place({ sprite: 'flowerbed', x: 11, y: 48, variant: 'pink' });
+  place({ id: 'gazebo', sprite: 'gazebo', x: 9, y: 54, w: 3, d: 3, label: 'The Gazebo' });
+  seat('bench', 8, 55, 'se');
+  seat('bench', 12, 55, 'nw');
+  seat('bench', 10, 53, 'sw');
+  seat('swing', 14, 54, 'sw');
+  seat('swing', 15, 54, 'sw');
+  seat('hammock', 16, 56, 'sw', undefined, { w: 2, d: 1 });
+  seat('hammock', 3, 56, 'sw', undefined, { w: 2, d: 1 });
+  seat('picnic', 4, 54, 'se', undefined, { w: 2, d: 1 });
+  seat('blanket', 14, 51, 'se', 'blue');
+  seat('blanket', 16, 51, 'sw', 'red');
+  place({ sprite: 'signpost', x: 18, y: 51, label: 'Meadow Commons', actions: info('Meadow Commons', 'Chess under the trees, a few hoops, swings, hammocks and a garden anyone can pick from. Bring a friend.') });
 
   // Lamp posts along the roads.
   for (let x = 8; x <= 34; x += 6) {
@@ -403,6 +526,14 @@ export function buildTown(): SceneDef {
     if (!blocked.has(`22,${y}`) && !['w', 'W', 'P', 'p'].includes(t.get(22, y)))
       add({ sprite: 'lamp-post', x: 22, y });
   }
+
+  for (let x = 26; x <= 54; x += 7) place({ sprite: 'lamp-post', x, y: 7 });
+  for (let y = 10; y <= 52; y += 7) place({ sprite: 'lamp-post', x: 57, y });
+  for (let x = 25; x <= 53; x += 7) place({ sprite: 'lamp-post', x, y: 55 });
+  place({ sprite: 'lamp-post', x: 7, y: 51 });
+  place({ sprite: 'lamp-post', x: 12, y: 51 });
+  place({ sprite: 'lamp-post', x: 52, y: 38 });
+  for (const k of clear) blocked.add(k);
 
   // Flower patches and bushes near paths.
   for (let y = 0; y < H; y++) {
@@ -422,8 +553,8 @@ export function buildTown(): SceneDef {
       const c = t.get(x, y);
       if (c !== 'g' && c !== 'h' && c !== 'm') continue;
       if (blocked.has(`${x},${y}`)) continue;
-      const edge = Math.min(x, y);
-      const forest = edge < 3 ? 0.72 : x < 9 && y < 12 ? 0.55 : x < 6 || y < 5 ? 0.45 : 0.07;
+      const edge = Math.min(x, y, W - 1 - x, H - 1 - y);
+      const forest = edge < 3 ? 0.72 : x < 9 && y < 12 ? 0.55 : x < 6 || y < 5 || x > 58 || y > 56 ? 0.45 : 0.07;
       const r = hash2(x, y, 5);
       if (r < forest) {
         const kind = hash2(x, y, 9);

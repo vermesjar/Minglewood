@@ -12,6 +12,7 @@ import { positionAlong, type Tile } from '@shared/world/pathfinding';
 import type { WalkGrid } from '@shared/world/walkGrid';
 import { interactionFor, TRACKS, type PropResult, type PropState } from '@shared/world/interactions';
 import { Ambience, type Light, type Mob } from './ambience';
+import { GROUND, terrainAt } from '@shared/world/scene';
 import { play } from './sfx';
 import { Camera } from './camera';
 import { behind, rectsOverlap, topoSort, type Box, type ScreenRect } from './depth';
@@ -53,7 +54,7 @@ interface Static {
 }
 
 interface Projectile {
-  kind: 'plane' | 'coin' | 'rocket';
+  kind: 'plane' | 'coin' | 'rocket' | 'ball' | 'bobber' | 'stone';
   from: { x: number; y: number };
   to: { x: number; y: number } | string;
   start: number;
@@ -96,7 +97,22 @@ const facingFrom = (dx: number, dy: number, prev: Facing): Facing => {
   return dy > 0 ? 'sw' : 'ne';
 };
 
-const SEAT_LIFT: Record<string, number> = { chair: 5, bench: 5, stool: 7, couch: 4, armchair: 4, beanbag: 1 };
+const SEAT_LIFT: Record<string, number> = {
+  chair: 5,
+  bench: 5,
+  stool: 7,
+  couch: 4,
+  armchair: 4,
+  beanbag: 1,
+  lounger: 5,
+  log: 4,
+  stump: 5,
+  swing: 6,
+  hammock: 5,
+  blanket: 0,
+  cushion: 2,
+  picnic: 5,
+};
 
 export class WorldView {
   readonly camera = new Camera();
@@ -620,6 +636,138 @@ export class WorldView {
         say(r.text);
         play('blip', g);
         return;
+      case 'marshmallow':
+        this.effects.burst(mid.x, mid.y - 4, 'sparks', 10);
+        if (a && r.give) a.treat = { emoji: r.give, until: now + 120_000 };
+        say(r.text);
+        play('crackle', g);
+        return;
+      case 'icecream':
+      case 'harvest':
+        this.effects.burst(mid.x, mid.y - 8, 'sparkle', 6);
+        if (it.fx === 'harvest') this.effects.burst(mid.x, mid.y - 4, 'crumbs', 6);
+        if (a && r.give) a.treat = { emoji: r.give, until: now + 120_000 };
+        say(r.text);
+        play('pop', g);
+        return;
+      case 'stargaze':
+        this.effects.burst(mid.x + 10, mid.y - 30, 'stars', 8);
+        say(r.text);
+        play('sparkle', g);
+        return;
+      case 'chess':
+      case 'boardgame':
+        this.effects.burst(mid.x, mid.y - 6, 'sparkle', 5);
+        say(r.text);
+        play('pop', g);
+        return;
+      case 'piano':
+        this.effects.burst(mid.x, mid.y - 16, 'notes', 12, ['#9b6bd6', '#e24c9c', '#3ec7e0'][Math.floor(Math.random() * 3)]);
+        say(r.text);
+        play('notes', g);
+        return;
+      case 'hoop': {
+        const rim = isoToScreen(obj.x + 0.5, obj.y + 0.74, 37);
+        this.projectiles.push({
+          kind: 'ball',
+          from: hand,
+          to: { x: rim.x, y: rim.y - (r.made ? 0 : 3) },
+          start: now,
+          dur: 800,
+          arc: 30,
+          onLand: (x, y) => {
+            if (r.made) {
+              this.effects.burst(x, y + 4, 'stars', 8);
+              this.projectiles.push({ kind: 'ball', from: { x, y }, to: { x: x + 2, y: y + 38 }, start: performance.now(), dur: 450, arc: 0 });
+            } else {
+              this.projectiles.push({ kind: 'ball', from: { x, y }, to: { x: x + (Math.random() < 0.5 ? -24 : 24), y: y + 40 }, start: performance.now(), dur: 650, arc: 14 });
+            }
+            say(r.text, r.made && (r.n ?? 0) >= 3 ? '#ffd23f' : undefined);
+            play(r.made ? 'sparkle' : 'pop', g);
+          },
+        });
+        play('whoosh', g * 0.6);
+        return;
+      }
+      case 'pingpong': {
+        const left = isoToScreen(obj.x + 0.2, cy, 14);
+        const right = isoToScreen(obj.x + (obj.w ?? 1) - 0.2, cy, 14);
+        const hits = Math.min(6, 2 + Math.floor((r.n ?? 2) / 6));
+        for (let i = 0; i < hits; i++) {
+          const [f, t] = i % 2 ? [right, left] : [left, right];
+          this.projectiles.push({ kind: 'ball', from: f, to: t, start: now + i * 320, dur: 320, arc: 8 });
+        }
+        setTimeout(() => say(r.text, r.best ? '#ffd23f' : undefined), hits * 320);
+        play('pop', g);
+        return;
+      }
+      case 'fish':
+      case 'skip': {
+        const dir = this.waterDirection(obj, a);
+        if (!dir) {
+          say(r.text);
+          return;
+        }
+        if (it.fx === 'fish') {
+          const spot = isoToScreen(dir.x, dir.y, -2);
+          this.projectiles.push({
+            kind: 'bobber',
+            from: hand,
+            to: spot,
+            start: now,
+            dur: 700,
+            arc: 26,
+            onLand: (x, y) => {
+              this.effects.ring(x, y, 'rgba(255,255,255,0.9)', 6);
+              setTimeout(() => {
+                this.effects.ring(x, y, 'rgba(255,255,255,0.9)', 9);
+                this.effects.burst(x, y, 'water', r.made ? 10 : 4);
+                if (r.best) this.effects.burst(x, y - 10, 'gold', 16);
+                this.floaters.push({ x, y: y - 12, text: r.text ?? '', start: performance.now(), dur: 3400, bg: r.best ? '#ffd23f' : undefined });
+                play('splash', g);
+              }, 900 + Math.random() * 700);
+            },
+          });
+          play('whoosh', g * 0.5);
+          return;
+        }
+        // Skipping: the stone hops across the water, a ripple at every touch.
+        const hops = Math.min(9, r.n ?? 1);
+        const step = { x: (dir.x - (a?.x ?? obj.x) - 0.5) , y: (dir.y - (a?.y ?? obj.y) - 0.5) };
+        const len = Math.hypot(step.x, step.y) || 1;
+        const ux = step.x / len;
+        const uy = step.y / len;
+        let from = hand;
+        let t0 = now;
+        for (let i = 0; i < hops; i++) {
+          const d = 0.9 + i * 0.25;
+          const bx = dir.x + ux * (i === 0 ? 0 : 1) * (i * 0.9 + (i * (i - 1)) * 0.12);
+          const by = dir.y + uy * (i === 0 ? 0 : 1) * (i * 0.9 + (i * (i - 1)) * 0.12);
+          const to = isoToScreen(bx, by, -2);
+          const dur = i === 0 ? 500 : Math.max(120, 300 - i * 25);
+          const last = i === hops - 1;
+          this.projectiles.push({
+            kind: 'stone',
+            from,
+            to,
+            start: t0,
+            dur,
+            arc: i === 0 ? 18 : Math.max(2, 10 - i * 1.2) * d,
+            onLand: (x, y) => {
+              this.effects.ring(x, y, 'rgba(255,255,255,0.85)', 5);
+              if (last) {
+                this.effects.burst(x, y, 'water', 4);
+                this.floaters.push({ x, y: y - 10, text: r.text ?? '', start: performance.now(), dur: 3000, bg: r.best ? '#ffd23f' : undefined });
+                play(r.best ? 'sparkle' : 'splash', g);
+              }
+            },
+          });
+          from = to;
+          t0 += dur;
+        }
+        play('whoosh', g * 0.4);
+        return;
+      }
       case 'launch': {
         say(r.text);
         const from = isoToScreen(cx, cy, 20);
@@ -661,6 +809,27 @@ export class WorldView {
   giveTreat(memberId: string, emoji: string, ms = 120_000) {
     const a = this.actors.get(memberId);
     if (a) a.treat = { emoji, until: performance.now() + ms };
+  }
+
+  /** A water point beyond an object, away from whoever's using it (fishing, skipping stones). */
+  private waterDirection(o: SceneObject, a: ActorView | undefined): { x: number; y: number } | null {
+    const scene = this.scene;
+    if (!scene) return null;
+    const cx = o.x + (o.w ?? 1) / 2;
+    const cy = o.y + (o.d ?? 1) / 2;
+    const water = (x: number, y: number) => ['w', 'W'].includes(terrainAt(scene, Math.floor(x), Math.floor(y)));
+    const dirs: Array<[number, number]> = [];
+    if (a) dirs.push([cx - (a.x + 0.5), cy - (a.y + 0.5)]);
+    for (let k = 0; k < 8; k++) dirs.push([Math.cos((k / 8) * Math.PI * 2), Math.sin((k / 8) * Math.PI * 2)]);
+    for (const [dx, dy] of dirs) {
+      const l = Math.hypot(dx, dy) || 1;
+      for (let d = 1; d <= 4; d += 0.5) {
+        const x = cx + (dx / l) * d;
+        const y = cy + (dy / l) * d;
+        if (water(x, y)) return { x, y };
+      }
+    }
+    return null;
   }
 
   private ahead(a: ActorView, n: number): { x: number; y: number } {
@@ -839,6 +1008,7 @@ export class WorldView {
 
   private actorLift(a: ActorView): number {
     if (usesWheelchair(a.occ.avatar)) return 0;
+    if (a.occ.sittingOn === GROUND) return -2;
     if (a.occ.sittingOn && this.scene) {
       const o = this.scene.objects.find((x) => x.id === a.occ.sittingOn);
       if (o) return SEAT_LIFT[o.sprite] ?? 4;
@@ -1056,7 +1226,7 @@ export class WorldView {
     const now = performance.now();
     for (const pr of this.projectiles) {
       const to = this.targetPos(pr.to);
-      if (!to) continue;
+      if (!to || now < pr.start) continue;
       const k = Math.min(1, (now - pr.start) / pr.dur);
       const e = pr.kind === 'rocket' ? k * k : k;
       const x = pr.from.x + (to.x - pr.from.x) * e;
@@ -1072,6 +1242,25 @@ export class WorldView {
         c.fillRect(rx + 2 * dir - (dir < 0 ? 1 : 0), ry - 1, 2, 1);
         c.fillStyle = '#dfe6ee';
         c.fillRect(rx - 3, ry - 1, 4, 1);
+      } else if (pr.kind === 'ball') {
+        c.fillStyle = '#e8702a';
+        c.fillRect(rx - 1, ry - 1, 3, 3);
+        c.fillStyle = '#2a1f2d';
+        c.fillRect(rx, ry - 1, 1, 3);
+      } else if (pr.kind === 'bobber') {
+        c.strokeStyle = 'rgba(255,255,255,0.6)';
+        c.lineWidth = 0.5;
+        c.beginPath();
+        c.moveTo(pr.from.x, pr.from.y - 6);
+        c.lineTo(rx, ry);
+        c.stroke();
+        c.fillStyle = '#e0503f';
+        c.fillRect(rx - 1, ry - 1, 2, 1);
+        c.fillStyle = '#fffaf0';
+        c.fillRect(rx - 1, ry, 2, 1);
+      } else if (pr.kind === 'stone') {
+        c.fillStyle = '#8e8a84';
+        c.fillRect(rx - 1, ry, 3, 1);
       } else if (pr.kind === 'coin') {
         const wide = Math.floor(now / 70) % 2 === 0;
         c.fillStyle = '#ffd23f';

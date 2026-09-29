@@ -26,6 +26,9 @@ export const UNWALKABLE_TERRAIN = new Set<string>(['w', 'W', ' ']);
 
 export type Facing = 'se' | 'sw' | 'ne' | 'nw';
 
+/** `sittingOn` value for sitting right where you are (grass, sand, floor). */
+export const GROUND = '@ground';
+
 export type ObjectAction =
   | { kind: 'enter'; roomId: string }
   | { kind: 'exit' }

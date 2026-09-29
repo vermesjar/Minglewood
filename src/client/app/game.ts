@@ -11,10 +11,10 @@ import { getScene, TOWN_ID, buildingForRoom } from '@shared/world';
 import { livedScene } from '@shared/world/lived';
 import { DECOR_BY_ID, decorObject, placementProblem } from '@shared/world/decor';
 import type { SceneObject } from '@shared/world/scene';
-import { isSeat } from '@shared/world/scene';
+import { GROUND, isSeat } from '@shared/world/scene';
 import { WalkGrid } from '@shared/world/walkGrid';
 import { findPath, type Tile } from '@shared/world/pathfinding';
-import { distanceToObject, interactionFor } from '@shared/world/interactions';
+import { distanceToObject, inFrontOf, interactionFor } from '@shared/world/interactions';
 import type { PropState } from '@shared/world/interactions';
 import { play, setSoundEnabled, setSoundVolume } from '../engine/sfx';
 import { WorldView, type BuildingBadge } from '../engine/WorldView';
@@ -604,7 +604,11 @@ class Game {
     const me = this.world?.actorTile(this.meId);
     if (!it || !sceneId || !me) return;
     const send = () => this.rt?.send({ t: 'interact', objectId: o.id });
-    if (distanceToObject(o, me[0], me[1]) <= it.reach && !this.world?.isMoving(this.meId)) {
+    const good = (x: number, y: number) => {
+      const d = distanceToObject(o, x, y);
+      return d <= it.reach && d >= (it.minDistance ?? 0) && (!it.front || inFrontOf(o, x, y));
+    };
+    if (good(me[0], me[1]) && !this.world?.isMoving(this.meId)) {
       send();
       return;
     }
@@ -614,7 +618,7 @@ class Game {
     const r = Math.ceil(it.reach);
     for (let y = o.y - r; y < o.y + (o.d ?? 1) + r; y++) {
       for (let x = o.x - r; x < o.x + (o.w ?? 1) + r; x++) {
-        if (grid.walkable(x, y) && distanceToObject(o, x, y) <= it.reach) spots.push([x, y]);
+        if (grid.walkable(x, y) && good(x, y)) spots.push([x, y]);
       }
     }
     spots.sort((a, b) => Math.hypot(a[0] - me[0], a[1] - me[1]) - Math.hypot(b[0] - me[0], b[1] - me[1]));
@@ -630,6 +634,13 @@ class Game {
       if (d && Math.abs(d.x - x) <= 2 && Math.abs(d.y - y) <= 2) return r.id;
     }
     return undefined;
+  }
+
+  /** Sit down right here, or stand back up. */
+  toggleSit() {
+    const occ = getState().occupants[this.meId];
+    if (occ?.sittingOn) this.rt?.send({ t: 'stand' });
+    else if (!this.world?.isMoving(this.meId)) this.rt?.send({ t: 'sit', objectId: GROUND });
   }
 
   private onObjectActivate(o: SceneObject) {
@@ -828,6 +839,10 @@ class Game {
     if (e.key === 'Enter') {
       (document.getElementById('mw-chat') as HTMLInputElement | null)?.focus();
       e.preventDefault();
+      return;
+    }
+    if (e.key === 'x' || e.key === 'X') {
+      this.toggleSit();
       return;
     }
     if (e.key === '+' || e.key === '=') this.world?.zoomBy(1.25);

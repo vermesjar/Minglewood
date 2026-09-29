@@ -275,11 +275,12 @@ export class Ambience {
     for (const o of s.objects) {
       if (o.sprite.startsWith('tree/')) this.trees.push([o.x, o.y]);
       if (o.sprite === 'flowerbed') this.flowers.push([o.x, o.y]);
-      if (grid && ['bench', 'fountain', 'flowerbed', 'picnic', 'mailbox', 'signpost'].includes(o.sprite)) {
+      // Biscuit keeps to the middle of town (short, cozy rounds).
+      if (grid && o.x < 38 && o.y < 46 && ['bench', 'fountain', 'flowerbed', 'picnic', 'mailbox', 'signpost'].includes(o.sprite)) {
         const n = grid.nearestWalkable(o.x, o.y + (o.d ?? 1), 2);
         if (n) this.catSpots.push([n.x, n.y]);
       }
-      if (grid && o.door) this.catSpots.push([o.door.x, o.door.y]);
+      if (grid && o.door && o.x < 38) this.catSpots.push([o.door.x, o.door.y]);
     }
     for (let i = 0; i < 3; i++) this.spawnFlock(i, 0);
     for (let i = 0; i < 6 && this.flowers.length; i++) {
@@ -311,6 +312,12 @@ export class Ambience {
         break;
       case 'fireplace':
         L(8, 96, [255, 150, 70], 1, { flicker: 1 });
+        break;
+      case 'campfire':
+        L(8, 120, [255, 150, 70], 1, { flicker: 1 });
+        break;
+      case 'piano':
+        L(28, 30, [255, 230, 170], 0.5);
         break;
       case 'lighthouse':
         L(46, 110, [255, 240, 180], 1, { nightOnly: true });
