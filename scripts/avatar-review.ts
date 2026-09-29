@@ -415,3 +415,44 @@ console.log(`${people.length} characters, ${total} issue(s) → ${OUT}/`);
   );
   sheet.save('art/review/assets/pets.png');
 }
+
+/* ------------------------------------------------------------------ the sitting pose, every facing */
+{
+  const looks: AvatarLoadout[] = [
+    { hair: 'hair.bob', hairColor: '#3b2518', top: 'top.hoodie', topColor: '#e0703a', bottom: 'bottom.jeans', bottomColor: '#3b5b8a' } as AvatarLoadout,
+    { hair: 'hair.long', hairColor: '#d9a35b', top: 'top.dress', topColor: '#9b6bd6', shoes: 'shoes.heels' } as AvatarLoadout,
+    { hair: 'hair.afro', hairColor: '#1f1612', skin: '#643721', top: 'top.labcoat', bottom: 'bottom.chinos', bottomColor: '#3a3a46' } as AvatarLoadout,
+  ];
+  const z = 5;
+  const SC = [14, 20, 62, 88];
+  const cw = SC[2] * z + 6;
+  const ch = SC[3] * z + 6;
+  const sheet = new Sheet(cw * 4, ch * looks.length, BG);
+  looks.forEach((look, row) =>
+    FACINGS.forEach((f, col) => sheet.paste(renderAvatarLayers(look, f, 'sit').px, col * cw + 3, row * ch + 3, z, SC)),
+  );
+  sheet.save('art/review/assets/sitting.png');
+}
+
+/* ------------------------------------------------------------------ big hair × hats */
+{
+  const hairs = ['hair.afro', 'hair.mohawk', 'hair.bun', 'hair.spacebuns', 'hair.swoop', 'hair.ponytail', 'hair.curly', 'hair.long'];
+  const hats = ['hat.cap', 'hat.beanie', 'hat.bucket', 'hat.cowboy', 'hat.beret', 'hat.headphones', 'hat.crown', 'hat.party'];
+  const z = 3;
+  const HC = [16, 8, 58, 62];
+  const cw = HC[2] * z + 4;
+  const ch = HC[3] * z + 4;
+  for (const [facing, file] of [
+    ['se', 'bighair-hats-front'],
+    ['ne', 'bighair-hats-back'],
+  ] as const) {
+    const sheet = new Sheet(cw * hats.length, ch * hairs.length, BG);
+    hairs.forEach((h, row) =>
+      hats.forEach((hat, col) => {
+        const look = { hair: h, hairColor: '#3b2518', headwear: hat, headwearColor: '#e0503f', top: 'top.tee', topColor: '#3f8fd8' } as AvatarLoadout;
+        sheet.paste(renderAvatarLayers(look, facing, 'stand').px, col * cw + 2, row * ch + 2, z, HC);
+      }),
+    );
+    sheet.save(`art/review/assets/${file}.png`);
+  }
+}

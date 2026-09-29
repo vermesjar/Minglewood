@@ -21,13 +21,22 @@ import PET_LIB from './petLib.json';
  * Paint a hand-drawn tone map at (x0, y0): '#' base, 'h' light, 's' shade, 'd' deep, '.' empty, tinted from
  * `base`; every pixel on the map's boundary becomes the line colour, so pieces are outlined like the rest.
  */
-function paintMap(P: Pix, x0: number, y0: number, rows: string[], base: RGB, tint?: (x: number, y: number, c: RGB) => RGB) {
-  const at = (r: number, c: number) => (rows[r]?.[c] ?? '.') !== '.';
+function paintMap(
+  P: Pix,
+  x0: number,
+  y0: number,
+  rows: string[],
+  base: RGB,
+  tint?: (x: number, y: number, c: RGB) => RGB,
+  clip?: (x: number, y: number) => boolean,
+) {
+  // clipped pixels count as empty, so the part's own edge line follows the clip
+  const at = (r: number, c: number) => (rows[r]?.[c] ?? '.') !== '.' && !clip?.(x0 + c, y0 + r);
   const tone: Record<string, RGB> = { '#': base, h: lightOf(base), s: shadowOf(base), d: mix(base, LINE, 0.55), l: mix(base, LINE, 0.8) };
   rows.forEach((row, r) => {
     for (let c = 0; c < row.length; c++) {
       const ch = row[c];
-      if (ch === '.') continue;
+      if (ch === '.' || clip?.(x0 + c, y0 + r)) continue;
       const edge = !at(r - 1, c) || !at(r + 1, c) || !at(r, c - 1) || !at(r, c + 1);
       let col = edge ? lineOf(base) : (tone[ch] ?? base);
       if (!edge && tint) col = tint(x0 + c, y0 + r, col);
@@ -83,7 +92,29 @@ function drawHair(P: Pix, F: Frame, L: FullLoadout, layer: 'behind' | 'front') {
   const v = layer === 'behind' ? (F.view === 'front' ? st.behindFront : st.behindBack) : F.view === 'front' ? st.front : st.back;
   if (!v) return;
   const m = placed(v, hairOrigin(F), headShift(F));
-  paintMap(P, m.x, m.y, m.rows, hx(L.hairColor), hairTint(L));
+  paintMap(P, m.x, m.y, m.rows, hx(L.hairColor), hairTint(L), underHat(F, L));
+}
+
+/** Hats that sit over the crown: hair can't rise above them (a bun, a quiff or a mohawk goes under the hat). */
+const CROWN_HATS = new Set(['cap', 'capback', 'beanie', 'bucket', 'cowboy', 'beret']);
+
+/**
+ * The hide rule for crown hats: in every column the hat spans, hair above the hat's top edge is not drawn.
+ * Hair-top accessories (headphones, bows, crowns, ears, flowers, party hats) leave the hair alone.
+ */
+function underHat(F: Frame, L: FullLoadout): ((x: number, y: number) => boolean) | undefined {
+  const id = L.headwear.replace('hat.', '');
+  if (!CROWN_HATS.has(id)) return undefined;
+  const map = HATS[id]?.[F.view];
+  if (!map) return undefined;
+  const m = placed(map, hairOrigin(F), headShift(F));
+  const top = new Map<number, number>();
+  m.rows.forEach((row, r) => {
+    for (let c = 0; c < row.length; c++) if (row[c] !== '.' && !top.has(m.x + c)) top.set(m.x + c, m.y + r);
+  });
+  // a column's top is the highest hat pixel in it or its neighbours (so the clip line is smooth)
+  const topAt = (x: number) => Math.min(top.get(x) ?? Infinity, (top.get(x - 1) ?? Infinity) + 1, (top.get(x + 1) ?? Infinity) + 1);
+  return (x, y) => y < topAt(x);
 }
 
 /** Glasses sit on the frame's eyes: a ring round each, a bridge between, an arm back to the ear. */
