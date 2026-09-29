@@ -2,6 +2,9 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { ServerMsg } from '@shared/protocol';
 import { ORG_ID } from '@shared/seed/northstar';
 import { DEFAULT_LOADOUT } from '@shared/avatar';
+import { getScene } from '@shared/world';
+import { WalkGrid } from '@shared/world/walkGrid';
+import type { Tile } from '@shared/world/pathfinding';
 import { Store } from '../store/store';
 import { MemoryPersistence } from '../store/jsonFile';
 import { OrgHub, type HubClient } from './orgHub';
@@ -74,6 +77,24 @@ describe('OrgHub', () => {
     hub.enter(a.id, 'town', 'live', [21, 23]);
     expect(hub.move(a.id, [[21, 23], [25, 23]])).toBe(false);
     expect(hub.move(a.id, [[30, 30], [31, 30]])).toBe(false);
+  });
+
+  it('lets a walker extend its path mid-stride without restarting it, but not skip ahead', () => {
+    const a = newMember(store, 'Ada');
+    const cb = client(a.id);
+    hub.connect(client(a.id));
+    hub.connect(cb);
+    hub.enter(a.id, 'cafe', 'live');
+    const { x, y } = hub.actor(a.id)!;
+    const grid = new WalkGrid(getScene('cafe')!);
+    const dir = ([[1, 0], [-1, 0], [0, 1], [0, -1]] as const).find(([dx, dy]) => [1, 2, 3].every((i) => grid.walkable(x + dx * i, y + dy * i)))!;
+    const line = (n: number): Tile[] => Array.from({ length: n + 1 }, (_, i) => [x + dir[0] * i, y + dir[1] * i]);
+    const t0 = Date.now() - 150;
+    expect(hub.move(a.id, line(2), t0)).toBe(true);
+    const moved = cb.msgs.filter((m) => m.t === 'moved').pop();
+    expect(moved && moved.t === 'moved' && moved.startedAt).toBe(t0);
+    // A start claimed long ago would put the walker three tiles ahead of where the server has it.
+    expect(hub.move(a.id, line(3), Date.now() - 900)).toBe(false);
   });
 
   it('holds knocks for focused people and delivers them when they are free', () => {

@@ -14,6 +14,7 @@ import type { SceneObject } from '@shared/world/scene';
 import { isSeat } from '@shared/world/scene';
 import { WalkGrid } from '@shared/world/walkGrid';
 import { findPath, type Tile } from '@shared/world/pathfinding';
+import { heldDelta, KEY_DIRS, planHeldWalk, type ScreenDir } from '@shared/world/heldWalk';
 import { WorldView, type BuildingBadge } from '../engine/WorldView';
 import { api, ApiError, setActivityTransport } from './api';
 import { Realtime } from './socket';
@@ -39,8 +40,15 @@ class Game {
   private lastScene: { sceneId: string; occupants: Occupant[] } | null = null;
   private sceneWaiters = new Map<string, Array<() => void>>();
   private arrival: { goal: Tile; then: () => void; started: number } | null = null;
-  private ownPath: string | null = null;
+  /** Our recently sent paths, so the server's echo of them doesn't restart our own walk. */
+  private ownPaths: string[] = [];
   private keyHandler: ((e: KeyboardEvent) => void) | null = null;
+  private keyUpHandler: ((e: KeyboardEvent) => void) | null = null;
+  private blurHandler: (() => void) | null = null;
+  /** Screen directions currently held (arrows / WASD) and the steering loop that follows them. */
+  private held = new Set<ScreenDir>();
+  private walkRaf = 0;
+  private keyWalking = false;
   private arrivalTimer: number | null = null;
   initialScene = TOWN_ID;
 
@@ -133,13 +141,28 @@ class Game {
     this.applyPrefs();
     if (this.lastScene) this.loadScene(this.lastScene.sceneId, this.lastScene.occupants);
     this.keyHandler = (e) => this.onKey(e);
+    this.keyUpHandler = (e) => {
+      const dir = KEY_DIRS[e.code];
+      if (dir && this.held.delete(dir)) this.steer();
+    };
+    this.blurHandler = () => {
+      this.held.clear();
+      this.steer();
+    };
     window.addEventListener('keydown', this.keyHandler);
+    window.addEventListener('keyup', this.keyUpHandler);
+    window.addEventListener('blur', this.blurHandler);
   }
 
   detach() {
     this.world?.destroy();
     this.world = null;
+    this.held.clear();
+    cancelAnimationFrame(this.walkRaf);
+    this.walkRaf = 0;
     if (this.keyHandler) window.removeEventListener('keydown', this.keyHandler);
+    if (this.keyUpHandler) window.removeEventListener('keyup', this.keyUpHandler);
+    if (this.blurHandler) window.removeEventListener('blur', this.blurHandler);
   }
 
   /** Tell the renderer which parts of the screen the panels cover. */
@@ -198,7 +221,7 @@ class Game {
         });
         break;
       case 'moved':
-        if (m.memberId === this.meId && this.ownPath === pathKey(m.path)) break;
+        if (m.memberId === this.meId && this.ownPaths.includes(pathKey(m.path))) break;
         w?.move(m.memberId, m.path, m.startedAt);
         break;
       case 'updated':
@@ -426,12 +449,49 @@ class Game {
       this.checkArrival();
       return true;
     }
-    const startedAt = Date.now() + (this.rt?.serverOffset ?? 0);
-    this.ownPath = pathKey(path);
-    this.world.move(this.meId, path, startedAt);
+    this.keyWalking = false;
+    this.sendOwnPath(path, this.serverNow());
     this.world.showDestination(target);
-    this.rt?.send({ t: 'move', path });
     return true;
+  }
+
+  private serverNow() {
+    return Date.now() + (this.rt?.serverOffset ?? 0);
+  }
+
+  /** Walk our own avatar locally right away and tell the server; its echo of the same path is ignored. */
+  private sendOwnPath(path: Tile[], startedAt: number) {
+    this.ownPaths = [...this.ownPaths.slice(-7), pathKey(path)];
+    this.world?.move(this.meId, path, startedAt);
+    this.rt?.send({ t: 'move', path, startedAt });
+  }
+
+  /** Arrow keys / WASD changed: keep steering while any are held, stop at the next tile when released. */
+  private steer() {
+    if (heldDelta(this.held)) {
+      if (!this.walkRaf) this.walkRaf = requestAnimationFrame(this.walkTick);
+    } else this.planKeyWalk();
+  }
+
+  private walkTick = () => {
+    this.walkRaf = 0;
+    if (!heldDelta(this.held)) return;
+    this.planKeyWalk();
+    this.walkRaf = requestAnimationFrame(this.walkTick);
+  };
+
+  private planKeyWalk() {
+    const sceneId = getState().sceneId;
+    const d = heldDelta(this.held);
+    if (!this.world || !sceneId || (!d && !this.keyWalking)) return;
+    const grid = this.grid(sceneId);
+    const tile = this.world.actorTile(this.meId);
+    if (!grid || !tile) return;
+    const next = planHeldWalk(this.world.actorPath(this.meId), tile, this.serverNow(), d, grid);
+    if (!next) return;
+    this.keyWalking = true;
+    this.arrival = null;
+    this.sendOwnPath(next.path, next.startedAt);
   }
 
   private checkArrival() {
@@ -452,21 +512,6 @@ class Game {
     setState({ selection: null });
     this.world?.setSelected(null);
     this.walkTo(t);
-  }
-
-  step(dx: number, dy: number) {
-    const t = this.world?.actorTile(this.meId);
-    const sceneId = getState().sceneId;
-    if (!t || !sceneId || this.world?.isMoving(this.meId)) return;
-    const grid = this.grid(sceneId)!;
-    const tries: Tile[] = [[t[0] + dx, t[1] + dy]];
-    if (dx && dy) tries.push([t[0] + dx, t[1]], [t[0], t[1] + dy]);
-    for (const goal of tries) {
-      if (grid.walkable(goal[0], goal[1])) {
-        this.walkTo(goal);
-        return;
-      }
-    }
   }
 
   /* ------------------------------------------------------------------ navigation */
@@ -726,21 +771,14 @@ class Game {
       this.world?.setSelected(null);
       return;
     }
-    if (typing) return;
-    const map: Record<string, [number, number]> = {
-      ArrowUp: [-1, -1],
-      w: [-1, -1],
-      ArrowDown: [1, 1],
-      s: [1, 1],
-      ArrowLeft: [-1, 1],
-      a: [-1, 1],
-      ArrowRight: [1, -1],
-      d: [1, -1],
-    };
-    const dir = map[e.key];
+    if (typing || e.ctrlKey || e.metaKey || e.altKey) return;
+    const dir = KEY_DIRS[e.code];
     if (dir) {
       e.preventDefault();
-      this.step(dir[0], dir[1]);
+      if (!this.held.has(dir)) {
+        this.held.add(dir);
+        this.steer();
+      }
       return;
     }
     if (e.key === '/') {
@@ -777,3 +815,6 @@ export function daysSinceStart(iso: string): number {
 }
 
 export const game = new Game();
+
+// Dev-only handle for poking at the running world from the console or browser automation.
+if (import.meta.env.DEV) (window as unknown as { __mw: Game }).__mw = game;

@@ -87,7 +87,7 @@ export function attachSockets(server: Server, store: Store, hubs: Map<string, Or
           if (getScene(msg.sceneId)) hub.enter(memberId, msg.sceneId, 'live', msg.at ?? hub.spotNear(msg.sceneId, msg.near));
           break;
         case 'move':
-          if (!hub.move(memberId, msg.path)) {
+          if (!hub.move(memberId, msg.path, msg.startedAt)) {
             // Resync the client with authoritative state.
             const a = hub.actor(memberId);
             if (a) client.send({ t: 'updated', memberId, patch: { x: a.x, y: a.y, path: undefined } });

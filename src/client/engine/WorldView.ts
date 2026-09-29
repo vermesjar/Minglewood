@@ -344,6 +344,13 @@ export class WorldView {
     return [Math.round(p.x), Math.round(p.y)];
   }
 
+  /** The path an actor is walking right now (server-time start), or null when standing still. */
+  actorPath(id: string): { path: Tile[]; startedAt: number } | null {
+    const a = this.actors.get(id);
+    if (!a?.occ.path || a.occ.pathStartedAt === undefined || !this.livePos(a).moving) return null;
+    return { path: a.occ.path, startedAt: a.occ.pathStartedAt };
+  }
+
   isMoving(id: string): boolean {
     const a = this.actors.get(id);
     return !!a && this.livePos(a).moving;

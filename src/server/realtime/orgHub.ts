@@ -23,6 +23,9 @@ import { findPath, isValidPath, positionAlong, type Tile } from '@shared/world/p
 import { sanitizeLoadout } from '@shared/avatar';
 import type { Store } from '../store/store';
 
+/** How far back a client may date a path it is extending (a little more than one diagonal step plus latency). */
+const MAX_PATH_BACKDATE_MS = 1500;
+
 export interface HubClient {
   id: string;
   memberId: string;
@@ -326,18 +329,24 @@ export class OrgHub extends EventEmitter<HubEvents> {
 
   /* ------------------------------------------------------------------ movement */
 
-  /** Client-proposed path (validated). */
-  move(memberId: string, path: Tile[]): boolean {
+  /**
+   * Client-proposed path (validated). A client walking with held keys extends its path as it goes and
+   * sends the time the path started, so everyone keeps interpolating the same motion without a restart.
+   * The claimed start is only honoured if it is recent and puts the actor where the server has it now.
+   */
+  move(memberId: string, path: Tile[], startedAt?: number): boolean {
     const a = this.actors.get(memberId);
     if (!a) return false;
     const grid = this.grids.get(a.sceneId)!;
-    const pos = this.position(a);
-    const [sx, sy] = path[0];
-    if (Math.hypot(sx - pos.x, sy - pos.y) > 1.6) return false;
+    const now = Date.now();
+    const pos = this.position(a, now);
+    const start = startedAt !== undefined && startedAt >= now - MAX_PATH_BACKDATE_MS && startedAt <= now + 250 ? Math.min(startedAt, now) : now;
+    const at = positionAlong(path, now - start);
+    if (Math.hypot(at.x - pos.x, at.y - pos.y) > 1.6) return false;
     const last = path[path.length - 1];
     const seatAtEnd = this.seatAt(a.sceneId, last[0], last[1]);
     if (!isValidPath(grid, path, !!seatAtEnd)) return false;
-    this.startPath(a, path);
+    this.startPath(a, path, start);
     return true;
   }
 
@@ -354,9 +363,9 @@ export class OrgHub extends EventEmitter<HubEvents> {
     return true;
   }
 
-  private startPath(a: Actor, path: Tile[]) {
+  private startPath(a: Actor, path: Tile[], startedAt = Date.now()) {
     a.path = path;
-    a.pathStartedAt = Date.now();
+    a.pathStartedAt = startedAt;
     a.sittingOn = undefined;
     a.x = path[0][0];
     a.y = path[0][1];

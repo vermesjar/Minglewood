@@ -99,7 +99,8 @@ export const outfitsSchema = z
 
 export const clientMsgSchema = z.discriminatedUnion('t', [
   z.object({ t: z.literal('enter'), sceneId: idStr, at: tile.optional(), near: idStr.optional() }),
-  z.object({ t: z.literal('move'), path: z.array(tile).min(1).max(400) }),
+  // `startedAt` (server epoch ms) lets a held-key walk extend its path without restarting it.
+  z.object({ t: z.literal('move'), path: z.array(tile).min(1).max(400), startedAt: z.number().finite().optional() }),
   z.object({ t: z.literal('sit'), objectId: idStr }),
   z.object({ t: z.literal('stand') }),
   z.object({
