@@ -303,7 +303,7 @@ export function buildInteriors(): SceneDef[] {
       { id: 'hq-stanchion-3', sprite: 'stanchion', x: 10, y: 3 },
       { id: 'hq-stanchion-4', sprite: 'stanchion', x: 12, y: 3 },
       // Reception, framed by topiaries under the logo wall.
-      { id: 'hq-desk-chair', sprite: 'chair', variant: 'office', x: 7, y: 1, facing: 'sw', label: 'Reception chair', actions: sit },
+      { id: 'hq-desk-chair', sprite: 'chair', variant: 'office', x: 8, y: 1, facing: 'sw', label: 'Reception chair' },
       { id: 'hq-topiary-3', sprite: 'planter', variant: 'brass', x: 5, y: 2 },
       { id: 'hq-topiary-4', sprite: 'planter', variant: 'brass', x: 9, y: 2 },
       // The lounge by the elevator, on its own rug.
@@ -339,6 +339,41 @@ export function buildInteriors(): SceneDef[] {
   );
 
   // One back-to-back pod: the far row faces the room over its monitors, the near row faces the screens.
+  // The front desk is the receptionist's: guests talk to Margot across it.
+  hq.staff = [{ x: 6, y: 1, w: 3, d: 1 }];
+  hq.npcs = [
+    {
+      id: 'receptionist',
+      name: 'Margot',
+      role: 'Receptionist',
+      blurb: 'Runs the front desk at Northstar HQ. Tell Margot who you’re looking for and she’ll point you to their room — or let them know you’re here.',
+      avatar: {
+        skin: '#f6c9a4',
+        hair: 'hair.bob',
+        hairColor: '#1f1612',
+        eyes: 'eyes.lashes',
+        eyeColor: '#3f7fbf',
+        brows: 'brows.soft',
+        mouth: 'mouth.smile',
+        eyewear: 'eye.round',
+        top: 'top.blazer',
+        topColor: '#1f2a44',
+        topAccent: '#d9a441',
+        neck: 'neck.lanyard',
+        neckColor: '#d9a441',
+        bottom: 'bottom.skirt',
+        bottomColor: '#1f2a44',
+        shoes: 'shoes.loafers',
+        shoesColor: '#3b2518',
+        accessory: 'acc.none',
+      },
+      spots: [
+        { x: 7, y: 1, facing: 'sw' },
+        { x: 6, y: 1, facing: 'sw' },
+      ],
+    },
+  ];
+
   const engDesks: Obj[] = [];
   for (const dx of [3, 5, 7]) {
     engDesks.push({ sprite: 'desk', x: dx, y: 4, w: 2, d: 1, facing: 'ne' });
@@ -736,13 +771,13 @@ export function buildInteriors(): SceneDef[] {
       { id: 'arcade-air-hockey', sprite: 'air-hockey', x: 8, y: 4, w: 2, d: 1, facing: 'sw', label: 'Air hockey' },
       // Snacks and prizes by the door: the vending machine, the prize counter, a high table with stools.
       { id: 'arcade-vending', sprite: 'vending-machine', x: 0, y: 5, facing: 'se', label: 'Snack machine' },
-      { id: 'arcade-prizes', sprite: 'prize-counter', x: 0, y: 8, w: 1, d: 2, facing: 'se', label: 'Prize counter' },
+      { id: 'arcade-prizes', sprite: 'prize-counter', x: 1, y: 8, w: 1, d: 2, facing: 'se', label: 'Prize counter' },
       { id: 'arcade-snack-rug', sprite: 'rug', x: 2, y: 7, w: 5, d: 3, flat: true, variant: 'neon' },
-      { id: 'arcade-high-table', sprite: 'table-high', variant: 'neon', x: 3, y: 8 },
-      { id: 'arcade-stool-3', sprite: 'stool', variant: 'neon', x: 2, y: 8, actions: sit },
-      { id: 'arcade-stool-4', sprite: 'stool', variant: 'neon', x: 4, y: 8, actions: sit },
-      { id: 'arcade-stool-5', sprite: 'stool', variant: 'neon', x: 3, y: 9, actions: sit },
-      { id: 'arcade-popcorn', sprite: 'popcorn-cart', x: 6, y: 8, label: 'Popcorn' },
+      { id: 'arcade-high-table', sprite: 'table-high', variant: 'neon', x: 4, y: 8 },
+      { id: 'arcade-stool-3', sprite: 'stool', variant: 'neon', x: 3, y: 8, actions: sit },
+      { id: 'arcade-stool-4', sprite: 'stool', variant: 'neon', x: 5, y: 8, actions: sit },
+      { id: 'arcade-stool-5', sprite: 'stool', variant: 'neon', x: 4, y: 9, actions: sit },
+      { id: 'arcade-popcorn', sprite: 'popcorn-cart', x: 6, y: 7, label: 'Popcorn' },
       // Beanbags round a side table in the front corner.
       { id: 'arcade-lounge-rug', sprite: 'rug', x: 8, y: 6, w: 4, d: 4, flat: true, variant: 'cyan' },
       { id: 'arcade-side-table', sprite: 'table-low', x: 9, y: 8, w: 1, d: 1, variant: 'side' },
@@ -826,6 +861,75 @@ export function buildInteriors(): SceneDef[] {
       },
     ],
   );
+
+  // The prize counter's attendant works the lane behind it.
+  arcade.staff = [{ x: 0, y: 8, w: 1, d: 2 }];
+  arcade.npcs = [
+    {
+      id: 'attendant',
+      name: 'Pip',
+      role: 'Arcade attendant',
+      blurb: 'Keeps the cabinets running and the prize counter stocked at Pixel Pier. Pip knows every high score in the building.',
+      avatar: {
+        skin: '#7c4a2d',
+        hair: 'hair.curlyshort',
+        hairColor: '#1f1612',
+        eyes: 'eyes.wide',
+        eyeColor: '#5a3825',
+        brows: 'brows.bold',
+        mouth: 'mouth.grin',
+        headwear: 'hat.cap',
+        headwearColor: '#4fe3f0',
+        top: 'top.jersey',
+        topColor: '#2a1f4a',
+        topAccent: '#ff5fd1',
+        bottom: 'bottom.jeans',
+        bottomColor: '#1f2a44',
+        shoes: 'shoes.hightops',
+        shoesColor: '#ff5fd1',
+        accessory: 'acc.none',
+      },
+      spots: [
+        { x: 0, y: 8, facing: 'se' },
+        { x: 0, y: 9, facing: 'se' },
+      ],
+    },
+  ];
+
+  // The corner of the stacks is the librarian's: Wren shelves returns and keeps the grove quiet.
+  focus.staff = [{ x: 1, y: 1, w: 3, d: 1 }];
+  focus.npcs = [
+    {
+      id: 'librarian',
+      name: 'Wren',
+      role: 'Librarian',
+      blurb: 'Looks after the Quiet Grove’s shelves. Ask Wren for a book, a quiet corner, or the famous “Why we chose Postgres” zine.',
+      avatar: {
+        skin: '#b3764c',
+        hair: 'hair.pixie',
+        hairColor: '#c9ced6',
+        eyes: 'eyes.sleepy',
+        eyeColor: '#3f9a6b',
+        brows: 'brows.soft',
+        mouth: 'mouth.smile',
+        eyewear: 'eye.square',
+        top: 'top.cardigan',
+        topColor: '#6d8d68',
+        topAccent: '#f4efe0',
+        bottom: 'bottom.longskirt',
+        bottomColor: '#4a3322',
+        shoes: 'shoes.loafers',
+        shoesColor: '#4a2c20',
+        held: 'held.book',
+        heldColor: '#d9a441',
+        accessory: 'acc.none',
+      },
+      spots: [
+        { x: 1, y: 1, facing: 'sw' },
+        { x: 3, y: 1, facing: 'ne' },
+      ],
+    },
+  ];
 
   return [hq, cafe, eng, launch, events, focus, arcade, design];
 }

@@ -477,3 +477,25 @@ console.log(`${people.length} characters, ${total} issue(s) → ${OUT}/`);
   });
   sheet.save('art/review/assets/tips-fantasy.png');
 }
+
+/* ------------------------------------------------------------------ mouths */
+{
+  const mouths = [...ITEM_BY_ID.values()].filter((i) => i.slot === 'mouth').map((i) => i.id);
+  const skins = ['#ffe6d0', '#eab58d', '#b3764c', '#643721', '#4e2a18'];
+  const FC = [34, 38, 24, 22];
+  for (const [z, file] of [
+    [6, 'mouths'],
+    [1, 'mouths-1x'],
+  ] as const) {
+    const cw = FC[2] * z + 4;
+    const ch = FC[3] * z + 4;
+    const sheet = new Sheet(cw * mouths.length, ch * skins.length, BG);
+    skins.forEach((sk, row) =>
+      mouths.forEach((m, col) => {
+        const look = { skin: sk, mouth: m, hair: 'hair.short', hairColor: '#3b2518', eyes: 'eyes.dot' } as AvatarLoadout;
+        sheet.paste(renderAvatarLayers(look, 'se', 'stand').px, col * cw + 2, row * ch + 2, z, FC);
+      }),
+    );
+    sheet.save(`art/review/assets/${file}.png`);
+  }
+}

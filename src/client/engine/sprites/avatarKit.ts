@@ -370,12 +370,15 @@ function drawFace(P: Pix, F: Frame, L: FullLoadout, expr?: Expression) {
   // Small, symmetric mouths on the mouth anchor (mx-2..mx+2): simple shapes read best at 1:1.
   const mouths: Record<string, string[]> = {
     smile: ['m...m', '.mmm.'],
-    grin: ['mmmmm', '.mwm.', '..m..'],
+    // a wide open smile showing a row of teeth
+    grin: ['mmmmm', 'mwwwm', '.mmm.'],
     neutral: ['.mmm.'],
     smirk: ['....m', '.mmm.'],
-    o: ['.m.', 'mdm', '.m.'],
-    tongue: ['m...m', '.mmm.', '..tt.'],
-    talk: ['.mmm.', '.mdm.', '..m..'],
+    // a small round "ooh": a ring around a dark opening
+    o: ['.mm.', 'mddm', '.mm.'],
+    // cheeky: a smile with the tip of the tongue out
+    tongue: ['m...m', '.mmm.', '..t..'],
+    talk: ['.mmm.', 'mdddm', '.mmm.'],
   };
   const gm = USE_GENERATED_MOUTHS ? FACES.mouth[L.mouth.replace('mouth.', '')] : undefined;
   if (gm) {

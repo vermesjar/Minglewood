@@ -86,6 +86,8 @@ interface RoomOpts {
   names?: boolean;
   name?: string;
   footprints?: boolean;
+  /** Draw the room's NPCs at their home spots, as the server first places them (default true). */
+  npcs?: boolean;
 }
 
 async function room(sceneId: string, o: RoomOpts = {}) {
@@ -105,6 +107,8 @@ async function room(sceneId: string, o: RoomOpts = {}) {
     festiveRooms: new Set(),
     party: false,
   });
+  if (o.npcs !== false)
+    view.setNpcs(scene, (scene.npcs ?? []).map((n) => ({ id: n.id, x: n.spots[0].x, y: n.spots[0].y, facing: n.spots[0].facing })));
   const v = view as unknown as {
     camera: { zoom: number; tzoom: number };
     update(dt: number): void;

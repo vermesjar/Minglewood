@@ -53,3 +53,28 @@ owned by the café/engine agent (WorldView.ts, effects.ts, art.ts).
 
 6. **Trees sway (optional).** A 1–2 px horizontal skew of the top half of `tree/*` sprites on a slow sine with a
    per-object phase gives the forest life. Only if it stays crisp (whole-pixel offsets).
+
+## NPC behaviours (from the interiors pass)
+
+The interiors now have three more NPCs besides the café's Juno, all using only what `npcs.ts` supports today
+(idle drifting between spots): **Margot** (HQ receptionist, staff lane (6–8, 1) behind the reception desk),
+**Pip** (Arcade attendant, lane (0, 8–9) behind the prize counter) and **Wren** (Quiet Grove librarian, lane
+(1–3, 1) in front of the left-hand stacks). These would make them feel like people who work there rather than
+people standing there, in priority order:
+
+1. **Greet (P1: receptionist, attendant).** When a player enters the room or comes within ~2 tiles of the NPC's
+   home spot, the NPC turns to face them and waves (`doing: 'serve'` already maps to the `wave` pose) for
+   ~1.2 s, with an optional speech bubble. Suggested data: `NpcDef.greeting?: string[]` (one picked at random,
+   e.g. Margot: "Welcome to Northstar!" / "Looking for someone? I can point you there.", Pip: "Tickets? Prizes are
+   this way!"). Rate-limit per player (once per visit). Wren should *not* greet: she's the quiet one.
+2. **Per-spot idle activity (P2: librarian, receptionist).** Let a spot say what the NPC does there:
+   `spots[].doing?: 'work'` (reusing the existing `work` pose), so Wren's shelf spot (3, 1) facing `ne` reads as
+   shelving books, and Margot's spot (6, 1) as typing at the monitor. Today they just stand.
+3. **Seated NPCs (P2).** `spots[].sit?: objectId` so an NPC can sit on a chair at a spot (the `sit` pose,
+   seat height from `artSeat`). Margot's office chair `hq-desk-chair` at (8, 1) is placed for this (it has no
+   `sit` action so guests can't take it); she could spend some idle turns seated there.
+4. **Counter service for the arcade (P3).** `serves` needs a vend object. A prize counter that hands out a
+   prize would need a carryable prize: a `held.plush` (small plush toy, tinted by `heldColor`) added to the
+   avatar kit and `CARRYABLE`, then the counter gets `actions: [{ kind: 'vend', item: 'plush', label: 'Trade in
+   tickets' }]` and Pip gets `serves: 'prize-counter'`. Same pattern would work for `popcorn-cart` (`held.popcorn`)
+   and the snack `vending-machine` (`held.soda`). I have *not* added these actions, since the items don't exist yet.
