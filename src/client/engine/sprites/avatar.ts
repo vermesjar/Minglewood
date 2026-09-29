@@ -24,7 +24,8 @@ export const AVATAR_ANCHOR = { x: 45, y: 104 };
 /** Crop rectangles (canvas px) for UI previews. */
 export const AVATAR_CROPS = {
   head: { x: 27, y: 26, w: 38, h: 36 },
-  face: { x: 31, y: 31, w: 30, h: 30 },
+  // the face itself (brows to chin), for the wardrobe's face tiles shown at 2×
+  face: { x: 35, y: 41, w: 22, h: 18 },
   bust: { x: 24, y: 26, w: 44, h: 50 },
   torso: { x: 26, y: 54, w: 40, h: 30 },
   legs: { x: 26, y: 74, w: 40, h: 32 },

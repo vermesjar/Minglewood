@@ -118,7 +118,7 @@ const CATEGORIES: Category[] = [
       { kind: 'colors', title: 'Buddy color', field: 'petColor', palette: ['#e8a15a', '#3a3a46', '#fffaf0', '#c98f4a', '#9aa0a8', '#f2c14e', '#7cc576', '#e27ca7'], when: (l) => neutral(l, 'pet') },
       { kind: 'items', title: 'Around your neck', slot: 'neck', field: 'neck', crop: 'torso' },
       { kind: 'colors', title: 'Neck color', field: 'neckColor', palette: CLOTH_COLORS, when: (l) => ['neck.scarf', 'neck.bowtie', 'neck.tie', 'neck.bandana', 'neck.lanyard'].includes(l.neck) },
-      { kind: 'items', title: 'Pins & little things', slot: 'accessory', field: 'accessory', crop: 'body' },
+      { kind: 'items', title: 'Pins & little things', slot: 'accessory', field: 'accessory', crop: 'bust' },
     ],
   },
 ];
@@ -158,7 +158,7 @@ function Stage({ L, extra }: { L: FullLoadout; extra?: React.ReactNode }) {
     <div className="stage-wrap">
       <div className={`preview-stage ${walking ? 'walking' : ''}`}>
         <div className="stage-floor" aria-hidden />
-        <AvatarCanvas loadout={L} scale={5} facing={FACINGS[facing]} pose={pose} crop="full" className="stage-avatar" />
+        <AvatarCanvas loadout={L} scale={4} facing={FACINGS[facing]} pose={pose} crop="full" className="stage-avatar" />
       </div>
       <div className="stage-controls" role="group" aria-label="Preview">
         <button className="btn small" onClick={() => setFacing((facing + 3) % 4)} aria-label="Turn left">
@@ -233,7 +233,7 @@ function ItemGrid({ section, L, set, unlocked }: { section: Extract<Section, { k
               onClick={() => set({ ...L, [section.field]: item.id })}
               title={locked ? item.unlock!.description : item.name}
             >
-              <AvatarCanvas loadout={preview} crop={section.crop} scale={section.crop === 'full' ? 1.4 : section.crop === 'body' ? 1.6 : section.crop === 'bust' ? 2 : 2.4} />
+              <AvatarCanvas loadout={preview} crop={section.crop} scale={section.crop === 'face' ? 4 : 2} />
               <span>{item.name}</span>
               {item.unlock && <em className="unlock">{locked ? `🔒 ${item.unlock.description}` : '✨ earned'}</em>}
             </button>
@@ -263,7 +263,7 @@ function SavedLooks({ L, onApply }: { L: FullLoadout; onApply: (l: FullLoadout) 
         {outfits.map((o) => (
           <div key={o.id} className="look">
             <button className="look-btn" onClick={() => onApply(normalizeLoadout(o.loadout))} title={`Try on ${o.name}`}>
-              <AvatarCanvas loadout={o.loadout} crop="body" scale={1.3} />
+              <AvatarCanvas loadout={o.loadout} crop="bust" scale={2} />
               <span>{o.name}</span>
             </button>
             <button className="look-x" onClick={() => void game.saveOutfits(outfits.filter((x) => x.id !== o.id))} aria-label={`Delete ${o.name}`}>

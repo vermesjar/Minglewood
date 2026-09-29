@@ -26,9 +26,13 @@ export function AvatarCanvas({
   const r = AVATAR_CROPS[crop ?? (head ? 'head' : 'body')] ?? AVATAR_CROPS.full;
   const [sx, sy, sw, sh] = [r.x, r.y, r.w, r.h];
   // Crops are in the sprite's own pixels (2 per art pixel); `scale` is per art pixel, as UI sizes were designed.
+  // Pixel art must land on whole device pixels: every sprite pixel becomes an integer number of device
+  // pixels (never 1.5 — uneven — and never less than 1 — dropped pixels), at any browser zoom.
   const k = scale / AVATAR_DENSITY;
-  const dw = Math.round(sw * k);
-  const dh = Math.round(sh * k);
+  const dpr = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1;
+  const kd = Math.max(1, Math.round(k * dpr));
+  const bw = sw * kd;
+  const bh = sh * kd;
   useEffect(() => {
     const c = ref.current;
     if (!c) return;
@@ -36,15 +40,15 @@ export function AvatarCanvas({
     ctx.imageSmoothingEnabled = false;
     ctx.clearRect(0, 0, c.width, c.height);
     const s = avatarSprite(loadout, facing, pose);
-    ctx.drawImage(s.canvas, sx, sy, sw, sh, 0, 0, dw, dh);
-  }, [loadout, facing, pose, sx, sy, sw, sh, dw, dh]);
+    ctx.drawImage(s.canvas, sx, sy, sw, sh, 0, 0, bw, bh);
+  }, [loadout, facing, pose, sx, sy, sw, sh, bw, bh]);
   return (
     <canvas
       ref={ref}
-      width={dw}
-      height={dh}
+      width={bw}
+      height={bh}
       className={className}
-      style={{ imageRendering: 'pixelated', width: dw, height: dh }}
+      style={{ imageRendering: 'pixelated', width: bw / dpr, height: bh / dpr }}
       aria-hidden
     />
   );

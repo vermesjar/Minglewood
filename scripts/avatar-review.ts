@@ -373,3 +373,20 @@ console.log(`${people.length} characters, ${total} issue(s) → ${OUT}/`);
   );
   sheet.save('art/review/assets/patterns.png');
 }
+
+/* ------------------------------------------------------------------ wardrobe face tiles */
+// Exactly what the wardrobe's face tiles show: the 'face' crop at 2 device px per sprite px.
+{
+  const { AVATAR_CROPS } = await import('../src/client/engine/sprites/avatar');
+  const c = AVATAR_CROPS.face;
+  const rows: Array<[string, AvatarLoadout]> = [];
+  for (const i of [...ITEM_BY_ID.values()].filter((it) => ['eyes', 'mouth', 'facialHair', 'eyewear', 'faceDetail'].includes(it.slot)))
+    rows.push([i.id, { hair: 'hair.short', skin: '#e8b48c', [i.slot]: i.id } as AvatarLoadout]);
+  const z = 2;
+  const cw = c.w * z + 6;
+  const ch = c.h * z + 6;
+  const cols = 10;
+  const sheet = new Sheet(cw * cols, ch * Math.ceil(rows.length / cols), [255, 248, 234]);
+  rows.forEach(([, look], i) => sheet.paste(renderAvatarLayers(look, 'se', 'stand').px, (i % cols) * cw + 3, Math.floor(i / cols) * ch + 3, z, [c.x, c.y, c.w, c.h]));
+  sheet.save('art/review/assets/wardrobe-face-tiles.png');
+}
