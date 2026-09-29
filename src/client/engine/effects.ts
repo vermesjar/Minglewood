@@ -1,7 +1,8 @@
 /** Particles and ambient life (fountain spray, smoke, confetti, ducks, cloud shadows). */
 import { isoToScreen } from '@shared/iso';
-import type { SceneDef } from '@shared/world/scene';
-import { makeCanvas } from './sprites/painter';
+import { terrainAt, type SceneDef, type SceneObject } from '@shared/world/scene';
+import { hash2 } from '@shared/world/builders';
+import { makeCanvas, type Sprite } from './sprites/painter';
 
 interface Particle {
   x: number;
@@ -63,6 +64,75 @@ function duckSheet(): HTMLCanvasElement {
   return duckCanvas;
 }
 
+const isWater = (scene: SceneDef, x: number, y: number) => {
+  const t = terrainAt(scene, x, y);
+  return t === 'w' || t === 'W';
+};
+
+function waterTiles(scene: SceneDef): Array<[number, number]> {
+  const out: Array<[number, number]> = [];
+  for (let y = 0; y < scene.height; y++) for (let x = 0; x < scene.width; x++) if (isWater(scene, x, y)) out.push([x, y]);
+  return out;
+}
+
+/**
+ * Where ducks paddle: open water two to four tiles from the shore (so their loop never touches land), picked
+ * deterministically so everyone sees the same ducks, spread apart. The first has a companion.
+ */
+function duckCircuits(scene: SceneDef): Duck[] {
+  const W = scene.width;
+  const H = scene.height;
+  const dist = new Int16Array(W * H).fill(-1);
+  const queue: number[] = [];
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++)
+      if (!isWater(scene, x, y)) {
+        dist[y * W + x] = 0;
+        queue.push(y * W + x);
+      }
+  for (let q = 0; q < queue.length; q++) {
+    const i = queue[q];
+    const x = i % W;
+    const y = (i / W) | 0;
+    for (const [dx, dy] of [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+      [1, 1],
+      [-1, -1],
+      [1, -1],
+      [-1, 1],
+    ]) {
+      const nx = x + dx;
+      const ny = y + dy;
+      if (nx < 0 || ny < 0 || nx >= W || ny >= H || dist[ny * W + nx] >= 0) continue;
+      dist[ny * W + nx] = dist[i] + 1;
+      queue.push(ny * W + nx);
+    }
+  }
+  const candidates: Array<{ x: number; y: number; d: number; h: number }> = [];
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      const d = dist[y * W + x];
+      if (d >= 2 && d <= 4) candidates.push({ x, y, d, h: hash2(x, y, 23) });
+    }
+  candidates.sort((a, b) => a.h - b.h);
+  const picked: typeof candidates = [];
+  for (const c of candidates) {
+    if (picked.length >= 4) break;
+    if (picked.every((p) => Math.hypot(p.x - c.x, p.y - c.y) >= 6)) picked.push(c);
+  }
+  const ducks: Duck[] = [];
+  picked.forEach((c, i) => {
+    const r = Math.min(2.2, c.d - 1.2);
+    const duck = { cx: c.x + 0.5, cy: c.y + 0.5, rx: r, ry: r * 0.75, phase: c.h * 6.28, speed: 0.08 + (i % 3) * 0.02 };
+    ducks.push(duck);
+    if (i === 0) ducks.push({ ...duck, phase: duck.phase + 0.5 }); // a pair
+  });
+  return ducks;
+}
+
 export class Effects {
   private particles: Particle[] = [];
   private emitters: Emitter[] = [];
@@ -73,18 +143,47 @@ export class Effects {
   lighthouse: { x: number; y: number } | null = null;
   reducedMotion = false;
 
-  load(scene: SceneDef, opts: { party: boolean }) {
+  /** The town's water tiles (for ducks and glints), found once per scene. */
+  private water: Array<[number, number]> = [];
+  /** Beacons that pulse (antenna lights, tower tops), in world px. */
+  private blinks: Array<{ x: number; y: number; phase: number }> = [];
+  /** How dark it is outside, 0 (day) … 1 (night): beacons, the lighthouse beam. Set every frame. */
+  night = 0;
+  private cloudSpan = 1400;
+
+  /**
+   * Set up a scene's ambient life. Things with finished art give off smoke, spray and light from the points
+   * their drawing marks (manifest `emitters`); the procedural buildings keep their computed chimneys.
+   */
+  load(scene: SceneDef, opts: { party: boolean }, statics: Array<{ obj: SceneObject; sprite: Sprite; dx: number; dy: number }> = []) {
     this.particles = [];
     this.emitters = [];
     this.ducks = [];
     this.clouds = [];
+    this.blinks = [];
+    this.water = [];
     this.lighthouse = null;
     this.outdoor = scene.kind === 'outdoor';
     const at = (x: number, y: number, z: number) => {
       const s = isoToScreen(x, y, z);
       return { x: s.x, y: s.y };
     };
+    const drawn = new Map(statics.map((st) => [st.obj.id, st]));
     for (const o of scene.objects) {
+      const st = drawn.get(o.id);
+      const marks = st?.sprite.emitters;
+      if (st && marks) {
+        const k = st.sprite.scale ?? 1;
+        for (const m of marks) {
+          const p = { x: st.dx + m.x / k, y: st.dy + m.y / k };
+          if (m.kind === 'smoke') this.emitters.push({ kind: 'smoke', ...p, acc: 0, rate: 2.2 });
+          else if (m.kind === 'spray') this.emitters.push({ kind: 'spray', ...p, acc: 0, rate: 26 });
+          else if (m.kind === 'blink') this.blinks.push({ ...p, phase: (o.x * 7 + o.y * 3) % 10 / 10 });
+          else if (m.kind === 'beam') this.lighthouse = p;
+        }
+        continue;
+      }
+      if (st?.sprite.file) continue; // finished art without emitters gives off nothing
       const cx = o.x + (o.w ?? 1) / 2;
       const cy = o.y + (o.d ?? 1) / 2;
       if (o.sprite === 'fountain') this.emitters.push({ kind: 'spray', ...at(cx, cy, 24), acc: 0, rate: 26 });
@@ -104,13 +203,13 @@ export class Effects {
       this.emitters.push({ kind: 'confetti', ...s, acc: 0, rate: 10 });
     }
     if (this.outdoor) {
-      this.ducks = [
-        { cx: 38, cy: 31, rx: 3, ry: 2, phase: 0, speed: 0.12 },
-        { cx: 38.6, cy: 31.4, rx: 3, ry: 2, phase: 0.5, speed: 0.12 },
-        { cx: 35, cy: 40, rx: 2, ry: 3, phase: 2, speed: 0.09 },
-        { cx: 43, cy: 24, rx: 1.5, ry: 2.5, phase: 1, speed: 0.1 },
-      ];
-      for (let i = 0; i < 4; i++) this.clouds.push({ x: -800 + i * 520, y: 120 + (i % 2) * 260, r: 150 + i * 30, v: 5 + i });
+      this.water = waterTiles(scene);
+      this.ducks = duckCircuits(scene);
+      // clouds drift across the whole town, not just its top
+      const span = (scene.width + scene.height) * 8;
+      this.cloudSpan = (scene.width + scene.height) * 16 * 0.5 + 500;
+      for (let i = 0; i < 7; i++)
+        this.clouds.push({ x: -this.cloudSpan + i * ((this.cloudSpan * 2) / 7), y: 80 + ((i * 0.37) % 1) * (span * 1.6), r: 150 + (i % 3) * 40, v: 4 + (i % 4) });
     }
   }
 
@@ -160,7 +259,7 @@ export class Effects {
     this.particles = this.particles.filter((p) => p.life < p.max);
     for (const c of this.clouds) {
       c.x += c.v * dt;
-      if (c.x > 1400) c.x = -1400;
+      if (c.x > this.cloudSpan) c.x = -this.cloudSpan;
     }
   }
 
@@ -202,16 +301,21 @@ export class Effects {
       const bob = Math.round(Math.sin(t * 3 + d.phase) * 0.6);
       ctx.drawImage(duckSheet(), flip ? 8 : 0, 0, 8, 8, Math.round(s.x - 4), Math.round(s.y - 7 + bob), 8, 8);
     }
-    // water sparkles
-    for (let i = 0; i < 18; i++) {
-      const k = Math.floor(t * 2 + i * 7.3);
-      const hx = 30 + ((k * 73 + i * 131) % 15);
-      const hy = 16 + ((k * 37 + i * 91) % 28);
-      const s = isoToScreen(hx + 0.5, hy + 0.5, -3);
-      const ph = (t * 2 + i) % 1;
-      if (ph > 0.5) continue;
-      ctx.fillStyle = 'rgba(255,255,255,0.85)';
-      ctx.fillRect(Math.round(s.x), Math.round(s.y), ph < 0.25 ? 1 : 2, 1);
+    // glints on the water: a few at a time, each a short-lived two-pixel twinkle somewhere on the lake
+    const n = this.water.length;
+    if (n && !this.reducedMotion) {
+      const count = Math.min(60, Math.round(n / 12));
+      for (let i = 0; i < count; i++) {
+        const k = Math.floor(t * 0.9 + i * 7.3);
+        const [wx, wy] = this.water[(k * 7919 + i * 104729) % n];
+        const ox = hash2(k, i, 5);
+        const oy = hash2(i, k, 9);
+        const s = isoToScreen(wx + ox, wy + oy, -3);
+        const ph = (t * 0.9 + i * 0.37) % 1;
+        if (ph > 0.45) continue;
+        ctx.fillStyle = `rgba(255,255,255,${ph < 0.1 || ph > 0.35 ? 0.45 : 0.85})`;
+        ctx.fillRect(Math.round(s.x), Math.round(s.y), ph > 0.12 && ph < 0.33 ? 2 : 1, 0.5);
+      }
     }
   }
 
@@ -244,14 +348,57 @@ export class Effects {
       }
     }
     ctx.globalAlpha = 1;
+    // beacons: a small red light pulsing about once a second, with a halo that shows at night
+    for (const b of this.blinks) {
+      const k = 0.5 + 0.5 * Math.sin((this.t + b.phase) * Math.PI * 2);
+      const on = this.reducedMotion ? 1 : k * k;
+      if (this.night > 0.05) {
+        const r = 7;
+        const g = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, r);
+        g.addColorStop(0, `rgba(255,90,70,${0.55 * on * this.night})`);
+        g.addColorStop(1, 'rgba(255,90,70,0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(b.x - r, b.y - r, r * 2, r * 2);
+      }
+      ctx.fillStyle = `rgba(255,${Math.round(70 + 60 * on)},60,${0.35 + 0.65 * on})`;
+      ctx.fillRect(Math.round(b.x * 2) / 2 - 0.5, Math.round(b.y * 2) / 2 - 0.5, 1, 1);
+    }
     if (this.lighthouse) {
-      const on = Math.sin(this.t * 2.2) > 0.6;
-      if (on) {
-        const g = ctx.createRadialGradient(this.lighthouse.x, this.lighthouse.y, 1, this.lighthouse.x, this.lighthouse.y, 22);
-        g.addColorStop(0, 'rgba(255,240,170,0.9)');
+      const L = this.lighthouse;
+      if (this.night > 0.05) {
+        // a beam sweeping slowly round the lantern: a long soft wedge that swings across the lake
+        const turn = this.reducedMotion ? 0.3 : (this.t / 9) % 1;
+        const ang = turn * Math.PI * 2;
+        const dir = Math.cos(ang); // screen x of the beam's far end
+        const depth = Math.sin(ang); // + toward the viewer, − away
+        const len = 150 + 60 * Math.abs(dir);
+        const ex = L.x + dir * len;
+        const ey = L.y + depth * len * 0.35 + 6;
+        const spread = 10 + 8 * Math.abs(depth);
+        const a = this.night * (depth > 0 ? 0.26 : 0.14);
+        const g = ctx.createLinearGradient(L.x, L.y, ex, ey);
+        g.addColorStop(0, `rgba(255,244,190,${a})`);
+        g.addColorStop(1, 'rgba(255,244,190,0)');
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.moveTo(L.x, L.y);
+        ctx.lineTo(ex - (ey - L.y) * (spread / len), ey + (ex - L.x) * (spread / len));
+        ctx.lineTo(ex + (ey - L.y) * (spread / len), ey - (ex - L.x) * (spread / len));
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+      // the lamp itself: steady at night, a slow wink by day
+      const on = this.night > 0.05 ? 0.85 + 0.15 * Math.sin(this.t * 3) : Math.max(0, Math.sin(this.t * 2.2) - 0.6) * 2.5;
+      if (on > 0.02) {
+        const r = 10 + 10 * this.night;
+        const g = ctx.createRadialGradient(L.x, L.y, 1, L.x, L.y, r);
+        g.addColorStop(0, `rgba(255,240,170,${0.9 * on})`);
         g.addColorStop(1, 'rgba(255,240,170,0)');
         ctx.fillStyle = g;
-        ctx.fillRect(this.lighthouse.x - 22, this.lighthouse.y - 22, 44, 44);
+        ctx.fillRect(L.x - r, L.y - r, r * 2, r * 2);
       }
     }
     if (this.outdoor && !this.reducedMotion) {

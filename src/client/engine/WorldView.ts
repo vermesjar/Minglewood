@@ -94,6 +94,43 @@ const SEAT_STYLE: Record<string, { back: boolean; fwd: number }> = {
   bench: { back: false, fwd: 0 },
 };
 const seatStyle = (sprite: string) => SEAT_STYLE[sprite] ?? { back: true, fwd: 0 };
+/** The haze around the town, by phase. */
+const OUTDOOR_BG: Record<Sky['phase'], [string, string]> = {
+  day: ['#bfe7ef', '#f7ecd9'],
+  dawn: ['#f3cdbd', '#fbe6cc'],
+  dusk: ['#7d6a9a', '#e9ae90'],
+  night: ['#161c36', '#262c4c'],
+};
+/** How dark it is outside, by phase (effects: beacons, the lighthouse beam). */
+const NIGHTNESS: Record<Sky['phase'], number> = { night: 1, dusk: 0.6, dawn: 0.3, day: 0 };
+/** How strongly lit windows show outdoors, by phase. */
+const GLOW_ALPHA: Record<Sky['phase'], number> = { night: 0.9, dusk: 0.6, dawn: 0.25, day: 0 };
+
+/**
+ * Trees (and potted plants near windows) sway in the breeze: the drawing is cut into three horizontal bands
+ * and the upper ones shift by whole sprite pixels on a slow, per-object sine — the trunk never moves, the
+ * crown leans by at most a pixel or two, so it stays crisp.
+ */
+function swayOf(o: SceneObject, t: number): number {
+  if (!o.sprite.startsWith('tree')) return 0;
+  const phase = o.x * 1.37 + o.y * 0.71;
+  const v = Math.sin(t * 0.55 + phase) + 0.35 * Math.sin(t * 1.3 + phase * 2);
+  return v > 0.75 ? 1 : v < -0.75 ? -1 : 0;
+}
+
+function drawSwaying(c: CanvasRenderingContext2D, sp: Sprite, x: number, y: number, dir: number) {
+  const k = sp.scale ?? 1;
+  const w = sp.canvas.width;
+  const h = sp.canvas.height;
+  const x0 = x - sp.ax / k;
+  const y0 = y - sp.ay / k;
+  const cut1 = Math.round(h * 0.34); // crown top: moves 2 px
+  const cut2 = Math.round(h * 0.62); // crown middle: moves 1 px; below: the trunk, still
+  c.drawImage(sp.canvas, 0, 0, w, cut1, x0 + (2 * dir) / k, y0, w / k, cut1 / k);
+  c.drawImage(sp.canvas, 0, cut1, w, cut2 - cut1, x0 + dir / k, y0 + cut1 / k, w / k, (cut2 - cut1) / k);
+  c.drawImage(sp.canvas, 0, cut2, w, h - cut2, x0, y0 + cut2 / k, w / k, (h - cut2) / k);
+}
+
 /** Lights that are flames, not bulbs: they flicker on their own. */
 const FIRE_LIGHTS = new Set(['fireplace', 'heirloom-dragonlamp']);
 const FACE_VEC: Record<Facing, [number, number]> = { se: [1, 0], sw: [0, 1], ne: [0, -1], nw: [-1, 0] };
@@ -217,7 +254,7 @@ export class WorldView {
     this.dest = null;
     this.ground =
       scene.kind === 'outdoor'
-        ? renderOutdoorGround(scene)
+        ? renderOutdoorGround(scene, window.devicePixelRatio > 1 || window.innerWidth > 1200 ? 2 : 1)
         : renderInteriorShell(scene, { theme: scene.interior!, activeDecor: opts.activeDecor, bannerText: opts.bannerText });
     const statics: Static[] = [];
     this.stageBoxes = [];
@@ -249,7 +286,7 @@ export class WorldView {
     this.actors.clear();
     for (const o of occupants) this.upsert(o);
     this.effects.reducedMotion = this.reducedMotion;
-    this.effects.load(scene, { party: opts.party });
+    this.effects.load(scene, { party: opts.party }, this.statics);
 
     const W = scene.width;
     const H = scene.height;
@@ -631,8 +668,10 @@ export class WorldView {
     const outdoor = this.scene?.kind === 'outdoor';
     const bg = c.createLinearGradient(0, 0, 0, this.canvas.height);
     if (outdoor) {
-      bg.addColorStop(0, '#bfe7ef');
-      bg.addColorStop(1, '#f7ecd9');
+      // the haze around the town follows the time of day
+      const [top, bottom] = OUTDOOR_BG[skyAt().phase];
+      bg.addColorStop(0, top);
+      bg.addColorStop(1, bottom);
     } else {
       bg.addColorStop(0, '#2d2538');
       bg.addColorStop(1, '#1b1623');
@@ -650,7 +689,7 @@ export class WorldView {
     const sky = skyAt();
     const shell = 'windows' in this.ground ? this.ground : null;
     if (shell) this.drawWindowViews(c, shell, sky);
-    const gk = shell?.scale ?? 1;
+    const gk = this.ground.scale ?? 1;
     c.drawImage(this.ground.canvas, this.ground.minX, this.ground.minY, this.ground.canvas.width / gk, this.ground.canvas.height / gk);
     if (shell) {
       // Sunlight through the windows follows the weather; passing clouds make it breathe a little.
@@ -698,20 +737,41 @@ export class WorldView {
       }
     }
 
+    this.effects.night = NIGHTNESS[sky.phase];
+    // Lit windows and lanterns (outdoors, dusk to dawn): collected in depth order on their own layer — each
+    // thing drawn in front erases what it covers — and added over the dimmed town at the end.
+    const glowAlpha = outdoor ? GLOW_ALPHA[sky.phase] : 0;
+    const gl = glowAlpha > 0 ? this.glowLayer(s, Math.round(tx), Math.round(ty)) : null;
+
     // depth-sorted statics + actors
     const order = this.buildDrawOrder();
+    const now = performance.now() / 1000;
     for (const d of order) {
       if ('obj' in d) {
         const hovered = this.hover?.kind === 'object' && this.hover.id === d.obj.id;
         const [nx, ny] = this.anims.offset(d.obj.id, this.reducedMotion);
         const ox = d.dx + d.sprite.ax / (d.sprite.scale ?? 1) + nx;
         const oy = d.dy + d.sprite.ay / (d.sprite.scale ?? 1) + ny;
+        const sway = this.reducedMotion ? 0 : swayOf(d.obj, now);
         if (hovered) blit(c, d.sprite, ox, oy, highlightOf(d.sprite), 2);
+        else if (sway) drawSwaying(c, d.sprite, ox, oy, sway);
         else blit(c, d.sprite, ox, oy);
         this.anims.drawFor(c, d.obj.id, this.reducedMotion);
         if (d.festive) c.drawImage(d.festive.canvas, d.dx, d.dy);
+        if (gl) {
+          gl.globalCompositeOperation = 'destination-out';
+          blit(gl, d.sprite, ox, oy);
+          if (d.sprite.glow) {
+            gl.globalCompositeOperation = 'source-over';
+            blit(gl, d.sprite, ox, oy, d.sprite.glow);
+          }
+        }
       } else {
         this.drawActor(d);
+        if (gl) {
+          gl.globalCompositeOperation = 'destination-out';
+          blit(gl, avatarSprite(this.look(d), d.facing, this.pose(d)), Math.round(d.sx), Math.round(d.sy));
+        }
       }
     }
     if (this.ghost) {
@@ -727,7 +787,16 @@ export class WorldView {
     }
     this.drawGlints(c);
     this.effects.drawOver(c);
-    if (shell) this.drawAmbience(c, sky, s, Math.round(tx), Math.round(ty));
+    this.drawAmbience(c, sky, s, Math.round(tx), Math.round(ty));
+    if (gl && this.glow) {
+      // lit glass over the dimmed town: warm, a touch of flicker per window row
+      c.save();
+      c.setTransform(1, 0, 0, 1, 0, 0);
+      c.globalCompositeOperation = 'lighter';
+      c.globalAlpha = glowAlpha;
+      c.drawImage(this.glow, 0, 0);
+      c.restore();
+    }
 
     // People can tuck themselves behind furniture — no see-through silhouettes. The one exception: in
     // town a whole building can swallow you, so your own avatar keeps a faint outline there.
@@ -924,6 +993,26 @@ export class WorldView {
   }
 
   private glintCanvas: HTMLCanvasElement | null = null;
+  /** Night-glow layer (outdoors): lit windows in depth order, see draw(). */
+  private glow: HTMLCanvasElement | null = null;
+
+  /** A cleared glow layer the size of the canvas, set to the world transform for this frame. */
+  private glowLayer(s: number, tx: number, ty: number): CanvasRenderingContext2D {
+    const W = this.canvas.width;
+    const H = this.canvas.height;
+    if (!this.glow || this.glow.width !== W || this.glow.height !== H) {
+      this.glow = document.createElement('canvas');
+      this.glow.width = W;
+      this.glow.height = H;
+    }
+    const g = this.glow.getContext('2d')!;
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.globalCompositeOperation = 'source-over';
+    g.clearRect(0, 0, W, H);
+    g.setTransform(s, 0, 0, s, tx, ty);
+    g.imageSmoothingEnabled = false;
+    return g;
+  }
 
   /**
    * Heirlooms catch the light: every few seconds a bright diagonal glint sweeps across each one, and now
@@ -999,6 +1088,8 @@ export class WorldView {
     else if (!mood && (sky.weather === 'clouds' || sky.weather === 'snow')) mood = ['#dfe2ec', 0.22];
     const now = performance.now();
     const flicker = 0.95 + 0.05 * Math.sin(now / 170) * Math.sin(now / 530);
+    // indoors lamps glow whenever they're on; street lamps only once the light goes
+    const outdoorK = this.scene?.kind === 'outdoor' ? NIGHTNESS[sky.phase] : 1;
     const lamps = this.statics
       .filter((st) => (st.obj.sprite === 'lamp' || !!artLight(st.obj)) && this.isOn(st.obj.id))
       .map((st) => {
@@ -1008,8 +1099,9 @@ export class WorldView {
         const fire = FIRE_LIGHTS.has(st.obj.sprite);
         const seed = st.obj.x * 3.1 + st.obj.y * 1.7;
         const own = fire ? 0.9 + 0.1 * Math.sin(now / 90 + seed) * Math.sin(now / 237 + seed * 2) : flicker;
-        return { x: p.x + L.dx, y: p.y + L.dy, fx: p.x + L.dx * 0.5, fy: p.y + 12, r: L.r, k: own };
-      });
+        return { x: p.x + L.dx, y: p.y + L.dy, fx: p.x + L.dx * 0.5, fy: p.y + 12, r: L.r, k: own * outdoorK };
+      })
+      .filter((p) => p.k > 0.01);
     if (mood) {
       const W = this.canvas.width;
       const H = this.canvas.height;
@@ -1027,7 +1119,7 @@ export class WorldView {
       l.globalCompositeOperation = 'destination-out';
       l.setTransform(s, 0, 0, s, tx, ty);
       for (const p of lamps) {
-        const R = 78;
+        const R = Math.max(78, p.r * 2.2);
         const g = l.createRadialGradient(p.fx, p.fy - 6, 2, p.fx, p.fy - 6, R);
         const a = Math.min(1, sky.lamp * p.k);
         g.addColorStop(0, `rgba(0,0,0,${0.95 * a})`);

@@ -502,32 +502,32 @@
       "fit": "anchor",
       "file": "bike-rack.png",
       "anchor": [
-        38,
-        44
+        26,
+        45
       ]
     },
     "boat.red": {
       "footprint": [
-        1,
-        1
+        2,
+        2
       ],
       "fit": "anchor",
       "file": "boat.red.png",
       "anchor": [
-        56,
-        60
+        30,
+        39
       ]
     },
     "boat.yellow": {
       "footprint": [
-        1,
-        1
+        2,
+        2
       ],
       "fit": "anchor",
       "file": "boat.yellow.png",
       "anchor": [
-        56,
-        60
+        26,
+        40
       ]
     },
     "bookshelf.a": {
@@ -726,21 +726,21 @@
     },
     "building.focus": {
       "footprint": [
-        5,
-        7
+        7,
+        8
       ],
       "fit": "anchor",
       "file": "building.focus.png",
       "anchor": [
-        273,
-        267
+        260,
+        231
       ],
       "glow": "building.focus.glow.png",
       "emitters": [
         {
           "kind": "smoke",
-          "x": 154,
-          "y": 63
+          "x": 156,
+          "y": 12
         }
       ]
     },
@@ -805,7 +805,7 @@
       "file": "bush.flower.png",
       "anchor": [
         32,
-        42
+        31
       ]
     },
     "bush.plain": {
@@ -816,8 +816,8 @@
       "fit": "anchor",
       "file": "bush.plain.png",
       "anchor": [
-        31,
-        38
+        30,
+        28
       ]
     },
     "cake-stand": {
@@ -1362,13 +1362,13 @@
     "flower-cart": {
       "footprint": [
         2,
-        1
+        2
       ],
       "fit": "anchor",
       "file": "flower-cart.png",
       "anchor": [
-        59,
-        142
+        70,
+        112
       ]
     },
     "flower-stand": {
@@ -1846,8 +1846,8 @@
       "fit": "anchor",
       "file": "lamp-post.png",
       "anchor": [
-        20,
-        82
+        11,
+        78
       ],
       "light": {
         "x": 25,
@@ -1905,14 +1905,14 @@
     },
     "lighthouse": {
       "footprint": [
-        1,
-        1
+        2,
+        2
       ],
       "fit": "anchor",
       "file": "lighthouse.png",
       "anchor": [
-        42,
-        122
+        40,
+        99
       ],
       "light": {
         "x": 37,
@@ -1955,7 +1955,7 @@
       "file": "mailbox.png",
       "anchor": [
         18,
-        58
+        54
       ]
     },
     "menu-board": {
@@ -2023,8 +2023,8 @@
       "fit": "anchor",
       "file": "noticeboard.png",
       "anchor": [
-        35,
-        87
+        56,
+        86
       ]
     },
     "parts-rack": {
@@ -2114,13 +2114,13 @@
     "picnic": {
       "footprint": [
         2,
-        1
+        2
       ],
       "fit": "anchor",
       "file": "picnic.png",
       "anchor": [
-        62,
-        84
+        67,
+        59
       ]
     },
     "plan-chest": {
@@ -2362,7 +2362,7 @@
       "file": "reeds.png",
       "anchor": [
         28,
-        42
+        38
       ]
     },
     "register": {
@@ -2420,7 +2420,7 @@
       "file": "rocket-statue.png",
       "anchor": [
         36,
-        83
+        67
       ]
     },
     "screen.countdown": {
@@ -2492,8 +2492,8 @@
       "fit": "anchor",
       "file": "signpost.png",
       "anchor": [
-        33,
-        93
+        30,
+        90
       ]
     },
     "speaker": {
@@ -2754,8 +2754,8 @@
       "fit": "anchor",
       "file": "tree/birch.a.png",
       "anchor": [
-        39,
-        124
+        40,
+        121
       ]
     },
     "tree/birch.b": {
@@ -2766,20 +2766,20 @@
       "fit": "anchor",
       "file": "tree/birch.b.png",
       "anchor": [
-        42,
-        107
+        43,
+        104
       ]
     },
     "tree/oak-big": {
       "footprint": [
-        2,
-        2
+        3,
+        3
       ],
       "fit": "anchor",
       "file": "tree/oak-big.png",
       "anchor": [
-        118,
-        200
+        114,
+        132
       ]
     },
     "tree/pine.a": {
@@ -2791,7 +2791,7 @@
       "file": "tree/pine.a.png",
       "anchor": [
         46,
-        149
+        146
       ]
     },
     "tree/pine.b": {
@@ -2802,8 +2802,8 @@
       "fit": "anchor",
       "file": "tree/pine.b.png",
       "anchor": [
-        50,
-        121
+        48,
+        118
       ]
     },
     "tree/round.a": {
@@ -2815,7 +2815,7 @@
       "file": "tree/round.a.png",
       "anchor": [
         62,
-        126
+        120
       ]
     },
     "tree/round.b": {
@@ -2826,8 +2826,8 @@
       "fit": "anchor",
       "file": "tree/round.b.png",
       "anchor": [
-        60,
-        122
+        74,
+        117
       ]
     },
     "trophy-case": {
@@ -2862,7 +2862,7 @@
       "file": "umbrella-table.red.png",
       "anchor": [
         56,
-        129
+        131
       ]
     },
     "umbrella-table.teal": {
@@ -2873,8 +2873,8 @@
       "fit": "anchor",
       "file": "umbrella-table.teal.png",
       "anchor": [
-        56,
-        129
+        55,
+        131
       ]
     },
     "vending-machine": {

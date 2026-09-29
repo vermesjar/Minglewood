@@ -30,6 +30,10 @@ interface ArtEntry {
   light?: { x: number; y: number; r?: number };
   /** Seat surface height above the floor, in art px (chairs, sofas, stools). */
   seat?: number;
+  /** A mask of what lights up at night (lit windows, lanterns, bulbs), same size and anchor as the drawing. */
+  glow?: string;
+  /** Points in the drawing (image px) that give off something: chimney smoke, fountain spray, beacons. */
+  emitters?: Array<{ kind: 'smoke' | 'spray' | 'blink' | 'beam'; x: number; y: number }>;
 }
 
 interface Manifest {
@@ -60,6 +64,7 @@ export async function loadArt(base = ''): Promise<void> {
     const files = new Set<string>();
     for (const e of Object.values(m.sprites)) {
       if (e.file) files.add(e.file);
+      if (e.glow) files.add(e.glow);
       for (const f of Object.values(e.facings ?? {})) if (f) files.add(f.file);
     }
     const bust = `?v=${Date.now().toString(36)}`;
@@ -185,5 +190,18 @@ export function artSprite(o: SceneObject): Sprite | null {
     ax = e.fit === 'stand' ? img.width / 2 - (w - d) * 8 * S : d * 16 * S;
     ay = e.fit === 'stand' ? bottom - (w + d) * 4 * S : bottom - (w + d) * 8 * S;
   }
-  return { canvas, ax, ay, mask, scale: S, mirrored: mirror, file: rec.file };
+  // the night-glow mask and emitters follow the drawing (mirrored with it)
+  const glowImg = e.glow ? images.get(e.glow) : undefined;
+  let glow: HTMLCanvasElement | undefined;
+  if (glowImg) {
+    glow = makeCanvas(img.width, img.height);
+    const g = glow.getContext('2d')!;
+    if (mirror) {
+      g.translate(img.width, 0);
+      g.scale(-1, 1);
+    }
+    g.drawImage(glowImg, 0, 0);
+  }
+  const emitters = e.emitters?.map((m) => ({ kind: m.kind, x: mirror ? img.width - m.x : m.x, y: m.y }));
+  return { canvas, ax, ay, mask, scale: S, mirrored: mirror, file: rec.file, glow, emitters };
 }

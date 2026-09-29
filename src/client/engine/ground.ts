@@ -46,8 +46,13 @@ const PAL = {
   plaza2: C('#d9c29d'),
   plazaRing: C('#c9ae86'),
   sand: C('#efd9a4'),
+  wetSand: C('#d9bd86'),
+  foam: C('#e9f7fb'),
+  shallow: C('#74c8e6'),
   water: C('#58b4de'),
+  mid: C('#4aa3d4'),
   deep: C('#3f96c9'),
+  abyss: C('#347fb6'),
   lily: C('#5fae5a'),
   lilyDark: C('#3f8a47'),
   dock: C('#b98250'),
@@ -180,13 +185,16 @@ function landColor(c: string, s: Sample, T: (x: number, y: number) => string, fo
   }
 }
 
-function waterColor(deep: boolean, s: Sample, shoreDist: number): RGB {
-  // deeper toward the middle, with long soft wave glints
-  let base = deep ? PAL.deep : PAL.water;
-  if (!deep && shoreDist > 1.5) base = shade(base, 0.96);
-  const wave = Math.sin(s.px * 0.18 + s.py * 0.7 + Math.sin(s.py * 0.07) * 3) + Math.sin(s.px * 0.04 - s.py * 0.25);
-  if (wave > 1.78) return shade(base, 1.16);
-  if (wave < -1.9) return shade(base, 0.93);
+function waterColor(depth: number, s: Sample): RGB {
+  // four depth tones from the (interpolated) distance to shore; band edges curve with the shore and are
+  // dithered so they read as a gradient in pixel art, not stair-steps
+  const d = depth + (dither(s.sx, s.sy) - 0.5) * 0.35;
+  let base = d < 0.9 ? PAL.shallow : d < 2.0 ? PAL.water : d < 3.4 ? PAL.mid : d < 4.8 ? PAL.deep : PAL.abyss;
+  // long soft ripple lines (lighter) and a few sparkles on the crests
+  const wave = Math.sin(s.px * 0.16 + s.py * 0.62 + Math.sin(s.py * 0.05 + s.px * 0.01) * 3) + 0.6 * Math.sin(s.px * 0.035 - s.py * 0.21);
+  if (wave > 1.42) base = shade(base, 1.12);
+  if (wave > 1.5 && hash2(s.px >> 1, s.py, 41) > 0.93) return C('#f4fbff');
+  if (wave < -1.45) base = shade(base, 0.95);
   return base;
 }
 
@@ -208,6 +216,56 @@ export function renderOutdoorGround(scene: SceneDef, scale = 1): GroundLayer {
   const img = ctx.createImageData(cw, ch);
   const d = img.data;
   const T = (x: number, y: number) => terrainAt(scene, x, y);
+  // Natural edges (water, sand, grass) are drawn from a smoothed field, not tile by tile, so shores curve;
+  // streets, the plaza and the pier keep their crisp tile edges. Only tiles near water pay for it.
+  const natural = (c: string) => c === 'w' || c === 'W' || c === 's' || c === 'g' || c === 'h' || c === 'm';
+  const wet = new Uint8Array(W * H);
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++)
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (['w', 'W', 's'].includes(T(x + dx, y + dy))) wet[y * W + x] = 1;
+  // Blurred water / sand coverage (tile resolution, ~1-tile Gaussian): its 0.5 contour is a smooth curve
+  // that follows the authored shore, so banks bend instead of stepping tile by tile.
+  const blur = (src: Float32Array) => {
+    const k = [1, 4, 6, 4, 1];
+    const tmp = new Float32Array(W * H);
+    const out = new Float32Array(W * H);
+    const at = (a: Float32Array, x: number, y: number) => a[Math.min(H - 1, Math.max(0, y)) * W + Math.min(W - 1, Math.max(0, x))];
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) tmp[y * W + x] = k.reduce((acc, w, i) => acc + w * at(src, x + i - 2, y), 0) / 16;
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) out[y * W + x] = k.reduce((acc, w, i) => acc + w * at(tmp, x, y + i - 2), 0) / 16;
+    return out;
+  };
+  const waterF = new Float32Array(W * H);
+  const sandF = new Float32Array(W * H);
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      const c = T(x, y);
+      waterF[y * W + x] = isWater(c) ? 1 : 0;
+      sandF[y * W + x] = isWater(c) || c === 's' ? 1 : 0;
+    }
+  const waterB = blur(waterF);
+  const sandB = blur(sandF);
+  const sampleF = (f: Float32Array, gx: number, gy: number) => {
+    const cx = gx - 0.5;
+    const cy = gy - 0.5;
+    const x0 = Math.floor(cx);
+    const y0 = Math.floor(cy);
+    const fx = cx - x0;
+    const fy = cy - y0;
+    const v = (x: number, y: number) => f[Math.min(H - 1, Math.max(0, y)) * W + Math.min(W - 1, Math.max(0, x))];
+    return (v(x0, y0) * (1 - fx) + v(x0 + 1, y0) * fx) * (1 - fy) + (v(x0, y0 + 1) * (1 - fx) + v(x0 + 1, y0 + 1) * fx) * fy;
+  };
+  const classAt = (gx: number, gy: number): string => {
+    const tx = Math.floor(gx);
+    const ty = Math.floor(gy);
+    const own = T(tx, ty);
+    if (!natural(own) || !wet[ty * W + tx]) return own;
+    // next to a street or the pier: keep the authored, crisp edge
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (!natural(T(tx + dx, ty + dy)) && T(tx + dx, ty + dy) !== ' ') return own;
+    const n = (vnoise(gx, gy, 0.8, 31) - 0.5) * 0.12;
+    if (sampleF(waterB, gx, gy) + n > 0.5) return 'w';
+    if (sampleF(sandB, gx, gy) + n * 0.8 > 0.5) return 's';
+    return own === 's' || own === 'w' || own === 'W' ? 'g' : own;
+  };
   const f = scene.objects.find((o) => o.sprite === 'fountain');
   const fountain = f ? { x: f.x + (f.w ?? 1) / 2, y: f.y + (f.d ?? 1) / 2 } : null;
   // distance to shore for water tiles (in tiles), for depth tones and lily pads
@@ -220,6 +278,18 @@ export function renderOutdoorGround(scene: SceneDef, scale = 1): GroundLayer {
       shore[y * W + x] = best;
     }
 
+  // distance to shore, bilinear between tile centres (land counts as 0)
+  const shoreAt = (gx: number, gy: number) => {
+    const cx = gx - 0.5;
+    const cy = gy - 0.5;
+    const x0 = Math.floor(cx);
+    const y0 = Math.floor(cy);
+    const fx = cx - x0;
+    const fy = cy - y0;
+    const v = (x: number, y: number) => (x < 0 || y < 0 || x >= W || y >= H ? 4 : isWater(T(x, y)) ? Math.min(6, shore[y * W + x]) : 0);
+    return (v(x0, y0) * (1 - fx) + v(x0 + 1, y0) * fx) * (1 - fy) + (v(x0, y0 + 1) * (1 - fx) + v(x0 + 1, y0 + 1) * fx) * fy;
+  };
+
   for (let sy = 0; sy < ch; sy++) {
     for (let sx = 0; sx < cw; sx++) {
       const ax = minX + (sx + 0.5) / S;
@@ -231,10 +301,15 @@ export function renderOutdoorGround(scene: SceneDef, scale = 1): GroundLayer {
       const g = screenToIso(ax, ay);
       const tx = Math.floor(g.x);
       const ty = Math.floor(g.y);
-      const c = T(tx, ty);
+      const c = classAt(g.x, g.y);
       const smp: Sample = { gx: g.x, gy: g.y, tx, ty, px: Math.floor((ax - minX) * 2), py: Math.floor((ay - minY) * 2), sx, sy };
       if (isLand(c)) {
         rgb = landColor(c, smp, T, fountain);
+        if (c === 's' && wet[ty * W + tx]) {
+          // the wet band just above the waterline
+          const w2 = classAt(g.x + 0.22, g.y + 0.22);
+          if (isWater(w2) || isWater(classAt(g.x - 0.18, g.y + 0.18)) || isWater(classAt(g.x + 0.18, g.y - 0.18))) rgb = PAL.wetSand;
+        }
         // a soft shadow line where grass meets sand or a path, for readability
         const ex = frac(g.x);
         const ey = frac(g.y);
@@ -246,20 +321,23 @@ export function renderOutdoorGround(scene: SceneDef, scale = 1): GroundLayer {
         // Bank below a land tile edge?
         for (let k = 1; k <= WATER_DROP + 1 && !rgb; k++) {
           const u = screenToIso(ax, ay - k);
-          if (isLand(T(Math.floor(u.x), Math.floor(u.y)))) rgb = k <= 1 ? PAL.dirt : PAL.dirtDark;
+          if (isLand(classAt(u.x, u.y))) rgb = k <= 1 ? PAL.dirt : PAL.dirtDark;
         }
         if (!rgb) {
           const wv = screenToIso(ax, ay - WATER_DROP);
           const wx = Math.floor(wv.x);
           const wy = Math.floor(wv.y);
-          const wc = T(wx, wy);
+          const wc = classAt(wv.x, wv.y);
           if (isWater(wc)) {
             const sd = shore[wy * W + wx] ?? 99;
             const ws: Sample = { ...smp, gx: wv.x, gy: wv.y, tx: wx, ty: wy };
-            rgb = waterColor(wc === 'W', ws, sd);
-            // foam near the shore
-            const near = [T(wx + 1, wy), T(wx - 1, wy), T(wx, wy + 1), T(wx, wy - 1)].some(isLand);
-            if (near && hash2(px >> 1, py, 8) > 0.55) rgb = shade(rgb, 1.22);
+            // depth follows the (interpolated) distance to shore, so every band forms smooth contours
+            const depth = shoreAt(wv.x, wv.y) + (vnoise(wv.x, wv.y, 1.3, 33) - 0.5) * 0.9;
+            rgb = waterColor(depth, ws);
+            // a thin broken foam line where the water laps the sand
+            const edge = shoreAt(wv.x, wv.y);
+            if (edge < 0.32 && hash2(px >> 1, py, 8) > 0.35) rgb = PAL.foam;
+            else if (edge < 0.55 && hash2(px, py >> 1, 9) > 0.8) rgb = shade(PAL.shallow, 1.1);
             // lily pads in the shallows: little round pads with a notch, a pink flower on a few
             if (sd > 1 && sd < 3.2 && wc === 'w') {
               const cx = Math.floor(wv.x * 2.2);

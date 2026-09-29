@@ -98,10 +98,10 @@ export const BUILDINGS: BuildingDef[] = [
     id: 'b-focus',
     roomId: 'focus',
     label: 'The Quiet Grove',
-    x: 9,
-    y: 8,
-    w: 5,
-    d: 7,
+    x: 8,
+    y: 7,
+    w: 7,
+    d: 8,
     spec: {
       wallH: 61,
       wall: '#9a7350',
@@ -111,7 +111,7 @@ export const BUILDINGS: BuildingDef[] = [
       trim: '#4a3322',
       window: '#ffd98a',
       doorFace: 'right',
-      doorAt: 4,
+      doorAt: 3,
       extras: ['chimney', 'porch', 'lanterns'],
     },
   },
@@ -185,8 +185,8 @@ export const BUILDINGS: BuildingDef[] = [
     id: 'b-events',
     roomId: 'events',
     label: 'Lantern Hall',
-    x: 39,
-    y: 58,
+    x: 38,
+    y: 57,
     w: 12,
     d: 6,
     spec: {
@@ -210,11 +210,14 @@ function doorTile(b: BuildingDef): { x: number; y: number } {
     : { x: b.x + b.w, y: b.y + b.spec.doorAt };
 }
 
-/** The lake: two overlapping ellipses with a gentle wobble. Returns < 1 inside water. */
+/**
+ * The lake: two overlapping ellipses with a gentle wobble. Returns < 1 inside water. It stays inside the map
+ * with a far shore and a treeline beyond it, so the town sits in a valley rather than on a floating slab.
+ */
 function inLake(x: number, y: number): number {
   const wob = Math.sin(x * 0.45) * 0.045 + Math.cos(y * 0.55) * 0.045;
-  const a = ((x - 67) / 16) ** 2 + ((y - 62) / 20) ** 2;
-  const b = ((x - 72) / 10) ** 2 + ((y - 34) / 16) ** 2;
+  const a = ((x - 61) / 11.5) ** 2 + ((y - 60) / 11) ** 2;
+  const b = ((x - 66) / 6.5) ** 2 + ((y - 39) / 12.5) ** 2;
   return Math.min(a, b) + wob;
 }
 
@@ -237,9 +240,9 @@ export function buildTown(): SceneDef {
       if (v < 1) t.set(x, y, v < 0.45 ? 'W' : 'w');
     }
   }
-  for (let y = 59; y <= 66; y++) {
-    for (let x = 65; x <= 72; x++) {
-      const dd = Math.hypot(x - 68.5, y - 62.5);
+  for (let y = 57; y <= 64; y++) {
+    for (let x = 61; x <= 68; x++) {
+      const dd = Math.hypot(x - 64.5, y - 60.5);
       if (dd < 1.9) t.set(x, y, 'g');
       else if (dd < 3.1) t.set(x, y, 's');
     }
@@ -310,7 +313,7 @@ export function buildTown(): SceneDef {
   road(byRoom('eng'), [34, 42]);
   road(byRoom('design'), [34, 54]);
   road(byRoom('launch'), [34, 65]);
-  road(byRoom('events'), [44, 66]);
+  road(byRoom('events'), [43, 66]);
   // Forest trail from the Quiet Grove, winding down to Main Street.
   road(byRoom('focus'), [22, 12], [22, 33]);
   // Lakeside promenade: from Grove Lane past Lantern Hall's doors to the shore.
@@ -361,7 +364,7 @@ export function buildTown(): SceneDef {
   });
 
   // Plaza life: a flower seller and the town notice board.
-  add({ sprite: 'flower-cart', x: 38, y: 30, w: 2, d: 1, label: 'Flower cart' });
+  add({ sprite: 'flower-cart', x: 38, y: 30, w: 2, d: 2, label: 'Flower cart' });
   add({
     id: 'noticeboard',
     sprite: 'noticeboard',
@@ -389,9 +392,9 @@ export function buildTown(): SceneDef {
     id: 'founders-oak',
     sprite: 'tree/oak-big',
     x: 49,
-    y: 46,
-    w: 2,
-    d: 2,
+    y: 45,
+    w: 3,
+    d: 3,
     label: 'Founders’ Oak',
     artifactId: 'art-founders-oak',
     actions: [{ kind: 'artifact', artifactId: 'art-founders-oak' }],
@@ -418,17 +421,19 @@ export function buildTown(): SceneDef {
   add({
     id: 'lighthouse',
     sprite: 'lighthouse',
-    x: 68,
-    y: 62,
+    x: 64,
+    y: 60,
+    w: 2,
+    d: 2,
     label: 'The Little Light',
     artifactId: 'art-lighthouse',
     actions: [{ kind: 'artifact', artifactId: 'art-lighthouse' }],
   });
 
   // Event decorations outside Lantern Hall (only while a celebration is on).
-  add({ sprite: 'balloons', x: 42, y: 65, eventDecor: 'balloons', solid: false });
-  add({ sprite: 'balloons', x: 47, y: 65, eventDecor: 'balloons', variant: 'b', solid: false });
-  add({ sprite: 'balloons', x: 37, y: 64, eventDecor: 'balloons', variant: 'c', solid: false });
+  add({ sprite: 'balloons', x: 41, y: 65, eventDecor: 'balloons', solid: false });
+  add({ sprite: 'balloons', x: 46, y: 65, eventDecor: 'balloons', variant: 'b', solid: false });
+  add({ sprite: 'balloons', x: 38, y: 65, eventDecor: 'balloons', variant: 'c', solid: false });
 
   // The park south of the hall: a bandstand by the Founders' Oak, a picnic spot, benches, boats at the shore.
   add({ id: 'bandstand', sprite: 'gazebo', x: 42, y: 45, w: 3, d: 3, label: 'The bandstand' });
@@ -436,13 +441,16 @@ export function buildTown(): SceneDef {
   for (let oy = 0; oy < 3; oy++)
     for (let ox = 0; ox < 4; ox++) add({ sprite: 'tree/round', x: 47 + ox * 3, y: 8 + oy * 3 + (ox % 2), variant: 'b' });
   // The park south of the hall: picnic, benches, boats at the shore.
-  add({ sprite: 'picnic', x: 47, y: 51, w: 2, d: 1 });
+  add({ sprite: 'picnic', x: 47, y: 51, w: 2, d: 2 });
   add({ sprite: 'bench', x: 41, y: 49, facing: 'ne', actions: [{ kind: 'sit' }] });
   add({ sprite: 'bench', x: 46, y: 44, facing: 'sw', actions: [{ kind: 'sit' }] });
   add({ sprite: 'flowerbed', x: 40, y: 44, variant: 'yellow' });
   add({ sprite: 'flowerbed', x: 45, y: 49, variant: 'blue' });
-  add({ sprite: 'boat', x: 63, y: 38, variant: 'red', solid: true });
-  add({ sprite: 'boat', x: 57, y: 60, variant: 'yellow', solid: true });
+  // Rowboats moored in open water: one beside the pier, one off the park shore.
+  add({ sprite: 'boat', x: 67, y: 38, w: 2, d: 2, variant: 'red', solid: true });
+  add({ sprite: 'boat', x: 55, y: 60, w: 2, d: 2, variant: 'yellow', solid: true });
+  // A lamp at the end of the pier.
+  add({ sprite: 'lamp-post', x: 71, y: 34 });
   add({ sprite: 'bike-rack', x: 30, y: 44 });
   add({ sprite: 'mailbox', x: 28, y: 36 });
 
@@ -475,7 +483,11 @@ export function buildTown(): SceneDef {
       // keep a clear ring around roads so they read as streets, not forest trails
       const nearRoad = [-1, 0, 1].some((dy) => [-1, 0, 1].some((dx) => ['p', 'P', 'd'].includes(t.get(x + dx, y + dy))));
       if (nearRoad) continue;
-      const edge = Math.min(x, y);
+      if (Math.hypot(x - 64.5, y - 60.5) < 3.2) continue; // the lighthouse island stays clear
+      // every entrance keeps an open approach (no tree on the steps or right in front of the door)
+      if (BUILDINGS.some((b) => Math.abs(doorTile(b).x - x) <= 3 && Math.abs(doorTile(b).y - y) <= 3)) continue;
+      // the far edges too: a treeline across the water closes the valley
+      const edge = Math.min(x, y, W - 1 - x, H - 1 - y);
       const grove = Math.hypot(x - 12, y - 11) < 14;
       const meadowWest = x < 20 && y > 46;
       const forest = edge < 3 ? 0.7 : grove ? 0.42 : x < 8 || y < 7 ? 0.38 : meadowWest ? 0.12 : 0.045;

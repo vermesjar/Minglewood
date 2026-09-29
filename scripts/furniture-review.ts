@@ -18,6 +18,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { deflateSync, inflateSync } from 'node:zlib';
 import { baseCentre as footingCentre, isSmall, silhouette } from '../src/client/engine/sprites/footing';
+import { allScenes } from '@shared/world';
 
 type Facing = 'se' | 'sw' | 'ne' | 'nw';
 const FACINGS: Facing[] = ['se', 'sw', 'ne', 'nw'];
@@ -26,6 +27,13 @@ const OUT = 'art/review/furniture';
 /** Things drawn once for every rotation because they look the same from all sides. */
 const ROUND = /^(plant|lamp|stool|jar|grinder|cake-stand|cups|beanbag|table-round|table-low|heirloom-globe|heirloom-bell|heirloom-trophy|time-capsule|heirloom-gold)/;
 const SEATS = /^(chair|armchair|couch|stool|beanbag|bench|heirloom-throne)/;
+/**
+ * Keys placed inside rooms (and so in the rearrangeable furniture catalogue): these need every rotation.
+ * Town pieces (buildings, trees, the lighthouse) stand as authored.
+ */
+const ROOM_KEYS = new Set<string>();
+for (const scene of allScenes().values())
+  if (scene.kind === 'interior') for (const o of scene.objects) ROOM_KEYS.add(o.variant ? `${o.sprite}.${o.variant}` : o.sprite).add(o.sprite);
 
 /* ------------------------------------------------------------------ PNG in / out */
 interface Img {
@@ -160,8 +168,9 @@ export function resolve(e: Entry, facing: Facing, sprites: string): Placed | nul
     rec ??= Object.values(e.facings)[0];
     // a long piece turned 90° swaps its footprint
     if (mirror && w !== d) [w, d] = [d, w];
-  } else if (w !== d && (facing === 'se' || facing === 'nw')) {
-    // single drawings of long pieces are placed as authored for ±y facings and mirrored along the other axis
+  } else if (w !== d && (facing === 'sw' || facing === 'nw')) {
+    // a single drawing of a long piece: as authored (se, ne), or turned 90° — its mirror with the footprint
+    // swapped (sw, nw), exactly as art.ts does for an object placed with w and d swapped
     mirror = true;
     [w, d] = [d, w];
   }
@@ -183,18 +192,47 @@ export const footCentre = (p: Placed): [number, number] => [p.ax + 16 * (p.w - p
  * counter, lamps, ornaments) must have its base centred on the footprint. A LARGE piece fills its footprint:
  * it must not spill past the footprint's left, right or front vertex.
  */
-export function placement(p: Placed): { kind: 'small'; dx: number; dy: number } | { kind: 'large'; spill: string[] } {
+export function placement(p: Placed, town = false): { kind: 'small'; dx: number; dy: number } | { kind: 'large'; spill: string[] } {
   const fc = footCentre(p);
   const bc = footingCentre(p.img);
   if (bc && isSmall(p.img, p.w, p.d)) return { kind: 'small', dx: bc[0] - fc[0], dy: bc[1] - fc[1] };
+  // A large piece stands on its footprint: its BASE (the lower part of the drawing, where it meets the
+  // ground) must not spill past the footprint's corners. Canopies, eaves and roofs above may overhang.
   const e = silhouette(p.img)!;
+  const baseTop = Math.max(e.t, p.ay + 16 * Math.min(p.w, p.d)); // below the footprint's side corners
+  let l = p.img.w;
+  let r = -1;
+  for (let y = baseTop; y <= e.b; y++)
+    for (let x = 0; x < p.img.w; x++)
+      if (p.img.d[(y * p.img.w + x) * 4 + 3] > 0) {
+        l = Math.min(l, x);
+        r = Math.max(r, x);
+      }
   const left = p.ax - 32 * p.d;
   const right = p.ax + 32 * p.w;
   const front = p.ay + 16 * (p.w + p.d);
   const spill: string[] = [];
-  if (e.l < left - 4) spill.push(`left by ${left - e.l}px`);
-  if (e.r > right + 4) spill.push(`right by ${e.r - right}px`);
+  if (r >= 0 && l < left - 4) spill.push(`base left by ${left - l}px`);
+  if (r >= 0 && r > right + 4) spill.push(`base right by ${r - right}px`);
   if (e.b > front + 4) spill.push(`front by ${e.b - front}px`);
+  // …and a town piece standing on a narrow base (a trunk, a post) stands on the footprint's centre. (Room
+  // furniture on legs reads as narrow at its very bottom, so this only applies outdoors.)
+  if (town && bc && r >= 0 && p.w * p.d <= 4) {
+    let bl = p.img.w;
+    let br = -1;
+    for (let y = Math.max(0, e.b - 5); y <= e.b; y++)
+      for (let x = 0; x < p.img.w; x++)
+        if (p.img.d[(y * p.img.w + x) * 4 + 3] > 0) {
+          bl = Math.min(bl, x);
+          br = Math.max(br, x);
+        }
+    const narrow = br - bl < (p.w + p.d) * 32 * 0.5;
+    // where the trunk or post meets the ground: the middle of its very bottom rows
+    const dx = (bl + br) / 2 - fc[0];
+    const dy = e.b - (br - bl) / 4 - fc[1];
+    // organic pieces (roots, grass tufts) get a little more slack than furniture
+    if (narrow && (Math.abs(dx) > 6 || Math.abs(dy) > 6)) spill.push(`narrow base off the footprint centre by (${dx.toFixed(1)}, ${dy.toFixed(1)}) sprite px`);
+  }
   return { kind: 'large', spill };
 }
 
@@ -266,22 +304,27 @@ function dot(c: Img, x: number, y: number, rgb: number[]) {
 }
 
 /* ------------------------------------------------------------------ main */
+/** A manifest key as a single file name (keys like `tree/birch.a` contain slashes). */
+const fileSafe = (key: string) => key.replace(/[\/:*?"<>|]+/g, '__');
+
 export function reviewEntry(key: string, e: Entry, sprites: string) {
   const issues: string[] = [];
   const cells: Array<{ facing: Facing; p: Placed | null }> = FACINGS.map((f) => ({ facing: f, p: resolve(e, f, sprites) }));
-  if (!e.facings && !ROUND.test(key)) issues.push('one drawing for all rotations (needs a front and a back unless it is round)');
+  if (!e.facings && !ROUND.test(key) && ROOM_KEYS.has(key)) issues.push('one drawing for all rotations (needs a front and a back unless it is round)');
   if (e.facings && !(e.facings.se || e.facings.sw)) issues.push('no front drawing (se/sw)');
   if (e.facings && !(e.facings.ne || e.facings.nw)) issues.push('no back drawing (ne/nw)');
   if (SEATS.test(key) && e.seat === undefined) issues.push('seat without seat height');
   const offsets: Array<{ facing: Facing; dx: number; dy: number }> = [];
   for (const { facing, p } of cells) {
     if (!p) continue;
-    const fit = placement(p);
+    // town pieces stand as authored (se): only that orientation is theirs to answer for
+    if (!ROOM_KEYS.has(key) && facing !== 'se') continue;
+    const fit = placement(p, !ROOM_KEYS.has(key));
     if (fit.kind === 'small') {
       // small pieces are centred on their footprint at runtime (art.ts + footing.ts); record how far off the
       // drawing's own anchor was
       offsets.push({ facing, dx: fit.dx, dy: fit.dy });
-    } else if (fit.spill.length) issues.push(`${facing}: spills past its footprint (${fit.spill.join(', ')})`);
+    } else if (fit.spill.length) issues.push(`${facing}: ${fit.spill.join('; ')}`);
     const sp = specks(p.img);
     if (sp.length && (facing === 'se' || facing === 'ne' || !p.mirrored)) issues.push(`${facing}: ${sp.length} stray bit(s) (${sp.join(', ')} px) in ${p.file}`);
   }
@@ -301,25 +344,30 @@ function main() {
     if (e.wall) continue;
     if (only.length && !only.some((o) => key.startsWith(o))) continue;
     const { issues, notes, cells } = reviewEntry(key, e, 'public/art/sprites');
-    const cw = 110 * Z;
-    const ch = 150 * Z;
+    // each cell fits the drawing and its footprint diamond, whatever their size
+    const ext = cells.map(({ p }) => (p ? { l: Math.min(0, p.ax - 32 * p.d), r: Math.max(p.img.w, p.ax + 32 * p.w), b: Math.max(p.img.h, p.ay + 16 * (p.w + p.d)) } : { l: 0, r: 110, b: 110 }));
+    const spanW = Math.max(...ext.map((e) => e.r - e.l));
+    const spanH = Math.max(...ext.map((e) => e.b));
+    const Zk = Math.max(spanW, spanH) > 200 ? 1 : Z;
+    const cw = Math.round((spanW + 30) * Zk);
+    const ch = Math.round((spanH + 30) * Zk);
     const sheet = canvas(cw * 4, ch, [58, 48, 70]);
     cells.forEach(({ p }, i) => {
       if (!p) return;
-      const ox = i * cw + Math.round(cw / 2 - p.ax * Z);
-      const oy = Math.round(ch * 0.62 - p.ay * Z);
+      const ox = i * cw + Math.round((15 - ext[i].l) * Zk);
+      const oy = Math.round(15 * Zk);
       // footprint diamond
-      const V = (x: number, y: number): [number, number] => [ox + (p.ax + (x - y) * 32) * Z, oy + (p.ay + (x + y) * 16) * Z];
+      const V = (x: number, y: number): [number, number] => [ox + (p.ax + (x - y) * 32) * Zk, oy + (p.ay + (x + y) * 16) * Zk];
       const quad = [V(0, 0), V(p.w, 0), V(p.w, p.d), V(0, p.d)];
       for (let k = 0; k < 4; k++) line(sheet, ...quad[k], ...quad[(k + 1) % 4], [80, 240, 255]);
-      paste(sheet, p.img, ox, oy, Z);
+      paste(sheet, p.img, ox, oy, Zk);
       for (let k = 0; k < 4; k++) line(sheet, ...quad[k], ...quad[(k + 1) % 4], [80, 240, 255]);
       const fc = footCentre(p);
-      dot(sheet, ox + fc[0] * Z, oy + fc[1] * Z, [80, 240, 255]);
+      dot(sheet, ox + fc[0] * Zk, oy + fc[1] * Zk, [80, 240, 255]);
       const bc = footingCentre(p.img);
-      if (bc) dot(sheet, ox + bc[0] * Z, oy + bc[1] * Z, [240, 60, 60]);
+      if (bc) dot(sheet, ox + bc[0] * Zk, oy + bc[1] * Zk, [240, 60, 60]);
     });
-    writePng(`${OUT}/${key}.png`, sheet);
+    writePng(`${OUT}/${fileSafe(key)}.png`, sheet);
     if (issues.length) bad++;
     report.push(`## ${key} — ${issues.length ? issues.length + ' issue(s)' : 'ok'}`, ...issues.map((i) => `- ${i}`), ...notes.map((n) => `- note: ${n}`), '');
   }

@@ -120,6 +120,10 @@ interface Opts {
   npcs?: NpcState[];
   /** Crop to tiles [x0, y0, x1, y1] (with headroom), at the render zoom. */
   crop?: [number, number, number, number];
+  /** Centre the camera on this tile. */
+  center?: [number, number];
+  /** Seconds of simulated time before the shot (effects settle: smoke, ducks, clouds). */
+  settle?: number;
 }
 
 async function render(scene: SceneDef, occupants: Occupant[], o: Opts, name: string) {
@@ -133,10 +137,16 @@ async function render(scene: SceneDef, occupants: Occupant[], o: Opts, name: str
   });
   view.loadScene(scene, [...occupants, ...(o.extra ?? [])], { meId: '', activeDecor: new Set(), festiveRooms: new Set(), party: false });
   view.setNpcs(scene, o.npcs ?? (scene.npcs ?? []).map((n) => ({ id: n.id, x: n.spots[0].x, y: n.spots[0].y, facing: n.spots[0].facing })));
-  const v = view as unknown as { camera: { zoom: number; tzoom: number; x: number; y: number }; update(dt: number): void; draw(): void; drawActorOverlays(): void };
+  const v = view as unknown as { camera: { zoom: number; tzoom: number; x: number; y: number; tx: number; ty: number }; update(dt: number): void; draw(): void; drawActorOverlays(): void };
   if (o.zoom) v.camera.zoom = v.camera.tzoom = o.zoom;
   v.drawActorOverlays = noop;
+  for (let t = 0; t < (o.settle ?? 0); t += 0.1) v.update(0.1);
   v.update(0.016);
+  if (o.center) {
+    const p = isoToScreen(o.center[0], o.center[1]);
+    v.camera.x = v.camera.tx = p.x;
+    v.camera.y = v.camera.ty = p.y;
+  }
   v.draw();
   if (o.crop) {
     const [x0, y0, x1, y1] = o.crop;

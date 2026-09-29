@@ -22,3 +22,13 @@ for (let y = 0; y < s.height; y++)
     if (d >= 2 && d <= 3 && (x + y) % 7 === 0) spots.push(`(${x},${y})`);
   }
 console.log('duck water:', spots.slice(0, 24).join(' '));
+// Every object's footprint sits on the terrain it belongs on (boats on water, everything else on land).
+const bad: string[] = [];
+for (const o of s.objects) {
+  for (let y = o.y; y < o.y + (o.d ?? 1); y++)
+    for (let x = o.x; x < o.x + (o.w ?? 1); x++) {
+      const onWater = water(T(x, y));
+      if ((o.sprite === 'boat') !== onWater) bad.push(`${o.id} ${o.sprite} at ${x},${y} on '${T(x, y)}'`);
+    }
+}
+console.log('misplaced tiles:', bad.length ? bad.slice(0, 12).join('; ') : 'none');

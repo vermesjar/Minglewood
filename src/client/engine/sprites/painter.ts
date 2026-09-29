@@ -23,6 +23,10 @@ export interface Sprite {
   mirrored?: boolean;
   /** The art drawing it was made from (art.ts), for per-drawing animation points. */
   file?: string;
+  /** What lights up at night (lit windows, lanterns), same size and anchor as the canvas. */
+  glow?: HTMLCanvasElement;
+  /** Points (canvas px) that give off smoke, spray, a blinking beacon or a lighthouse beam. */
+  emitters?: Array<{ kind: 'smoke' | 'spray' | 'blink' | 'beam'; x: number; y: number }>;
 }
 
 /** Draws a sprite with its anchor at art-space (x, y), at its own pixel density. */

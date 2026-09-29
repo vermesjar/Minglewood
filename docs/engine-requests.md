@@ -48,8 +48,24 @@ owned by the café/engine agent (WorldView.ts, effects.ts, art.ts).
    at zoom 2. Cost: one ~4.9k × 2.5k canvas (≈ 48 MB RGBA) for the 76×76 town; if that is too heavy on
    phones, render 2× only when `devicePixelRatio > 1 || innerWidth > 1200`.
 
-5. **Water shimmer.** The lake is a static ground layer. A few slow-moving glint particles on water tiles (or a
-   2-frame shimmer overlay for water pixels) would make it breathe.
+5. **Animated water (sparkle + ripple).** The lake's ground layer now has per-pixel depth (4 dithered tones
+   following the distance to shore), a foam line, wet sand, lily pads and static ripple/sparkle highlights.
+   To make it move: every ~0.25 s, redraw ~2 % of water pixels as highlights along the same ripple function
+   shifted by time, or cheaper — keep two pre-rendered sparkle masks (ground.ts can export them; ask) and
+   cross-fade them on a slow sine. Water pixels are those whose terrain class is `w`/`W` after smoothing
+   (`renderOutdoorGround` can return a `water` mask canvas if you want it — say so in this file).
+
+## Linter notes (scripts/furniture-review.ts)
+
+7. **Diamond-filling pieces read as narrow.** `flowerbed.*` (fit to their tile diamond, base centred exactly
+   on the footprint) are flagged "narrow base off the footprint centre by (-0.5, 10.3)": their lowest rows are
+   the diamond's front vertex, which is narrow by construction. Suggest: skip the narrow-base check when the
+   base (lower 30 %) is ≥ 70 % of the footprint width.
+8. **Building stoops.** `building.*` show 5–20 px of steps / planters / a parked bike past the front or side
+   corner. Deliberate: a stoop stands on the apron tile in front of the door, which the town already keeps
+   clear (a 1-tile ring around every building is unbuildable). Suggest a 24 px apron tolerance for
+   `building.*`. (The Quiet Grove, which spilled 44 px with its fern skirt, was re-conformed to a 7×8
+   footprint that includes the skirt and now passes.)
 
 6. **Trees sway (optional).** A 1–2 px horizontal skew of the top half of `tree/*` sprites on a slow sine with a
    per-object phase gives the forest life. Only if it stays crisp (whole-pixel offsets).
