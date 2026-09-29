@@ -80,10 +80,17 @@ function hairStyle(L: FullLoadout): HairLook | null {
   return HAIR[id] ?? HAIR.short;
 }
 
-function hairTint(L: FullLoadout) {
+/**
+ * Two-tone tips: the lower part of the style's own length takes the highlight colour, in two steps (as a
+ * pixel artist would blend), so short styles show it at the ends and long styles along the lengths.
+ */
+function hairTint(L: FullLoadout, top: number, height: number) {
   if (!L.hairHighlight) return undefined;
   const tip = hx(L.hairHighlight);
-  return (_x: number, y: number, c: RGB) => (y > 70 ? mix(c, tip, 0.7) : c);
+  return (_x: number, y: number, c: RGB) => {
+    const t = (y - top) / Math.max(1, height);
+    return t > 0.78 ? mix(c, tip, 0.72) : t > 0.6 ? mix(c, tip, 0.38) : c;
+  };
 }
 
 function drawHair(P: Pix, F: Frame, L: FullLoadout, layer: 'behind' | 'front') {
@@ -92,7 +99,7 @@ function drawHair(P: Pix, F: Frame, L: FullLoadout, layer: 'behind' | 'front') {
   const v = layer === 'behind' ? (F.view === 'front' ? st.behindFront : st.behindBack) : F.view === 'front' ? st.front : st.back;
   if (!v) return;
   const m = placed(v, hairOrigin(F), headShift(F));
-  paintMap(P, m.x, m.y, m.rows, hx(L.hairColor), hairTint(L), underHat(F, L));
+  paintMap(P, m.x, m.y, m.rows, hx(L.hairColor), hairTint(L, m.y, m.rows.length), underHat(F, L));
 }
 
 /** Hats that sit over the crown: hair can't rise above them (a bun, a quiff or a mohawk goes under the hat). */

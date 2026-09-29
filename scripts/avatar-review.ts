@@ -456,3 +456,24 @@ console.log(`${people.length} characters, ${total} issue(s) → ${OUT}/`);
     sheet.save(`art/review/assets/${file}.png`);
   }
 }
+
+/* ------------------------------------------------------------------ two-tone tips & fantasy skin */
+{
+  const { FANTASY_SKIN } = await import('@shared/avatar');
+  const looks: AvatarLoadout[] = [
+    ...['hair.long', 'hair.bob', 'hair.wavy', 'hair.ponytail', 'hair.curly', 'hair.braids'].map(
+      (h, i) => ({ hair: h, hairColor: ['#1f1612', '#e8c16d', '#5a3825', '#1f1612', '#8a5a32', '#3b2518'][i], hairHighlight: ['#e27ca7', '#9b6bd6', '#e0703a', '#3f8fd8', '#e8c16d', '#e27ca7'][i], top: 'top.tee' }) as AvatarLoadout,
+    ),
+    ...FANTASY_SKIN.map((sk, i) => ({ skin: sk, hair: ['hair.messy', 'hair.bob', 'hair.afro', 'hair.pixie', 'hair.long'][i], hairColor: '#f4efe6', top: 'top.hoodie', topColor: '#1f2a44' }) as AvatarLoadout),
+  ];
+  const z = 4;
+  const BC = [14, 14, 60, 70];
+  const cw = BC[2] * z + 6;
+  const ch = BC[3] * z + 6;
+  const sheet = new Sheet(cw * 6, ch * 2 * 2, BG);
+  looks.forEach((l, i) => {
+    sheet.paste(renderAvatarLayers(l, 'se', 'stand').px, (i % 6) * cw + 3, Math.floor(i / 6) * 2 * ch + 3, z, BC);
+    sheet.paste(renderAvatarLayers(l, 'ne', 'stand').px, (i % 6) * cw + 3, (Math.floor(i / 6) * 2 + 1) * ch + 3, z, BC);
+  });
+  sheet.save('art/review/assets/tips-fantasy.png');
+}
