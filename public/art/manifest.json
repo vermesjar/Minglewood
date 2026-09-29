@@ -2367,7 +2367,7 @@
       "file": "plant.b.png",
       "anchor": [
         27,
-        68
+        76
       ]
     },
     "plant.fern": {
@@ -2713,7 +2713,7 @@
           "file": "register.ne.png",
           "anchor": [
             18,
-            18
+            19
           ]
         }
       }
@@ -3160,8 +3160,8 @@
       "fit": "anchor",
       "file": "tree/oak-big.png",
       "anchor": [
-        114,
-        132
+        102,
+        115
       ]
     },
     "tree/pine.a": {

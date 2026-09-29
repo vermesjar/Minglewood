@@ -158,7 +158,8 @@ export function lintAvatar(look: AvatarLoadout, facing: Facing, pose: Pose, r = 
   if (chestGap > 0) issues.push({ kind: 'torso-gap', detail: `${chestGap} chest px not covered by the top` });
   const waistGap = count(Z.waist, (o) => o === LAYER.none || o === LAYER.armBack);
   if (waistGap > 0) issues.push({ kind: 'waist-gap', detail: `${waistGap} see-through px at the waist` });
-  if (L.shoes !== 'shoes.none' && L.mobility !== 'mob.wheelchair') {
+  // (seated and seen from behind, the feet are on the far side of the body and don't show)
+  if (L.shoes !== 'shoes.none' && L.mobility !== 'mob.wheelchair' && !(F.sitting && F.view === 'back')) {
     // bare = leg (skin / trouser) or nothing where a shoe belongs; hair or a held thing hiding the feet is fine
     const bare = count(Z.feet, (o) => o === LAYER.legs || o === LAYER.none);
     if (bare > 2) issues.push({ kind: 'bare-feet', detail: `${bare} foot px not covered by shoes` });

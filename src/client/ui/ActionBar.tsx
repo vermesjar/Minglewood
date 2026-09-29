@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { EMOTES, EMOTE_IDS } from '@shared/presence';
 import { game } from '../app/game';
 import { useStore } from '../app/store';
+import { carryMeta } from '@shared/carry';
 
-const CARRY_EMOJI: Record<string, string> = { coffee: '☕', boba: '🧋', icecream: '🍦', plush: '🧸', popcorn: '🍿', soda: '🥤' };
 
 export function ActionBar() {
   const [text, setText] = useState('');
@@ -45,8 +45,15 @@ export function ActionBar() {
         />
       </form>
       {carrying && (
-        <button className="btn small" onClick={() => game.putDown()} title="Put it down">
-          {CARRY_EMOJI[carrying] ?? '✋'} Put down
+        // what you're holding, right where you act: "☕ Coffee · Put down"
+        <button className="btn small carrying" onClick={() => game.putDown()} title={`You’re holding a ${carryMeta(carrying)?.name.toLowerCase() ?? 'something'} — put it down`}>
+          <span className="carry-item">
+            {carryMeta(carrying)?.emoji ?? '✋'} {carryMeta(carrying)?.name ?? 'Holding'}
+          </span>
+          <span className="carry-sep" aria-hidden>
+            ·
+          </span>
+          Put down
         </button>
       )}
       {sitting && (

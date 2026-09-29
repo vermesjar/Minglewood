@@ -451,7 +451,8 @@ export function buildTown(): SceneDef {
   add({ sprite: 'boat', x: 55, y: 60, w: 2, d: 2, variant: 'yellow', solid: true });
   // A lamp at the end of the pier.
   add({ sprite: 'lamp-post', x: 71, y: 34 });
-  add({ sprite: 'bike-rack', x: 30, y: 44 });
+  // on open grass by Grove Lane, clear of the studio's stoop (its own art has a bike by the door)
+  add({ sprite: 'bike-rack', x: 33, y: 45 });
   add({ sprite: 'mailbox', x: 28, y: 36 });
 
   // Lamp posts along both roads, every six tiles.

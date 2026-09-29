@@ -152,6 +152,8 @@ export class Effects {
   /** Twinkles on the water (off when the ground animates its own water). */
   glints = true;
   private cloudSpan = 1400;
+  /** The outdoor map's size in tiles (cloud shadows are clipped to it). */
+  private ground: { w: number; h: number } | null = null;
 
   /**
    * Set up a scene's ambient life. Things with finished art give off smoke, spray and light from the points
@@ -166,6 +168,7 @@ export class Effects {
     this.water = [];
     this.lighthouse = null;
     this.outdoor = scene.kind === 'outdoor';
+    this.ground = this.outdoor ? { w: scene.width, h: scene.height } : null;
     const at = (x: number, y: number, z: number) => {
       const s = isoToScreen(x, y, z);
       return { x: s.x, y: s.y };
@@ -403,14 +406,25 @@ export class Effects {
         ctx.fillRect(L.x - r, L.y - r, r * 2, r * 2);
       }
     }
-    if (this.outdoor && !this.reducedMotion) {
+    if (this.outdoor && !this.reducedMotion && this.ground) {
+      // cloud shadows fall on the ground only: clipped to the map's diamond, never onto the sky around it
+      const { w, h } = this.ground;
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(w * 16, w * 8);
+      ctx.lineTo((w - h) * 16, (w + h) * 8);
+      ctx.lineTo(-h * 16, h * 8);
+      ctx.closePath();
+      ctx.clip();
+      ctx.fillStyle = 'rgba(40,50,90,0.05)';
       for (const c of this.clouds) {
-        ctx.fillStyle = 'rgba(40,50,90,0.05)';
         ctx.beginPath();
         ctx.ellipse(c.x, c.y, c.r, c.r * 0.45, 0, 0, Math.PI * 2);
         ctx.ellipse(c.x + c.r * 0.6, c.y + 20, c.r * 0.6, c.r * 0.3, 0, 0, Math.PI * 2);
         ctx.fill();
       }
+      ctx.restore();
     }
   }
 }

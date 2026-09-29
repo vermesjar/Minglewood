@@ -7,4 +7,5 @@ npm test
 npm run avatars:sweep
 npx tsx --tsconfig tsconfig.json scripts/room-map.ts --quiet
 npm run furniture:review
+(cd art && uv run check_facings.py)
 echo "gate: all green"

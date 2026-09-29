@@ -564,6 +564,8 @@ console.log(`${people.length} characters, ${total} issue(s) → ${OUT}/`);
     ['se', 'stand'],
     ['se', 'walk1'],
     ['sw', 'stand'],
+    ['ne', 'stand'],
+    ['nw', 'walk2'],
   ] as const;
   const cw = HC[2] * z + 4;
   const ch = HC[3] * z + 4;

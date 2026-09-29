@@ -22,10 +22,11 @@ describe('team decoration placement', () => {
   });
 
   it('never lets decorations cut anyone off from a seat', () => {
-    // Surround the chair at (4,5) on its open sides one by one; the last blocking piece must be refused.
+    // Surround the chair at (5,4) (facing the table at 4,4) on its open sides one by one; the last blocking piece
+    // must be refused.
     const decos: Decoration[] = [];
     let refused = false;
-    for (const [x, y] of [[3, 5], [5, 5], [4, 6], [3, 6], [5, 6]] as Array<[number, number]>) {
+    for (const [x, y] of [[6, 4], [5, 3], [5, 5], [6, 3], [6, 5]] as Array<[number, number]>) {
       const scene = livedScene(cafe, [], decos);
       const p = placementProblem(scene, x, y);
       if (p) {

@@ -514,6 +514,12 @@ function drawArm(P: Pix, F: Frame, L: FullLoadout, near: boolean) {
   paint(P, M().ellipse(hand[0], hand[1], 2.4, 2.6), skin, { shade });
 }
 
+/**
+ * Seated and seen from behind, the legs are on the far side of the body: nothing below the hips shows (a
+ * backless bench or stool must not show feet dangling toward the camera).
+ */
+export const seatedFromBehind = (F: Frame) => F.sitting && F.view === 'back';
+
 function drawLegs(P: Pix, F: Frame, L: FullLoadout) {
   const skin = hx(L.skin);
   const pants = hx(L.bottomColor);
@@ -524,6 +530,7 @@ function drawLegs(P: Pix, F: Frame, L: FullLoadout) {
     [F.legFar, true],
     [F.legNear, false],
   ] as const) {
+    if (seatedFromBehind(F)) break;
     const shade = far ? 0.35 : 0;
     limb(P, leg.a, leg.m, leg.b, 2.7, 2.4, skin, shade);
     if (skirt) continue;
@@ -650,6 +657,7 @@ function drawLowerGarment(P: Pix, F: Frame, L: FullLoadout) {
 }
 
 function drawShoes(P: Pix, F: Frame, L: FullLoadout) {
+  if (seatedFromBehind(F)) return;
   const kind = L.shoes.replace('shoes.', '');
   const c = hx(L.shoesColor);
   const front = F.view === 'front';
@@ -884,9 +892,12 @@ function drawAccessory(P: Pix, F: Frame, L: FullLoadout) {
   }
 }
 
+/** Things you carry to show (held up in front of you); balloons, umbrellas and laptops are held low. */
+const CARRIED = new Set(['held.coffee', 'held.boba', 'held.soda', 'held.popcorn', 'held.icecream', 'held.plush', 'held.book', 'held.plant']);
+
 function drawHeld(P: Pix, F: Frame, L: FullLoadout) {
   if (L.held === 'held.none') return;
-  const [x, y] = F.pose === 'wave' ? F.handFar : F.handNear;
+  const [x, y] = F.hold;
   const c = hx(L.heldColor);
   switch (L.held) {
     case 'held.coffee':
@@ -1061,7 +1072,8 @@ export function drawAvatarV2(input: AvatarLoadout, view: View, requested: Pose, 
   const wheelchair = L.mobility === 'mob.wheelchair';
   const pose: Pose = wheelchair && requested !== 'wave' ? 'sit' : requested;
   const body = bodyOf(L);
-  let F = frameFor(view, pose, body);
+  const carry = CARRIED.has(L.held);
+  let F = frameFor(view, pose, body, carry);
   if (wheelchair && pose === 'wave') {
     const sit = frameFor(view, 'sit', body);
     F = { ...sit, pose: 'wave', armNear: F.armNear, handNear: F.handNear };
@@ -1080,7 +1092,7 @@ export function drawAvatarV2(input: AvatarLoadout, view: View, requested: Pose, 
   // Seen from behind, the holding hand is in front of the body: what it holds hides behind the torso
   // (a balloon or umbrella still shows above it).
   on(LAYER.held);
-  if (view === 'back' || L.held === 'held.balloon') drawHeld(P, F, L);
+  if (!F.holdInFront || L.held === 'held.balloon') drawHeld(P, F, L);
   on(LAYER.legs);
   drawLegs(P, F, L);
   on(LAYER.shoes);
@@ -1107,7 +1119,7 @@ export function drawAvatarV2(input: AvatarLoadout, view: View, requested: Pose, 
   on(LAYER.chairFront);
   if (wheelchair) drawWheelchair(P, F, 'front');
   on(LAYER.held);
-  if (view === 'front' && L.held !== 'held.balloon') drawHeld(P, F, L);
+  if (F.holdInFront && L.held !== 'held.balloon') drawHeld(P, F, L);
   on(LAYER.cane);
   if (L.mobility === 'mob.cane' && !F.sitting) drawCane(P, F);
   sealHairPockets(P, L);

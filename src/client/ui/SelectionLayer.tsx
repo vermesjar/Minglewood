@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { STATUS_META } from '@shared/presence';
+import { carryMeta } from '@shared/carry';
 import { game } from '../app/game';
 import { setState, useStore } from '../app/store';
 import { AvatarCanvas, Popover, StatusDot, formatDate, formatTime, localTime, tenureLabel, timeAgo } from './common';
@@ -118,27 +119,32 @@ function ProfileCard({ id }: { id: string; x: number; y: number }) {
           </>
         )}
         {!isMe ? (
-          <div className="profile-actions compact">
-            {sameRoom && (
-              <button className="btn small" onClick={() => game.emote('wave', id)}>
-                👋 Wave
-              </button>
-            )}
-            <button className="btn small primary" disabled={!reachable} onClick={() => game.knock(id, 'chat')} title={STATUS_META[status].interruptible ? 'Ask if they have a minute' : 'They’ll see it when they’re free'}>
-              🚪 Knock
-            </button>
-            <button className="btn small" disabled={!reachable} onClick={() => game.knock(id, 'coffee')}>
-              ☕ Coffee?
-            </button>
+          <>
             {!sameRoom && entry?.sceneId && (
-              <button className="btn small" onClick={() => game.goToMember(id)}>
-                📍 Go to {first}
+              <button className="btn small primary full join" onClick={() => game.goToMember(id)}>
+                📍 {room ? `Join ${first}` : `Go to ${first}`}
               </button>
             )}
-            <button className="btn small ghost" onClick={() => setMore((v) => !v)} aria-expanded={more}>
-              {more ? 'Less' : 'More'}
-            </button>
-          </div>
+            <div className="profile-actions compact">
+              {sameRoom && (
+                <button className="btn small" onClick={() => game.emote('wave', id)}>
+                  👋 Wave
+                </button>
+              )}
+              <button
+                className={`btn small ${sameRoom ? 'primary' : ''}`}
+                disabled={!reachable}
+                onClick={() => game.knock(id, 'chat')}
+                title={STATUS_META[status].interruptible ? 'Ask if they have a minute' : 'They’ll see it when they’re free'}
+              >
+                🚪 Knock
+              </button>
+              <button className="btn small" disabled={!reachable} onClick={() => game.knock(id, 'coffee')}>
+                ☕ Coffee?
+              </button>
+              <MoreButton more={more} setMore={setMore} who={first} />
+            </div>
+          </>
         ) : (
           <div className="profile-actions compact">
             <button className="btn small" onClick={() => setState({ panel: 'avatar', selection: null })}>
@@ -147,9 +153,7 @@ function ProfileCard({ id }: { id: string; x: number; y: number }) {
             <button className="btn small" onClick={() => setState({ panel: 'profile', selection: null })}>
               📝 Profile
             </button>
-            <button className="btn small ghost" onClick={() => setMore((v) => !v)} aria-expanded={more}>
-              {more ? 'Less' : 'More'}
-            </button>
+            <MoreButton more={more} setMore={setMore} who="you" />
           </div>
         )}
         {!isMe && !STATUS_META[status].interruptible && reachable && (
@@ -157,6 +161,14 @@ function ProfileCard({ id }: { id: string; x: number; y: number }) {
         )}
       </div>
     </aside>
+  );
+}
+
+function MoreButton({ more, setMore, who }: { more: boolean; setMore: (f: (v: boolean) => boolean) => void; who: string }) {
+  return (
+    <button className="btn small ghost more" onClick={() => setMore((v) => !v)} aria-expanded={more} aria-label={more ? 'Show less' : `More about ${who}`} title={more ? 'Less' : 'More'}>
+      {more ? '▴' : '⋯'}
+    </button>
   );
 }
 
@@ -272,37 +284,53 @@ function ObjectCard({ sceneId, objectId, x, y }: { sceneId: string; objectId: st
   return null;
 }
 
-const ORDER_EMOJI: Record<string, string> = { coffee: '☕', plush: '🧸', popcorn: '🍿', soda: '🥤' };
 
-/** A room NPC (the café's barista): clearly not a coworker — no presence, no profile, just what they do here. */
-function NpcCard({ sceneId, npcId, x, y }: { sceneId: string; npcId: string; x: number; y: number }) {
+/**
+ * A room NPC (the café's barista), docked bottom-right like a person's card so the two feel like one system —
+ * but clearly not a coworker: no presence, no profile, just who they are here and what they do.
+ */
+function NpcCard({ sceneId, npcId }: { sceneId: string; npcId: string; x: number; y: number }) {
+  const interior = useStore((s) => !!s.boot?.rooms.some((r) => r.id === s.sceneId));
+  const room = useStore((s) => s.boot?.rooms.find((r) => r.id === sceneId));
   const scene = game.scene(sceneId);
   const npc = scene?.npcs?.find((n) => n.id === npcId);
   if (!npc) return null;
   // what they make, from the machine they run: "Get a coffee", "Trade in your tickets"
   const vend = npc.serves ? scene?.objects.find((o) => o.sprite === npc.serves)?.actions?.find((a) => a.kind === 'vend') : undefined;
-  const order = vend && vend.kind === 'vend' ? `${ORDER_EMOJI[vend.item] ?? '✨'} ${vend.label}` : null;
+  const order = vend && vend.kind === 'vend' ? `${carryMeta(vend.item)?.emoji ?? '✨'} ${vend.label}` : null;
   return (
-    <Popover x={x} y={y} onClose={close} label={`${npc.name}, ${npc.role} (NPC)`}>
-      <div className="info-card npc-card">
-        <div className="npc-head">
-          <AvatarCanvas loadout={npc.avatar} head scale={2} />
-          <div>
-            <h3>{npc.name}</h3>
-            <p className="muted small">
-              {npc.role} <span className="tag">NPC</span>
-            </p>
+    <aside className={`infostand card npc-card ${interior ? 'beside-panel' : ''}`} role="dialog" aria-label={`${npc.name}, ${npc.role} (NPC)`}>
+      <button className="close-x" onClick={close} aria-label="Close">
+        ×
+      </button>
+      <div className="profile">
+        <div className="infostand-head">
+          <div className="infostand-avatar npc">
+            <AvatarCanvas loadout={npc.avatar} crop="bust" scale={2} />
+          </div>
+          <div className="infostand-who">
+            <h3>
+              {npc.name} <span className="tag npc-tag">NPC</span>
+            </h3>
+            <p className="title">{npc.role}</p>
+            {room && (
+              <p className="team-line">
+                <span>
+                  {room.emoji} {room.name}
+                </span>
+              </p>
+            )}
           </div>
         </div>
-        <p>{npc.blurb}</p>
+        <p className="npc-blurb">{npc.blurb}</p>
         {order && (
-          <button className="btn primary full" onClick={() => game.orderFrom(sceneId, npcId)}>
+          <button className="btn small primary full" onClick={() => game.orderFrom(sceneId, npcId)}>
             {order}
           </button>
         )}
         <p className="fineprint">Part of the room — not a coworker.</p>
       </div>
-    </Popover>
+    </aside>
   );
 }
 

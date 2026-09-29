@@ -86,4 +86,37 @@ describe('room NPCs', () => {
     const handing = sent.find((m): m is NpcMsg => m.t === 'npc' && m.npc.doing === 'serve');
     expect(handing?.npc).toMatchObject({ id: 'attendant', holding: 'plush' });
   });
+
+  it('never teleports: an order during a stroll waits for the step to finish, and every walk starts where they are', () => {
+    const cafe = getScene('cafe')!;
+    const machine = cafe.objects.find((o) => o.sprite === 'espresso')!;
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    npcs.statesIn('cafe');
+    // let the idle drift start a stroll to another spot
+    vi.advanceTimersByTime(8000);
+    npcs.tick();
+    const juno = () => sent.filter((m): m is NpcMsg => m.t === 'npc' && m.npc.id === 'barista').map((m) => m.npc);
+    const stroll = juno().find((s) => s.path);
+    expect(stroll).toBeTruthy();
+    // an order arrives mid-stroll
+    vi.advanceTimersByTime(100);
+    npcs.serve('cafe', machine, 'ada', () => undefined);
+    vi.advanceTimersByTime(20000);
+    // each walk begins at the tile where the previous state left them
+    const states = juno();
+    let at = { x: states[0].x, y: states[0].y };
+    for (const st of states) {
+      if (st.path) {
+        expect(st.path[0]).toEqual([at.x, at.y]);
+        at = { x: st.path[st.path.length - 1][0], y: st.path[st.path.length - 1][1] };
+      } else {
+        expect([st.x, st.y]).toEqual([at.x, at.y]);
+      }
+    }
+    // and she brews facing the machine, which faces her
+    const brew = states.find((s) => s.doing === 'brew')!;
+    expect(brew.facing).toBe('sw');
+    expect(machine.facing).toBe('ne');
+    random.mockRestore();
+  });
 });

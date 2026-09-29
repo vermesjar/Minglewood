@@ -2,6 +2,7 @@
  * Game controller: the glue between the realtime socket, the WorldView renderer and the React UI.
  * Product decisions about what an interaction *means* live here.
  */
+import { carryMeta } from '@shared/carry';
 import type { Bootstrap, PublicConfig } from '@shared/api';
 import type { AvatarLoadout, PresenceStatus, SavedOutfit } from '@shared/domain/types';
 import type { KnockKind, KnockReply, NpcState, Occupant, ServerMsg } from '@shared/protocol';
@@ -36,13 +37,6 @@ export const QUESTS: Array<{ id: string; label: string; hint: string }> = [
   { id: 'party', label: 'Stop by the party in Lantern Hall', hint: 'There’s cake.' },
 ];
 
-/** What you hear when something lands in your hands. */
-const GOT: Record<string, string> = {
-  coffee: '☕ Freshly pulled — enjoy your coffee.',
-  plush: '🧸 A prize! It’s yours to carry around.',
-  popcorn: '🍿 Fresh popcorn — careful, it’s hot.',
-  soda: '🥤 Ice cold.',
-};
 
 class Game {
   world: WorldView | null = null;
@@ -267,7 +261,7 @@ class Game {
       }
       case 'updated':
         if (m.memberId === this.meId && m.patch.carrying && m.patch.carrying !== getState().occupants[this.meId]?.carrying)
-          toast(GOT[m.patch.carrying] ?? 'Enjoy!', 'social', undefined, 3000);
+          this.handedOver(m.patch.carrying);
         w?.patch(m.memberId, m.patch);
         setState((s) => {
           const cur = s.occupants[m.memberId];
@@ -556,6 +550,17 @@ class Game {
     }
     setState({ selection: null });
     this.world?.setSelected(null);
+    // A click on a seat's tile (a bench's far cushion, the floor-coloured gap in a low seat's sprite) means
+    // "sit there", never "stand inside the furniture".
+    const sceneId = getState().sceneId;
+    const scene = sceneId ? this.scene(sceneId) : undefined;
+    const at = scene ? seatSpotAt(scene, t[0], t[1]) : null;
+    if (at) {
+      const me = getState().occupants[this.meId];
+      if (me?.sittingOn === at.seat.id && me.x === at.spot.x && me.y === at.spot.y) return;
+      this.sitOn(at.seat, [at.spot.x, at.spot.y]);
+      return;
+    }
     this.walkTo(t);
   }
 
@@ -627,6 +632,16 @@ class Game {
 
   /* ------------------------------------------------------------------ objects & people */
 
+  /**
+   * Show someone's card from outside the world (search, lists): the card opens wherever they are; if they're in
+   * this scene the camera glances over to them, but nobody moves until you choose to join them.
+   */
+  showMember(id: string) {
+    const t = this.world?.actorTile(id);
+    if (t) this.world?.focusOn(t);
+    this.selectMember(id, this.world?.actorScreen(id) ?? { x: window.innerWidth / 2, y: window.innerHeight / 2 });
+  }
+
   selectMember(id: string, p: { x: number; y: number }) {
     if (id.startsWith('npc:')) {
       const sceneId = getState().sceneId;
@@ -636,6 +651,24 @@ class Game {
     }
     setState({ selection: { kind: 'member', id, x: p.x, y: p.y } });
     this.world?.setSelected(id);
+  }
+
+  /**
+   * Something just landed in your hands: make it unmistakable. Whoever made it (the NPC running that machine)
+   * says so as they hand it over, the item pops up over your head with a sparkle, and a toast confirms it; the
+   * action bar then shows what you're holding until you put it down.
+   */
+  private handedOver(item: string) {
+    const meta = carryMeta(item);
+    const first = this.name(this.meId).split(' ')[0];
+    const scene = getState().sceneId ? this.scene(getState().sceneId!) : undefined;
+    const maker = scene?.npcs?.find((n) => {
+      const machine = n.serves ? scene.objects.find((o) => o.sprite === n.serves) : undefined;
+      return machine?.actions?.some((a) => a.kind === 'vend' && a.item === item);
+    });
+    if (maker && meta) this.world?.say(`npc:${maker.id}`, meta.handOff.replace('{name}', first));
+    this.world?.gotItem(this.meId, meta?.emoji ?? '✨');
+    toast(meta?.got ?? 'Enjoy!', 'social', { label: 'Put down', run: () => this.putDown() }, 4500);
   }
 
   /** Order from whatever an NPC runs (the barista's espresso machine). */
@@ -676,12 +709,19 @@ class Game {
     }
     if (kinds.has('sit')) {
       const occ = getState().occupants[this.meId];
+      // the cushion that was clicked (a bench or couch has one per tile)
+      const clicked = this.world?.tileAt(p.x, p.y);
+      const spots = seatSpots(o, this.scene(sceneId));
+      const target = clicked && spots.length > 1 ? spots.reduce((b, s) => (Math.hypot(s.x - clicked[0], s.y - clicked[1]) < Math.hypot(b.x - clicked[0], b.y - clicked[1]) ? s : b)) : undefined;
       if (occ?.sittingOn === o.id) {
-        this.rt?.send({ t: 'stand' });
+        // Already sitting here: clicking your own cushion does nothing (stand up with the Stand up button or by
+        // walking off); clicking another free cushion of the same seat shifts you over.
+        const mine = !target || (target.x === occ.x && target.y === occ.y);
+        if (!mine) this.sitOn(o, [target.x, target.y]);
         return;
       }
       if (!kinds.has('artifact')) {
-        this.sitOn(o);
+        this.sitOn(o, target ? [target.x, target.y] : undefined);
         return;
       }
     }
@@ -714,8 +754,11 @@ class Game {
     this.world.showDestination(way.tile);
   }
 
-  /** Walk to the nearest free spot on a seat (a couch has one per cushion) and sit down there. */
-  private sitOn(o: SceneObject) {
+  /**
+   * Walk to a free spot on a seat (a couch or bench has one per cushion) and sit down there: the cushion you
+   * clicked if it's free, else the free one nearest to it (or to you).
+   */
+  private sitOn(o: SceneObject, prefer?: Tile) {
     const sceneId = getState().sceneId;
     const scene = sceneId ? this.scene(sceneId) : undefined;
     const me = this.world?.actorTile(this.meId);
@@ -726,7 +769,8 @@ class Game {
       toast('Someone’s already sitting there.', 'info', undefined, 2500);
       return;
     }
-    free.sort((a, b) => Math.hypot(a.x - me[0], a.y - me[1]) - Math.hypot(b.x - me[0], b.y - me[1]));
+    const ref = prefer ?? me;
+    free.sort((a, b) => Math.hypot(a.x - ref[0], a.y - ref[1]) - Math.hypot(b.x - ref[0], b.y - ref[1]));
     const spot = free[0];
     this.walkTo([spot.x, spot.y], () => this.rt?.send({ t: 'sit', objectId: o.id }));
   }

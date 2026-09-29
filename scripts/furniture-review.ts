@@ -9,6 +9,8 @@
  *   - a piece's base sits centred on its footprint: the centre of its base contact (the bottom rows of the
  *     drawing) lands on the footprint's centre, within 3 sprite px (1.5 world px)
  *   - no stray pixels: nothing detached from the piece smaller than 6 px
+ *   - nothing sliced by its frame: the top rows narrow to a cap instead of running flat across (a crown of leaves
+ *     cut straight by the slicer)
  *   - every rotation exists: a front and a back drawing (the other two are mirrors), unless it's round
  *   - seats say how high their seat is (manifest `seat`)
  *
@@ -308,6 +310,27 @@ function dot(c: Img, x: number, y: number, rgb: number[]) {
   for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) put(c, Math.round(x) + dx, Math.round(y) + dy, rgb);
 }
 
+/**
+ * A drawing sliced by its own frame: the top rows are opaque across the same span, row after row, instead of
+ * narrowing to a cap (a leafy crown or a lamp shade cut flat by the slicer). Round tops and diamond corners
+ * narrow toward the edge, so they pass. Returns the flat run's width, or 0.
+ */
+function slicedTop(img: Img): number {
+  const span = (y: number) => {
+    let l = -1;
+    let r = -1;
+    for (let x = 0; x < img.w; x++)
+      if (img.d[(y * img.w + x) * 4 + 3]) {
+        if (l < 0) l = x;
+        r = x;
+      }
+    return l < 0 ? 0 : r - l + 1;
+  };
+  if (img.h < 4) return 0;
+  const [a, b, c] = [span(0), span(1), span(2)];
+  return a > 6 && b - a < 2 && c - b < 2 ? a : 0;
+}
+
 /* ------------------------------------------------------------------ main */
 /** A manifest key as a single file name (keys like `tree/birch.a` contain slashes). */
 const fileSafe = (key: string) => key.replace(/[\/:*?"<>|]+/g, '__');
@@ -330,6 +353,8 @@ export function reviewEntry(key: string, e: Entry, sprites: string) {
       // drawing's own anchor was
       offsets.push({ facing, dx: fit.dx, dy: fit.dy });
     } else if (fit.spill.length) issues.push(`${facing}: ${fit.spill.join('; ')}`);
+    const cut = slicedTop(p.img);
+    if (cut && (facing === 'se' || facing === 'ne' || !p.mirrored)) issues.push(`${facing}: top sliced flat (${cut} px) in ${p.file}`);
     const sp = specks(p.img);
     if (sp.length && (facing === 'se' || facing === 'ne' || !p.mirrored)) issues.push(`${facing}: ${sp.length} stray bit(s) (${sp.join(', ')} px) in ${p.file}`);
   }

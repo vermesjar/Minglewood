@@ -8,6 +8,7 @@ import { EMOTES, STATUS_META, type EmoteId } from '@shared/presence';
 import { isoToScreen, screenToIso } from '@shared/iso';
 import type { Facing, NpcDef, SceneDef, SceneObject } from '@shared/world/scene';
 import type { NpcState } from '@shared/protocol';
+import { carryMeta } from '@shared/carry';
 import { footprint } from '@shared/world/scene';
 import { positionAlong, type Tile } from '@shared/world/pathfinding';
 import { Camera } from './camera';
@@ -18,7 +19,7 @@ import { renderInteriorShell, type InteriorLayer } from './interior';
 import { skyAt, windowView, type Sky } from './weather';
 import { artLight, artSeat } from './sprites/art';
 import { ObjectAnimations } from './animations';
-import { INK_CSS, PAPER, UI_FONT, pill, roundRect, speechBubble } from './overlays';
+import { INK_CSS, PAPER, UI_FONT, drawBubble, layoutBubbles, pill, roundRect, type BubbleSpec, type Rect } from './overlays';
 import { AVATAR_CROPS, avatarSprite, usesWheelchair, type Expression, type Pose } from './sprites/avatar';
 import { festiveFor, spriteFor } from './sprites/registry';
 import { blit, highlightOf, spriteSize, type Sprite } from './sprites/painter';
@@ -457,6 +458,13 @@ export class WorldView {
     return { x: a.x, y: a.y, moving: false };
   }
 
+  /** The floor tile under a canvas point (CSS px), e.g. where a click landed. */
+  tileAt(sx: number, sy: number): Tile {
+    const [ax, ay] = this.camera.toWorld(sx, sy, this.vw, this.vh);
+    const g = screenToIso(ax, ay);
+    return [Math.floor(g.x), Math.floor(g.y)];
+  }
+
   actorTile(id: string): Tile | null {
     const a = this.actors.get(id);
     if (!a) return null;
@@ -493,6 +501,15 @@ export class WorldView {
     if (emote === 'celebrate') this.effects.burst(p.x, p.y, 'confetti', 30);
     if (emote === 'heart') this.effects.burst(p.x, p.y, 'hearts', 8);
     if (emote === 'clap' || emote === 'idea') this.effects.burst(p.x, p.y, 'sparkle', 8);
+  }
+
+  /** Something landed in someone's hands: the item pops up over their head with a little sparkle. */
+  gotItem(memberId: string, emoji: string) {
+    const a = this.actors.get(memberId);
+    if (!a) return;
+    a.emotes.push({ emoji, start: performance.now() });
+    const p = isoToScreen(a.x + 0.5, a.y + 0.5, 30);
+    this.effects.burst(p.x, p.y, 'sparkle', 10);
   }
 
   /** The room's NPCs as the server has them (a newcomer's snapshot). */
@@ -941,73 +958,90 @@ export class WorldView {
     return this.camera.toScreen(a.sx, a.sy - top, this.vw, this.vh);
   }
 
+  /**
+   * Heads-up over the people in the scene, Habbo-style: quiet by default. Names show for whoever you hover or
+   * select (or everyone, with the "show all names" preference); your own figure always carries a small "You"
+   * tag; presence dots only where they say something (open to chat, heads-down, away — not plain available).
+   * Speech bubbles carry the speaker's head and name, and are laid out together so they never overlap: the
+   * newest sits over its speaker, older ones rise and fade.
+   */
+  private bubbleMemory = new Map<string, { dx: number; dy: number }>();
+
   private drawActorOverlays() {
     const c = this.ctx;
     const z = this.camera.zoom;
-    const interior = this.scene?.kind === 'interior';
     const now = performance.now();
     const list = [...this.actors.values()].sort((p, q) => p.sy - q.sy);
+    const obstacles: Rect[] = [];
+    const bubbles: BubbleSpec[] = [];
+    const emotes: Array<{ a: ActorView; x: number; top: number }> = [];
+    // the bubble's little head: a 24 × 24 crop of the sprite at 1:1, crown to chin
+    const headCrop = { x: 33, y: 33, w: 24, h: 24 };
     for (const a of list) {
       const [hx, hy] = this.headScreen(a);
       if (hx < -100 || hy < -100 || hx > this.vw + 100 || hy > this.vh + 200) continue;
       const id = a.occ.memberId;
       const isMe = id === this.meId;
       const hovered = this.hover?.kind === 'actor' && this.hover.id === id;
-      const showName = hovered || id === this.selectedActor || this.showAllNames || (interior ? z >= 1.5 : z >= 2.6) || !!a.bubble;
+      const focus = hovered || id === this.selectedActor;
+      const showName = focus || this.showAllNames;
       let top = hy - 4;
       if (a.npc) {
-        // a room NPC: name, role and an NPC tag — never a presence dot, never mistaken for a coworker
+        // a room NPC: "Name · Role" and an NPC tag when you look at them — never a presence dot
         if (showName) {
-          const r = pill(c, hx, top, `${a.npc.def.name} · ${a.npc.def.role}`, { size: 11, bg: hovered ? '#ffffff' : 'rgba(255,248,236,0.94)', padX: 6 });
+          const r = pill(c, hx, top, `${a.npc.def.name} · ${a.npc.def.role}`, { size: 11, bg: hovered ? '#ffffff' : 'rgba(255,248,236,0.96)', padX: 6 });
           const tag = pill(c, hx, r.y - 3, 'NPC', { size: 9, bg: '#2f5d46', fg: '#f4efe6', padX: 4 });
+          obstacles.push(r, tag);
           top = tag.y - 3;
         }
-        if (a.bubble) {
-          const age = now - a.bubble.start;
-          const alpha = Math.min(1, age / 150, (a.bubble.until - now) / 400);
-          speechBubble(c, hx, top, a.bubble.text, Math.max(0, alpha));
+      } else {
+        const meta = STATUS_META[a.occ.status];
+        if (a.occ.status !== 'available' || focus || this.showAllNames) {
+          const dx = hx + (9 * Math.min(z, 3)) / 2;
+          c.fillStyle = INK_CSS;
+          c.beginPath();
+          c.arc(dx, hy + 4, 4.5, 0, Math.PI * 2);
+          c.fill();
+          c.fillStyle = meta.color;
+          c.beginPath();
+          c.arc(dx, hy + 4, 3, 0, Math.PI * 2);
+          c.fill();
         }
-        continue;
+        if (showName || isMe) {
+          const name = isMe ? 'You' : this.cb.nameOf(id).split(' ')[0];
+          const voice = a.occ.voice || a.occ.via === 'provider' ? ' 🎧' : '';
+          // what they're holding rides along on the tag ("You ☕")
+          const held = carryMeta(a.occ.carrying);
+          const r = pill(c, hx, top, name + voice + (held ? ` ${held.emoji}` : ''), {
+            size: isMe && !focus ? 10 : 11,
+            bg: isMe ? '#ffd23f' : hovered ? '#ffffff' : 'rgba(255,248,236,0.96)',
+            padX: isMe && !focus ? 5 : 6,
+          });
+          obstacles.push(r);
+          top = r.y - 3;
+        }
       }
-      // status dot
-      const meta = STATUS_META[a.occ.status];
-      c.fillStyle = INK_CSS;
-      c.beginPath();
-      c.arc(hx + 9 * Math.min(z, 3) / 2, hy + 4, 4.5, 0, Math.PI * 2);
-      c.fill();
-      c.fillStyle = meta.color;
-      c.beginPath();
-      c.arc(hx + 9 * Math.min(z, 3) / 2, hy + 4, 3, 0, Math.PI * 2);
-      c.fill();
-
-      if (showName) {
-        const name = isMe ? 'You' : this.cb.nameOf(id).split(' ')[0];
-        const voice = a.occ.voice ? ' 🎧' : a.occ.via === 'provider' ? ' 🎧' : '';
-        const r = pill(c, hx, top, name + voice, {
-          size: 11,
-          bg: isMe ? '#ffd23f' : hovered ? '#ffffff' : 'rgba(255,248,236,0.94)',
-          padX: 6,
-        });
-        top = r.y - 3;
-      } else if (isMe) {
-        const bob = this.reducedMotion ? 0 : Math.sin(now / 250) * 2;
-        c.fillStyle = '#ffd23f';
-        c.strokeStyle = INK_CSS;
-        c.lineWidth = 2;
-        c.beginPath();
-        c.moveTo(hx - 6, top - 10 + bob);
-        c.lineTo(hx + 6, top - 10 + bob);
-        c.lineTo(hx, top - 2 + bob);
-        c.closePath();
-        c.fill();
-        c.stroke();
-        top -= 12;
-      }
-      if (a.bubble) {
+      if (a.bubble && now < a.bubble.until) {
         const age = now - a.bubble.start;
-        const alpha = Math.min(1, age / 150, (a.bubble.until - now) / 400);
-        top = speechBubble(c, hx, top, a.bubble.text, Math.max(0, alpha)) - 2;
+        const spr = avatarSprite(this.look(a), 'se', 'stand');
+        bubbles.push({
+          key: id,
+          anchorX: hx,
+          anchorY: top,
+          name: a.npc ? a.npc.def.name : isMe ? 'You' : this.cb.nameOf(id).split(' ')[0],
+          text: a.bubble.text,
+          start: a.bubble.start,
+          alpha: Math.max(0, Math.min(1, age / 150, (a.bubble.until - now) / 400)),
+          accent: a.npc ? '#2f5d46' : undefined,
+          head: { img: spr.canvas, sx: headCrop.x, sy: headCrop.y, sw: headCrop.w, sh: headCrop.h },
+        });
       }
+      if (a.emotes.length) emotes.push({ a, x: hx, top });
+    }
+    // every bubble placed at once (so none covers another), drawn oldest first so the newest reads on top
+    const placed = layoutBubbles(c, bubbles, obstacles, this.vw, this.bubbleMemory);
+    for (const b of placed.sort((p, q) => p.start - q.start)) drawBubble(c, b);
+    for (const { a, x, top } of emotes)
       for (const e of a.emotes) {
         const k = (now - e.start) / 1800;
         const rise = (this.reducedMotion ? 0.3 : k) * 34;
@@ -1016,10 +1050,9 @@ export class WorldView {
         c.font = `${Math.round(20 * pop)}px ${UI_FONT}`;
         c.textAlign = 'center';
         c.textBaseline = 'bottom';
-        c.fillText(e.emoji, hx, top - rise);
+        c.fillText(e.emoji, x, top - rise);
         c.globalAlpha = 1;
       }
-    }
   }
 
   private glintCanvas: HTMLCanvasElement | null = null;
@@ -1283,7 +1316,12 @@ export class WorldView {
       if (!o.roomId) continue;
       const b = this.badges.get(o.roomId);
       const hovered = this.hover?.kind === 'object' && this.hover.id === o.id;
-      const label = z < 1.4 ? `${b?.emoji ?? ''} ${b?.count ?? 0}` : `${b?.emoji ?? ''} ${b?.name ?? o.label ?? ''}`;
+      const name = `${b?.emoji ?? ''} ${b?.name ?? o.label ?? ''}`.trim();
+      const occupied = !!b && b.count > 0;
+      // Zoomed out, a badge only says who's where: an empty building shows nothing (its name on hover), never
+      // a "0". Closer in, every building carries its name as a sign, with faces and a count when occupied.
+      if (z < 1.4 && !occupied && !hovered && !b?.event) continue;
+      const label = z < 1.4 && !hovered && occupied ? `${b.emoji} ${b.count}`.trim() : name;
       const size = z < 1.4 ? 11 : 12;
       c.font = `800 ${size}px ${UI_FONT}`;
       const lw = Math.ceil(c.measureText(label).width) + 14 + (b && b.count > 0 && z >= 1.4 ? Math.min(4, b.faces.length) * 13 + 22 : 0);

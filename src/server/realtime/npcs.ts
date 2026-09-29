@@ -184,6 +184,13 @@ export class NpcDirector {
     if (!job) return;
     const now = this.clock();
     this.settle(n, now);
+    // mid-stroll: finish the step they're on first, then go (a new walk from where the last one started
+    // would snap them back across the bar)
+    const s = n.state;
+    if (s.path && s.pathStartedAt !== undefined) {
+      this.later(Math.max(0, s.pathStartedAt + walkMs(s.path) - now) + 20, () => this.next(sceneId, n));
+      return;
+    }
     // the spot nearest the machine, on the NPC's side of it
     const spot = n.def.spots.reduce((best, s) =>
       Math.hypot(s.x - job.machine.x, s.y - job.machine.y) < Math.hypot(best.x - job.machine.x, best.y - job.machine.y) ? s : best,

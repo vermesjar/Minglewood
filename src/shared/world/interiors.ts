@@ -93,12 +93,13 @@ export function buildInteriors(): SceneDef[] {
         x: 4,
         y: 1,
         z: COUNTER_TOP,
-        facing: 'sw',
+        // its working face toward the barista; guests see the back panel and plaque, as in a real café
+        facing: 'ne',
         label: 'Espresso machine',
         actions: [{ kind: 'vend', item: 'coffee', label: 'Get a coffee' }],
       },
       { sprite: 'grinder', x: 5, y: 1, z: COUNTER_TOP, label: 'Coffee grinder' },
-      { sprite: 'register', x: 6, y: 1, z: COUNTER_TOP, facing: 'sw' },
+      { sprite: 'register', x: 6, y: 1, z: COUNTER_TOP, facing: 'ne' },
       { sprite: 'jar', x: 7, y: 1, z: COUNTER_TOP, label: 'Biscotti' },
       { sprite: 'backbar', wall: 'right', x: 5, y: 0, w: 3, label: 'Back bar' },
       { sprite: 'stool', x: 6, y: 2, actions: sit },
@@ -110,11 +111,9 @@ export function buildInteriors(): SceneDef[] {
       { sprite: 'table-round', x: 4, y: 4 },
       chair(3, 4, 'se', 'cafe'),
       chair(5, 4, 'nw', 'cafe'),
-      chair(4, 5, 'ne', 'cafe'),
       { sprite: 'table-round', x: 8, y: 3 },
       chair(7, 3, 'se', 'cafe'),
       chair(9, 3, 'nw', 'cafe'),
-      chair(8, 4, 'ne', 'cafe'),
       { sprite: 'table-round', x: 4, y: 8 },
       chair(3, 8, 'se', 'cafe'),
       chair(5, 8, 'nw', 'cafe'),
@@ -311,7 +310,7 @@ export function buildInteriors(): SceneDef[] {
       { sprite: 'couch', x: 2, y: 7, w: 1, d: 2, facing: 'se', variant: 'blue', actions: sit },
       { sprite: 'table-low', x: 3, y: 7, w: 1, d: 2 },
       { sprite: 'couch', x: 4, y: 7, w: 1, d: 2, facing: 'nw', variant: 'blue', actions: sit },
-      { id: 'hq-armchair', sprite: 'armchair', variant: 'mustard', x: 3, y: 6, facing: 'sw', actions: sit },
+      { id: 'hq-armchair', sprite: 'armchair', variant: 'mustard', x: 5, y: 6, facing: 'sw', actions: sit },
       { id: 'hq-side-table', sprite: 'table-side', variant: 'brass', x: 2, y: 6 },
       { id: 'hq-lamp', sprite: 'lamp', x: 1, y: 8, actions: [{ kind: 'toggle', label: 'Switch the lamp' }] },
       // Visitors wait on benches facing reception across the star.
@@ -475,7 +474,7 @@ export function buildInteriors(): SceneDef[] {
       { id: 'eng-meet-rug', sprite: 'rug', x: 1, y: 9, w: 4, d: 3, flat: true, variant: 'teal' },
       { id: 'eng-meet-table', sprite: 'table-low', x: 2, y: 10, w: 1, d: 2 },
       { id: 'eng-meet-sofa', sprite: 'couch', variant: 'blue', x: 3, y: 10, w: 1, d: 2, facing: 'nw', actions: sit },
-      { id: 'eng-meet-chair', sprite: 'armchair', variant: 'mustard', x: 2, y: 9, facing: 'sw', actions: sit },
+      { id: 'eng-meet-chair', sprite: 'armchair', variant: 'mustard', x: 1, y: 11, facing: 'se', actions: sit },
       { id: 'eng-meet-lamp', sprite: 'lamp', x: 4, y: 9, actions: [{ kind: 'toggle', label: 'Switch the lamp' }] },
       // The lounge: a sofa and a coffee table anchor the beanbags.
       { id: 'eng-lounge-rug', sprite: 'rug', x: 10, y: 6, w: 5, d: 5, flat: true, variant: 'teal' },
@@ -484,7 +483,7 @@ export function buildInteriors(): SceneDef[] {
       { id: 'eng-lounge-table', sprite: 'table-low', x: 11, y: 7, w: 2, d: 1 },
       { sprite: 'beanbag', x: 11, y: 8, variant: 'orange', actions: sit },
       { sprite: 'beanbag', x: 12, y: 8, variant: 'purple', actions: sit },
-      { sprite: 'beanbag', x: 13, y: 7, variant: 'cyan', actions: sit },
+      { sprite: 'beanbag', x: 10, y: 8, variant: 'cyan', actions: sit },
       { id: 'eng-lounge-side', sprite: 'table-low', x: 10, y: 7, w: 1, d: 1, variant: 'side' },
       plant(15, 10, 'b'),
       // A second, smaller pod at the front for the platform team.
@@ -653,14 +652,12 @@ export function buildInteriors(): SceneDef[] {
       { sprite: 'window', wall: 'left', x: 0, y: 6, d: 2 },
       { id: 'events-bistro-2', sprite: 'table-round', x: 1, y: 6 },
       { id: 'events-bistro-2-chair-1', ...chair(1, 5, 'sw', 'cafe') },
-      { id: 'events-bistro-2-chair-2', ...chair(2, 6, 'nw', 'cafe') },
       { id: 'events-bistro-2-chair-3', ...chair(1, 7, 'ne', 'cafe') },
       { id: 'events-lantern-1', sprite: 'lantern-floor', x: 0, y: 8, actions: [{ kind: 'toggle', label: 'Switch the lantern' }] },
       // By the piano, for the people who come for the music.
       { id: 'events-bistro', sprite: 'table-round', x: 14, y: 6 },
       { id: 'events-bistro-chair-1', ...chair(13, 6, 'se', 'cafe') },
       { id: 'events-bistro-chair-2', ...chair(15, 6, 'nw', 'cafe') },
-      { id: 'events-bistro-chair-3', ...chair(14, 7, 'ne', 'cafe') },
       // The front of the hall: standing tables on a rose rug for mingling after the talk.
       { id: 'events-mingle-rug', sprite: 'rug', x: 3, y: 10, w: 8, d: 3, flat: true, variant: 'rose' },
       { id: 'events-cocktail-1', sprite: 'cocktail-table', x: 4, y: 11 },
@@ -720,7 +717,7 @@ export function buildInteriors(): SceneDef[] {
       { sprite: 'rug', x: 9, y: 1, w: 3, d: 2, flat: true, variant: 'cream' },
       { sprite: 'fireplace', x: 10, y: 0, w: 1, d: 1, facing: 'sw', label: 'Fireplace', actions: [{ kind: 'toggle', label: 'Light the fire' }] },
       { sprite: 'armchair', x: 9, y: 1, facing: 'se', variant: 'green', actions: sit },
-      { sprite: 'armchair', x: 10, y: 2, facing: 'ne', variant: 'green', actions: sit },
+      { sprite: 'armchair', x: 11, y: 1, facing: 'nw', variant: 'green', actions: sit },
       { id: 'focus-fire-table', sprite: 'side-table', variant: 'walnut', x: 9, y: 2, actions: [{ kind: 'toggle', label: 'Switch the lamp' }] },
       { id: 'focus-fern-1', sprite: 'plant', variant: 'fern', x: 11, y: 0 },
       // The window nook: a rust wingback and a banker's lamp.
@@ -735,13 +732,12 @@ export function buildInteriors(): SceneDef[] {
       chair(4, 5, 'ne'),
       chair(5, 5, 'ne'),
       { id: 'focus-globe', sprite: 'globe-stand', x: 6, y: 4, label: 'The old globe' },
-      // The reading circle: three wingbacks and an ottoman round the marble table, on a big forest rug.
+      // The reading circle: two wingbacks facing across the marble table, an ottoman footrest, on a forest rug.
       { id: 'focus-circle-rug', sprite: 'rug', x: 7, y: 5, w: 5, d: 5, flat: true, variant: 'forest' },
       { sprite: 'armchair', x: 8, y: 7, facing: 'se', variant: 'rust', actions: sit },
       { sprite: 'table-round', x: 9, y: 7 },
       { sprite: 'armchair', x: 10, y: 7, facing: 'nw', variant: 'rust', actions: sit },
-      { id: 'focus-circle-chair', sprite: 'armchair', x: 9, y: 6, facing: 'sw', variant: 'green', actions: sit },
-      { id: 'focus-ottoman', sprite: 'ottoman', variant: 'green', x: 9, y: 8, actions: sit },
+      { id: 'focus-ottoman', sprite: 'ottoman', variant: 'green', x: 9, y: 8, label: 'Footrest' },
       { sprite: 'lamp', x: 8, y: 6 },
       { id: 'focus-circle-books', sprite: 'book-stack', x: 10, y: 8 },
       // A second nook by the door: two wingbacks and a side table.
@@ -849,7 +845,6 @@ export function buildInteriors(): SceneDef[] {
       { id: 'arcade-high-table', sprite: 'table-high', variant: 'neon', x: 4, y: 8 },
       { id: 'arcade-stool-3', sprite: 'stool', variant: 'neon', x: 3, y: 8, actions: sit },
       { id: 'arcade-stool-4', sprite: 'stool', variant: 'neon', x: 5, y: 8, actions: sit },
-      { id: 'arcade-stool-5', sprite: 'stool', variant: 'neon', x: 4, y: 9, actions: sit },
       { id: 'arcade-popcorn', sprite: 'popcorn-cart', x: 6, y: 7, label: 'Popcorn', actions: [{ kind: 'vend', item: 'popcorn', label: 'Grab some popcorn' }] },
       // Beanbags round a side table in the front corner.
       { id: 'arcade-lounge-rug', sprite: 'rug', x: 8, y: 6, w: 4, d: 4, flat: true, variant: 'cyan' },

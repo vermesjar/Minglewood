@@ -1,0 +1,36 @@
+{
+  "name": "fix-backs",
+  "note": "Critic pass: proper back views for pieces that turned to face the barista.",
+  "mood": "A warm, glossy vintage café: polished brass, walnut, cream enamel.",
+  "colors": 28,
+  "quality": "high",
+  "sheets": [
+    {
+      "name": "register-back",
+      "grid": "2x1",
+      "size": "1536x1024",
+      "tile": 300,
+      "refs": ["out/cafe/countertop/register.sw.raw.png"],
+      "note": "The second reference image is the finished FRONT of this exact cash register. Both cells show the SAME register: the left cell from the front, the right cell from BEHIND (the customer's side). Match its materials, colours, proportions and size exactly.",
+      "items": [
+        {
+          "facing": "sw",
+          "w": 1,
+          "d": 1,
+          "h": 16,
+          "prompt": "The antique brass cash register from the reference, seen from the FRONT: round typewriter keys in rows and the walnut cash drawer at the bottom. No text or numbers."
+        },
+        {
+          "key": "register",
+          "facing": "ne",
+          "w": 1,
+          "d": 1,
+          "h": 16,
+          "width": 36,
+          "fill": 0.3,
+          "prompt": "The SAME antique brass cash register seen from BEHIND, from the customer's side: NO keys and NO drawer are visible (they face away from us). The face toward the LOWER LEFT is the register's big flat back: a smooth polished brass panel with an ornate raised scrollwork border and a small oval brass maker's plate. On top, a little glass-fronted display box holds an upright round brass 'amount' flag facing the customer (toward the lower left). The face toward the lower right is the register's plain brass side panel. The walnut base plinth runs round the bottom. No text or numbers anywhere."
+        }
+      ]
+    }
+  ]
+}

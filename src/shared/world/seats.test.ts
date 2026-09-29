@@ -63,7 +63,12 @@ describe('using things', () => {
   });
 
   it('lists the tiles in front of an object first', () => {
+    // the machine's working face is toward the barista (ne = −y), so its front tile is behind the bar;
+    // guests still order from the room side (above) because that lane is staff-only
+    expect(machine.facing).toBe('ne');
     const [first] = approachTiles(machine);
-    expect(first).toEqual([machine.x, machine.y + 1]);
+    expect(first).toEqual([machine.x, machine.y - 1]);
+    const [fx, fy] = approachTiles({ ...machine, facing: 'sw' })[0];
+    expect([fx, fy]).toEqual([machine.x, machine.y + 1]);
   });
 });

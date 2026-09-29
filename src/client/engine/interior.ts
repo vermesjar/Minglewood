@@ -7,7 +7,7 @@
  * pools so they can follow the weather without re-rendering the room.
  */
 import { hash2 } from '@shared/world/builders';
-import { screenToIso } from '@shared/iso';
+import { isoToScreen, screenToIso } from '@shared/iso';
 import type { InteriorTheme, SceneDef } from '@shared/world/scene';
 import { footprint } from '@shared/world/scene';
 import { hexToRgb } from './sprites/color';
@@ -608,31 +608,94 @@ export function renderInteriorShell(scene: SceneDef, rc: InteriorRenderContext):
     }
   }
 
-  // Stage platforms (Lantern Hall) keep their vector look, at 2×.
-  ctx.putImageData(img, 0, 0);
-  const stages = scene.objects.filter((o) => o.flat && o.sprite === 'stage');
-  if (stages.length) {
-    ctx.save();
-    ctx.setTransform(S, 0, 0, S, -minX * S, -minY * S);
-    for (const o of stages) {
-      const f = footprint(o);
-      const h = 6;
-      const P = (x: number, y: number, z = 0): [number, number] => [(x - y) * 16, (x + y) * 8 - z];
-      const poly = (pts: Array<[number, number, number]>, fill: string) => {
-        ctx.fillStyle = fill;
-        ctx.beginPath();
-        pts.forEach(([x, y, z], i) => (i ? ctx.lineTo(...P(x, y, z)) : ctx.moveTo(...P(x, y, z))));
-        ctx.closePath();
-        ctx.fill();
-      };
-      poly([[f.x0, f.y1, 0], [f.x1, f.y1, 0], [f.x1, f.y1, h], [f.x0, f.y1, h]], '#6a3f27');
-      poly([[f.x1, f.y0, 0], [f.x1, f.y1, 0], [f.x1, f.y1, h], [f.x1, f.y0, h]], '#522f1f');
-      poly([[f.x0, f.y0, h], [f.x1, f.y0, h], [f.x1, f.y1, h], [f.x0, f.y1, h]], '#b0784a');
-      for (let y = f.y0 + 0.33; y < f.y1; y += 0.33) poly([[f.x0, y, h], [f.x1, y, h], [f.x1, y + 0.03, h], [f.x0, y + 0.03, h]], '#94623a');
-      poly([[f.x0, f.y1 - 0.06, h], [f.x1, f.y1 - 0.06, h], [f.x1, f.y1, h], [f.x0, f.y1, h]], '#d9a066');
-    }
-    ctx.restore();
+  // Stage platforms (Lantern Hall), drawn pixel by pixel at the shell's density like everything else:
+  // polished honey boards with staggered plank joints and a bright front lip with footlights, over a pleated
+  // plum velvet skirt with a brass rail, a shaded end panel, and a dark contact line on the floor.
+  for (const o of scene.objects.filter((ob) => ob.flat && ob.sprite === 'stage')) {
+    const f = footprint(o);
+    const h = 6;
+    const pal = {
+      board: C('#b98252'),
+      boardAlt: C('#ad7648'),
+      seam: C('#7a4c30'),
+      back: C('#8f5f3c'),
+      lip: C('#e9b87c'),
+      brass: C('#dcb04e'),
+      brassD: C('#a8741f'),
+      velvet: C('#7a2f52'),
+      velvetD: C('#5b2140'),
+      velvetL: C('#94406a'),
+      kick: C('#3a1a2c'),
+      bulb: C('#fff0b8'),
+      socket: C('#5a3a22'),
+    };
+    const corners = [
+      isoToScreen(f.x0, f.y0, h),
+      isoToScreen(f.x1, f.y0, h),
+      isoToScreen(f.x1, f.y1, 0),
+      isoToScreen(f.x0, f.y1, 0),
+      isoToScreen(f.x0, f.y1, h),
+    ];
+    const px0 = Math.max(0, Math.floor((Math.min(...corners.map((q) => q.x)) - minX) * S) - 1);
+    const px1 = Math.min(cw - 1, Math.ceil((Math.max(...corners.map((q) => q.x)) - minX) * S) + 1);
+    const py0 = Math.max(0, Math.floor((Math.min(...corners.map((q) => q.y)) - minY) * S) - 1);
+    const py1 = Math.min(ch - 1, Math.ceil((Math.max(...corners.map((q) => q.y)) - minY) * S) + 1);
+    const hash = (x: number, y: number) => {
+      let n = Math.imul(x * 374761393 + y * 668265263, 1274126177);
+      n ^= n >>> 13;
+      return ((n >>> 0) % 1000) / 1000;
+    };
+    for (let py = py0; py <= py1; py++)
+      for (let px = px0; px <= px1; px++) {
+        const ax = minX + (px + 0.5) / S;
+        const ay = minY + (py + 0.5) / S;
+        let rgb: RGB | null = null;
+        // the top at height h
+        const tx = (ax / 16 + (ay + h) / 8) / 2;
+        const ty = ((ay + h) / 8 - ax / 16) / 2;
+        if (tx >= f.x0 && tx < f.x1 && ty >= f.y0 && ty < f.y1) {
+          const plank = Math.floor((ty - f.y0) * 4);
+          const along = tx - f.x0 + ((plank * 0.61) % 1.4);
+          if (ty > f.y1 - 0.08) {
+            // the front lip, with a footlight every tile
+            const fx = (tx - f.x0) % 1;
+            rgb = fx > 0.47 && fx < 0.53 ? pal.bulb : fx > 0.44 && fx < 0.56 ? pal.socket : pal.lip;
+          } else if (ty < f.y0 + 0.05) rgb = pal.back;
+          else if (((ty - f.y0) * 4) % 1 < 0.1 || along % 1.4 < 0.035) rgb = pal.seam;
+          else {
+            rgb = plank % 2 ? pal.boardAlt : pal.board;
+            const g = hash(Math.floor(tx * 24), plank);
+            if (g > 0.86) rgb = dark(rgb, 0.08);
+            else if (g < 0.1) rgb = light(rgb, 0.08);
+            if (tx > f.x1 - 0.05) rgb = light(rgb, 0.12);
+          }
+        } else {
+          // the front face (the y = y1 plane)
+          const fx = ax / 16 + f.y1;
+          const fz = (fx + f.y1) * 8 - ay;
+          if (fx >= f.x0 && fx <= f.x1 && fz >= 0 && fz <= h) {
+            if (fz > h - 1) rgb = pal.brass;
+            else if (fz > h - 1.5) rgb = pal.brassD;
+            else if (fz < 0.5) rgb = pal.kick;
+            else {
+              const pleat = ((fx - f.x0) * 10) % 1;
+              rgb = pleat < 0.18 ? pal.velvetD : pleat < 0.42 ? pal.velvetL : pal.velvet;
+            }
+          } else {
+            // the end face (the x = x1 plane), in shade
+            const ey = f.x1 - ax / 16;
+            const ez = (f.x1 + ey) * 8 - ay;
+            if (ey >= f.y0 && ey <= f.y1 && ez >= 0 && ez <= h) {
+              if (ez > h - 1) rgb = pal.brassD;
+              else if (ez < 0.5) rgb = pal.kick;
+              else rgb = ((ey - f.y0) * 10) % 1 < 0.2 ? dark(pal.velvetD, 0.15) : pal.velvetD;
+            }
+          }
+        }
+        if (rgb) put((py * cw + px) * 4, rgb);
+      }
   }
+  ctx.putImageData(img, 0, 0);
 
   // A 1 px plum outline around the whole diorama (not around the window openings).
   const out = ctx.getImageData(0, 0, cw, ch);

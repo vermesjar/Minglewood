@@ -64,6 +64,9 @@ export interface Frame {
   heelFar?: boolean;
   sitting: boolean;
   body: Body;
+  /** Where a carried thing is held, and whether it's in front of the body in this view. */
+  hold: Pt;
+  holdInFront: boolean;
 }
 
 const CX = 45;
@@ -120,7 +123,11 @@ function upper(view: View, dy: number, body: Body) {
   };
 }
 
-export function frameFor(view: View, pose: Pose, body: Body = 'a'): Frame {
+/**
+ * `carry`: holding something to show (a cup, a soda, popcorn, a plush): one arm is bent with the hand raised in
+ * front of the chest (seen from the front) or held out at the side (seen from behind), and doesn't swing.
+ */
+export function frameFor(view: View, pose: Pose, body: Body = 'a', carry = false): Frame {
   const sitting = pose === 'sit';
   const dy = sitting ? 6 : pose === 'walk1' || pose === 'walk2' ? 1 : 0;
   const U = upper(view, dy, body);
@@ -144,6 +151,14 @@ export function frameFor(view: View, pose: Pose, body: Body = 'a'): Frame {
   } else if (sitting) {
     armNear = { a: [CX - 9, s + 3], m: [CX - 9, s + 11], b: [CX - 3, s + 16] };
     armFar = { a: [CX + 10, s + 3], m: [CX + 11, s + 10], b: [CX + 10, s + 15] };
+  }
+  const carrying = carry && (pose === 'stand' || pose === 'walk1' || pose === 'walk2');
+  if (carrying && view === 'front') {
+    // the near arm: elbow at the waist, forearm forward, hand up in front of the chest
+    armNear = { a: [CX - 9, s + 3], m: [CX - 9, s + 11], b: [CX - 3, s + 9] };
+  } else if (carrying) {
+    // from behind the far-side arm is the one in front of the body: held out and up so the item shows
+    armFar = { a: [CX + 10, s + 3], m: [CX + 12, s + 10], b: [CX + 15, s + 7] };
   }
   if (body === 'b') {
     // narrower shoulders: the arms hang two pixels further in
@@ -175,10 +190,13 @@ export function frameFor(view: View, pose: Pose, body: Body = 'a'): Frame {
     legNear = { a: [CX - 4, h], m: [CX + 7, h + 3], b: [CX + 8, 98] };
     legFar = { a: [CX + 4, h - 1], m: [CX + 13, h + 2], b: [CX + 14, 97] };
   }
+  const holdLimb = carrying ? (view === 'front' ? armNear : armFar) : pose === 'wave' ? armFar : armNear;
   return {
     view,
     pose,
     body,
+    hold: hand(holdLimb),
+    holdInFront: carrying || view === 'front',
     ...U,
     armNear,
     armFar,

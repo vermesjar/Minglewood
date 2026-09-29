@@ -7,6 +7,8 @@
  *     way the client resolves them (art.ts: facings, mirroring, small pieces centred on their footprint) and
  *     read per pixel column, so a thin lamp pole beside a frame doesn't count, but its shade in front does.
  *     The memory-wall slots (where future artifacts will hang) are checked too.
+ *   - crowding: an occupied seat whose sitter would cover the face and body of someone sitting just behind
+ *     them in the same screen column (see crowdedSeats).
  *
  *   npx tsx scripts/room-map.ts [roomId ...] [--quiet]     (exits 1 if anything is wrong)
  */
@@ -14,7 +16,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import { inflateSync } from 'node:zlib';
 import { buildInteriors } from '../src/shared/world/interiors';
 import { MEMORY_SLOTS } from '../src/shared/world/memory';
-import { footprint, type Facing, type SceneDef, type SceneObject } from '../src/shared/world/scene';
+import { footprint, isSeat, type Facing, type SceneDef, type SceneObject } from '../src/shared/world/scene';
+import { seatSpots } from '../src/shared/world/seats';
 import { WalkGrid } from '../src/shared/world/walkGrid';
 import { centredAnchor } from '../src/client/engine/sprites/footing';
 
@@ -276,6 +279,42 @@ function occlusions(s: SceneDef): string[] {
   return out;
 }
 
+/* ------------------------------------------------------------------ sitters crowding each other */
+/**
+ * Two occupied seats whose sitters land in the same screen column, the nearer one close enough in depth that
+ * its figure covers the farther sitter's face and body (an armchair tucked behind a sofa cushion). Only a
+ * sitter who faces the camera (se / sw) can be crowded this way: rows of backs (an audience, the near side of
+ * a desk pod) overlap naturally. Figures are the kit's seated silhouette in world px from the sitter's anchor:
+ * about 22 px wide, 34 px tall, lifted by the seat's height.
+ */
+function crowdedSeats(s: SceneDef): string[] {
+  const manifest = existsSync('public/art/manifest.json') ? JSON.parse(readFileSync('public/art/manifest.json', 'utf8')).sprites : {};
+  const seatH = (o: SceneObject): number => {
+    const e = (o.variant && manifest[`${o.sprite}.${o.variant}`]) || manifest[o.sprite];
+    return typeof e?.seat === 'number' ? e.seat - 6.5 : 4;
+  };
+  const spots = s.objects.filter(isSeat).flatMap((o) => seatSpots(o, s).map((sp) => ({ o, sp, lift: seatH(o) })));
+  const out: string[] = [];
+  for (const a of spots)
+    for (const b of spots) {
+      if (a === b || a.o === b.o) continue;
+      if (a.sp.facing !== 'se' && a.sp.facing !== 'sw') continue;
+      // b in front of a (greater depth)
+      const da = a.sp.x + a.sp.y;
+      const db = b.sp.x + b.sp.y;
+      if (db <= da || db - da > 3) continue;
+      const ax = (a.sp.x - a.sp.y) * 16;
+      const bx = (b.sp.x - b.sp.y) * 16;
+      if (Math.abs(ax - bx) >= 12) continue;
+      const ay = (da + 1) * 8 - a.lift;
+      const by = (db + 1) * 8 - b.lift;
+      // b's figure top (by - 34) above a's seat line (ay) by more than a few px: it covers a's torso and face
+      const cover = ay - (by - 34);
+      if (cover > 6) out.push(`${s.id}: sitter on ${b.o.id} (${b.sp.x},${b.sp.y}) covers the sitter facing out on ${a.o.id} (${a.sp.x},${a.sp.y}) by ${Math.round(cover)}px`);
+    }
+  return out;
+}
+
 /* ------------------------------------------------------------------ report */
 const args = process.argv.slice(2);
 const quiet = args.includes('--quiet');
@@ -336,6 +375,10 @@ for (const s of buildInteriors()) {
   }
   say('  ' + [...key].map(([n, l]) => `${l}=${n}`).join(' '));
   for (const line of occlusions(s)) {
+    console.log(`  ! ${line}`);
+    problems++;
+  }
+  for (const line of crowdedSeats(s)) {
     console.log(`  ! ${line}`);
     problems++;
   }

@@ -54,11 +54,10 @@ export function SearchPalette() {
         title: m.displayName,
         sub: `${m.title} · ${d?.online ? `${STATUS_META[d.status].label}${room ? ` in ${room.name}` : d.sceneId === TOWN_ID ? ' in town' : ''}` : 'Offline'}`,
         score: s + (d?.online ? 0.5 : 0),
+        // a person opens their card (wherever they are); jumping to them is a choice made from the card
         run: () => {
           close();
-          if (d?.sceneId) game.goToMember(m.id);
-          const p = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
-          setTimeout(() => game.selectMember(m.id, game.world?.actorScreen(m.id) ?? p), d?.sceneId ? 1300 : 0);
+          game.showMember(m.id);
         },
       });
     }
@@ -140,7 +139,7 @@ export function SearchPalette() {
           })}
           {results.length === 0 && <li className="empty">No matches. Try a name, a team, or a place like “café”.</li>}
         </ul>
-        <p className="fineprint">Jumping to someone puts you right next to them — no long walks.</p>
+        <p className="fineprint">Pick someone to see their card — join them from there, no long walks.</p>
       </div>
     </Modal>
   );

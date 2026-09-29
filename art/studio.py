@@ -596,6 +596,47 @@ def run_sheet(spec: dict, sheet: dict, a) -> list[dict]:
     return results
 
 
+def lean(img: Image.Image) -> float:
+    """How far the top quarter of a drawing sits right (+) or left (−) of its centre, as a fraction of its width
+    (check_facings.py's test: a seat's backrest says which way it faces)."""
+    al = np.array(img.convert("RGBA"))[..., 3] > 0
+    ys, xs = np.where(al)
+    if not len(xs):
+        return 0.0
+    h = ys.max() - ys.min() + 1
+    _, tx = np.where(al[ys.min(): ys.min() + max(3, h // 4)])
+    return float((tx.mean() - xs.mean()) / (xs.max() - xs.min() + 1))
+
+
+def orient_backs(results: list[dict], m: dict) -> None:
+    """The model sometimes draws a back view facing the front's way (a chair's back view leaning like its front):
+    published as-is, it would sit sideways to its desk. For one-tile seats, compare each back view's lean with its
+    front's (normalised to se / nw: sw and ne are mirrors) and flip any that lean the wrong way."""
+    fronts: dict[str, float] = {}
+    for r in results:
+        if r.get("facing") in ("se", "sw"):
+            v = lean(r["img"])
+            fronts[r["key"]] = v if r["facing"] == "se" else -v
+    for r in results:
+        if r.get("facing") not in ("ne", "nw") or r.get("footprint") != [1, 1]:
+            continue
+        seat = r.get("extra", {}).get("seat") is not None or m["sprites"].get(r["key"], {}).get("seat") is not None
+        if not seat:
+            continue
+        front = fronts.get(r["key"])
+        if front is None:
+            e = m["sprites"].get(r["key"], {}).get("facings", {})
+            rec, sign = (e.get("se"), 1) if e.get("se") else (e.get("sw"), -1)
+            if not rec:
+                continue
+            front = sign * lean(Image.open(PUBLIC / "sprites" / rec["file"]))
+        back = lean(r["img"]) * (1 if r["facing"] == "nw" else -1)
+        if abs(front) >= 0.06 and abs(back) > 0.03 and (front < 0) == (back < 0):
+            r["img"] = r["img"].transpose(Image.FLIP_LEFT_RIGHT)
+            r["anchor"] = (r["img"].width - r["anchor"][0], r["anchor"][1])
+            print(f"  ! {r['key']}.{r['facing']}: back view leaned like its front; flipped (lean {front:+.2f} / {back:+.2f})")
+
+
 def cmd_build(a):
     import concurrent.futures as cf  # noqa: PLC0415
     spec = json.loads(Path(a.spec).read_text(encoding="utf-8"))
@@ -612,6 +653,7 @@ def cmd_build(a):
     skip = set((a.skip or "").split(","))
     with ManifestLock():
         m = load_manifest()
+        orient_backs([r for _, res in done for r in res], m)
         for sh, res in done:
             for r in res:
                 if not a.no_publish and r["key"] not in skip:
