@@ -204,6 +204,22 @@ export const BUILDINGS: BuildingDef[] = [
   },
 ];
 
+/**
+ * Tiles in front of each building that its drawing stands on — steps' side blocks, column plinths, planters, a
+ * parked bike — kept out of reach so nobody stands inside a stoop. Measured from the art by
+ * scripts/town-stoops.ts (which fails the gate if a covered front tile is walkable); the door tile and the tile
+ * it opens onto stay free.
+ */
+const STOOP_BLOCKS: Record<string, Array<[number, number]>> = {
+  'b-hq': [[31, 23], [32, 23], [32, 24], [33, 23], [33, 24], [34, 23], [34, 24], [36, 23], [36, 24], [37, 23], [37, 24], [38, 23], [38, 24]],
+  'b-cafe': [[55, 30], [57, 30], [58, 30], [61, 25]],
+  'b-focus': [[15, 7], [15, 8], [15, 9], [15, 11]],
+  'b-eng': [[28, 40], [28, 41], [29, 41]],
+  'b-design': [[28, 53], [28, 55], [28, 56], [28, 57]],
+  'b-launch': [[28, 64]],
+  'b-events': [[40, 63], [41, 63], [42, 63], [45, 63], [46, 63], [47, 63]],
+};
+
 function doorTile(b: BuildingDef): { x: number; y: number } {
   return b.spec.doorFace === 'left'
     ? { x: b.x + b.spec.doorAt, y: b.y + b.d }
@@ -337,6 +353,10 @@ export function buildTown(): SceneDef {
     objects.push({ ...o, id });
     block(o.x, o.y, o.w ?? 1, o.d ?? 1);
   };
+
+  // Stoops: invisible blockers on the tiles a building's front stands on (see STOOP_BLOCKS).
+  for (const [bid, tiles] of Object.entries(STOOP_BLOCKS))
+    for (const [x, y] of tiles) add({ id: `stoop-${bid}-${x}-${y}`, sprite: 'blocker', x, y, flat: true, solid: true });
 
   // Plaza: the fountain at the crossroads, benches facing it, flower beds at the corners.
   add({ id: 'fountain', sprite: 'fountain', x: 34, y: 34, w: 3, d: 3, label: 'Founders’ Fountain' });

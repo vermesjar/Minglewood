@@ -400,12 +400,23 @@
         1
       ],
       "fit": "anchor",
-      "file": "beanbag.cyan.png",
-      "anchor": [
-        26,
-        20
-      ],
-      "seat": 8
+      "seat": 8,
+      "facings": {
+        "se": {
+          "file": "beanbag.cyan.png",
+          "anchor": [
+            26,
+            20
+          ]
+        },
+        "nw": {
+          "file": "beanbag.cyan.nw.png",
+          "anchor": [
+            26,
+            15
+          ]
+        }
+      }
     },
     "beanbag.orange": {
       "footprint": [
@@ -413,12 +424,23 @@
         1
       ],
       "fit": "anchor",
-      "file": "beanbag.orange.png",
-      "anchor": [
-        26,
-        21
-      ],
-      "seat": 8
+      "seat": 8,
+      "facings": {
+        "se": {
+          "file": "beanbag.orange.png",
+          "anchor": [
+            26,
+            21
+          ]
+        },
+        "nw": {
+          "file": "beanbag.orange.nw.png",
+          "anchor": [
+            26,
+            15
+          ]
+        }
+      }
     },
     "beanbag.pink": {
       "footprint": [
@@ -426,12 +448,23 @@
         1
       ],
       "fit": "anchor",
-      "file": "beanbag.pink.png",
-      "anchor": [
-        26,
-        20
-      ],
-      "seat": 8
+      "seat": 8,
+      "facings": {
+        "se": {
+          "file": "beanbag.pink.png",
+          "anchor": [
+            26,
+            20
+          ]
+        },
+        "nw": {
+          "file": "beanbag.pink.nw.png",
+          "anchor": [
+            26,
+            15
+          ]
+        }
+      }
     },
     "beanbag.purple": {
       "footprint": [
@@ -439,12 +472,23 @@
         1
       ],
       "fit": "anchor",
-      "file": "beanbag.purple.png",
-      "anchor": [
-        26,
-        20
-      ],
-      "seat": 8
+      "seat": 8,
+      "facings": {
+        "se": {
+          "file": "beanbag.purple.png",
+          "anchor": [
+            26,
+            20
+          ]
+        },
+        "nw": {
+          "file": "beanbag.purple.nw.png",
+          "anchor": [
+            26,
+            15
+          ]
+        }
+      }
     },
     "bench": {
       "footprint": [

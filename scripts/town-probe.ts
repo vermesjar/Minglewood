@@ -6,7 +6,7 @@ const s = getScene(TOWN_ID)!;
 const manifest = JSON.parse(readFileSync('public/art/manifest.json', 'utf8')).sprites as Record<string, unknown>;
 const missing = new Map<string, number>();
 for (const o of s.objects) {
-  if (o.eventDecor) continue;
+  if (o.eventDecor || o.sprite === 'blocker') continue;
   const key = o.variant && manifest[`${o.sprite}.${o.variant}`] ? `${o.sprite}.${o.variant}` : o.sprite;
   if (!manifest[key]) missing.set(`${o.sprite}${o.variant ? '.' + o.variant : ''}`, (missing.get(key) ?? 0) + 1);
 }

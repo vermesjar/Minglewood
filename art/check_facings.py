@@ -29,10 +29,35 @@ def lean(file: str) -> float:
     return float((tx.mean() - xs.mean()) / (xs.max() - xs.min() + 1))
 
 
+# Seats that have a back or a hump (so their drawing says which way the sitter faces), whatever their silhouette.
+BACKED = {"chair", "armchair", "couch", "sofa", "bench", "throne", "heirloom-throne", "beanbag"}
+
+
+def symmetry(file: str) -> float:
+    """How closely the upper half of a drawing's silhouette (seat and backrest, not the legs, which splay in
+    perspective) matches its own mirror image: intersection over union, 1 = symmetric."""
+    a = np.array(Image.open(PUBLIC / "sprites" / file).convert("RGBA"))[..., 3] > 0
+    ys, xs = np.where(a)
+    a = a[ys.min(): ys.min() + (ys.max() - ys.min() + 1) // 2, xs.min(): xs.max() + 1]
+    b = a[:, ::-1]
+    return float((a & b).sum() / max(1, (a | b).sum()))
+
+
 def main() -> int:
     sprites = json.loads((PUBLIC / "manifest.json").read_text(encoding="utf-8"))["sprites"]
     bad = []
     checked = 0
+    # A seat drawn once serves every facing, so it must look the same from every side (round stools, ottomans).
+    # Anything with a back or a hump needs its own back view.
+    for key, e in sprites.items():
+        if e.get("seat") is None or e.get("facings") or not e.get("file"):
+            continue
+        sym = symmetry(e["file"])
+        checked += 1
+        if key.split(".")[0] in BACKED:
+            bad.append(f"{key}: a seat with a back (or a hump) drawn once for every facing; give it facings {{se, nw}}")
+        elif sym < 0.9:
+            bad.append(f"{key}: one drawing for every facing, but it isn't symmetric (IoU {sym:.2f}); give it facings {{se, nw}}")
     for key, e in sprites.items():
         f = e.get("facings") or {}
         # seats: their backrest is what says which way they face (props with one drawing for both views skip)

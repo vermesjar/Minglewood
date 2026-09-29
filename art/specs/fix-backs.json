@@ -1,7 +1,7 @@
 {
   "name": "fix-backs",
   "note": "Critic pass: proper back views for pieces that turned to face the barista.",
-  "mood": "A warm, glossy vintage café: polished brass, walnut, cream enamel.",
+  "mood": "A warm, glossy vintage caf\u00e9: polished brass, walnut, cream enamel.",
   "colors": 28,
   "quality": "high",
   "sheets": [
@@ -10,7 +10,9 @@
       "grid": "2x1",
       "size": "1536x1024",
       "tile": 300,
-      "refs": ["out/cafe/countertop/register.sw.raw.png"],
+      "refs": [
+        "out/cafe/countertop/register.sw.raw.png"
+      ],
       "note": "The second reference image is the finished FRONT of this exact cash register. Both cells show the SAME register: the left cell from the front, the right cell from BEHIND (the customer's side). Match its materials, colours, proportions and size exactly.",
       "items": [
         {
@@ -29,6 +31,71 @@
           "width": 36,
           "fill": 0.3,
           "prompt": "The SAME antique brass cash register seen from BEHIND, from the customer's side: NO keys and NO drawer are visible (they face away from us). The face toward the LOWER LEFT is the register's big flat back: a smooth polished brass panel with an ornate raised scrollwork border and a small oval brass maker's plate. On top, a little glass-fronted display box holds an upright round brass 'amount' flag facing the customer (toward the lower left). The face toward the lower right is the register's plain brass side panel. The walnut base plinth runs round the bottom. No text or numbers anywhere."
+        }
+      ]
+    },
+    {
+      "name": "beanbag-backs",
+      "grid": "2x2",
+      "size": "1536x1024",
+      "tile": 260,
+      "refs": [
+        "out/eng/lounge/beanbag.orange.raw.png",
+        "out/eng/lounge/beanbag.cyan.raw.png"
+      ],
+      "note": "The second and third reference images are the FRONTS of these beanbags (orange corduroy, cyan vinyl; purple and pink are the same beanbag in other fabrics). Draw each one from BEHIND, same shape and size.",
+      "items": [
+        {
+          "key": "beanbag.orange",
+          "facing": "nw",
+          "w": 1,
+          "d": 1,
+          "h": 18,
+          "width": 52,
+          "fill": 0.6,
+          "prompt": "The SAME slouchy beanbag chair in burnt-orange corduroy seen from BEHIND: its tall rounded back hump is toward us, a smooth soft mound of fabric with seams running down it; the sitting dent is on the far side and hidden. Same size, colour and material as the reference.",
+          "extra": {
+            "seat": 8
+          }
+        },
+        {
+          "key": "beanbag.purple",
+          "facing": "nw",
+          "w": 1,
+          "d": 1,
+          "h": 18,
+          "width": 52,
+          "fill": 0.6,
+          "prompt": "The SAME slouchy beanbag chair in plum-purple corduroy seen from BEHIND: its tall rounded back hump is toward us, a smooth soft mound of fabric with seams running down it; the sitting dent is on the far side and hidden. Same size, colour and material as the reference.",
+          "extra": {
+            "seat": 8
+          }
+        },
+        {
+          "key": "beanbag.cyan",
+          "facing": "nw",
+          "w": 1,
+          "d": 1,
+          "h": 18,
+          "width": 52,
+          "fill": 0.6,
+          "prompt": "The SAME slouchy beanbag chair in electric-cyan glossy vinyl seen from BEHIND: its tall rounded back hump is toward us, a smooth soft mound of fabric with seams running down it; the sitting dent is on the far side and hidden. Same size, colour and material as the reference.",
+          "extra": {
+            "seat": 8
+          }
+        },
+        {
+          "key": "beanbag.pink",
+          "facing": "nw",
+          "w": 1,
+          "d": 1,
+          "h": 18,
+          "width": 52,
+          "fill": 0.6,
+          "prompt": "The SAME slouchy beanbag chair in hot-pink glossy vinyl seen from BEHIND: its tall rounded back hump is toward us, a smooth soft mound of fabric with seams running down it; the sitting dent is on the far side and hidden. Same size, colour and material as the reference.",
+          "extra": {
+            "seat": 8
+          }
         }
       ]
     }
