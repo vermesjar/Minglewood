@@ -16,7 +16,7 @@ import { WalkGrid } from '@shared/world/walkGrid';
 import { findPath, type Tile } from '@shared/world/pathfinding';
 import { distanceToObject, interactionFor } from '@shared/world/interactions';
 import type { PropState } from '@shared/world/interactions';
-import { setSoundEnabled } from '../engine/sfx';
+import { play, setSoundEnabled, setSoundVolume } from '../engine/sfx';
 import { WorldView, type BuildingBadge } from '../engine/WorldView';
 import { api, ApiError, setActivityTransport } from './api';
 import { Realtime } from './socket';
@@ -90,6 +90,7 @@ class Game {
   }
 
   private startAttempts = 0;
+  private soundOn = false;
   private activityStarted = false;
 
   begin(boot: Bootstrap) {
@@ -166,7 +167,11 @@ class Game {
     this.world.ambience.reducedMotion = p.reducedMotion;
     this.world.ambience.alwaysDay = !!p.alwaysDay;
     this.world.showAllNames = p.showAllNames;
+    setSoundVolume(p.soundVolume ?? 0.5);
+    const wasOn = this.soundOn;
     setSoundEnabled(!!p.sound);
+    this.soundOn = !!p.sound;
+    if (this.soundOn && !wasOn && this.world) play('sparkle', 0.8);
   }
 
   async signOut() {

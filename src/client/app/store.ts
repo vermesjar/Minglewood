@@ -34,6 +34,8 @@ export interface Prefs {
   sidebarOpen: boolean;
   /** Little synthesized sound effects (off by default). */
   sound?: boolean;
+  /** 0–1, default 0.5. */
+  soundVolume?: number;
   /** Keep the town in daylight instead of following my clock. */
   alwaysDay?: boolean;
 }

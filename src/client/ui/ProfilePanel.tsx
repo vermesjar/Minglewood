@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { MemberSettings } from '@shared/domain/types';
 import { game } from '../app/game';
+import { play } from '../engine/sfx';
 import { setState, toast, useStore } from '../app/store';
 import { Modal } from './common';
 
@@ -127,6 +128,24 @@ export function ProfilePanel() {
               <input type="checkbox" checked={!!prefs.sound} onChange={pref('sound')} />
               <span>Little sound effects (coins, high fives, music)</span>
             </label>
+            {prefs.sound && (
+              <label className="check">
+                <span>Volume</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={Math.round((prefs.soundVolume ?? 0.5) * 100)}
+                  onChange={(e) => {
+                    setState((s) => ({ prefs: { ...s.prefs, soundVolume: Number(e.target.value) / 100 } }));
+                    game.applyPrefs();
+                  }}
+                  onPointerUp={() => play('coin')}
+                  onKeyUp={() => play('coin')}
+                  aria-label="Sound effects volume"
+                />
+              </label>
+            )}
             <label className="check">
               <input type="checkbox" checked={!!prefs.alwaysDay} onChange={pref('alwaysDay')} />
               <span>Keep the town in daylight (don’t follow my clock)</span>

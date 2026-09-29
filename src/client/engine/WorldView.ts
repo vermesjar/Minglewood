@@ -153,7 +153,7 @@ export class WorldView {
     this.ambience.onEvent = (kind, x, y) => {
       if (kind === 'flush') {
         this.effects.burst(x, y - 2, 'dust', 3);
-        if (this.onScreen(x, y)) play('chirp');
+        if (this.onScreen(x, y)) play('chirp', 0.6);
       } else if (kind === 'splash') {
         this.effects.ring(x, y, 'rgba(255,255,255,0.85)', 7);
         this.effects.burst(x, y, 'water', 5);
@@ -166,6 +166,14 @@ export class WorldView {
       }
     };
     this.raf = requestAnimationFrame(this.frame);
+  }
+
+  /** Quieter the further something is from the middle of the view; silent off screen. */
+  private gainAt(a: { x: number; y: number }): number {
+    const p = isoToScreen(a.x + 0.5, a.y + 0.5);
+    const [sx, sy] = this.camera.toScreen(p.x, p.y, this.vw, this.vh);
+    const d = Math.hypot(sx - this.vw / 2, sy - this.vh / 2) / Math.max(1, Math.hypot(this.vw, this.vh) / 2);
+    return Math.max(0, 1 - d * 1.1);
   }
 
   private onScreen(ax: number, ay: number) {
@@ -443,6 +451,9 @@ export class WorldView {
     if (!a) return;
     const now = performance.now();
     const target = targetId ? this.actors.get(targetId) : undefined;
+    // Your own actions and things aimed at you are heard; other people's chatter mostly isn't.
+    const mine = memberId === this.meId || targetId === this.meId;
+    const g = mine ? (memberId === this.meId ? 1 : 0.75) : ['dance', 'plane', 'highfive'].includes(emote) ? this.gainAt(a) * 0.35 : 0;
     if (target) a.facing = facingFrom(target.x - a.x, target.y - a.y, a.facing);
     const p = isoToScreen(a.x + 0.5, a.y + 0.5, 30);
     if (emote === 'plane') {
@@ -458,10 +469,10 @@ export class WorldView {
         onLand: (x, y) => {
           this.effects.burst(x, y, 'stars', 6);
           if (target) target.emotes.push({ emoji: '✈️', start: performance.now() });
-          play('pop');
+          play('pop', g);
         },
       });
-      play('whoosh');
+      play('whoosh', g);
       return;
     }
     a.emotes.push({ emoji: EMOTES[emote].emoji, start: now });
@@ -469,13 +480,13 @@ export class WorldView {
     if (emote === 'dance') {
       a.danceUntil = now + 9000;
       this.effects.burst(p.x, p.y - 6, 'notes', 5, ['#e24c9c', '#3ec7e0', '#ffd23f'][Math.floor(Math.random() * 3)]);
-      play('notes');
+      play('notes', g);
     }
     if (emote === 'celebrate') this.effects.burst(p.x, p.y, 'confetti', 30);
     if (emote === 'heart') this.effects.burst(p.x, p.y, 'hearts', 8);
     if (emote === 'clap' || emote === 'idea') this.effects.burst(p.x, p.y, 'sparkle', 8);
-    if (emote === 'clap') play('clap');
-    else if (emote !== 'dance') play('pop');
+    if (emote === 'clap') play('clap', g);
+    else if (emote !== 'dance') play('pop', g);
   }
 
   /** Two people completed a high five. */
@@ -491,8 +502,9 @@ export class WorldView {
     this.effects.burst(m.x, m.y, 'stars', 16);
     this.effects.burst(m.x, m.y, 'sparkle', 10);
     this.floaters.push({ x: m.x, y: m.y - 6, text: '🙌 High five!', start: now, dur: 1800, bg: '#ffd23f' });
+    const g = aId === this.meId || bId === this.meId ? 1 : this.gainAt(a) * 0.4;
     if (aId === this.meId || bId === this.meId) this.camera.kick(3);
-    play('clap');
+    play('clap', g);
   }
 
   /** Someone used a prop: everyone in the scene sees the same thing. */
@@ -502,6 +514,7 @@ export class WorldView {
     const it = obj && interactionFor(obj);
     if (!obj || !it) return;
     const a = this.actors.get(memberId);
+    const g = memberId === this.meId ? 1 : a ? this.gainAt(a) * 0.35 : 0;
     const cx = obj.x + (obj.w ?? 1) / 2;
     const cy = obj.y + (obj.d ?? 1) / 2;
     const top = st ? st.dy + 6 : isoToScreen(cx, cy, 30).y;
@@ -529,17 +542,17 @@ export class WorldView {
             this.effects.burst(x, y, 'gold', 10);
             this.ambience.flash(x, y, 30, [255, 220, 120], 500);
             say(r.text);
-            play('sparkle');
+            play('sparkle', g);
           },
         });
-        play('coin');
+        play('coin', g);
         return;
       case 'arcade':
         this.effects.burst(mid.x, mid.y - 8, 'stars', r.best ? 18 : 8);
         if (r.best) this.effects.burst(mid.x, mid.y - 20, 'confetti', 30);
         this.ambience.flash(mid.x, mid.y, 50, [255, 95, 209], 700);
         say(r.text, r.best ? '#ffd23f' : undefined);
-        play('blip');
+        play('blip', g);
         return;
       case 'notes': {
         const tr = r.track !== undefined ? TRACKS[r.track] : undefined;
@@ -547,7 +560,7 @@ export class WorldView {
         this.effects.setMusic(objectId, silent || !tr ? null : tr.color);
         if (!silent && tr) this.effects.burst(mid.x, mid.y - 10, 'notes', 10, tr.color);
         say(r.text);
-        if (!silent) play('notes');
+        if (!silent) play('notes', g);
         return;
       }
       case 'sparks':
@@ -555,18 +568,18 @@ export class WorldView {
         if (r.boostUntil) this.effects.boost(objectId, r.boostUntil);
         this.ambience.flash(mid.x, mid.y, 110, [255, 150, 70], 1500);
         say(r.text);
-        play('crackle');
+        play('crackle', g);
         return;
       case 'light':
         if (r.on === false) this.ambience.lightsOff.add(objectId);
         else this.ambience.lightsOff.delete(objectId);
         this.effects.burst(mid.x, top + 4, 'sparkle', 4);
-        play('pop');
+        play('pop', g);
         return;
       case 'clack':
         this.effects.burst(mid.x, mid.y, 'sparkle', 6);
         say(r.text);
-        play('pop');
+        play('pop', g);
         return;
       case 'crumbs':
       case 'steam':
@@ -575,37 +588,37 @@ export class WorldView {
         if (it.fx === 'steam') this.effects.burst(mid.x, mid.y - 6, 'smoke', 4);
         if (a && r.give) a.treat = { emoji: r.give, until: now + 120_000 };
         say(r.text);
-        play('pop');
+        play('pop', g);
         return;
       case 'water':
         this.effects.burst(mid.x, mid.y - 8, 'water', 14);
         this.effects.burst(mid.x, mid.y - 4, 'sparkle', 5);
         say(r.text);
-        play('splash');
+        play('splash', g);
         return;
       case 'mail':
       case 'mic':
       case 'bell':
         this.effects.burst(mid.x, top + 4, 'sparkle', 4);
         say(r.text);
-        play(it.fx === 'bell' ? 'bell' : 'pop');
+        play(it.fx === 'bell' ? 'bell' : 'pop', g);
         return;
       case 'luck':
       case 'polish':
         this.effects.burst(mid.x, mid.y - 10, 'gold', 18);
         say(r.text);
-        play('sparkle');
+        play('sparkle', g);
         return;
       case 'paint':
         this.effects.burst(mid.x, mid.y - 8, 'paint', 18);
         say(r.text);
-        play('pop');
+        play('pop', g);
         return;
       case 'reboot':
         this.effects.burst(mid.x, mid.y - 6, 'sparks', 10);
         this.ambience.flash(mid.x, mid.y, 60, [120, 255, 170], 1200);
         say(r.text);
-        play('blip');
+        play('blip', g);
         return;
       case 'launch': {
         say(r.text);
@@ -621,7 +634,7 @@ export class WorldView {
             onLand: (x, y) => this.effects.burst(x, y, 'confetti', 24),
           });
           this.ambience.flash(from.x, from.y, 70, [255, 180, 90], 900);
-          play('launch');
+          play('launch', g);
         }, 1400);
         return;
       }
@@ -635,7 +648,7 @@ export class WorldView {
     const p = isoToScreen(b.door.x + 0.5, b.door.y + 0.5, 4);
     this.effects.burst(p.x, p.y, 'dust', 5);
     this.ambience.flash(p.x, p.y - 6, 40, [255, 214, 150], 600, 0.9);
-    if (this.onScreen(p.x, p.y)) play('door');
+    if (this.onScreen(p.x, p.y)) play('door', 0.4);
   }
 
   arrivalPuff(memberId: string) {
