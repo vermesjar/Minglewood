@@ -179,6 +179,14 @@ character parts through `charkit.py`. These would make it complete:
    `scripts/seat-fit.ts --fit <key>`, run on the staged drawing, would measure `seatDepth` and `backDepth`
    the way it does for catalog seats. The lab would call it before publishing.
 
+**Design Lab follow-up:** the lab now passes the true footprint and relies on 1. A long mirror piece is still drawn
+sw + ne, the catalog's convention, from a 'full' sheet with only those two kept. **6 is done in the lab:** the
+Seat panel calibrates from one click, `scripts/lab-seat.ts` re-fits it on the staged drawings before a publish,
+and `scripts/seat-fit.ts` reads `art/seat-calibration.json`, which the lab writes. Seen while testing, for the
+seat standard's owner: a cushion point clicked far too high (on the backrest) still passes the back views
+(ne/nw "sit right" while the fronts float), so the back check doesn't catch a sitter hovering above the seat
+behind a tall backrest.
+
 **Done (1–3, the rotation/model-spec pass):** `lab-generate` draws each view on `footprintFacing(spec, facing)`
 (all views on one sheet), returns `raw: {sheet, prompt, guide}` and each view's `raw`, and gives a lamp
 (category `lighting`, or a spec with a `light`) a `light` per drawing where that drawing glows (its lit shade or

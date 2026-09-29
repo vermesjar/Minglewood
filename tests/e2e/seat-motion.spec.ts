@@ -132,7 +132,8 @@ async function record(p: Player, memberId: string) {
       if (!rec.on) return;
       const a = w.actors.get(rec.id);
       if (a) {
-        const lift = w.actorLift(a);
+        // (the lift it was drawn with, not one worked out a moment later: that could be mid-crouch)
+        const lift = a.lift ?? w.actorLift(a);
         const k = w.seatK(a);
         rec.frames.push({
           t: performance.now(),

@@ -318,10 +318,14 @@ export function frameFor(view: View, pose: Pose, body: Body = 'a', carry = false
       gesture = 'phone';
       break;
   }
-  const carrying = carry && (pose === 'stand' || pose === 'walk1' || pose === 'walk2' || pose === 'pass1' || pose === 'pass2');
+  const carrying = carry && (pose === 'stand' || pose === 'walk1' || pose === 'walk2' || pose === 'pass1' || pose === 'pass2' || sitting);
   if (carrying && view === 'front') {
-    // the near arm: elbow at the waist, forearm forward, hand up in front of the chest
+    // the near arm: elbow at the waist, forearm forward, hand up in front of the chest (above the lap when seated)
     armNear = { a: [CX - 9, s + 3], m: [CX - 9, s + 11], b: [CX - 3, s + 9] };
+  } else if (carrying && sitting) {
+    // seated, seen from behind: the cup raised by the shoulder, mid-sip — clear of a backrest that hides the
+    // hips and lower back (BACK_COVER_UP), so everyone can see what you're holding
+    armFar = { a: [CX + 10, s + 3], m: [CX + 13, s + 9], b: [CX + 14, s + 3] };
   } else if (carrying) {
     // from behind the far-side arm is the one in front of the body: held out and up so the item shows
     armFar = { a: [CX + 10, s + 3], m: [CX + 12, s + 10], b: [CX + 15, s + 7] };

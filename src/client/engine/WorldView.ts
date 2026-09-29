@@ -88,6 +88,8 @@ interface ActorView {
     to: number;
     start: number;
   };
+  /** How high the figure was lifted when last drawn (world px; a seat's lift, a stage's). */
+  lift?: number;
   /** After standing up: the step from the seat's tile onto the floor where the server put them. */
   stepOff?: { x: number; y: number; start: number; objId: string };
   /** Moved along a seat without a walk (the server shifted them a cushion over): the slide from where they were. */
@@ -135,11 +137,14 @@ const facingFrom = (dx: number, dy: number, prev: Facing): Facing => {
 const SIT_DOWN_MS = 180;
 const STAND_UP_MS = 150;
 const STEP_OFF_MS = 260;
-const CROUCH_UNTIL = 0.4;
+const CROUCH_UNTIL = 0.35;
 /** How far above the cushion (world px) a sitter is as they start to settle into it. */
 const SETTLE = 2;
-/** A sit the server hasn't confirmed by now didn't happen (someone else took the cushion). */
-const SIT_UNCONFIRMED_MS = 1500;
+/**
+ * A sit the server hasn't confirmed by now didn't happen (someone else took the cushion): stand back up.
+ * (The sitter's own client walks them off the cushion a little before this — game.ts SIT_CONFIRM_MS.)
+ */
+const SIT_UNCONFIRMED_MS = 2200;
 
 /**
  * Seen from behind, the part of a seat's drawing that covers its sitter — all of it but the cushion behind
@@ -613,7 +618,8 @@ export class WorldView {
     if (a.seat?.to === 1 && a.seat.spot.x === lx && a.seat.spot.y === ly) return;
     const [px, py] = path[path.length - 2];
     const last = Math.hypot(lx - px, ly - py);
-    if ((elapsedMs / 1000) * WALK_SPEED < pathLength(path) - last) return;
+    // (from the moment their feet are on the seat's tile: past the middle of the last step)
+    if ((elapsedMs / 1000) * WALK_SPEED < pathLength(path) - last / 2) return;
     const at = this.seatSpotAt(lx, ly);
     if (!at) return;
     const spot = { x: at.spot.x, y: at.spot.y, facing: at.spot.facing };
@@ -679,6 +685,15 @@ export class WorldView {
     const hip = sitterPoint({ x: foot.x - 0.5, y: foot.y - 0.5, facing: s.spot.facing }, profile);
     const inSeat = k >= CROUCH_UNTIL;
     const u = inSeat ? (k - CROUCH_UNTIL) / (1 - CROUCH_UNTIL) : 0;
+    const lift = sitterLift(profile, s.spot.facing);
+    // sitting down: up out of the crouch into the seat (from about where the seated feet meet the floor), a
+    // touch past it, and settling; getting up: lifted off the cushion a touch, then down into the crouch
+    const rise = Math.min(1, u / 0.6);
+    const settle = Math.max(0, (u - 0.6) / 0.4);
+    const seatLift =
+      s.to > s.from
+        ? 0.6 * lift + (0.4 * lift + SETTLE) * (1 - (1 - rise) * (1 - rise)) - SETTLE * settle * settle * (3 - 2 * settle)
+        : lift + SETTLE * (1 - u * (2 - u));
     return {
       obj,
       profile,
@@ -688,7 +703,7 @@ export class WorldView {
       ownSeat: inSeat || (Math.floor(foot.x) === s.spot.x && Math.floor(foot.y) === s.spot.y),
       x: foot.x + (hip.x - foot.x) * k,
       y: foot.y + (hip.y - foot.y) * k,
-      lift: inSeat ? sitterLift(profile, s.spot.facing) + SETTLE * (1 - u * (2 - u)) : 0,
+      lift: inSeat ? seatLift : 0,
       pose: (inSeat ? SIT_POSE_OF[profile.sitStyle] : 'crouch') as Pose,
     };
   }
@@ -742,6 +757,24 @@ export class WorldView {
       return { x: p.x, y: p.y, moving: !p.done };
     }
     return { x: a.x, y: a.y, moving: false };
+  }
+
+  /**
+   * The cushion of a couch or bench a click (canvas CSS px) meant: the one whose seat — where you'd sit, at
+   * sitting height — is drawn nearest the click. (The floor tile under the click is a tile further back than
+   * the cushion drawn there, so it picked the near cushion for half the far one's pixels.)
+   */
+  cushionAt(o: SceneObject, spots: SeatSpot[], sx: number, sy: number): SeatSpot | undefined {
+    const profile = artSeatProfile(o);
+    let best: { s: SeatSpot; d: number } | undefined;
+    for (const s of spots) {
+      const hip = sitterPoint(s, profile);
+      const p = isoToScreen(hip.x, hip.y, sitterLift(profile, s.facing));
+      const [x, y] = this.camera.toScreen(p.x, p.y, this.vw, this.vh);
+      const d = Math.hypot(x - sx, y - sy);
+      if (!best || d < best.d) best = { s, d };
+    }
+    return best?.s;
   }
 
   /** The floor tile under a canvas point (CSS px), e.g. where a click landed. */
@@ -933,12 +966,21 @@ export class WorldView {
   /* ------------------------------------------------------------------ loop */
 
   private frame = (t: number) => {
-    const dt = Math.min(0.05, (t - this.last) / 1000);
-    this.last = t;
-    this.update(dt);
-    this.draw();
+    // the next frame is booked first: one bad frame must never stop the world (a throw used to end the loop)
     this.raf = requestAnimationFrame(this.frame);
+    // a rAF timestamp is when its frame began, which can be before `last` (set at construction): never negative
+    const dt = Math.max(0, Math.min(0.05, (t - this.last) / 1000));
+    this.last = t;
+    try {
+      this.update(dt);
+      this.draw();
+    } catch (e) {
+      if (!this.frameError) console.error('[world] frame failed; carrying on', e);
+      this.frameError = true;
+    }
   };
+  /** A frame has thrown (reported once, not every frame). */
+  private frameError = false;
 
   private update(dt: number) {
     const now = this.now();
@@ -1266,7 +1308,8 @@ export class WorldView {
       // a sitter's figure stands on the seat standard's hip point, lifted onto the cushion
       const sat = this.seated(a);
       const foot = this.footPoint(a);
-      const p = sat ? isoToScreen(sat.x, sat.y, sat.lift) : isoToScreen(foot.x, foot.y, this.actorLift(a));
+      a.lift = sat ? sat.lift : this.actorLift(a);
+      const p = sat ? isoToScreen(sat.x, sat.y, sat.lift) : isoToScreen(foot.x, foot.y, a.lift);
       a.sx = p.x;
       a.sy = p.y;
       a.rect = { l: p.x - 12, t: p.y - 42, r: p.x + 12, b: p.y + 2 };

@@ -86,8 +86,8 @@ export function buildInteriors(): SceneDef[] {
       { sprite: 'rug', x: 7, y: 6, w: 5, d: 4, flat: true, variant: 'terracotta' },
       // A modular bar: six counter segments with the café's things standing on top.
       ...[2, 3, 4, 5, 6, 7].map((x): Obj => ({ sprite: 'counter', x, y: 1, facing: 'sw', variant: 'cafe', label: 'Espresso bar' })),
-      { sprite: 'pastry-case', x: 2, y: 1, z: COUNTER_TOP, facing: 'sw', label: 'Pastry case' },
-      { sprite: 'cake-stand', x: 3, y: 1, z: COUNTER_TOP, label: 'Cake of the day' },
+      { sprite: 'pastry-case', x: 7, y: 1, z: COUNTER_TOP, facing: 'sw', label: 'Pastry case' },
+      { sprite: 'cake-stand', x: 2, y: 1, z: COUNTER_TOP, label: 'Cake of the day' },
       {
         sprite: 'espresso',
         x: 4,
@@ -100,7 +100,7 @@ export function buildInteriors(): SceneDef[] {
       },
       { sprite: 'grinder', x: 5, y: 1, z: COUNTER_TOP, label: 'Coffee grinder' },
       { sprite: 'register', x: 6, y: 1, z: COUNTER_TOP, facing: 'ne' },
-      { sprite: 'jar', x: 7, y: 1, z: COUNTER_TOP, label: 'Biscotti' },
+      { sprite: 'jar', x: 3, y: 1, z: COUNTER_TOP, label: 'Biscotti' },
       { sprite: 'backbar', wall: 'right', x: 5, y: 0, w: 3, label: 'Back bar' },
       { sprite: 'stool', x: 6, y: 2, actions: sit },
       { sprite: 'stool', x: 7, y: 2, actions: sit },

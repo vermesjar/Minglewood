@@ -323,7 +323,7 @@ export class Effects {
       const count = Math.min(60, Math.round(n / 12));
       for (let i = 0; i < count; i++) {
         const k = Math.floor(t * 0.9 + i * 7.3);
-        const [wx, wy] = this.water[(k * 7919 + i * 104729) % n];
+        const [wx, wy] = this.water[(((k * 7919 + i * 104729) % n) + n) % n];
         const ox = hash2(k, i, 5);
         const oy = hash2(i, k, 9);
         const s = isoToScreen(wx + ox, wy + oy, -3);

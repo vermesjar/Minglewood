@@ -377,10 +377,15 @@ export class OrgHub extends EventEmitter<HubEvents> {
     if (!a) return false;
     const grid = this.grids.get(a.sceneId)!;
     const now = Date.now();
-    const pos = this.position(a, now);
     const start = startedAt !== undefined && startedAt >= now - MAX_PATH_BACKDATE_MS && startedAt <= now + 250 ? Math.min(startedAt, now) : now;
-    const at = positionAlong(path, now - start);
-    if (Math.hypot(at.x - pos.x, at.y - pos.y) > 1.6) return false;
+    // A walk is judged where it began: its first step against where we had you at the moment it was stamped. (Judged
+    // where it has got to by now, a message ~0.4 s late — a slow connection, a busy server — was refused as a jump
+    // and snapped you back.) How late it may be is bounded by MAX_PATH_BACKDATE_MS.
+    // …but never from before the walk you're already on began (claiming that would skip you ahead along it)
+    if (a.path && a.pathStartedAt !== undefined && start < a.pathStartedAt) return false;
+    const then = this.position(a, start);
+    const from = positionAlong(path, 0);
+    if (Math.hypot(from.x - then.x, from.y - then.y) > 1.6) return false;
     const last = path[path.length - 1];
     const seatAtEnd = this.seatAt(a.sceneId, last[0], last[1]);
     if (!isValidPath(grid, path, !!seatAtEnd)) return false;

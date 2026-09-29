@@ -107,7 +107,6 @@ play('#1 Stand up stands you up', async ({ player, page }) => {
 test('#2 a first frame stamped before the view was made does not stop the world', async ({
   page,
 }) => {
-  test.fail(OPEN, 'open bug: see docs/playtest.md #2 (fixed? delete this line)');
   await page.addInitScript(() => {
     const raf = window.requestAnimationFrame.bind(window);
     window.requestAnimationFrame = (cb) => raf((t) => cb(t - 4000));
@@ -122,7 +121,6 @@ test('#2 a first frame stamped before the view was made does not stop the world'
 
 /** #2 as a player meets it: load into town, walk into a room, and the room actually opens. */
 test('#2 entering a room from town finishes (the world keeps rendering)', async ({ page }) => {
-  test.fail(OPEN, 'open bug: see docs/playtest.md #2 (fixed? delete this line)');
   await page.addInitScript(() => {
     const raf = window.requestAnimationFrame.bind(window);
     window.requestAnimationFrame = (cb) => raf((t) => cb(t - 4000));
@@ -145,7 +143,6 @@ test('#2 entering a room from town finishes (the world keeps rendering)', async 
  * game has one cushion you can only get by clicking low on its front edge.
  */
 play('#4 clicking a cushion of a couch or bench seats you on that cushion', async ({ player }) => {
-  play.fail(OPEN, 'open bug: see docs/playtest.md #4 (fixed? delete this line)');
   play.setTimeout(180_000);
   let tried = 0;
   for (const room of ['hq', 'cafe', 'events', 'focus', 'design', 'arcade', 'eng', 'launch']) {
@@ -186,7 +183,6 @@ play('#4 clicking a cushion of a couch or bench seats you on that cushion', asyn
  * and other people's cushions count as taken after they've left them.
  */
 play('#3 walking off a seat and clicking it again sits you back down', async ({ player, page }) => {
-  play.fail(OPEN, 'open bug: see docs/playtest.md #3 (fixed? delete this line)');
   play.setTimeout(240_000);
   const standUp = page.getByRole('button', { name: 'Stand up' });
   for (const room of ['focus', 'cafe', 'hq', 'design']) {
@@ -244,13 +240,13 @@ play('#3 walking off a seat and clicking it again sits you back down', async ({ 
 });
 
 /**
- * #6 · What you carry disappears when you sit (character renderer: avatarKit drawHeld / the seated frames).
+ * #6 · (fixed) What you carried disappeared when you sat (character renderer: avatarKit drawHeld / the seated frames).
  * Seated facing away (ne/nw) the held coffee, soda, book… is drawn behind the body: 0 px of it show. Seated
  * facing the camera only 8–13 px show (a standing or walking figure shows 31–42 px). So a player sitting
  * down with their coffee can't see they still have it — the "You ☕" tag is the only sign.
  */
 play('#6 a coffee in hand still shows when you sit, from every side', async ({ player }) => {
-  play.fail(OPEN, 'open bug: see docs/playtest.md #6 (fixed? delete this line)');
+  // fixed 2026-09-29 (seated hold: in front of the chest facing the camera, by the shoulder facing away): guards it
   await player.enter('cafe');
   const root = process.cwd().split(String.fromCharCode(92)).join('/');
   const shown = await player.ev(async (root) => {
@@ -336,7 +332,6 @@ play('#5 a refused walk puts you back where the server has you', async ({ player
 play(
   '#5 a walk that reaches the server 450 ms after it was stamped is still accepted',
   async ({ player, page }) => {
-    play.fail(OPEN, 'open bug: see docs/playtest.md #5 (fixed? delete this line)');
     await player.roomScene('cafe');
     const start = await player.me();
     const path = await player.ev(([x0, y0]) => {
@@ -371,3 +366,23 @@ play(
     );
   },
 );
+
+/**
+ * #7 · A seat that's also a memory artifact can't be sat on (game.ts onObjectClick).
+ * The town's "1,000th Customer Bench" (bench-1000) has both `sit` and `artifact` actions; a click on a seat
+ * that's an artifact opens its story card instead of sitting, and the card has no way to sit. So that bench
+ * can never be sat on. (Sit on click and show the story alongside, or give the card a Sit button.)
+ */
+play('#7 the 1,000th Customer Bench can be sat on', async ({ player, page }) => {
+  play.setTimeout(180_000);
+  await player.enter('town');
+  await page.evaluate(() => (window as any).__mw.walkTo([48, 51]));
+  await player.still(40_000);
+  await player.settle();
+  const p = await player.objectPoint('bench-1000', { x: 48, y: 49, z: 10 });
+  expect(p, 'the bench is on screen').not.toBeNull();
+  await player.click(p!);
+  const r = await player.until((m) => m.sittingOn === 'bench-1000' && !m.moving, 15_000);
+  await player.shot('regress-7-plaque-bench');
+  expect(r.ok, 'sat on the bench').toBe(true);
+});

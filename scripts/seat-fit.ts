@@ -93,9 +93,9 @@ const CALIBRATION: Record<string, Calibration> = {
   'chair.red': { cushion: [22.6, 27.7], sitStyle: 'chair', backrest: true },
   'chair.wood': { cushion: [22.1, 29.6], sitStyle: 'chair', backrest: true },
   'heirloom-throne': { cushion: [35.8, 61.8], sitStyle: 'chair', backrest: true },
-  'armchair.green': { cushion: [38.4, 45.9], sitStyle: 'lounge', backrest: true },
-  'armchair.mustard': { cushion: [39.1, 33.5], sitStyle: 'lounge', backrest: true },
-  'armchair.rust': { cushion: [40.0, 46.5], sitStyle: 'lounge', backrest: true },
+  'armchair.green': { cushion: [38.4, 45.9], sitStyle: 'chair', backrest: true },
+  'armchair.mustard': { cushion: [39.1, 33.5], sitStyle: 'chair', backrest: true },
+  'armchair.rust': { cushion: [40.0, 46.5], sitStyle: 'chair', backrest: true },
   'couch.green': { cushion: [74.4, 37.9], sitStyle: 'lounge', backrest: true },
   'couch.blue': { cushion: [68.2, 31.7], sitStyle: 'lounge', backrest: true },
   // its upholstery is one colour all over and its back hides the cushions: all of it covers
@@ -112,6 +112,7 @@ const CALIBRATION: Record<string, Calibration> = {
   'beanbag.pink': { cushion: [26.0, 17.0], sitStyle: 'floor', backrest: true, backLine: ALL('nw') },
   'beanbag.purple': { cushion: [26.0, 17.0], sitStyle: 'floor', backrest: true, backLine: ALL('nw') },
 };
+
 /**
  * Seats calibrated in the Design Lab: art/seat-calibration.json ({key: Calibration}), written when the lab
  * publishes a seat (it clicks the same cushion centre, and fits it with the same seatCheck maths).

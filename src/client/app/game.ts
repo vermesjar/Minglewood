@@ -12,7 +12,7 @@ import { getScene, TOWN_ID, buildingForRoom } from '@shared/world';
 import { livedScene } from '@shared/world/lived';
 import { DECOR_BY_ID, decorObject, placementProblem } from '@shared/world/decor';
 import type { SceneObject } from '@shared/world/scene';
-import { seatSpotAt, seatSpots } from '@shared/world/seats';
+import { seatSpotAt, seatSpots, stepOffTiles, type SeatSpot } from '@shared/world/seats';
 import { approach } from '@shared/world/interact';
 import { WalkGrid } from '@shared/world/walkGrid';
 import { findPath, type Tile } from '@shared/world/pathfinding';
@@ -37,6 +37,9 @@ export const QUESTS: Array<{ id: string; label: string; hint: string }> = [
   { id: 'party', label: 'Stop by the party in Lantern Hall', hint: 'There’s cake.' },
 ];
 
+
+/** How long a sit may wait for the server before we step back off the cushion (WorldView stands you up then too). */
+const SIT_CONFIRM_MS = 1500;
 
 class Game {
   world: WorldView | null = null;
@@ -279,6 +282,12 @@ class Game {
         });
         break;
       case 'moved':
+        // walking means not sitting: the store forgets the seat too (the view does in move()), so the seat is
+        // free to click again and the Stand up button goes
+        setState((s) => {
+          const cur = s.occupants[m.memberId];
+          return cur?.sittingOn ? { occupants: { ...s.occupants, [m.memberId]: { ...cur, sittingOn: undefined } } } : {};
+        });
         if (m.memberId === this.meId && this.ownPaths.includes(pathKey(m.path))) break;
         w?.move(m.memberId, m.path, m.startedAt);
         break;
@@ -539,6 +548,11 @@ class Game {
     this.ownPaths = [...this.ownPaths.slice(-7), pathKey(path)];
     this.world?.move(this.meId, path, startedAt);
     this.rt?.send({ t: 'move', path, startedAt });
+    // walking off a seat: it's free again for the store too (the server clears it as the walk starts)
+    setState((s) => {
+      const cur = s.occupants[this.meId];
+      return cur?.sittingOn ? { occupants: { ...s.occupants, [this.meId]: { ...cur, sittingOn: undefined } } } : {};
+    });
   }
 
   /** Arrow keys / WASD changed: keep steering while any are held, stop at the next tile when released. */
@@ -755,10 +769,9 @@ class Game {
     }
     if (kinds.has('sit')) {
       const occ = getState().occupants[this.meId];
-      // the cushion that was clicked (a bench or couch has one per tile)
-      const clicked = this.world?.tileAt(p.x, p.y);
+      // the cushion that was clicked (a bench or couch has one per tile), judged at cushion height
       const spots = seatSpots(o, this.scene(sceneId));
-      const target = clicked && spots.length > 1 ? spots.reduce((b, s) => (Math.hypot(s.x - clicked[0], s.y - clicked[1]) < Math.hypot(b.x - clicked[0], b.y - clicked[1]) ? s : b)) : undefined;
+      const target = spots.length > 1 ? this.world?.cushionAt(o, spots, p.x, p.y) : undefined;
       if (occ?.sittingOn === o.id) {
         // Already sitting here: clicking your own cushion does nothing (stand up with the Stand up button or by
         // walking off); clicking another free cushion of the same seat shifts you over.
@@ -766,10 +779,9 @@ class Game {
         if (!mine) this.sitOn(o, [target.x, target.y]);
         return;
       }
-      if (!kinds.has('artifact')) {
-        this.sitOn(o, target ? [target.x, target.y] : undefined);
-        return;
-      }
+      // sit down — and a seat that's also a memory (the 1,000th Customer Bench) tells its story alongside
+      this.sitOn(o, target ? [target.x, target.y] : undefined);
+      if (!kinds.has('artifact')) return;
     }
     if (kinds.has('artifact')) this.quest('artifact');
     setState({ selection: { kind: 'object', sceneId, objectId: o.id, x: p.x, y: p.y } });
@@ -825,7 +837,23 @@ class Game {
       sit();
       return;
     }
-    this.walkTo([spot.x, spot.y], sit);
+    this.walkTo([spot.x, spot.y], () => {
+      sit();
+      // a sit the server doesn't confirm (someone took the cushion first, the walk was refused): step back
+      // off it — never left standing in the furniture
+      window.setTimeout(() => this.offUnconfirmedSeat(spot), SIT_CONFIRM_MS);
+    });
+  }
+
+  /** Still standing on a cushion the server never seated us on: walk off it onto the floor beside it. */
+  private offUnconfirmedSeat(spot: SeatSpot) {
+    const sceneId = getState().sceneId;
+    const grid = sceneId ? this.grid(sceneId) : undefined;
+    const t = this.world?.actorTile(this.meId);
+    if (!grid || !t || getState().occupants[this.meId]?.sittingOn || this.world?.isMoving(this.meId)) return;
+    if (t[0] !== spot.x || t[1] !== spot.y) return;
+    const off = stepOffTiles(spot).find(([x, y]) => grid.walkable(x, y));
+    if (off) this.walkTo(off);
   }
 
   private onObjectActivate(o: SceneObject) {

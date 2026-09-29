@@ -455,7 +455,7 @@
       },
       "seat": 10.9,
       "seatDepth": 0.23,
-      "sitStyle": "lounge",
+      "sitStyle": "chair",
       "backrest": true,
       "rotation": "mirror",
       "name": "Green armchair",
@@ -504,7 +504,7 @@
       },
       "seat": 13.77,
       "seatDepth": 0.19,
-      "sitStyle": "lounge",
+      "sitStyle": "chair",
       "backrest": true,
       "rotation": "mirror",
       "name": "Mustard armchair",
@@ -556,7 +556,7 @@
       },
       "seat": 11.5,
       "seatDepth": 0.28,
-      "sitStyle": "lounge",
+      "sitStyle": "chair",
       "backrest": true,
       "rotation": "mirror",
       "name": "Rust armchair",
@@ -1113,6 +1113,57 @@
         ]
       },
       "backDepth": 0.05
+    },
+    "bench-garden.teal": {
+      "name": "Teal garden bench",
+      "category": "seating",
+      "tags": [
+        "garden",
+        "bench",
+        "teal",
+        "wood"
+      ],
+      "rooms": [
+        "outdoors",
+        "lounge"
+      ],
+      "footprint": [
+        2,
+        1
+      ],
+      "height": 28,
+      "rotation": "mirror",
+      "layer": "object",
+      "walk": "seat",
+      "seat": 10,
+      "sitStyle": "chair",
+      "backrest": true,
+      "use": {
+        "face": "front",
+        "actions": [
+          "sit"
+        ]
+      },
+      "base": "filled",
+      "fit": "anchor",
+      "facings": {
+        "ne": {
+          "file": "bench-garden.teal.ne.png",
+          "anchor": [
+            32,
+            32
+          ]
+        },
+        "sw": {
+          "file": "bench-garden.teal.sw.png",
+          "anchor": [
+            32,
+            44
+          ]
+        }
+      },
+      "seatDepth": 0,
+      "backDepth": 0
     },
     "bench.navy": {
       "footprint": [
@@ -2125,7 +2176,7 @@
       "sitStyle": "chair",
       "backrest": true,
       "rotation": "mirror",
-      "name": "Café chair",
+      "name": "Caf\u00e9 chair",
       "category": "seating",
       "tags": [
         "chair",
@@ -4262,7 +4313,7 @@
       "sitStyle": "chair",
       "backrest": true,
       "rotation": "mirror",
-      "name": "Founders’ throne",
+      "name": "Founders\u2019 throne",
       "category": "seating",
       "tags": [
         "heirloom",

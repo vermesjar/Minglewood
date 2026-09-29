@@ -99,6 +99,22 @@ describe('OrgHub', () => {
     expect(hub.move(a.id, line(3), Date.now() - 900)).toBe(false);
   });
 
+  it('accepts a walk that arrives late (a slow connection, a busy server): judged where it began', () => {
+    const a = newMember(store, 'Ada');
+    hub.connect(client(a.id));
+    hub.enter(a.id, 'cafe', 'live');
+    const { x, y } = hub.actor(a.id)!;
+    const grid = new WalkGrid(getScene('cafe')!);
+    const dir = ([[1, 0], [-1, 0], [0, 1], [0, -1]] as const).find(([dx, dy]) => [1, 2, 3].every((i) => grid.walkable(x + dx * i, y + dy * i)))!;
+    const line = (n: number): Tile[] => Array.from({ length: n + 1 }, (_, i) => [x + dir[0] * i, y + dir[1] * i]);
+    // a walk that doesn't begin where she stands is refused, however it's stamped
+    const away: Tile[] = line(3).slice(2);
+    expect(hub.move(a.id, away, Date.now())).toBe(false);
+    expect(hub.move(a.id, away, Date.now() - 450)).toBe(false);
+    // stamped 450 ms before it reaches us: by now the path says ~1.9 tiles along, but it began where she stood
+    expect(hub.move(a.id, line(3), Date.now() - 450)).toBe(true);
+  });
+
   it('hands out a coffee only at the machine, and everyone sees it until it is put down', () => {
     vi.useFakeTimers();
     const a = newMember(store, 'Ada');

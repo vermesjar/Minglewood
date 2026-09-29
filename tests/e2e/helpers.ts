@@ -560,20 +560,6 @@ export class Player {
   }
 }
 
-/**
- * Known bug #1 (docs/playtest.md): a first frame stamped before WorldView was made stops the world for good,
- * and headless Chromium does that on most boots — which would stop every playthrough at its first step. Until
- * it's fixed, hand the game frame times that never run backwards (regressions.spec.ts still reproduces it).
- * PLAYTEST_RAW=1 plays without the workaround.
- */
-const MONOTONIC_FRAMES = () => {
-  const raf = window.requestAnimationFrame.bind(window);
-  window.requestAnimationFrame = (cb) => {
-    const asked = performance.now();
-    return raf((t) => cb(Math.max(t, asked)));
-  };
-};
-
 export const test = base.extend<{ player: Player }, { botFile: string }>({
   botFile: [
     async ({}, use, workerInfo) => use(botState(workerInfo.parallelIndex)),
@@ -581,7 +567,6 @@ export const test = base.extend<{ player: Player }, { botFile: string }>({
   ],
   storageState: async ({ botFile }, use) => use(botFile),
   player: async ({ page, botFile }, use, testInfo) => {
-    if (!process.env.PLAYTEST_RAW) await page.addInitScript(MONOTONIC_FRAMES);
     const p = new Player(page);
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(String(e)));
