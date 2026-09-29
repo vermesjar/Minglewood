@@ -28,7 +28,7 @@ const STYLES: Record<string, CounterStyle> = {
     base: '#5a3522',
     top: '#e9e2da',
     topSide: '#cfc5c0',
-    vein: '#a99db6',
+    vein: '#dcd3d4',
     rail: '#d99a2b',
   },
 };
@@ -81,16 +81,14 @@ function counterFront(style: CounterStyle, back: boolean): Sprite {
   P.faceRect('right', 1, y0 + 0.08 + q, 3.5, y1 - y0 - 0.16 - 2 * q, H - 8, style.side);
   // marble top, overhanging the front a touch
   P.box(0, y0 - 0.04, H, 1, y1 - y0 + 0.1, 2.5, style.top, { top: style.top, left: style.topSide, right: '#c8bfc6' });
+  // one soft, unbroken vein per segment (dotted veins read as stray pixels once things stand on the top)
   const vr = rng(back ? 11 : 5);
-  for (let v = 0; v < 3; v++) {
-    let u = vr() * 0.8;
-    let w = y0 + vr() * (y1 - y0);
-    for (let k = 0; k < 7; k++) {
-      P.px(u, w, H + 2.5, 0, 0, 0.5, 0.5, style.vein);
-      u += 0.05 + vr() * 0.05;
-      w += (vr() - 0.5) * 0.06;
-      if (u > 1) break;
-    }
+  let u = 0.1 + vr() * 0.2;
+  let w = y0 + 0.2 + vr() * 0.3;
+  while (u < 0.9) {
+    P.px(u, w, H + 2.5, 0, 0, 0.5, 0.5, style.vein);
+    u += q;
+    w += (vr() - 0.5) * q * 1.4;
   }
   // polished front edge
   P.faceRect('left', y1 + 0.06, 0, H + 2, 1, 0.5, '#ffffff');

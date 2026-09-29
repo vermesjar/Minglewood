@@ -450,6 +450,11 @@ function topColorOf(L: FullLoadout): RGB {
   return L.top === 'top.labcoat' ? [246, 244, 240] : hx(L.topColor);
 }
 
+/** Sleeves are the garment's colour, except under an apron, where they're the tee's. */
+function sleeveColorOf(L: FullLoadout): RGB {
+  return L.top === 'top.apron' ? hx(L.topAccent) : topColorOf(L);
+}
+
 /** A small printed motif (3×3) repeated on a 6-px grid, alternate rows offset. */
 function motif(shape: string[], ink: RGB) {
   return (x: number, y: number, c: RGB): RGB => {
@@ -489,7 +494,7 @@ function drawArm(P: Pix, F: Frame, L: FullLoadout, near: boolean) {
   const bare = L.top === 'top.tank' || L.top === 'top.dress';
   limb(P, arm.a, arm.m, arm.b, 2.3, 2.1, skin, shade);
   if (!bare) {
-    const c = topColorOf(L);
+    const c = sleeveColorOf(L);
     const tint = patternTint(L);
     const sleeve = long
       ? M().capsule(arm.a[0], arm.a[1], arm.m[0], arm.m[1], 2.9).capsule(arm.m[0], arm.m[1], arm.b[0], arm.b[1], 2.7)
@@ -689,7 +694,15 @@ function drawTorso(P: Pix, F: Frame, L: FullLoadout) {
   const dy = F.shoulderY - 58;
   if (map) {
     const m = placed(map, [TORSO_ORIGIN.x, TORSO_ORIGIN.y + dy], [0, dy]);
-    paintMap(P, m.x, m.y, m.rows, c, tint);
+    let t = tint;
+    if (L.top === 'top.apron' && F.view === 'front') {
+      // the tee around the bib takes the accent colour (same tone, recoloured)
+      const tee = hx(L.topAccent);
+      const bib = (x: number, y: number) => y >= F.shoulderY + 4 && x >= F.hx - 6 && x <= F.hx + 7;
+      const k = (col: RGB) => lum(col) / Math.max(0.01, lum(c));
+      t = (x, y, col) => (bib(x, y) ? col : (tee.map((v) => Math.min(255, v * Math.min(1.25, k(col)))) as RGB));
+    }
+    paintMap(P, m.x, m.y, m.rows, c, t);
     drawPrint(P, F, L);
     if (L.top === 'top.raincoat') {
       // a belt at the waist with a brass buckle

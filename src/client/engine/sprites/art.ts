@@ -5,6 +5,7 @@
  */
 import type { Facing, SceneObject } from '@shared/world/scene';
 import { makeCanvas, type Sprite } from './painter';
+import { centredAnchor } from './footing';
 
 interface ArtFile {
   file: string;
@@ -99,9 +100,16 @@ export function wallArt(o: SceneObject): { img: HTMLImageElement; v: [number, nu
   return img ? { img, v: e.wall.v, margin: e.wall.margin } : null;
 }
 
-/** How high this seat's surface is, in art px, if its art says so. */
+/**
+ * How high this seat's surface is, in art px, if its art says so. A variant drawn without a seat height
+ * borrows its sibling's (a blue couch sits like the green one).
+ */
 export function artSeat(o: SceneObject): number | null {
-  return entryFor(o)?.seat ?? null;
+  const own = entryFor(o)?.seat;
+  if (own !== undefined) return own;
+  if (!entryFor(o) || !manifest) return null;
+  const sibling = Object.entries(manifest.sprites).find(([k, e]) => (k === o.sprite || k.startsWith(`${o.sprite}.`)) && e.seat !== undefined);
+  return sibling?.[1].seat ?? null;
 }
 
 /** Where a lamp's light comes from, relative to the sprite's anchor, in art px (follows mirroring). */
@@ -123,10 +131,9 @@ function computeLight(o: SceneObject): { dx: number; dy: number; r: number } | n
   const S = manifest.scale;
   const [primary] = e.file ? [{ file: e.file, anchor: e.anchor }] : Object.values(e.facings ?? {});
   const img = primary ? images.get(primary.file) : undefined;
-  if (!img || !primary?.anchor) return null;
+  if (!img) return null;
   // The light is authored on the primary drawing; mirrored rotations reflect it.
-  const mirrored = s.ax !== primary.anchor[0];
-  const lx = mirrored ? img.width - e.light.x : e.light.x;
+  const lx = s.mirrored ? img.width - e.light.x : e.light.x;
   return { dx: (lx - s.ax) / S, dy: (e.light.y - s.ay) / S, r: (e.light.r ?? 40) / S };
 }
 
@@ -161,7 +168,13 @@ export function artSprite(o: SceneObject): Sprite | null {
   for (let i = 0; i < mask.length; i++) mask[i] = data[i * 4 + 3] > 0 ? 1 : 0;
   let ax: number;
   let ay: number;
-  if (rec.anchor) {
+  // The furniture standard: a small piece (an espresso machine, a lamp, an ornament) stands with its base
+  // centred on its footprint, whatever the drawing's own anchor says. Large pieces fill their footprint and
+  // keep the anchor their construction guide gave them.
+  const centred = e.wall ? null : centredAnchor({ w: img.width, h: img.height, d: data }, o.w ?? 1, o.d ?? 1, S);
+  if (centred) {
+    [ax, ay] = centred;
+  } else if (rec.anchor) {
     [ax, ay] = rec.anchor;
     // Mirroring swaps the footprint's axes; its back corner stays the top vertex, reflected.
     if (mirror) ax = img.width - ax;
@@ -172,5 +185,5 @@ export function artSprite(o: SceneObject): Sprite | null {
     ax = e.fit === 'stand' ? img.width / 2 - (w - d) * 8 * S : d * 16 * S;
     ay = e.fit === 'stand' ? bottom - (w + d) * 4 * S : bottom - (w + d) * 8 * S;
   }
-  return { canvas, ax, ay, mask, scale: S };
+  return { canvas, ax, ay, mask, scale: S, mirrored: mirror, file: rec.file };
 }

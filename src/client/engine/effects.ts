@@ -13,7 +13,7 @@ interface Particle {
   size: number;
   color: string;
   gravity: number;
-  kind: 'square' | 'circle' | 'heart';
+  kind: 'square' | 'circle' | 'heart' | 'note';
   spin?: number;
 }
 
@@ -88,8 +88,7 @@ export class Effects {
       const cx = o.x + (o.w ?? 1) / 2;
       const cy = o.y + (o.d ?? 1) / 2;
       if (o.sprite === 'fountain') this.emitters.push({ kind: 'spray', ...at(cx, cy, 24), acc: 0, rate: 26 });
-      if (o.sprite === 'fireplace') this.emitters.push({ kind: 'fire', ...at(cx, cy + 0.4, 4), acc: 0, rate: 14 });
-      if (o.sprite === 'counter') this.emitters.push({ kind: 'steam', ...at(o.x + 2.6, o.y + 0.5, 30), acc: 0, rate: 3 });
+      // (fireplaces, espresso machines and other living furniture animate through animations.ts)
       if (o.sprite === 'lighthouse') this.lighthouse = at(cx, cy, 46);
       if (o.building?.extras.includes('chimney')) {
         const b = o.building;
@@ -113,6 +112,11 @@ export class Effects {
       ];
       for (let i = 0; i < 4; i++) this.clouds.push({ x: -800 + i * 520, y: 120 + (i % 2) * 260, r: 150 + i * 30, v: 5 + i });
     }
+  }
+
+  /** A single particle in world (art) space, for animations.ts. */
+  add(p: { x: number; y: number; vx?: number; vy?: number; max: number; size: number; color: string; gravity?: number; kind?: Particle['kind'] }) {
+    this.particles.push({ vx: 0, vy: 0, gravity: 0, kind: 'circle', life: 0, ...p });
   }
 
   burst(x: number, y: number, kind: 'confetti' | 'hearts' | 'sparkle', n = 24) {
@@ -221,6 +225,13 @@ export class Effects {
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.size * (1 + p.life * 0.4), 0, Math.PI * 2);
         ctx.fill();
+      } else if (p.kind === 'note') {
+        // an eighth note: head, stem, flag
+        const x = Math.round(p.x);
+        const y = Math.round(p.y + Math.sin(p.life * 5) * 0.8);
+        ctx.fillRect(x - 1, y, 2, 2);
+        ctx.fillRect(x + 1, y - 4, 1, 5);
+        ctx.fillRect(x + 2, y - 4, 1, 1);
       } else if (p.kind === 'heart') {
         const x = Math.round(p.x);
         const y = Math.round(p.y);

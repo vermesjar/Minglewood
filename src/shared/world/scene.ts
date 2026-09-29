@@ -2,7 +2,7 @@
  * Scene format — plain JSON-serializable data so a future visual world builder can edit it.
  * A scene is either the outdoor world or a building interior.
  */
-import type { OrgEvent } from '../domain/types';
+import type { AvatarLoadout, OrgEvent } from '../domain/types';
 
 /** Terrain legend (one char per tile). */
 export const TERRAIN = {
@@ -114,6 +114,29 @@ export interface SceneDef {
   spawn: { x: number; y: number };
   objects: SceneObject[];
   interior?: InteriorTheme;
+  /** Areas only staff (NPCs) use — the lane behind a bar. Players can't walk there. */
+  staff?: Array<{ x: number; y: number; w: number; d: number }>;
+  /** People who work here (a barista, a receptionist): not coworkers, and always labelled as NPCs. */
+  npcs?: NpcDef[];
+}
+
+/**
+ * A non-player character who works in a room. The server moves them (npcs.ts on the server); every client
+ * draws them through the same avatar kit as everyone else, labelled "<role> · NPC".
+ */
+export interface NpcDef {
+  /** Unique within the scene. */
+  id: string;
+  name: string;
+  /** What they do here: "Barista", "Receptionist". */
+  role: string;
+  /** One line for their info card. */
+  blurb: string;
+  avatar: AvatarLoadout;
+  /** Where they work, home first; they drift between these (inside the room's staff area). */
+  spots: Array<{ x: number; y: number; facing: Facing }>;
+  /** The sprite of the machine they run (a vend object): orders there are theirs to make. */
+  serves?: string;
 }
 
 export interface InteriorTheme {

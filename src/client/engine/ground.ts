@@ -25,6 +25,8 @@ export interface GroundLayer {
   minX: number;
   minY: number;
   wallHits: WallHit[];
+  /** Canvas px per art px (outdoor terrain can be rasterized at the 2× art density). */
+  scale?: number;
 }
 
 type RGB = [number, number, number];
@@ -34,14 +36,20 @@ const PAL = {
   grass: C('#7cc26a'),
   grass2: C('#6db35d'),
   grassDark: C('#5f9f52'),
+  grassLight: C('#8fd07a'),
   meadow: C('#86c872'),
   path: C('#d8c6a6'),
   pathDark: C('#bca885'),
+  pathLight: C('#e8dcc2'),
+  curb: C('#a8977a'),
   plaza: C('#e6d3b3'),
   plaza2: C('#d9c29d'),
+  plazaRing: C('#c9ae86'),
   sand: C('#efd9a4'),
   water: C('#58b4de'),
   deep: C('#3f96c9'),
+  lily: C('#5fae5a'),
+  lilyDark: C('#3f8a47'),
   dock: C('#b98250'),
   dirt: C('#8a5a3b'),
   dirtDark: C('#6b4428'),
@@ -55,100 +63,190 @@ function shade([r, g, b]: RGB, k: number): RGB {
 const frac = (v: number) => v - Math.floor(v);
 const isWater = (c: string) => c === 'w' || c === 'W';
 const isLand = (c: string) => c !== ' ' && !isWater(c);
+const isPaved = (c: string) => c === 'p' || c === 'P' || c === 'd';
 
-function landColor(c: string, fx: number, fy: number, tx: number, ty: number, px: number, py: number): RGB {
-  const n = hash2(px >> 1, py >> 1, 3);
+/** Smooth value noise over tile space (bilinear between hashed lattice points), 0..1. */
+function vnoise(x: number, y: number, cell: number, seed: number): number {
+  const gx = x / cell;
+  const gy = y / cell;
+  const x0 = Math.floor(gx);
+  const y0 = Math.floor(gy);
+  const fx = gx - x0;
+  const fy = gy - y0;
+  const sx = fx * fx * (3 - 2 * fx);
+  const sy = fy * fy * (3 - 2 * fy);
+  const a = hash2(x0, y0, seed);
+  const b = hash2(x0 + 1, y0, seed);
+  const c = hash2(x0, y0 + 1, seed);
+  const d = hash2(x0 + 1, y0 + 1, seed);
+  return (a * (1 - sx) + b * sx) * (1 - sy) + (c * (1 - sx) + d * sx) * sy;
+}
+
+/** 2×2 ordered dither: pixel art never blends tones, it interleaves them. */
+const BAYER = [0.125, 0.625, 0.875, 0.375];
+const dither = (px: number, py: number) => BAYER[(px & 1) + (py & 1) * 2];
+
+interface Sample {
+  gx: number; // iso position (tiles)
+  gy: number;
+  tx: number;
+  ty: number;
+  px: number; // art-space pixel (for hashing, scale-independent)
+  py: number;
+  sx: number; // canvas pixel (for dithering at the render density)
+  sy: number;
+}
+
+function grassColor(c: string, s: Sample): RGB {
+  // organic patches of three greens (no tile-shaped blocks), dithered where they meet
+  const n = vnoise(s.gx, s.gy, 3.2, 7) * 0.65 + vnoise(s.gx, s.gy, 1.1, 8) * 0.35;
+  const t = n + (dither(s.sx, s.sy) - 0.5) * 0.08;
+  let base = c === 'm' ? PAL.meadow : t < 0.36 ? PAL.grass2 : t > 0.66 ? PAL.grassLight : PAL.grass;
+  // blades: short dark strokes and a few light tips
+  const h = hash2(s.px, s.py >> 1, 9);
+  if (h > 0.972) base = shade(base, 0.86);
+  else if (h < 0.018) base = shade(base, 1.12);
+  if (c === 'm') {
+    const f = hash2(s.px >> 1, s.py >> 1, 4);
+    if (f > 0.985) return hash2(s.px, s.py, 5) > 0.5 ? C('#ffd23f') : C('#ff9ec4');
+    if (f < 0.012) return C('#fffaf0');
+  }
+  return base;
+}
+
+function pathColor(s: Sample, T: (x: number, y: number) => string): RGB {
+  const fx = frac(s.gx);
+  const fy = frac(s.gy);
+  // a curb where the path meets grass, so streets read crisply
+  const edge = 0.07;
+  const grassAt = (dx: number, dy: number) => !isPaved(T(s.tx + dx, s.ty + dy)) && isLand(T(s.tx + dx, s.ty + dy));
+  if ((fx < edge && grassAt(-1, 0)) || (fx > 1 - edge && grassAt(1, 0)) || (fy < edge && grassAt(0, -1)) || (fy > 1 - edge && grassAt(0, 1)))
+    return PAL.curb;
+  // rounded cobbles, three to a tile, in a running bond
+  const row = Math.floor(fy * 3);
+  const cx = fx * 3 + (row % 2) * 0.5;
+  const u = frac(cx);
+  const v = frac(fy * 3);
+  const mortar = u < 0.1 || v < 0.12;
+  if (mortar) return PAL.pathDark;
+  const k = 0.94 + hash2(s.tx * 3 + Math.floor(cx), s.ty * 3 + row, 5) * 0.1;
+  const lit = v < 0.3 && u > 0.2 && u < 0.7; // a highlight on the upper edge of each stone
+  return shade(lit ? PAL.pathLight : PAL.path, k);
+}
+
+function plazaColor(s: Sample, fountain: { x: number; y: number } | null): RGB {
+  // rings of darker setts radiating from the fountain, big flagstones elsewhere
+  if (fountain) {
+    const r = Math.hypot(s.gx - fountain.x, s.gy - fountain.y);
+    if ((r > 3.0 && r < 3.3) || (r > 5.1 && r < 5.35)) return PAL.plazaRing;
+    if (r < 3.0) {
+      const a = Math.atan2(s.gy - fountain.y, s.gx - fountain.x);
+      const seg = Math.floor(((a + Math.PI) / (Math.PI * 2)) * 24);
+      const ring = Math.floor(r * 3);
+      if (frac(r * 3) < 0.12) return shade(PAL.plaza2, 0.9);
+      return (seg + ring) % 2 ? PAL.plaza : PAL.plaza2;
+    }
+  }
+  const fx = frac(s.gx * 2);
+  const fy = frac(s.gy * 2);
+  if (fx < 0.06 || fy < 0.06) return shade(PAL.plaza2, 0.9);
+  const k = 0.97 + hash2(Math.floor(s.gx * 2), Math.floor(s.gy * 2), 6) * 0.06;
+  return shade((Math.floor(s.gx * 2) + Math.floor(s.gy * 2)) % 2 ? PAL.plaza : PAL.plaza2, k);
+}
+
+function landColor(c: string, s: Sample, T: (x: number, y: number) => string, fountain: { x: number; y: number } | null): RGB {
   switch (c) {
     case 'g':
     case 'h':
-    case 'm': {
-      let base = c === 'h' ? PAL.grass2 : c === 'm' ? PAL.meadow : PAL.grass;
-      if (n > 0.93) base = shade(base, 1.1);
-      else if (n < 0.08) base = shade(base, 0.92);
-      const t = hash2(px, py, 9);
-      if (t > 0.985) return shade(base, 1.18);
-      if (c === 'm' && t < 0.012) return hash2(px, py, 4) > 0.5 ? C('#ffd23f') : C('#ff9ec4');
-      if (c === 'm' && t < 0.02) return C('#fffaf0');
-      return base;
-    }
-    case 'p': {
-      const cx = Math.floor(fx * 3);
-      const cy = Math.floor(fy * 3);
-      const mortar = frac(fx * 3) < 0.12 || frac(fy * 3) < 0.12;
-      if (mortar) return PAL.pathDark;
-      const k = 0.94 + hash2(tx * 3 + cx, ty * 3 + cy, 5) * 0.1;
-      return shade(PAL.path, k);
-    }
-    case 'P': {
-      const cx = Math.floor(fx * 2);
-      const cy = Math.floor(fy * 2);
-      const mortar = frac(fx * 2) < 0.06 || frac(fy * 2) < 0.06;
-      if (mortar) return shade(PAL.plaza2, 0.9);
-      return (tx * 2 + cx + ty * 2 + cy) % 2 ? PAL.plaza : PAL.plaza2;
-    }
+    case 'm':
+      return grassColor(c, s);
+    case 'p':
+      return pathColor(s, T);
+    case 'P':
+      return plazaColor(s, fountain);
     case 's': {
-      const t = hash2(px, py, 2);
+      const t = hash2(s.px, s.py, 2);
       return t > 0.93 ? shade(PAL.sand, 0.9) : t < 0.04 ? shade(PAL.sand, 1.05) : PAL.sand;
     }
     case 'd': {
+      const fx = frac(s.gx);
+      const fy = frac(s.gy);
       const seam = frac(fy * 5) < 0.14;
       const end = frac(fx * 1.5 + (Math.floor(fy * 5) % 2) * 0.5) < 0.04;
-      return seam || end ? PAL.dirtDark : shade(PAL.dock, 0.95 + hash2(tx, Math.floor(fy * 5) + ty * 5, 1) * 0.1);
+      return seam || end ? PAL.dirtDark : shade(PAL.dock, 0.95 + hash2(s.tx, Math.floor(fy * 5) + s.ty * 5, 1) * 0.1);
     }
     default:
       return PAL.grass;
   }
 }
 
-function waterColor(deep: boolean, px: number, py: number): RGB {
-  const base = deep ? PAL.deep : PAL.water;
-  const wave = Math.sin(px * 0.21 + py * 0.9) + Math.sin(px * 0.05 - py * 0.3);
-  if (wave > 1.75) return shade(base, 1.15);
+function waterColor(deep: boolean, s: Sample, shoreDist: number): RGB {
+  // deeper toward the middle, with long soft wave glints
+  let base = deep ? PAL.deep : PAL.water;
+  if (!deep && shoreDist > 1.5) base = shade(base, 0.96);
+  const wave = Math.sin(s.px * 0.18 + s.py * 0.7 + Math.sin(s.py * 0.07) * 3) + Math.sin(s.px * 0.04 - s.py * 0.25);
+  if (wave > 1.78) return shade(base, 1.16);
+  if (wave < -1.9) return shade(base, 0.93);
   return base;
 }
 
-/** Outdoor terrain rasterizer. */
-export function renderOutdoorGround(scene: SceneDef): GroundLayer {
+/**
+ * Outdoor terrain rasterizer. `scale` is canvas px per art px: 2 matches the art density (64 px per floor
+ * tile); the layer reports it so the view can draw it at world size.
+ */
+export function renderOutdoorGround(scene: SceneDef, scale = 1): GroundLayer {
   const { width: W, height: H } = scene;
+  const S = scale;
   const minX = -H * 16 - 8;
   const maxX = W * 16 + 8;
   const minY = -12;
   const maxY = (W + H) * 8 + CLIFF + 8;
-  const cw = maxX - minX;
-  const ch = maxY - minY;
+  const cw = Math.ceil((maxX - minX) * S);
+  const ch = Math.ceil((maxY - minY) * S);
   const canvas = makeCanvas(cw, ch);
   const ctx = canvas.getContext('2d')!;
   const img = ctx.createImageData(cw, ch);
   const d = img.data;
   const T = (x: number, y: number) => terrainAt(scene, x, y);
+  const f = scene.objects.find((o) => o.sprite === 'fountain');
+  const fountain = f ? { x: f.x + (f.w ?? 1) / 2, y: f.y + (f.d ?? 1) / 2 } : null;
+  // distance to shore for water tiles (in tiles), for depth tones and lily pads
+  const shore = new Float32Array(W * H).fill(99);
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      if (!isWater(T(x, y))) continue;
+      let best = 99;
+      for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) if (isLand(T(x + dx, y + dy))) best = Math.min(best, Math.hypot(dx, dy));
+      shore[y * W + x] = best;
+    }
 
-  for (let py = 0; py < ch; py++) {
-    for (let px = 0; px < cw; px++) {
-      const ax = px + minX + 0.5;
-      const ay = py + minY + 0.5;
+  for (let sy = 0; sy < ch; sy++) {
+    for (let sx = 0; sx < cw; sx++) {
+      const ax = minX + (sx + 0.5) / S;
+      const ay = minY + (sy + 0.5) / S;
+      const px = Math.floor(ax - minX);
+      const py = Math.floor(ay - minY);
       let rgb: RGB | null = null;
-      let a = 255;
 
       const g = screenToIso(ax, ay);
       const tx = Math.floor(g.x);
       const ty = Math.floor(g.y);
       const c = T(tx, ty);
+      const smp: Sample = { gx: g.x, gy: g.y, tx, ty, px: Math.floor((ax - minX) * 2), py: Math.floor((ay - minY) * 2), sx, sy };
       if (isLand(c)) {
-        rgb = landColor(c, frac(g.x), frac(g.y), tx, ty, px, py);
-        // soft edge darkening where land meets sand/path for readability
+        rgb = landColor(c, smp, T, fountain);
+        // a soft shadow line where grass meets sand or a path, for readability
         const ex = frac(g.x);
         const ey = frac(g.y);
-        if ((c === 'g' || c === 'h') && (ex > 0.93 || ey > 0.93)) {
-          const n = ex > 0.93 ? T(tx + 1, ty) : T(tx, ty + 1);
-          if (n === 'p' || n === 'P' || n === 's') rgb = shade(rgb, 0.9);
+        if ((c === 'g' || c === 'h' || c === 'm') && (ex > 0.95 || ey > 0.95)) {
+          const n = ex > 0.95 ? T(tx + 1, ty) : T(tx, ty + 1);
+          if (n === 's') rgb = shade(rgb, 0.92);
         }
       } else {
         // Bank below a land tile edge?
         for (let k = 1; k <= WATER_DROP + 1 && !rgb; k++) {
           const u = screenToIso(ax, ay - k);
-          const ux = Math.floor(u.x);
-          const uy = Math.floor(u.y);
-          if (isLand(T(ux, uy))) rgb = k <= 1 ? PAL.dirt : PAL.dirtDark;
+          if (isLand(T(Math.floor(u.x), Math.floor(u.y)))) rgb = k <= 1 ? PAL.dirt : PAL.dirtDark;
         }
         if (!rgb) {
           const wv = screenToIso(ax, ay - WATER_DROP);
@@ -156,10 +254,26 @@ export function renderOutdoorGround(scene: SceneDef): GroundLayer {
           const wy = Math.floor(wv.y);
           const wc = T(wx, wy);
           if (isWater(wc)) {
-            rgb = waterColor(wc === 'W', px, py);
-            // foam near shore
+            const sd = shore[wy * W + wx] ?? 99;
+            const ws: Sample = { ...smp, gx: wv.x, gy: wv.y, tx: wx, ty: wy };
+            rgb = waterColor(wc === 'W', ws, sd);
+            // foam near the shore
             const near = [T(wx + 1, wy), T(wx - 1, wy), T(wx, wy + 1), T(wx, wy - 1)].some(isLand);
             if (near && hash2(px >> 1, py, 8) > 0.55) rgb = shade(rgb, 1.22);
+            // lily pads in the shallows: little round pads with a notch, a pink flower on a few
+            if (sd > 1 && sd < 3.2 && wc === 'w') {
+              const cx = Math.floor(wv.x * 2.2);
+              const cy = Math.floor(wv.y * 2.2);
+              if (hash2(cx, cy, 21) > 0.86) {
+                const ox = frac(wv.x * 2.2) - 0.5;
+                const oy = frac(wv.y * 2.2) - 0.5;
+                const r = Math.hypot(ox, oy);
+                if (r < 0.3 && !(ox > 0.02 && Math.abs(oy) < 0.05)) {
+                  rgb = r > 0.22 ? PAL.lilyDark : PAL.lily;
+                  if (r < 0.08 && hash2(cx, cy, 22) > 0.6) rgb = C('#f7a8c8');
+                }
+              }
+            }
           }
         }
       }
@@ -175,42 +289,42 @@ export function renderOutdoorGround(scene: SceneDef): GroundLayer {
           if (!onFront) continue;
           const tc = T(ux, uy);
           const rightFace = frac(u.x) > frac(u.y);
-          const f = rightFace ? 0.82 : 1;
-          if (isWater(tc)) rgb = shade(k < 6 ? PAL.water : k < 12 ? PAL.dirt : PAL.stone, f * (k < 6 ? 0.85 : 1));
-          else rgb = shade(k < 3 ? PAL.grassDark : k < 12 ? PAL.dirt : PAL.stone, f);
+          const fc = rightFace ? 0.82 : 1;
+          if (isWater(tc)) rgb = shade(k < 6 ? PAL.water : k < 12 ? PAL.dirt : PAL.stone, fc * (k < 6 ? 0.85 : 1));
+          else rgb = shade(k < 3 ? PAL.grassDark : k < 12 ? PAL.dirt : PAL.stone, fc);
           if (k > 12 && hash2(px, py, 6) > 0.8) rgb = shade(rgb, 0.85);
         }
       }
       if (!rgb) continue;
-      const i = (py * cw + px) * 4;
+      const i = (sy * cw + sx) * 4;
       d[i] = rgb[0];
       d[i + 1] = rgb[1];
       d[i + 2] = rgb[2];
-      d[i + 3] = a;
-      a = 255;
+      d[i + 3] = 255;
     }
   }
   ctx.putImageData(img, 0, 0);
 
   // Soft contact shadows under objects.
   ctx.save();
+  ctx.scale(S, S);
   ctx.translate(-minX, -minY);
   for (const o of scene.objects) {
     if (o.sprite === 'reeds' || o.sprite === 'boat' || o.eventDecor) continue;
-    const f = footprint(o);
-    const cx = (f.x0 + f.x1) / 2;
-    const cy = (f.y0 + f.y1) / 2;
-    const sx = (cx - cy) * 16;
-    const sy = (cx + cy) * 8;
-    const rw = ((f.x1 - f.x0 + f.y1 - f.y0) / 2) * 16 * (o.building ? 1.08 : 0.8);
+    const fp = footprint(o);
+    const cx = (fp.x0 + fp.x1) / 2;
+    const cy = (fp.y0 + fp.y1) / 2;
+    const ssx = (cx - cy) * 16;
+    const ssy = (cx + cy) * 8;
+    const rw = ((fp.x1 - fp.x0 + fp.y1 - fp.y0) / 2) * 16 * (o.building ? 1.08 : 0.8);
     ctx.fillStyle = o.building ? 'rgba(40,30,50,0.20)' : 'rgba(40,30,50,0.16)';
     ctx.beginPath();
-    ctx.ellipse(sx + (o.building ? -4 : 0), sy + (o.building ? 3 : 1), rw, rw / 2, 0, 0, Math.PI * 2);
+    ctx.ellipse(ssx + (o.building ? -4 : 0), ssy + (o.building ? 3 : 1), rw, rw / 2, 0, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.restore();
 
-  return { canvas, minX, minY, wallHits: [] };
+  return { canvas, minX, minY, wallHits: [], scale: S };
 }
 
 /* -------------------------------------------------------------------- interiors */

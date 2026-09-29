@@ -9,7 +9,7 @@
  * The two authored views face screen-right: "front" (3/4 front, facing se) and "back" (3/4 back, facing
  * ne); sw/nw are mirrors.
  */
-export type Pose = 'stand' | 'walk1' | 'walk2' | 'sit' | 'wave';
+export type Pose = 'stand' | 'walk1' | 'walk2' | 'sit' | 'wave' | 'work';
 export type View = 'front' | 'back';
 export type Pt = [number, number];
 
@@ -120,6 +120,10 @@ export function frameFor(view: View, pose: Pose): Frame {
   } else if (pose === 'wave') {
     // raised clear of the head (a hand touching the ear traps a see-through pocket)
     armNear = { a: [CX - 9, s + 2], m: [CX - 16, s - 3], b: [CX - 18, s - 10] };
+  } else if (pose === 'work') {
+    // both hands forward at counter height (tamping, pouring, wiping down)
+    armNear = { a: [CX - 9, s + 3], m: [CX - 7, s + 10], b: [CX - 2, s + 12] };
+    armFar = { a: [CX + 10, s + 3], m: [CX + 12, s + 9], b: [CX + 7, s + 11] };
   } else if (sitting) {
     armNear = { a: [CX - 9, s + 3], m: [CX - 9, s + 11], b: [CX - 3, s + 16] };
     armFar = { a: [CX + 10, s + 3], m: [CX + 11, s + 10], b: [CX + 10, s + 15] };
@@ -140,8 +144,10 @@ export function frameFor(view: View, pose: Pose): Frame {
     legFar = { a: [CX + 4, h], m: [CX + 6, h + 9], b: [CX + 8, 99] };
     heelNear = true;
   } else if (sitting && view === 'back') {
-    legNear = { a: [CX - 4, h], m: [CX + 5, h - 2], b: [CX + 7, h + 6] };
-    legFar = { a: [CX + 4, h - 1], m: [CX + 12, h - 3], b: [CX + 13, h + 5] };
+    // seen from behind the thighs run away from us, staying inside the torso's silhouette (a low backrest
+    // must hide them), with just the shins and feet showing below
+    legNear = { a: [CX - 4, h], m: [CX + 3, h + 1], b: [CX + 5, h + 6] };
+    legFar = { a: [CX + 4, h], m: [CX + 9, h], b: [CX + 10, h + 5] };
   } else if (sitting) {
     legNear = { a: [CX - 4, h], m: [CX + 7, h + 3], b: [CX + 8, 98] };
     legFar = { a: [CX + 4, h - 1], m: [CX + 13, h + 2], b: [CX + 14, 97] };

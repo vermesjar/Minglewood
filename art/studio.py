@@ -192,6 +192,50 @@ def clean_cell(cell: Image.Image) -> Image.Image:
     return Image.fromarray(arr)
 
 
+def sheet_objects(im: Image.Image, n: int) -> list[Image.Image] | None:
+    """The drawn objects on a sheet, in reading order (rows top to bottom, left to right within a row), each
+    cut out by its own shape — or None when the count doesn't match n (then slice by grid cells). The model
+    often ignores the requested grid (a wide piece straddles two cells), so objects are found, not assumed."""
+    arr = np.array(im.convert("RGBA"))
+    arr[..., 3] = np.where(arr[..., 3] < 40, 0, arr[..., 3])
+    solid = (arr[..., 3] > 128).astype(np.uint8)
+    k, lab, stats, cent = cv2.connectedComponentsWithStats(cv2.dilate(solid, np.ones((25, 25), np.uint8)), 8)
+    if k < 2:
+        return None
+    areas = stats[1:, cv2.CC_STAT_AREA]
+    comps = [1 + i for i, ar in enumerate(areas) if ar >= 0.06 * areas.max()]
+    if len(comps) != n:
+        return None
+    hs = sorted(stats[c, cv2.CC_STAT_HEIGHT] for c in comps)
+    tol = hs[len(hs) // 2] * 0.5
+    order = sorted(comps, key=lambda c: cent[c][1])
+    rows: list[list[int]] = []
+    for c in order:
+        if rows and abs(cent[c][1] - np.mean([cent[r][1] for r in rows[-1]])) < tol:
+            rows[-1].append(c)
+        else:
+            rows.append([c])
+    out = []
+    for row in rows:
+        for c in sorted(row, key=lambda c: cent[c][0]):
+            one = arr.copy()
+            one[..., 3] = np.where(lab == c, one[..., 3], 0)
+            x, y, w, h = stats[c, :4]
+            out.append(Image.fromarray(one).crop((x, y, x + w, y + h)))
+    return out
+
+
+def drop_specks(img: Image.Image, min_px: int = 6) -> Image.Image:
+    """The furniture standard allows no stray pixels: remove bits detached from the piece smaller than min_px."""
+    arr = np.array(img.convert("RGBA"))
+    solid = (arr[..., 3] > 0).astype(np.uint8)
+    n, lab, stats, _ = cv2.connectedComponentsWithStats(solid, connectivity=8)
+    for i in range(1, n):
+        if stats[i, cv2.CC_STAT_AREA] < min_px:
+            arr[lab == i] = 0
+    return Image.fromarray(arr)
+
+
 def alpha_box(img: Image.Image, thresh: int = 24) -> tuple[int, int, int, int] | None:
     a = np.array(img.getchannel("A"))
     ys, xs = np.where(a > thresh)
@@ -376,6 +420,29 @@ GUIDE_TEXT = (
 GAME_TILE = 64  # sprite px per floor tile at 2x density
 
 
+class ManifestLock:
+    """Serializes manifest read-modify-write across parallel builds (a lock file created exclusively)."""
+
+    def __init__(self):
+        self.path = PUBLIC / ".manifest.lock"
+
+    def __enter__(self):
+        PUBLIC.mkdir(parents=True, exist_ok=True)
+        for _ in range(600):
+            try:
+                self.fd = os.open(self.path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                return self
+            except FileExistsError:
+                if time.time() - self.path.stat().st_mtime > 60:
+                    self.path.unlink(missing_ok=True)
+                time.sleep(0.1)
+        raise SystemExit("manifest lock timed out")
+
+    def __exit__(self, *exc):
+        os.close(self.fd)
+        self.path.unlink(missing_ok=True)
+
+
 def load_manifest() -> dict:
     mpath = PUBLIC / "manifest.json"
     return json.loads(mpath.read_text(encoding="utf-8")) if mpath.exists() else {"scale": 2, "sprites": {}}
@@ -384,7 +451,7 @@ def load_manifest() -> dict:
 def save_manifest(m: dict):
     PUBLIC.mkdir(parents=True, exist_ok=True)
     m["sprites"] = dict(sorted(m["sprites"].items()))
-    (PUBLIC / "manifest.json").write_text(json.dumps(m, indent=2) + "\n", encoding="utf-8")
+    (PUBLIC / "manifest.json").write_text(json.dumps(m, indent=2) + "\n", encoding="utf-8", newline="\n")
 
 
 def publish_sprite(m: dict, key: str, facing: str | None, img: Image.Image, anchor, footprint, extra: dict):
@@ -462,12 +529,13 @@ def run_sheet(spec: dict, sheet: dict, a) -> list[dict]:
     f = GAME_TILE / tile
     cw, ch = W / cols, H / rows
     results = []
+    found = None if sheet.get("slice") == "grid" else sheet_objects(im, len(items))
     for i, it in enumerate(items):
         if not it.get("key"):
             continue
         r, c = divmod(i, cols)
         x0c, y0c = int(c * cw), int(r * ch)
-        cell = clean_cell(im.crop((x0c, y0c, int((c + 1) * cw), int((r + 1) * ch))))
+        cell = found[i] if found else clean_cell(im.crop((x0c, y0c, int((c + 1) * cw), int((r + 1) * ch))))
         box = alpha_box(cell)
         if not box:
             print(f"  ! {it['key']}: empty cell")
@@ -482,8 +550,13 @@ def run_sheet(spec: dict, sheet: dict, a) -> list[dict]:
             v0, v1 = it["wall"]["v"]
             m_ = it["wall"].get("margin", 0.08)
             span = it.get("span", 1)
-            px = pixelize(obj, round((span - 2 * m_) * 32), round((v1 - v0) * 2), it.get("colors", spec.get("colors", 28)),
-                          "none", no_trim=True)
+            bw, bh = round((span - 2 * m_) * 32), round((v1 - v0) * 2)
+            # Fit inside the wall slot without stretching, centred; the slot is padded transparent.
+            k = min(bw / obj.width, bh / obj.height)
+            fitted = pixelize(obj, max(1, round(obj.width * k)), max(1, round(obj.height * k)),
+                              it.get("colors", spec.get("colors", 28)), "none", no_trim=True)
+            px = Image.new("RGBA", (bw, bh))
+            px.paste(fitted, ((bw - fitted.width) // 2, (bh - fitted.height) // 2))
             stem = it["key"]
             px.save(job / f"{stem}.png")
             prev = checker(px.width * 4, px.height * 4)
@@ -498,6 +571,7 @@ def run_sheet(spec: dict, sheet: dict, a) -> list[dict]:
                       no_trim=True, sharpen=it.get("sharpen", 0.0))
         if it.get("flip"):
             px = px.transpose(Image.FLIP_LEFT_RIGHT)  # the model drew it along the other diagonal
+        px = drop_specks(px)
         Wp, Hp = px.size
         nx, ny = it.get("nudge", [0, 0])
         if fit == "diamond":
@@ -516,7 +590,8 @@ def run_sheet(spec: dict, sheet: dict, a) -> list[dict]:
                    outline=(220, 40, 60, 255), width=2)
         prev.convert("RGB").save(job / f"{stem}.x4.png")
         results.append({"key": it["key"], "facing": it.get("facing"), "img": px, "anchor": anchor,
-                        "footprint": [it.get("w", 1), it.get("d", 1)], "extra": it.get("extra", {}), "stem": stem})
+                        "footprint": [it.get("w", 1), it.get("d", 1)], "extra": it.get("extra", {}), "stem": stem,
+                        "also": it.get("also", []), "also_facings": it.get("also_facings", [])})
         print(f"  {stem}: {px.size} anchor {anchor}")
     return results
 
@@ -526,18 +601,30 @@ def cmd_build(a):
     spec = json.loads(Path(a.spec).read_text(encoding="utf-8"))
     only = set(a.only.split(",")) if a.only else None
     sheets = [s for s in spec["sheets"] if not only or s["name"] in only]
-    with cf.ThreadPoolExecutor(max_workers=4) as ex:
-        done = list(ex.map(lambda sh: (sh, run_sheet(spec, sh, a)), sheets))
-    m = load_manifest()
+    # Sheets whose references are another sheet's output (a back view drawn from its front) run second.
+    later = [s for s in sheets if any(r.startswith("out/") for r in s.get("refs", []))]
+    first = [s for s in sheets if s not in later]
+    done = []
+    for phase in (first, later):
+        with cf.ThreadPoolExecutor(max_workers=4) as ex:
+            done += list(ex.map(lambda sh: (sh, run_sheet(spec, sh, a)), phase))
     previews = []
     skip = set((a.skip or "").split(","))
-    for sh, res in done:
-        for r in res:
-            if not a.no_publish and r["key"] not in skip:
-                publish_sprite(m, r["key"], r["facing"], r["img"], r["anchor"], r["footprint"], r["extra"])
-            previews.append(OUT / spec["name"] / sh["name"] / f"{r['stem']}.x4.png")
-    if not a.no_publish:
-        save_manifest(m)
+    with ManifestLock():
+        m = load_manifest()
+        for sh, res in done:
+            for r in res:
+                if not a.no_publish and r["key"] not in skip:
+                    # `also`: the same drawing published under more keys (one back view shared by colour variants)
+                    for key in [r["key"], *r.get("also", [])]:
+                        publish_sprite(m, key, r["facing"], r["img"], r["anchor"], r["footprint"], r["extra"])
+                        # `also_facings`: a piece that looks the same from behind (round or symmetric) uses its one
+                        # drawing for the back view too, so all four rotations exist
+                        for f in r.get("also_facings", []):
+                            publish_sprite(m, key, f, r["img"], r["anchor"], r["footprint"], r["extra"])
+                previews.append(OUT / spec["name"] / sh["name"] / f"{r['stem']}.x4.png")
+        if not a.no_publish:
+            save_manifest(m)
     if previews:
         sa = argparse.Namespace(images=[str(p) for p in previews], out=str(OUT / spec["name"] / "review.jpg"),
                                 cell=a.cell, cols=a.cols, nearest=False)
@@ -550,28 +637,29 @@ def cmd_build(a):
 def cmd_publish(a):
     PUBLIC.mkdir(parents=True, exist_ok=True)
     (PUBLIC / "sprites").mkdir(exist_ok=True)
-    mpath = PUBLIC / "manifest.json"
-    manifest = json.loads(mpath.read_text(encoding="utf-8")) if mpath.exists() else {"scale": 2, "sprites": {}}
     fname = f"{a.key}{'.' + a.facing if a.facing else ''}.png"
     im = Image.open(a.image).convert("RGBA")
     im.save(PUBLIC / "sprites" / fname, optimize=True)
-    e = manifest["sprites"].get(a.key, {})
-    e["footprint"] = [int(v) for v in a.footprint.split(",")]
-    e["fit"] = a.fit
-    if a.pad is not None:
-        e["pad"] = a.pad
-    if a.lift is not None:
-        e["lift"] = a.lift
-    if a.facing:
-        e.setdefault("facings", {})[a.facing] = fname
-        e.pop("file", None)
-    else:
-        e["file"] = fname
-    if a.note:
-        e["note"] = a.note
-    manifest["sprites"][a.key] = e
-    manifest["sprites"] = dict(sorted(manifest["sprites"].items()))
-    mpath.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    # Several agents publish at once: read, change and write the manifest only while holding the lock.
+    with ManifestLock():
+        manifest = load_manifest()
+        e = manifest["sprites"].get(a.key, {})
+        e["footprint"] = [int(v) for v in a.footprint.split(",")]
+        e["fit"] = a.fit
+        if a.pad is not None:
+            e["pad"] = a.pad
+        if a.lift is not None:
+            e["lift"] = a.lift
+        if a.facing:
+            # the client reads per-facing records as {file, anchor?} (art.ts)
+            e.setdefault("facings", {})[a.facing] = {"file": fname}
+            e.pop("file", None)
+        else:
+            e["file"] = fname
+        if a.note:
+            e["note"] = a.note
+        manifest["sprites"][a.key] = e
+        save_manifest(manifest)
     print(f"published {a.key}{' (' + a.facing + ')' if a.facing else ''} -> sprites/{fname} {im.size}")
 
 

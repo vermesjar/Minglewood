@@ -1,0 +1,87 @@
+{
+  "name": "town-props",
+  "colors": 32,
+  "quality": "high",
+  "mood": "Northstar Town, a cozy lakeside company town on a bright spring morning. Storybook, handcrafted, premium; lush layered greens, warm wood, black cast iron, weathered stone, brass. Everything sized for a town where a person is about as tall as a lamp post's lower half.",
+  "sheets": [
+    {
+      "name": "trees",
+      "grid": "3x2",
+      "size": "1536x1024",
+      "tile": 110,
+      "items": [
+        {"key": "tree/pine.a", "w": 1, "d": 1, "h": 120, "width": 92, "fill": 0.2, "prompt": "A tall evergreen pine tree: layered drooping boughs in deep forest green with lighter tips toward the light, a straight brown trunk showing at the base, a pointed top."},
+        {"key": "tree/pine.b", "w": 1, "d": 1, "h": 108, "width": 100, "fill": 0.2, "prompt": "A fuller, bushier fir tree: dense dark blue-green tiers with a soft snowless sheen, a short brown trunk, slightly rounder silhouette than a pine."},
+        {"key": "tree/round.a", "w": 1, "d": 1, "h": 110, "width": 124, "fill": 0.2, "prompt": "A round leafy linden tree: a big fluffy crown of fresh spring-green leaves in clustered clumps with bright highlights on the upper left, a sturdy brown trunk with a little root flare."},
+        {"key": "tree/round.b", "w": 1, "d": 1, "h": 100, "width": 120, "fill": 0.2, "prompt": "A blossoming cherry tree: a rounded crown of soft pink blossom clusters with a few green leaves, a dark curving trunk, a scatter of petals at its base."},
+        {"key": "tree/birch.a", "w": 1, "d": 1, "h": 122, "width": 78, "fill": 0.2, "prompt": "A slender silver birch: a white papery trunk with black marks, an airy oval crown of small light-green leaves."},
+        {"key": "tree/birch.b", "w": 1, "d": 1, "h": 112, "width": 84, "fill": 0.2, "prompt": "A pair of slender silver birch trunks growing together, white bark with black marks, a light airy crown of yellow-green leaves."}
+      ]
+    },
+    {
+      "name": "landmarks",
+      "grid": "2x2",
+      "size": "1024x1024",
+      "tile": 80,
+      "items": [
+        {"key": "tree/oak-big", "w": 2, "d": 2, "h": 170, "width": 236, "fill": 0.3, "prompt": "The Founders' Oak: a majestic ancient oak with a massive gnarled trunk, great spreading limbs and a huge billowing crown of deep green leaves, a ring of moss and wildflowers around its roots. Awe-inspiring and wise."},
+        {"key": "fountain", "w": 3, "d": 3, "h": 72, "fit": "diamond", "prompt": "The Founders' Fountain: a grand three-tier town fountain of pale carved stone with a wide octagonal basin full of clear blue water, a fluted pedestal, two stacked bowls with water spilling from tier to tier, a small brass star on top, lily pads and coins in the basin. It fills its floor diamond."},
+        {"key": "lighthouse", "w": 1, "d": 1, "h": 150, "width": 84, "fill": 0.2, "prompt": "A charming little lighthouse: a tapered tower with red and white stripes on a base of grey rocks, a black iron gallery rail, a glowing warm lantern room with a domed red cap and a tiny weathervane."},
+        {"key": "rocket-statue", "w": 1, "d": 1, "h": 104, "width": 72, "fill": 0.2, "prompt": "A commemorative rocket statue: a polished bronze-and-orange retro rocket with fins pointing up on a stepped granite plinth with a small brass plaque (no text), a ring of orange flowers at the base."}
+      ]
+    },
+    {
+      "name": "street",
+      "grid": "3x2",
+      "size": "1536x1024",
+      "tile": 150,
+      "items": [
+        {"key": "lamp-post", "w": 1, "d": 1, "h": 96, "width": 40, "fill": 0.1, "prompt": "A black cast-iron Victorian street lamp: a fluted post on a round base, a scrolled crossarm and a four-sided glass lantern with a warm golden glow and a little crown cap."},
+        {"key": "bench", "facing": "se", "w": 1, "d": 1, "h": 34, "width": 104, "fill": 0.55, "extra": {"seat": 12}, "prompt": "A classic park bench: warm honey-oak slats on black cast-iron scrollwork ends, a gently curved slatted backrest, long enough for two."},
+        {"key": "bench", "facing": "ne", "w": 1, "d": 1, "h": 34, "width": 104, "fill": 0.55, "extra": {"seat": 12}, "prompt": "The SAME park bench (honey-oak slats, black cast-iron scrollwork ends, curved slatted backrest)."},
+        {"key": "signpost", "w": 1, "d": 1, "h": 64, "width": 66, "fill": 0.2, "prompt": "A wooden town signpost: a stout post with three arrow-shaped direction boards in cream, teal and coral (no letters), a little roof cap and a flower box at the foot."},
+        {"key": "mailbox", "w": 1, "d": 1, "h": 40, "width": 36, "fill": 0.2, "prompt": "A round-topped cobalt-blue post box on a short black pedestal, a brass slot and a little brass star emblem."},
+        {"key": "bike-rack", "w": 1, "d": 1, "h": 28, "width": 76, "fill": 0.4, "prompt": "A black wave-shaped steel bike rack with one mint-green city bike with a wicker basket parked in it."}
+      ]
+    },
+    {
+      "name": "leisure",
+      "grid": "3x2",
+      "size": "1536x1024",
+      "tile": 150,
+      "items": [
+        {"key": "umbrella-table.red", "w": 1, "d": 1, "h": 76, "width": 112, "fill": 0.3, "prompt": "A round café terrace table with a white marble top and a black iron base, under a big parasol with red and cream stripes and a scalloped edge."},
+        {"key": "umbrella-table.teal", "w": 1, "d": 1, "h": 76, "width": 112, "fill": 0.3, "prompt": "A round café terrace table with a white marble top and a black iron base, under a big parasol with teal and cream stripes and a scalloped edge."},
+        {"key": "picnic", "w": 2, "d": 1, "h": 28, "width": 156, "fill": 0.5, "prompt": "A rustic wooden picnic table with attached benches on both long sides, a red-and-white gingham cloth, a wicker basket and a jug of lemonade on it."},
+        {"key": "boat.red", "w": 1, "d": 1, "h": 22, "width": 112, "fill": 0.35, "prompt": "A small wooden rowboat floating on water, painted red with a cream stripe and a honey-oak interior, two oars resting inside. No water drawn."},
+        {"key": "boat.yellow", "w": 1, "d": 1, "h": 22, "width": 112, "fill": 0.35, "prompt": "A small wooden rowboat floating on water, painted sunny yellow with a navy stripe and a honey-oak interior, two oars resting inside. No water drawn."},
+        {"key": "reeds", "w": 1, "d": 1, "h": 34, "width": 56, "fill": 0.2, "prompt": "A clump of lakeside reeds and cattails with brown velvet seed heads and a couple of yellow flag irises."}
+      ]
+    },
+    {
+      "name": "garden",
+      "grid": "3x2",
+      "size": "1536x1024",
+      "tile": 150,
+      "items": [
+        {"key": "bush.plain", "w": 1, "d": 1, "h": 30, "width": 62, "fill": 0.3, "prompt": "A round clipped boxwood shrub in fresh green with lighter leaf clusters on top."},
+        {"key": "bush.flower", "w": 1, "d": 1, "h": 32, "width": 64, "fill": 0.3, "prompt": "A round flowering hydrangea shrub with big blue and pink flower heads among green leaves."},
+        {"key": "flowerbed.pink", "w": 1, "d": 1, "h": 18, "fit": "diamond", "prompt": "A square raised flower bed with a low stone edging, filled with pink tulips and white daisies, filling its floor diamond."},
+        {"key": "flowerbed.yellow", "w": 1, "d": 1, "h": 18, "fit": "diamond", "prompt": "A square raised flower bed with a low stone edging, filled with yellow daffodils and orange marigolds, filling its floor diamond."},
+        {"key": "flowerbed.blue", "w": 1, "d": 1, "h": 18, "fit": "diamond", "prompt": "A square raised flower bed with a low stone edging, filled with blue irises and purple lavender, filling its floor diamond."},
+        {"key": "flowerbed.red", "w": 1, "d": 1, "h": 18, "fit": "diamond", "prompt": "A square raised flower bed with a low stone edging, filled with red geraniums and white alyssum, filling its floor diamond."}
+      ]
+    },
+    {
+      "name": "park",
+      "grid": "3x1",
+      "size": "1536x1024",
+      "tile": 110,
+      "items": [
+        {"key": "gazebo", "w": 3, "d": 3, "h": 96, "fit": "diamond", "prompt": "A white Victorian bandstand gazebo: an octagonal wooden platform with two steps, slender white posts with lacy fretwork, a teal-and-white striped conical roof with a brass finial, strings of little lights under the eaves. It fills its floor diamond."},
+        {"key": "flower-cart", "w": 2, "d": 1, "h": 50, "width": 150, "fill": 0.45, "prompt": "A wooden flower-seller's cart with two big spoked wheels and a striped coral-and-cream canopy, overflowing with buckets of tulips, sunflowers and roses."},
+        {"key": "noticeboard", "w": 1, "d": 1, "h": 62, "width": 70, "fill": 0.2, "prompt": "A small wooden town notice board with a little shingled roof, a cork panel covered in colourful pinned notes and flyers (no readable text), on two posts."}
+      ]
+    }
+  ]
+}

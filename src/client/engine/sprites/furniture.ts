@@ -368,6 +368,22 @@ export function rugTexture(variant: string): { base: string; border: string; acc
       return { base: '#eadfc9', border: '#c9b79a', accent: '#8a5a3b' };
     case 'mustard':
       return { base: '#e5b64a', border: '#c4952c', accent: '#fff4c9' };
+    case 'navy':
+      return { base: '#2f4a6b', border: '#1f3350', accent: '#d9a441' };
+    case 'oxblood':
+      return { base: '#7a2436', border: '#561828', accent: '#f2c14e' };
+    case 'mission':
+      return { base: '#26324f', border: '#1a2338', accent: '#ff8a3d' };
+    case 'plum':
+      return { base: '#6b3a5e', border: '#4e2745', accent: '#f2c14e' };
+    case 'rose':
+      return { base: '#d98a8f', border: '#b8636b', accent: '#fff1dc' };
+    case 'neon':
+      return { base: '#2a1f4a', border: '#1a1233', accent: '#ff5fd1' };
+    case 'cyan':
+      return { base: '#1f3f5c', border: '#152b40', accent: '#4fe3f0' };
+    case 'sage':
+      return { base: '#8fae8a', border: '#6d8d68', accent: '#f4efe0' };
     default:
       return { base: '#c96f5a', border: '#a8543f', accent: '#fff4c9' };
   }

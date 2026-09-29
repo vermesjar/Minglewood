@@ -1,0 +1,234 @@
+{
+  "name": "eng",
+  "tile": 200,
+  "colors": 30,
+  "quality": "medium",
+  "mood": "Engineering Studio: a focused, bright Scandinavian-industrial studio. Pale birch wood, slate-blue carpet, matte black steel, warm task lighting, tidy cable management, a few green plants. Calm and competent with small nerdy touches.",
+  "sheets": [
+    {
+      "name": "desks",
+      "grid": "3x2",
+      "items": [
+        {
+          "key": "desk",
+          "facing": "sw",
+          "w": 2,
+          "d": 1,
+          "h": 30,
+          "width": 96,
+          "fit": "diamond",
+          "prompt": "A birch standing desk two tiles long on black steel legs with two slim monitors showing colorful lines of code (no readable text), a mechanical keyboard, a mouse, a ceramic mug and a tiny succulent. The monitor screens face along the red arrow."
+        },
+        {
+          "key": "desk",
+          "facing": "ne",
+          "w": 2,
+          "d": 1,
+          "h": 30,
+          "width": 96,
+          "fit": "diamond",
+          "prompt": "The SAME birch standing desk seen from behind: the matte black backs of the two monitors with neat cables, black steel legs."
+        },
+        {
+          "key": "chair.office",
+          "facing": "se",
+          "w": 1,
+          "d": 1,
+          "h": 34,
+          "width": 44,
+          "fill": 0.5,
+          "prompt": "An ergonomic office chair: black mesh back, a charcoal seat cushion, armrests, a gas lift and a five-star base with small wheels.",
+          "extra": {
+            "seat": 15
+          }
+        },
+        {
+          "key": "chair.office",
+          "facing": "nw",
+          "w": 1,
+          "d": 1,
+          "h": 34,
+          "width": 44,
+          "fill": 0.5,
+          "prompt": "The SAME ergonomic office chair seen from directly behind: the back of the black mesh backrest nearest to us, hiding most of the seat, the five-star base with wheels.",
+          "extra": {
+            "seat": 15
+          }
+        },
+        {
+          "key": "server-rack",
+          "facing": "sw",
+          "w": 1,
+          "d": 1,
+          "h": 48,
+          "width": 60,
+          "fit": "diamond",
+          "prompt": "A retired build server rack nicknamed the Toaster: a black steel cabinet with a glass door, rows of servers with tiny green and amber status lights, a hand-painted toaster sticker on the side."
+        },
+        {
+          "key": "table-low.side",
+          "w": 1,
+          "d": 1,
+          "h": 14,
+          "width": 42,
+          "fill": 0.4,
+          "prompt": "A small round birch side table on three black legs with a stack of paperback books and a mug."
+        }
+      ]
+    },
+    {
+      "name": "lounge",
+      "grid": "3x2",
+      "items": [
+        {
+          "key": "bookshelf.birch",
+          "facing": "sw",
+          "w": 1,
+          "d": 1,
+          "h": 52,
+          "width": 60,
+          "fit": "diamond",
+          "prompt": "A tall open birch bookshelf with black steel frame: rows of colorful programming books, binders, a small plant, a rubber duck and a retro robot toy. Its open front faces along the red arrow."
+        },
+        {
+          "key": "bookshelf.birch",
+          "facing": "ne",
+          "w": 1,
+          "d": 1,
+          "h": 52,
+          "width": 60,
+          "fit": "diamond",
+          "prompt": "The SAME tall birch-and-black-steel bookshelf seen from behind: its plain birch back panel and black steel frame."
+        },
+        {
+          "key": "bookshelf.birch2",
+          "facing": "sw",
+          "w": 1,
+          "d": 1,
+          "h": 52,
+          "width": 60,
+          "fit": "diamond",
+          "prompt": "A matching tall birch-and-black-steel bookshelf holding stacked zines, board games, a cactus, labelled storage boxes and a small trophy. Its open front faces along the red arrow."
+        },
+        {
+          "key": "beanbag.orange",
+          "w": 1,
+          "d": 1,
+          "h": 18,
+          "width": 52,
+          "fill": 0.6,
+          "prompt": "A slouchy round beanbag chair in burnt-orange corduroy with a soft dent in the middle.",
+          "extra": {
+            "seat": 8
+          }
+        },
+        {
+          "key": "beanbag.purple",
+          "w": 1,
+          "d": 1,
+          "h": 18,
+          "width": 52,
+          "fill": 0.6,
+          "prompt": "The same slouchy round beanbag chair in plum-purple corduroy.",
+          "extra": {
+            "seat": 8
+          }
+        },
+        {
+          "key": "beanbag.cyan",
+          "w": 1,
+          "d": 1,
+          "h": 18,
+          "width": 52,
+          "fill": 0.6,
+          "prompt": "The same slouchy round beanbag chair in electric-cyan vinyl with a glossy highlight.",
+          "extra": {
+            "seat": 8
+          }
+        }
+      ]
+    },
+    {
+      "name": "extras",
+      "grid": "3x2",
+      "items": [
+        {
+          "key": "beanbag.pink",
+          "w": 1,
+          "d": 1,
+          "h": 18,
+          "width": 52,
+          "fill": 0.6,
+          "prompt": "A slouchy round beanbag chair in hot-pink vinyl with a glossy highlight.",
+          "extra": {
+            "seat": 8
+          }
+        },
+        {
+          "key": "bookshelf.birch2",
+          "facing": "ne",
+          "w": 1,
+          "d": 1,
+          "h": 52,
+          "width": 60,
+          "fit": "diamond",
+          "prompt": "A tall birch-and-black-steel bookshelf seen from behind: plain birch back panel and black steel frame."
+        },
+        {
+          "key": "server-rack",
+          "facing": "ne",
+          "w": 1,
+          "d": 1,
+          "h": 48,
+          "width": 60,
+          "fit": "diamond",
+          "prompt": "A black steel server rack seen from behind: a vented back door with bundles of neatly tied blue and yellow cables and a few green status lights."
+        }
+      ]
+    },
+    {
+      "name": "wall",
+      "kind": "wall",
+      "grid": "3x1",
+      "size": "1536x1024",
+      "items": [
+        {
+          "key": "whiteboard",
+          "span": 3,
+          "wall": {
+            "v": [
+              16,
+              48
+            ],
+            "margin": 0.08
+          },
+          "prompt": "A wide whiteboard, about 2.6 : 1, in a slim aluminium frame with a marker tray: a hand-drawn architecture diagram of boxes and arrows in blue, red and green marker, a few yellow sticky notes (no readable text)."
+        },
+        {
+          "key": "pennant.platform",
+          "span": 1,
+          "wall": {
+            "v": [
+              28,
+              46
+            ],
+            "margin": 0.2
+          },
+          "prompt": "A felt pennant flag hanging vertically (point down), tall and narrow, in amber-orange with a cream trim and a simple gear icon."
+        },
+        {
+          "key": "pennant.mobile",
+          "span": 1,
+          "wall": {
+            "v": [
+              28,
+              46
+            ],
+            "margin": 0.2
+          },
+          "prompt": "A felt pennant flag hanging vertically (point down), tall and narrow, in cobalt blue with a cream trim and a simple phone icon."
+        }
+      ]
+    }
+  ]
+}

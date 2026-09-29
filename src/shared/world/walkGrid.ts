@@ -1,8 +1,9 @@
 import { footprint, isSeat, isSolid, terrainAt, UNWALKABLE_TERRAIN, type SceneDef } from './scene';
 
 /**
- * Boolean walkability grid for a scene. Seats are left walkable so avatars can path onto
- * them; everything else solid blocks.
+ * Boolean walkability grid for a scene. All furniture blocks, seats included: you can't walk through a
+ * chair or stand in a couch. A seat is reached only as the last step of a path (pathfinding's allowGoal)
+ * and you sit there — see seats.ts.
  */
 export class WalkGrid {
   readonly width: number;
@@ -20,10 +21,11 @@ export class WalkGrid {
     }
     for (const o of scene.objects) {
       if (o.eventDecor && !activeDecor.has(o.eventDecor)) continue;
-      if (!isSolid(o) || isSeat(o)) continue;
+      if (!isSolid(o) && !isSeat(o)) continue;
       const f = footprint(o);
       for (let y = f.y0; y < f.y1; y++) for (let x = f.x0; x < f.x1; x++) this.set(x, y, false);
     }
+    for (const a of scene.staff ?? []) for (let y = a.y; y < a.y + a.d; y++) for (let x = a.x; x < a.x + a.w; x++) this.set(x, y, false);
   }
 
   inBounds(x: number, y: number): boolean {

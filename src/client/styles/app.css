@@ -2162,3 +2162,14 @@ body.rm *::after {
 .center-text {
   text-align: center;
 }
+
+/* A room NPC's card (the café's barista): who they are, and that they're part of the room. */
+.npc-card .npc-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.npc-card .npc-head h3 {
+  margin: 0;
+}

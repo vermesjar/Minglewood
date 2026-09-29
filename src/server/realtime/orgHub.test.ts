@@ -1,9 +1,10 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ServerMsg } from '@shared/protocol';
 import { ORG_ID } from '@shared/seed/northstar';
 import { DEFAULT_LOADOUT } from '@shared/avatar';
 import { getScene } from '@shared/world';
 import { WalkGrid } from '@shared/world/walkGrid';
+import { seatSpots, stepOffTiles } from '@shared/world/seats';
 import type { Tile } from '@shared/world/pathfinding';
 import { Store } from '../store/store';
 import { MemoryPersistence } from '../store/jsonFile';
@@ -98,6 +99,7 @@ describe('OrgHub', () => {
   });
 
   it('hands out a coffee only at the machine, and everyone sees it until it is put down', () => {
+    vi.useFakeTimers();
     const a = newMember(store, 'Ada');
     const b = newMember(store, 'Bo');
     const cb = client(b.id);
@@ -109,10 +111,90 @@ describe('OrgHub', () => {
     expect(hub.carry(a.id, machine.id)).toBe(false); // across the room
     hub.enter(a.id, 'cafe', 'live', [machine.x, machine.y + 1]);
     expect(hub.carry(a.id, machine.id)).toBe(true);
+    vi.advanceTimersByTime(8000); // the barista makes it
     expect(cb.msgs.some((m) => m.t === 'updated' && m.memberId === a.id && m.patch.carrying === 'coffee')).toBe(true);
+    vi.useRealTimers();
     expect(hub.carry(a.id, null)).toBe(true);
     const last = cb.msgs.filter((m) => m.t === 'updated' && m.memberId === a.id).pop();
     expect(last && last.t === 'updated' && last.patch.carrying).toBeNull();
+  });
+
+  it('seats one person per cushion, refuses a full seat, and steps you off onto the floor when you stand', () => {
+    const [a, b, c] = ['Ada', 'Bo', 'Cy'].map((n) => newMember(store, n));
+    [a, b, c].forEach((m) => hub.connect(client(m.id)));
+    const cafe = getScene('cafe')!;
+    const couch = cafe.objects.find((o) => o.sprite === 'couch')!;
+    const spots = seatSpots(couch, cafe);
+    hub.enter(a.id, 'cafe', 'live', [spots[0].x, spots[0].y]);
+    expect(hub.sit(a.id, couch.id)).toBe(true);
+    hub.enter(b.id, 'cafe', 'live', [spots[1].x, spots[1].y]);
+    expect(hub.sit(b.id, couch.id)).toBe(true);
+    expect(hub.actor(b.id)).toMatchObject({ x: spots[1].x, y: spots[1].y, sittingOn: couch.id, facing: couch.facing });
+    expect(hub.seatTaken('cafe', couch.id)).toBe(true);
+    const grid = new WalkGrid(cafe);
+    const off = stepOffTiles(spots[0]).find(([x, y]) => grid.walkable(x, y))!;
+    hub.enter(c.id, 'cafe', 'live', off);
+    expect(hub.sit(c.id, couch.id)).toBe(false);
+    hub.stand(a.id);
+    const up = hub.actor(a.id)!;
+    expect(up.sittingOn).toBeUndefined();
+    expect([up.x, up.y]).toEqual(off);
+    expect(grid.walkable(up.x, up.y)).toBe(true);
+  });
+
+  it('refuses a walk through furniture, but lets a walk end on a seat', () => {
+    const a = newMember(store, 'Ada');
+    hub.connect(client(a.id));
+    const cafe = getScene('cafe')!;
+    const stool = cafe.objects.find((o) => o.sprite === 'stool')!;
+    const grid = new WalkGrid(cafe);
+    const [fx, fy] = stepOffTiles(seatSpots(stool, cafe)[0]).find(([x, y]) => grid.walkable(x, y))!;
+    hub.enter(a.id, 'cafe', 'live', [fx, fy]);
+    expect(hub.move(a.id, [[fx, fy], [stool.x, stool.y]])).toBe(true); // onto the stool, to sit
+    hub.enter(a.id, 'cafe', 'live', [fx, fy]);
+    expect(hub.move(a.id, [[fx, fy], [stool.x, stool.y], [2 * stool.x - fx, 2 * stool.y - fy]])).toBe(false); // through it
+  });
+
+  it('turns you to face the machine when you order', () => {
+    const a = newMember(store, 'Ada');
+    const cb = client(a.id);
+    hub.connect(cb);
+    const machine = getScene('cafe')!.objects.find((o) => o.sprite === 'espresso')!;
+    hub.enter(a.id, 'cafe', 'live', [machine.x, machine.y + 1]);
+    expect(hub.carry(a.id, machine.id)).toBe(true);
+    expect(hub.actor(a.id)!.facing).toBe('ne');
+    const upd = cb.msgs.filter((m) => m.t === 'updated' && m.memberId === a.id).pop();
+    expect(upd && upd.t === 'updated' && upd.patch).toMatchObject({ facing: 'ne' });
+  });
+
+  it('has the barista make your coffee: to the machine, a brew everyone sees, then the hand-over', () => {
+    vi.useFakeTimers();
+    const a = newMember(store, 'Ada');
+    const b = newMember(store, 'Bo');
+    const ca = client(a.id);
+    const cb = client(b.id);
+    hub.connect(ca);
+    hub.connect(cb);
+    const machine = getScene('cafe')!.objects.find((o) => o.sprite === 'espresso')!;
+    hub.enter(b.id, 'cafe', 'live');
+    // a newcomer sees the barista behind the bar, in the staff lane
+    const snap = cb.msgs.find((m) => m.t === 'scene');
+    expect(snap && snap.t === 'scene' && snap.npcs?.[0]).toMatchObject({ id: 'barista', y: 0 });
+    hub.enter(a.id, 'cafe', 'live', [machine.x, machine.y + 1]);
+    expect(hub.carry(a.id, machine.id)).toBe(true);
+    expect(hub.carry(a.id, machine.id)).toBe(true); // a second click doesn't order twice
+    const carried = () => cb.msgs.filter((m) => m.t === 'updated' && m.memberId === a.id && m.patch.carrying === 'coffee').length;
+    expect(carried()).toBe(0); // not before it's made
+    vi.advanceTimersByTime(8000);
+    const kinds = cb.msgs.filter((m) => m.t === 'npc' || m.t === 'moment' || (m.t === 'updated' && m.memberId === a.id && m.patch.carrying));
+    const brew = kinds.findIndex((m) => m.t === 'moment' && m.what === 'brew' && m.objectId === machine.id);
+    const handed = kinds.findIndex((m) => m.t === 'updated');
+    const working = kinds.find((m) => m.t === 'npc' && m.npc.doing === 'brew');
+    expect(brew).toBeGreaterThanOrEqual(0);
+    expect(handed).toBeGreaterThan(brew);
+    expect(working && working.t === 'npc' && [working.npc.x, working.npc.y]).toEqual([machine.x, 0]);
+    expect(carried()).toBe(1);
+    vi.useRealTimers();
   });
 
   it('switches a lamp for the whole room and tells newcomers how it was left', () => {

@@ -1,0 +1,213 @@
+{
+  "name": "focus",
+  "tile": 200,
+  "colors": 30,
+  "quality": "medium",
+  "mood": "The Quiet Grove: a hushed library-greenhouse for deep focus. Dark walnut, moss-green carpet, worn leather, brass reading lamps, ferns and trailing plants, a crackling stone fireplace. Cozy, still, scholarly.",
+  "sheets": [
+    {
+      "name": "library",
+      "grid": "3x2",
+      "items": [
+        {
+          "key": "bookshelf.a",
+          "facing": "sw",
+          "w": 1,
+          "d": 1,
+          "h": 56,
+          "width": 60,
+          "fit": "diamond",
+          "prompt": "A tall dark walnut library bookcase with carved crown molding, packed with old leather-bound books in deep reds, greens and browns, a brass bookend and a trailing ivy plant. Its open front faces along the red arrow."
+        },
+        {
+          "key": "bookshelf.a",
+          "facing": "ne",
+          "w": 1,
+          "d": 1,
+          "h": 56,
+          "width": 60,
+          "fit": "diamond",
+          "prompt": "The SAME tall dark walnut library bookcase seen from behind: its plain walnut back panel with carved crown molding on top."
+        },
+        {
+          "key": "bookshelf.b",
+          "facing": "sw",
+          "w": 1,
+          "d": 1,
+          "h": 56,
+          "width": 60,
+          "fit": "diamond",
+          "prompt": "A matching tall dark walnut bookcase with glass-paned upper doors holding books, a small globe and a potted fern, and closed walnut cupboards below. Its front faces along the red arrow."
+        },
+        {
+          "key": "bookshelf.b",
+          "facing": "ne",
+          "w": 1,
+          "d": 1,
+          "h": 56,
+          "width": 60,
+          "fit": "diamond",
+          "prompt": "The SAME dark walnut glass-door bookcase seen from behind: its plain walnut back panel."
+        },
+        {
+          "key": "fireplace",
+          "facing": "sw",
+          "w": 1,
+          "d": 1,
+          "h": 44,
+          "width": 64,
+          "fit": "diamond",
+          "prompt": "A cozy stone fireplace with a dark walnut mantel holding a candle and a small clock, a crackling orange fire behind a brass guard, a basket of logs beside it. Its opening faces along the red arrow.",
+          "extra": {
+            "light": {
+              "x": 37,
+              "y": 47,
+              "r": 42
+            }
+          }
+        },
+        {
+          "key": "fireplace",
+          "facing": "ne",
+          "w": 1,
+          "d": 1,
+          "h": 44,
+          "width": 64,
+          "fit": "diamond",
+          "prompt": "The SAME stone fireplace seen from behind: its rough stone back and the chimney breast, the walnut mantel's edge."
+        }
+      ]
+    },
+    {
+      "name": "reading",
+      "grid": "3x2",
+      "items": [
+        {
+          "key": "armchair.rust",
+          "facing": "se",
+          "w": 1,
+          "d": 1,
+          "h": 30,
+          "width": 62,
+          "fill": 0.85,
+          "prompt": "A worn rust-brown leather wingback reading armchair with brass nailhead trim, a tartan throw over one arm and dark walnut legs.",
+          "extra": {
+            "seat": 12
+          }
+        },
+        {
+          "key": "armchair.rust",
+          "facing": "nw",
+          "w": 1,
+          "d": 1,
+          "h": 30,
+          "width": 62,
+          "fill": 0.85,
+          "prompt": "The SAME rust leather wingback armchair seen from behind: the tall curved wing back with brass nailheads, walnut legs.",
+          "extra": {
+            "seat": 12
+          }
+        },
+        {
+          "key": "armchair.green",
+          "facing": "se",
+          "w": 1,
+          "d": 1,
+          "h": 30,
+          "width": 62,
+          "fill": 0.85,
+          "prompt": "A deep bottle-green velvet wingback reading armchair with brass nailhead trim and dark walnut legs, a small cushion.",
+          "extra": {
+            "seat": 12
+          }
+        },
+        {
+          "key": "armchair.green",
+          "facing": "nw",
+          "w": 1,
+          "d": 1,
+          "h": 30,
+          "width": 62,
+          "fill": 0.85,
+          "prompt": "The SAME bottle-green velvet wingback armchair seen from behind: the tall curved wing back, walnut legs.",
+          "extra": {
+            "seat": 12
+          }
+        },
+        {
+          "key": "desk.wood",
+          "facing": "sw",
+          "w": 2,
+          "d": 1,
+          "h": 26,
+          "width": 96,
+          "fit": "diamond",
+          "prompt": "A dark walnut writing desk two tiles long with a green leather inlay, a brass banker's lamp with a green glass shade, a stack of books, an open notebook and a fountain pen. The drawer side faces along the red arrow."
+        },
+        {
+          "key": "desk.wood",
+          "facing": "ne",
+          "w": 2,
+          "d": 1,
+          "h": 26,
+          "width": 96,
+          "fit": "diamond",
+          "prompt": "The SAME dark walnut writing desk seen from behind: its plain walnut modesty panel, the green banker's lamp and books on top."
+        }
+      ]
+    },
+    {
+      "name": "chairs",
+      "grid": "3x1",
+      "size": "1536x1024",
+      "items": [
+        {
+          "key": "chair.wood",
+          "facing": "se",
+          "w": 1,
+          "d": 1,
+          "h": 32,
+          "width": 44,
+          "fill": 0.55,
+          "prompt": "A dark walnut library chair with a curved spindle back and a green leather seat pad.",
+          "extra": {
+            "seat": 15
+          }
+        },
+        {
+          "key": "chair.wood",
+          "facing": "nw",
+          "w": 1,
+          "d": 1,
+          "h": 32,
+          "width": 44,
+          "fill": 0.55,
+          "prompt": "The SAME walnut spindle-back library chair seen from directly behind: the spindles of the backrest nearest to us.",
+          "extra": {
+            "seat": 15
+          }
+        }
+      ]
+    },
+    {
+      "name": "wall",
+      "kind": "wall",
+      "grid": "1x1",
+      "size": "1024x1024",
+      "items": [
+        {
+          "key": "sign-quiet",
+          "span": 1,
+          "wall": {
+            "v": [
+              26,
+              40
+            ],
+            "margin": 0.18
+          },
+          "prompt": "A small oval brass plaque on a dark walnut mount, slightly wider than tall, engraved with a simple finger-to-lips 'shh' silhouette and tiny leaves around the edge (no letters)."
+        }
+      ]
+    }
+  ]
+}

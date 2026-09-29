@@ -1,11 +1,12 @@
 /**
- * Sky and weather for the world outside the windows. Time of day follows the viewer's clock; the weather
- * changes every three hours and is the same for everyone (seeded by the time slot), so coworkers see the
- * same rain. Window views are painted as tiny pixel canvases at wall-texture density and sheared onto the
+ * Sky and weather for the world outside the windows. Time of day follows the WORLD clock (the server's time
+ * in the organisation's zone — see @shared/worldClock), so everyone sees the same dusk; the weather changes
+ * every three hours and is the same for everyone (seeded by the time slot), so coworkers see the same rain. Window views are painted as tiny pixel canvases at wall-texture density and sheared onto the
  * wall, so they stay as crisp as the room around them. Clouds are positioned along the whole wall, so they
  * drift continuously from one window into the next.
  */
 import { hash2 } from '@shared/world/builders';
+import { worldTime } from '@shared/worldClock';
 import type { WindowView } from './interior';
 
 export type Phase = 'dawn' | 'day' | 'dusk' | 'night';
@@ -22,17 +23,36 @@ export interface Sky {
 
 let override: Partial<Sky> | null = null;
 
-/** Force a sky (sprite lab, demos). Pass null to follow the clock again. */
+/** Force a sky (sprite lab review renders only). Pass null to follow the world clock again. */
 export function setSkyOverride(o: Partial<Sky> | null) {
   override = o;
 }
 
-export function skyAt(date = new Date()): Sky {
-  const h = date.getHours() + date.getMinutes() / 60;
+/** The world clock as this client knows it: its offset to server time and the organisation's time zone. */
+const clock = { offsetMs: 0, timeZone: 'UTC' };
+
+/** Called by the game when it learns the server's time and the organisation. */
+export function setWorldClock(o: Partial<typeof clock>) {
+  Object.assign(clock, o);
+}
+
+/** Server time now (epoch ms). */
+export function worldNow(): number {
+  return Date.now() + clock.offsetMs;
+}
+
+/** The world's time of day right now, the same on every client. */
+export function worldTimeNow() {
+  return worldTime(worldNow(), clock.timeZone);
+}
+
+export function skyAt(epochMs = worldNow()): Sky {
+  const t = worldTime(epochMs, clock.timeZone);
+  const h = t.hours + t.minutes / 60;
   const phase: Phase = h < 5.5 || h >= 21 ? 'night' : h < 8 ? 'dawn' : h < 18 ? 'day' : 'dusk';
-  const slot = Math.floor(date.getTime() / (3 * 3600_000));
+  const slot = Math.floor(epochMs / (3 * 3600_000));
   const r = hash2(slot, 7, 13);
-  const winter = [10, 11, 0, 1].includes(date.getMonth());
+  const winter = [10, 11, 0, 1].includes(t.month);
   let weather: Weather = r < 0.45 ? 'clear' : r < 0.75 ? 'clouds' : winter ? 'snow' : 'rain';
   if (override?.weather) weather = override.weather;
   const ph = override?.phase ?? phase;

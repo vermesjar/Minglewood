@@ -19,6 +19,10 @@ export interface Sprite {
   highlight?: HTMLCanvasElement;
   /** Canvas pixels per art pixel: 1 for classic sprites, 2 for the hi-res art (64 px per floor tile). */
   scale?: number;
+  /** Drawn as the mirror of its partner rotation (art.ts). */
+  mirrored?: boolean;
+  /** The art drawing it was made from (art.ts), for per-drawing animation points. */
+  file?: string;
 }
 
 /** Draws a sprite with its anchor at art-space (x, y), at its own pixel density. */

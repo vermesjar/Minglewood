@@ -22,7 +22,7 @@ import { frameFor, type Frame, type Pose } from './avatarFrame';
 import { H, M, W, type Mask } from './pixkit';
 
 export const FACINGS: Facing[] = ['se', 'sw', 'ne', 'nw'];
-export const POSES: Pose[] = ['stand', 'walk1', 'walk2', 'sit', 'wave'];
+export const POSES: Pose[] = ['stand', 'walk1', 'walk2', 'sit', 'wave', 'work'];
 
 export interface Rendered {
   /** RGBA, W × H, exactly what the game blits. */
@@ -159,7 +159,8 @@ export function lintAvatar(look: AvatarLoadout, facing: Facing, pose: Pose, r = 
   const waistGap = count(Z.waist, (o) => o === LAYER.none || o === LAYER.armBack);
   if (waistGap > 0) issues.push({ kind: 'waist-gap', detail: `${waistGap} see-through px at the waist` });
   if (L.shoes !== 'shoes.none' && L.mobility !== 'mob.wheelchair') {
-    const bare = count(Z.feet, (o) => o !== LAYER.shoes && o !== LAYER.outline && o !== LAYER.pet && o !== LAYER.held && o !== LAYER.chairFront);
+    // bare = leg (skin / trouser) or nothing where a shoe belongs; hair or a held thing hiding the feet is fine
+    const bare = count(Z.feet, (o) => o === LAYER.legs || o === LAYER.none);
     if (bare > 2) issues.push({ kind: 'bare-feet', detail: `${bare} foot px not covered by shoes` });
   }
 

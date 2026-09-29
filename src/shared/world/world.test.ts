@@ -71,9 +71,24 @@ describe('pathfinding', () => {
   const grid = new WalkGrid(town);
 
   it('produces valid, contiguous paths', () => {
-    const p = findPath(grid, [21, 23], [33, 20])!;
+    // from the spawn point to the café door, across the plaza
+    const cafe = town.objects.find((o) => o.roomId === 'cafe')!;
+    const p = findPath(grid, [town.spawn.x, town.spawn.y], [cafe.door!.x, cafe.door!.y])!;
     expect(p).not.toBeNull();
     expect(isValidPath(grid, p)).toBe(true);
+  });
+
+  it('keeps the town open: roads are walkable end to end and no building overlaps another', () => {
+    // Main Street from the woods to the pier, Grove Lane from HQ's steps to the south
+    expect(findPath(grid, [8, 35], [62, 35])).not.toBeNull();
+    expect(findPath(grid, [35, 25], [35, 70])).not.toBeNull();
+    const bs = town.objects.filter((o) => o.building);
+    for (const a of bs)
+      for (const b of bs) {
+        if (a === b) continue;
+        const overlap = a.x < b.x + (b.w ?? 1) && b.x < a.x + (a.w ?? 1) && a.y < b.y + (b.d ?? 1) && b.y < a.y + (a.d ?? 1);
+        expect(overlap, `${a.id} overlaps ${b.id}`).toBe(false);
+      }
   });
 
   it('rejects teleporting paths', () => {

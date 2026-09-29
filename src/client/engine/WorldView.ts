@@ -6,7 +6,8 @@ import type { AvatarLoadout } from '@shared/domain/types';
 import type { Occupant } from '@shared/protocol';
 import { EMOTES, STATUS_META, type EmoteId } from '@shared/presence';
 import { isoToScreen, screenToIso } from '@shared/iso';
-import type { Facing, SceneDef, SceneObject } from '@shared/world/scene';
+import type { Facing, NpcDef, SceneDef, SceneObject } from '@shared/world/scene';
+import type { NpcState } from '@shared/protocol';
 import { footprint } from '@shared/world/scene';
 import { positionAlong, type Tile } from '@shared/world/pathfinding';
 import { Camera } from './camera';
@@ -16,8 +17,9 @@ import { renderOutdoorGround, type GroundLayer } from './ground';
 import { renderInteriorShell, type InteriorLayer } from './interior';
 import { skyAt, windowView, type Sky } from './weather';
 import { artLight, artSeat } from './sprites/art';
+import { ObjectAnimations } from './animations';
 import { INK_CSS, PAPER, UI_FONT, pill, roundRect, speechBubble } from './overlays';
-import { AVATAR_CROPS, avatarSprite, usesWheelchair, type Pose } from './sprites/avatar';
+import { AVATAR_CROPS, avatarSprite, usesWheelchair, type Expression, type Pose } from './sprites/avatar';
 import { festiveFor, spriteFor } from './sprites/registry';
 import { blit, highlightOf, spriteSize, type Sprite } from './sprites/painter';
 
@@ -60,6 +62,11 @@ interface ActorView {
   bubble?: { text: string; start: number; until: number };
   emotes: Array<{ emoji: string; start: number }>;
   waveUntil: number;
+  /** Set for a room NPC (a barista): who they are and what they're doing. */
+  npc?: { def: NpcDef; doing?: NpcState['doing'] };
+  /** Next idle blink (performance.now ms) and when the current one ends. */
+  blinkAt: number;
+  blinkUntil: number;
   rect: ScreenRect;
   sx: number;
   sy: number;
@@ -72,12 +79,32 @@ const facingFrom = (dx: number, dy: number, prev: Facing): Facing => {
 };
 
 const SEAT_LIFT: Record<string, number> = { chair: 5, bench: 5, stool: 7, couch: 4, armchair: 4, beanbag: 1 };
+/**
+ * How each kind of seat is sat in. `back`: it has a backrest, which hides a sitter who faces away (a stool or
+ * beanbag never covers its sitter). `fwd`: where the cushion is, in tiles forward of the tile centre along
+ * the way the seat faces — a thick backrest (a throne) pushes the sitter forward onto the cushion.
+ */
+const SEAT_STYLE: Record<string, { back: boolean; fwd: number }> = {
+  chair: { back: true, fwd: 0 },
+  armchair: { back: true, fwd: 0.04 },
+  couch: { back: true, fwd: 0.04 },
+  'heirloom-throne': { back: true, fwd: 0.16 },
+  stool: { back: false, fwd: 0 },
+  beanbag: { back: false, fwd: 0 },
+  bench: { back: false, fwd: 0 },
+};
+const seatStyle = (sprite: string) => SEAT_STYLE[sprite] ?? { back: true, fwd: 0 };
+/** Lights that are flames, not bulbs: they flicker on their own. */
+const FIRE_LIGHTS = new Set(['fireplace', 'heirloom-dragonlamp']);
+const FACE_VEC: Record<Facing, [number, number]> = { se: [1, 0], sw: [0, 1], ne: [0, -1], nw: [-1, 0] };
 /** In the sitting pose, the underside of an avatar's thighs is this many art px above its anchor. */
-const SIT_THIGH = 7.5;
+const SIT_THIGH = 6.5;
 
 export class WorldView {
   readonly camera = new Camera();
   readonly effects = new Effects();
+  /** Living furniture: steam, koi, flames, LEDs (animations.ts). */
+  private readonly anims = new ObjectAnimations(this.effects, (id) => this.isOn(id));
   private ctx: CanvasRenderingContext2D;
   private dpr = 1;
   private vw = 0;
@@ -218,6 +245,7 @@ export class WorldView {
       });
     }
     this.statics = topoSort(statics);
+    this.anims.load(this.statics);
     this.actors.clear();
     for (const o of occupants) this.upsert(o);
     this.effects.reducedMotion = this.reducedMotion;
@@ -324,6 +352,8 @@ export class WorldView {
       walkClock: 0,
       emotes: [],
       waveUntil: 0,
+      blinkAt: performance.now() + 1000 + Math.random() * 5000,
+      blinkUntil: 0,
       rect: { l: 0, t: 0, r: 0, b: 0 },
       sx: 0,
       sy: 0,
@@ -407,6 +437,56 @@ export class WorldView {
     if (emote === 'celebrate') this.effects.burst(p.x, p.y, 'confetti', 30);
     if (emote === 'heart') this.effects.burst(p.x, p.y, 'hearts', 8);
     if (emote === 'clap' || emote === 'idea') this.effects.burst(p.x, p.y, 'sparkle', 8);
+  }
+
+  /** The room's NPCs as the server has them (a newcomer's snapshot). */
+  setNpcs(scene: SceneDef, states: NpcState[]) {
+    for (const id of [...this.actors.keys()]) if (id.startsWith('npc:')) this.actors.delete(id);
+    for (const st of states) this.updateNpc(scene, st);
+  }
+
+  /** One NPC moved or started doing something. */
+  updateNpc(scene: SceneDef, st: NpcState) {
+    const def = scene.npcs?.find((n) => n.id === st.id);
+    if (!def) return;
+    const id = `npc:${def.id}`;
+    const occ: Occupant = {
+      memberId: id,
+      x: st.x,
+      y: st.y,
+      facing: st.facing,
+      path: st.path,
+      pathStartedAt: st.pathStartedAt,
+      status: 'available',
+      avatar: def.avatar,
+      via: 'sim',
+    };
+    const before = this.actors.get(id);
+    this.upsert(occ);
+    const a = this.actors.get(id)!;
+    if (!st.path) {
+      a.occ = { ...a.occ, path: undefined, pathStartedAt: undefined };
+      a.x = st.x;
+      a.y = st.y;
+    }
+    a.facing = st.facing;
+    a.npc = { def, doing: st.doing };
+    if (before && !before.npc) a.npc = { def, doing: st.doing };
+  }
+
+  /** A one-off moment on a piece of furniture: an espresso machine pulling a shot, the bell being rung. */
+  playObject(objectId: string, what: 'brew' | 'ring') {
+    this.anims.trigger(objectId, what);
+  }
+
+  /** Turn someone standing still toward an object's footprint (you face what you use). */
+  faceObject(memberId: string, o: SceneObject) {
+    const a = this.actors.get(memberId);
+    if (!a || a.moving) return;
+    const cx = o.x + (o.w ?? 1) / 2 - 0.5;
+    const cy = o.y + (o.d ?? 1) / 2 - 0.5;
+    a.facing = facingFrom(cx - a.x, cy - a.y, a.facing);
+    a.occ = { ...a.occ, facing: a.facing };
   }
 
   setSelected(memberId: string | null) {
@@ -506,6 +586,7 @@ export class WorldView {
     }
     this.camera.update(dt, this.reducedMotion);
     this.effects.update(dt);
+    this.anims.update(dt, this.reducedMotion);
     if (this.transition && this.transition.phase !== 'hold') {
       this.transition.t += dt / (this.transition.phase === 'close' ? 0.32 : 0.42);
       if (this.transition.t >= 1) {
@@ -531,6 +612,8 @@ export class WorldView {
   }
 
   private pose(a: ActorView): Pose {
+    if (a.npc?.doing === 'serve' && !a.moving) return 'wave';
+    if (a.npc?.doing === 'brew' && !a.moving) return 'work';
     if (a.occ.sittingOn && !a.moving) return 'sit';
     if (performance.now() < a.waveUntil) return 'wave';
     if (a.moving) {
@@ -620,10 +703,12 @@ export class WorldView {
     for (const d of order) {
       if ('obj' in d) {
         const hovered = this.hover?.kind === 'object' && this.hover.id === d.obj.id;
-        const ox = d.dx + d.sprite.ax / (d.sprite.scale ?? 1);
-        const oy = d.dy + d.sprite.ay / (d.sprite.scale ?? 1);
+        const [nx, ny] = this.anims.offset(d.obj.id, this.reducedMotion);
+        const ox = d.dx + d.sprite.ax / (d.sprite.scale ?? 1) + nx;
+        const oy = d.dy + d.sprite.ay / (d.sprite.scale ?? 1) + ny;
         if (hovered) blit(c, d.sprite, ox, oy, highlightOf(d.sprite), 2);
         else blit(c, d.sprite, ox, oy);
+        this.anims.drawFor(c, d.obj.id, this.reducedMotion);
         if (d.festive) c.drawImage(d.festive.canvas, d.dx, d.dy);
       } else {
         this.drawActor(d);
@@ -684,7 +769,11 @@ export class WorldView {
     const slots: Array<ActorView[]> = Array.from({ length: statics.length + 1 }, () => []);
     for (const a of this.actors.values()) {
       const lift = this.actorLift(a);
-      const p = isoToScreen(a.x + 0.5, a.y + 0.5, lift);
+      // a sitter sits on the seat's cushion, which a thick backrest pushes forward of the tile centre
+      const seatObj = a.occ.sittingOn && !a.moving ? this.scene?.objects.find((o) => o.id === a.occ.sittingOn) : undefined;
+      const fwd = seatObj ? seatStyle(seatObj.sprite).fwd : 0;
+      const [fx, fy] = FACE_VEC[a.facing];
+      const p = isoToScreen(a.x + 0.5 + fx * fwd, a.y + 0.5 + fy * fwd, lift);
       a.sx = p.x;
       a.sy = p.y;
       a.rect = { l: p.x - 12, t: p.y - 42, r: p.x + 12, b: p.y + 2 };
@@ -694,7 +783,8 @@ export class WorldView {
         const s = statics[i];
         if (!rectsOverlap(s.rect, a.rect)) continue;
         let isBehind: boolean;
-        if (a.occ.sittingOn === s.obj.id) isBehind = !(a.facing === 'ne' || a.facing === 'nw');
+        // Your own seat: you sit in front of it, unless its backrest is between you and us.
+        if (a.occ.sittingOn === s.obj.id) isBehind = !(seatStyle(s.obj.sprite).back && (a.facing === 'ne' || a.facing === 'nw'));
         else isBehind = behind(s.box, box);
         if (isBehind) slot = i + 1;
       }
@@ -710,14 +800,34 @@ export class WorldView {
     return out;
   }
 
-  /** The look to draw: whatever someone picked up in the world goes in their hand. */
+  /**
+   * The look to draw: whatever someone picked up in the world goes in their hand. A pet is left out while its
+   * person is seated — drawn with them it would float at seat height inside the furniture.
+   */
   private look(a: ActorView): AvatarLoadout {
-    return a.occ.carrying ? { ...a.occ.avatar, held: a.occ.carrying } : a.occ.avatar;
+    if (a.npc?.doing) return { ...a.occ.avatar, held: 'coffee' };
+    const seated = !!a.occ.sittingOn && !a.moving;
+    if (!a.occ.carrying && !seated) return a.occ.avatar;
+    return { ...a.occ.avatar, ...(a.occ.carrying ? { held: a.occ.carrying } : {}), ...(seated ? { pet: 'pet.none' } : {}) };
+  }
+
+  /**
+   * A momentary expression: an idle blink every few seconds (each person on their own rhythm), and a moving
+   * mouth while their speech bubble is up.
+   */
+  private expression(a: ActorView): Expression | undefined {
+    const now = performance.now();
+    if (a.bubble && now < a.bubble.until) return Math.floor(now / 140) % 2 ? 'talk' : undefined;
+    if (now >= a.blinkAt) {
+      a.blinkUntil = now + 120;
+      a.blinkAt = now + 2500 + Math.random() * 3500;
+    }
+    return now < a.blinkUntil ? 'blink' : undefined;
   }
 
   private drawActor(a: ActorView) {
     const c = this.ctx;
-    const sprite = avatarSprite(this.look(a), a.facing, this.pose(a));
+    const sprite = avatarSprite(this.look(a), a.facing, this.pose(a), this.reducedMotion ? undefined : this.expression(a));
     const hovered = this.hover?.kind === 'actor' && this.hover.id === a.occ.memberId;
     const x = Math.round(a.sx);
     const y = Math.round(a.sy);
@@ -746,6 +856,20 @@ export class WorldView {
       const hovered = this.hover?.kind === 'actor' && this.hover.id === id;
       const showName = hovered || id === this.selectedActor || this.showAllNames || (interior ? z >= 1.5 : z >= 2.6) || !!a.bubble;
       let top = hy - 4;
+      if (a.npc) {
+        // a room NPC: name, role and an NPC tag — never a presence dot, never mistaken for a coworker
+        if (showName) {
+          const r = pill(c, hx, top, `${a.npc.def.name} · ${a.npc.def.role}`, { size: 11, bg: hovered ? '#ffffff' : 'rgba(255,248,236,0.94)', padX: 6 });
+          const tag = pill(c, hx, r.y - 3, 'NPC', { size: 9, bg: '#2f5d46', fg: '#f4efe6', padX: 4 });
+          top = tag.y - 3;
+        }
+        if (a.bubble) {
+          const age = now - a.bubble.start;
+          const alpha = Math.min(1, age / 150, (a.bubble.until - now) / 400);
+          speechBubble(c, hx, top, a.bubble.text, Math.max(0, alpha));
+        }
+        continue;
+      }
       // status dot
       const meta = STATUS_META[a.occ.status];
       c.fillStyle = INK_CSS;
@@ -825,7 +949,7 @@ export class WorldView {
         const pos = -h + phase * (w + h * 2);
         const grad = gc.createLinearGradient(pos, 0, pos + h * 0.6, h * 0.6);
         grad.addColorStop(0, 'rgba(255,255,240,0)');
-        grad.addColorStop(0.5, 'rgba(255,252,225,0.75)');
+        grad.addColorStop(0.5, 'rgba(255,252,225,0.3)');
         grad.addColorStop(1, 'rgba(255,255,240,0)');
         gc.fillStyle = grad;
         gc.fillRect(0, 0, w, h);
@@ -880,7 +1004,11 @@ export class WorldView {
       .map((st) => {
         const L = artLight(st.obj) ?? { dx: 0, dy: -30, r: 22 };
         const p = isoToScreen(st.obj.x, st.obj.y, st.obj.z ?? 0);
-        return { x: p.x + L.dx, y: p.y + L.dy, fx: p.x + L.dx * 0.5, fy: p.y + 12, r: L.r };
+        // a fire or a candle-lit lantern breathes on its own (±10 %); electric lamps just hum
+        const fire = FIRE_LIGHTS.has(st.obj.sprite);
+        const seed = st.obj.x * 3.1 + st.obj.y * 1.7;
+        const own = fire ? 0.9 + 0.1 * Math.sin(now / 90 + seed) * Math.sin(now / 237 + seed * 2) : flicker;
+        return { x: p.x + L.dx, y: p.y + L.dy, fx: p.x + L.dx * 0.5, fy: p.y + 12, r: L.r, k: own };
       });
     if (mood) {
       const W = this.canvas.width;
@@ -901,7 +1029,7 @@ export class WorldView {
       for (const p of lamps) {
         const R = 78;
         const g = l.createRadialGradient(p.fx, p.fy - 6, 2, p.fx, p.fy - 6, R);
-        const a = Math.min(1, sky.lamp * flicker);
+        const a = Math.min(1, sky.lamp * p.k);
         g.addColorStop(0, `rgba(0,0,0,${0.95 * a})`);
         g.addColorStop(0.45, `rgba(0,0,0,${0.6 * a})`);
         g.addColorStop(1, 'rgba(0,0,0,0)');
@@ -919,7 +1047,7 @@ export class WorldView {
     c.save();
     c.globalCompositeOperation = 'lighter';
     for (const p of lamps) {
-      const k = sky.lamp * flicker;
+      const k = sky.lamp * p.k;
       const spill = c.createRadialGradient(p.fx, p.fy - 10, 2, p.fx, p.fy - 10, 64);
       spill.addColorStop(0, `rgba(255,170,90,${0.2 * k})`);
       spill.addColorStop(1, 'rgba(255,150,80,0)');

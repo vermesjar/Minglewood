@@ -23,7 +23,9 @@ export interface IncomingKnock {
 
 export type Selection =
   | { kind: 'member'; id: string; x: number; y: number }
-  | { kind: 'object'; sceneId: string; objectId: string; x: number; y: number };
+  | { kind: 'object'; sceneId: string; objectId: string; x: number; y: number }
+  /** A room NPC (the café's barista): shown as an NPC, never as a coworker. */
+  | { kind: 'npc'; sceneId: string; npcId: string; x: number; y: number };
 
 export type Panel = 'search' | 'people' | 'avatar' | 'profile' | null;
 

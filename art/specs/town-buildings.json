@@ -1,0 +1,136 @@
+{
+  "name": "town-buildings",
+  "colors": 40,
+  "quality": "high",
+  "mood": "Northstar Town, a cozy lakeside company town on a bright spring morning. Each building is a charming, handcrafted diorama piece with real materials: warm brick, painted clapboard, cedar shingles, slate and terracotta roofs, white window frames with glowing warm glass, flower boxes, brass lamps. Cohesive, storybook, premium — never generic or plain. Every building is clearly readable at a glance as what it is.",
+  "sheets": [
+    {
+      "name": "hq",
+      "grid": "1x1",
+      "size": "1024x1536",
+      "tile": 96,
+      "items": [
+        {
+          "key": "building.hq",
+          "w": 10,
+          "d": 8,
+          "h": 150,
+          "fit": "diamond",
+          "prompt": "Northstar HQ: the town's grand civic headquarters, three storeys of cream limestone and pale sandstone with a slate-blue hipped roof, a central clock pediment with a round white clock, a flagpole on the roof ridge with a red-and-gold flag, tall white-framed sash windows in neat rows on every storey, a columned portico with four white columns and wide stone steps around the entrance. The front entrance (double doors, taller than a person) is in the MIDDLE of the lower-left facing wall. Window boxes with red geraniums. Dignified, bright and welcoming."
+        }
+      ]
+    },
+    {
+      "name": "cafe",
+      "grid": "1x1",
+      "size": "1024x1536",
+      "tile": 120,
+      "items": [
+        {
+          "key": "building.cafe",
+          "w": 8,
+          "d": 6,
+          "h": 76,
+          "fit": "diamond",
+          "prompt": "Tidewater Café: a cozy lakeside café, warm peach-cream stucco walls with honey-oak trim, a steep terracotta tile gable roof with a brick chimney, a red-and-cream striped awning along the lower-left facing wall over big warm-lit shop windows, a glass-paned café door in the MIDDLE of the lower-left facing wall, a hanging wooden sign bracket with a coffee cup emblem (no text), strings of little lanterns under the eaves, flower boxes and a chalkboard easel by the door. Inviting, European, golden."
+        }
+      ]
+    },
+    {
+      "name": "arcade",
+      "grid": "1x1",
+      "size": "1024x1536",
+      "tile": 128,
+      "items": [
+        {
+          "key": "building.arcade",
+          "w": 7,
+          "d": 6,
+          "h": 80,
+          "fit": "diamond",
+          "prompt": "Pixel Pier Arcade: a playful retro boardwalk arcade, violet and deep indigo painted wood with pink and cyan neon tube trim along the edges, a flat roof with a big ornate marquee sign frame covered in chasing light bulbs (no letters), round porthole windows glowing pink, a wide open entrance with double glass doors in the MIDDLE of the lower-left facing wall under a bulb-lit canopy, a little star weathervane. Joyful, glowing, a bit seaside."
+        }
+      ]
+    },
+    {
+      "name": "focus",
+      "grid": "1x1",
+      "size": "1024x1536",
+      "tile": 140,
+      "items": [
+        {
+          "key": "building.focus",
+          "w": 6,
+          "d": 6,
+          "h": 64,
+          "fit": "diamond",
+          "prompt": "The Quiet Grove: a peaceful log cabin retreat in the woods, honey-brown log walls, a mossy green shingled gable roof with a stone chimney, small warm-lit windows with wooden shutters, a covered wooden porch with a rocking chair and hanging lanterns along the lower-right facing wall, the wooden front door in the MIDDLE of the lower-right facing wall, ferns and mushrooms at the base. Calm, hushed, woodland."
+        }
+      ]
+    },
+    {
+      "name": "eng",
+      "grid": "1x1",
+      "size": "1024x1536",
+      "tile": 100,
+      "items": [
+        {
+          "key": "building.eng",
+          "w": 10,
+          "d": 7,
+          "h": 104,
+          "fit": "diamond",
+          "prompt": "Engineering Studio: a modern two-storey workshop studio, pale grey fibre-cement panels with warm timber cladding bands, a flat roof with a row of blue solar panels, sawtooth skylights and a small antenna with a red light, big factory-style steel-framed windows with teal-lit glass on both storeys, a roll-up glass garage door and a glass entrance door in the MIDDLE of the lower-right facing wall, a bike rack and planters by the entrance. Smart, crafted, humming."
+        }
+      ]
+    },
+    {
+      "name": "design",
+      "grid": "1x1",
+      "size": "1024x1536",
+      "tile": 128,
+      "items": [
+        {
+          "key": "building.design",
+          "w": 7,
+          "d": 6,
+          "h": 100,
+          "fit": "diamond",
+          "prompt": "Design Loft: an artsy two-storey converted brick loft, butter-yellow painted brick with coral window frames, a steep coral-red gable roof with a big north-light studio skylight, tall arched windows full of plants, climbing green ivy over one corner, a small balcony with an easel, a coral front door in the MIDDLE of the lower-right facing wall with a round window above it. Creative, colourful, charming."
+        }
+      ]
+    },
+    {
+      "name": "launch",
+      "grid": "1x1",
+      "size": "1024x1536",
+      "tile": 128,
+      "items": [
+        {
+          "key": "building.launch",
+          "w": 7,
+          "d": 6,
+          "h": 96,
+          "fit": "diamond",
+          "prompt": "Launch Lab: a sleek two-storey mission-control lab, bright white panels with bold orange stripes and navy trim, a flat roof carrying a small radar dish and a slim launch tower with a tiny orange-and-white rocket model, porthole and ribbon windows glowing blue, a round-topped hangar-style entrance door in the MIDDLE of the lower-right facing wall with a countdown light above it. Optimistic, space-age, clean."
+        }
+      ]
+    },
+    {
+      "name": "events",
+      "grid": "1x1",
+      "size": "1024x1536",
+      "tile": 100,
+      "items": [
+        {
+          "key": "building.events",
+          "w": 10,
+          "d": 7,
+          "h": 110,
+          "fit": "diamond",
+          "prompt": "Lantern Hall: the town's festive event hall, rich terracotta-red brick with cream stone trim, a tall plum-purple slate gable roof, a grand front with four cream columns and a triangular pediment, tall arched windows glowing warm gold, strings of paper lanterns in many colours draped along the eaves, the grand double entrance doors in the MIDDLE of the lower-left facing wall under a small marquee canopy of bulbs. Celebratory, warm, a little theatrical."
+        }
+      ]
+    }
+  ]
+}

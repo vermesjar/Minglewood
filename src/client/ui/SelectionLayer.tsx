@@ -272,9 +272,38 @@ function ObjectCard({ sceneId, objectId, x, y }: { sceneId: string; objectId: st
   return null;
 }
 
+/** A room NPC (the café's barista): clearly not a coworker — no presence, no profile, just what they do here. */
+function NpcCard({ sceneId, npcId, x, y }: { sceneId: string; npcId: string; x: number; y: number }) {
+  const npc = game.scene(sceneId)?.npcs?.find((n) => n.id === npcId);
+  if (!npc) return null;
+  return (
+    <Popover x={x} y={y} onClose={close} label={`${npc.name}, ${npc.role} (NPC)`}>
+      <div className="info-card npc-card">
+        <div className="npc-head">
+          <AvatarCanvas loadout={npc.avatar} head scale={2} />
+          <div>
+            <h3>{npc.name}</h3>
+            <p className="muted small">
+              {npc.role} <span className="tag">NPC</span>
+            </p>
+          </div>
+        </div>
+        <p>{npc.blurb}</p>
+        {npc.serves && (
+          <button className="btn primary full" onClick={() => game.orderFrom(sceneId, npcId)}>
+            ☕ Order a coffee
+          </button>
+        )}
+        <p className="fineprint">Part of the room — not a coworker.</p>
+      </div>
+    </Popover>
+  );
+}
+
 export function SelectionLayer() {
   const sel = useStore((s) => s.selection);
   if (!sel) return null;
   if (sel.kind === 'member') return <ProfileCard key={sel.id} id={sel.id} x={sel.x} y={sel.y} />;
+  if (sel.kind === 'npc') return <NpcCard key={sel.npcId} sceneId={sel.sceneId} npcId={sel.npcId} x={sel.x} y={sel.y} />;
   return <ObjectCard key={sel.objectId} sceneId={sel.sceneId} objectId={sel.objectId} x={sel.x} y={sel.y} />;
 }

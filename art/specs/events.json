@@ -1,0 +1,390 @@
+{
+  "name": "events",
+  "tile": 200,
+  "colors": 30,
+  "quality": "medium",
+  "mood": "Lantern Hall: a festive community hall for parties and all-hands. Honey-colored planks, dusky plum and rose walls, paper lanterns, bunting, brass details, warm and celebratory.",
+  "sheets": [
+    {
+      "name": "hall",
+      "grid": "3x2",
+      "items": [
+        {
+          "key": "podium",
+          "facing": "sw",
+          "w": 1,
+          "d": 1,
+          "h": 34,
+          "width": 42,
+          "fill": 0.5,
+          "prompt": "A wooden speaker's lectern in warm oak with a plum front panel and a brass star, a slim brass gooseneck microphone on top. Its front faces along the red arrow."
+        },
+        {
+          "key": "podium",
+          "facing": "ne",
+          "w": 1,
+          "d": 1,
+          "h": 34,
+          "width": 42,
+          "fill": 0.5,
+          "prompt": "The SAME oak lectern seen from the speaker's side: a slanted reading shelf with note cards, the back of the brass microphone."
+        },
+        {
+          "key": "speaker",
+          "facing": "sw",
+          "w": 1,
+          "d": 1,
+          "h": 36,
+          "width": 40,
+          "fill": 0.5,
+          "prompt": "A vintage PA speaker cabinet in walnut with a woven cream grille cloth and a brass badge (no text), on a slim black tripod stand. Its grille faces along the red arrow."
+        },
+        {
+          "key": "speaker",
+          "facing": "ne",
+          "w": 1,
+          "d": 1,
+          "h": 36,
+          "width": 40,
+          "fill": 0.5,
+          "prompt": "The SAME vintage walnut PA speaker seen from behind: its walnut back with a cable plug, on the black tripod stand."
+        },
+        {
+          "key": "chair.red",
+          "facing": "se",
+          "w": 1,
+          "d": 1,
+          "h": 30,
+          "width": 40,
+          "fill": 0.5,
+          "prompt": "A stackable banquet chair with a gold-painted metal frame and a plush raspberry-red cushioned seat and back.",
+          "extra": {
+            "seat": 15
+          }
+        },
+        {
+          "key": null,
+          "facing": "nw",
+          "w": 1,
+          "d": 1,
+          "h": 30,
+          "width": 40,
+          "fill": 0.5,
+          "prompt": "The SAME gold-and-raspberry banquet chair seen from directly behind: the back of the cushioned backrest nearest to us, the gold frame legs.",
+          "extra": {
+            "seat": 15
+          }
+        }
+      ]
+    },
+    {
+      "name": "party",
+      "grid": "3x2",
+      "items": [
+        {
+          "key": "cake-table",
+          "w": 2,
+          "d": 1,
+          "h": 30,
+          "width": 96,
+          "fit": "diamond",
+          "prompt": "A party table two tiles long with a white tablecloth and a pink bunting skirt: a tall three-layer birthday cake with lit candles, cupcakes on a stand, wrapped gifts with bows and a stack of paper plates.",
+          "facing": "sw"
+        },
+        {
+          "key": "balloons",
+          "w": 1,
+          "d": 1,
+          "h": 58,
+          "width": 40,
+          "fill": 0.2,
+          "prompt": "A bunch of five shiny party balloons in yellow, coral and teal on curly ribbons tied to a small gold weight.",
+          "facing": "se"
+        },
+        {
+          "key": "balloons.b",
+          "w": 1,
+          "d": 1,
+          "h": 58,
+          "width": 40,
+          "fill": 0.2,
+          "prompt": "A bunch of five shiny party balloons in pink, lilac and gold on curly ribbons tied to a small gold weight.",
+          "facing": "se"
+        },
+        {
+          "key": "balloons.c",
+          "w": 1,
+          "d": 1,
+          "h": 58,
+          "width": 40,
+          "fill": 0.2,
+          "prompt": "A bunch of five shiny party balloons in mint, sky blue and white with a star-shaped gold foil balloon, on curly ribbons tied to a small gold weight.",
+          "facing": "se"
+        }
+      ]
+    },
+    {
+      "name": "chair-back",
+      "grid": "1x1",
+      "size": "1024x1024",
+      "tile": 320,
+      "refs": [
+        "out/events/hall/chair.red.se.raw.png"
+      ],
+      "note": "The second reference image shows this exact banquet chair from the front. Draw the SAME chair turned around so we look at it from directly BEHIND: the outside of the raspberry cushioned backrest and its gold frame are nearest to us, in front, hiding most of the seat, which is only glimpsed behind it. Same colours, same proportions, same pixel style.",
+      "items": [
+        {
+          "key": "chair.red",
+          "facing": "nw",
+          "w": 1,
+          "d": 1,
+          "h": 30,
+          "width": 40,
+          "fill": 0.5,
+          "extra": {
+            "seat": 15
+          },
+          "prompt": "The gold-and-raspberry banquet chair from the reference, seen from behind."
+        }
+      ]
+    },
+    {
+      "name": "decor",
+      "kind": "wall",
+      "grid": "1x2",
+      "size": "1536x1024",
+      "items": [
+        {
+          "key": "lantern-string",
+          "span": 3,
+          "wall": {
+            "v": [
+              40,
+              56
+            ],
+            "margin": 0.02
+          },
+          "prompt": "A string of glowing round paper lanterns hanging in a gentle swag, about 5 : 1: seven lanterns in plum, rose, gold and cream on a thin dark cord, each glowing softly from inside."
+        },
+        {
+          "key": "banner",
+          "span": 6,
+          "wall": {
+            "v": [
+              36,
+              54
+            ],
+            "margin": 0.03
+          },
+          "prompt": "A long festive fabric bunting banner, about 10 : 1: a scalloped plum velvet band with gold fringe along the bottom and a row of triangular pennants in rose, gold, cream and plum hanging below it (no letters)."
+        }
+      ]
+    },
+    {
+      "name": "bar",
+      "grid": "2x1",
+      "items": [
+        {
+          "key": "bar-cart",
+          "facing": "se",
+          "w": 1,
+          "d": 1,
+          "h": 30,
+          "width": 46,
+          "fill": 0.5,
+          "prompt": "A polished brass bar cart with two glass shelves and big spoked wheels: a pitcher of pink lemonade, a row of coupe glasses, a bottle of sparkling cider in an ice bucket, a small vase of rose-colored flowers. Its handle is on the far side."
+        },
+        {
+          "key": "bar-cart",
+          "facing": "nw",
+          "w": 1,
+          "d": 1,
+          "h": 30,
+          "width": 46,
+          "fill": 0.5,
+          "prompt": "The SAME brass bar cart with glass shelves seen from the other side, its curved brass handle nearest to us, the lemonade, coupe glasses and ice bucket behind it."
+        }
+      ]
+    },
+    {
+      "name": "back-cake-table",
+      "grid": "1x1",
+      "size": "1024x1024",
+      "tile": 300,
+      "refs": [
+        "out/events/party/cake-table.sw.raw.png"
+      ],
+      "note": "The second reference image shows this exact party table. Draw the SAME party table from the OPPOSITE side, turned half way round: the same shape, size, colours and pixel style, with everything on it seen from the other side (what was on the left is now on the right, what was at the back is now at the front). Its long side still runs from the upper left to the lower right.",
+      "items": [
+        {
+          "key": "cake-table",
+          "w": 2,
+          "d": 1,
+          "h": 30,
+          "width": 96,
+          "fit": "diamond",
+          "facing": "ne",
+          "prompt": "The party table from the reference, seen from the other side.",
+          "flip": true
+        }
+      ]
+    },
+    {
+      "name": "back-balloons",
+      "grid": "1x1",
+      "size": "1024x1024",
+      "tile": 300,
+      "refs": [
+        "out/events/party/balloons.se.raw.png"
+      ],
+      "note": "The second reference image shows this exact balloon bunch. Draw the SAME balloon bunch seen from the other side, turned half way round: same shape, size, colours and pixel style.",
+      "items": [
+        {
+          "key": "balloons",
+          "w": 1,
+          "d": 1,
+          "h": 58,
+          "width": 40,
+          "fill": 0.2,
+          "facing": "nw",
+          "prompt": "The balloon bunch from the reference, seen from the other side."
+        }
+      ]
+    },
+    {
+      "name": "back-balloons-b",
+      "grid": "1x1",
+      "size": "1024x1024",
+      "tile": 300,
+      "refs": [
+        "out/events/party/balloons.b.se.raw.png"
+      ],
+      "note": "The second reference image shows this exact balloon bunch. Draw the SAME balloon bunch seen from the other side, turned half way round: same shape, size, colours and pixel style.",
+      "items": [
+        {
+          "key": "balloons.b",
+          "w": 1,
+          "d": 1,
+          "h": 58,
+          "width": 40,
+          "fill": 0.2,
+          "facing": "nw",
+          "prompt": "The balloon bunch from the reference, seen from the other side."
+        }
+      ]
+    },
+    {
+      "name": "back-balloons-c",
+      "grid": "1x1",
+      "size": "1024x1024",
+      "tile": 300,
+      "refs": [
+        "out/events/party/balloons.c.se.raw.png"
+      ],
+      "note": "The second reference image shows this exact balloon bunch. Draw the SAME balloon bunch seen from the other side, turned half way round: same shape, size, colours and pixel style.",
+      "items": [
+        {
+          "key": "balloons.c",
+          "w": 1,
+          "d": 1,
+          "h": 58,
+          "width": 40,
+          "fill": 0.2,
+          "facing": "nw",
+          "prompt": "The balloon bunch from the reference, seen from the other side."
+        }
+      ]
+    },
+    {
+      "name": "party2",
+      "grid": "2x2",
+      "items": [
+        {
+          "key": "cocktail-table",
+          "facing": "se",
+          "also_facings": [
+            "nw"
+          ],
+          "w": 1,
+          "d": 1,
+          "h": 36,
+          "width": 40,
+          "fill": 0.4,
+          "prompt": "A tall round cocktail table for standing: a white linen cloth gathered at the waist with a plum satin sash tied in a bow, a small glass candle holder with a lit candle and two champagne coupes on top."
+        },
+        {
+          "key": "lantern-floor",
+          "facing": "se",
+          "also_facings": [
+            "nw"
+          ],
+          "w": 1,
+          "d": 1,
+          "h": 56,
+          "width": 30,
+          "fill": 0.3,
+          "extra": {
+            "light": {
+              "x": 15,
+              "y": 14,
+              "r": 42
+            }
+          },
+          "prompt": "A tall standing paper lantern floor lamp: a large round rose-and-cream paper lantern glowing warmly from inside, hanging from a curved dark bamboo pole on a round weighted base."
+        },
+        {
+          "key": "coat-rack",
+          "facing": "se",
+          "also_facings": [
+            "nw"
+          ],
+          "w": 1,
+          "d": 1,
+          "h": 56,
+          "width": 34,
+          "fill": 0.35,
+          "prompt": "A dark wooden bentwood coat rack on a tripod foot, a plum wool coat, a cream scarf and a straw hat hanging from its curved hooks, an umbrella leaning against it."
+        },
+        {
+          "key": "flower-stand",
+          "facing": "se",
+          "also_facings": [
+            "nw"
+          ],
+          "w": 1,
+          "d": 1,
+          "h": 48,
+          "width": 38,
+          "fill": 0.35,
+          "prompt": "A tall slim brass flower stand holding a big lush arrangement of pink peonies, cream roses, eucalyptus and trailing greenery."
+        }
+      ]
+    },
+    {
+      "name": "buffet",
+      "grid": "2x1",
+      "items": [
+        {
+          "key": "buffet",
+          "facing": "sw",
+          "w": 2,
+          "d": 1,
+          "h": 30,
+          "width": 96,
+          "fit": "diamond",
+          "prompt": "A refreshment table two tiles long: a long white tablecloth with a plum velvet runner and gold fringe, two tall glass drink dispensers of pink lemonade and cucumber water with brass taps, a tiered stand of pastel macarons, a tray of little sandwiches, stacked glass tumblers and a small vase of peonies. Its long front faces along the red arrow."
+        },
+        {
+          "key": "buffet",
+          "facing": "ne",
+          "w": 2,
+          "d": 1,
+          "h": 30,
+          "width": 96,
+          "fit": "diamond",
+          "prompt": "The SAME refreshment table seen from the other side: the white tablecloth and plum runner, the two glass drink dispensers (seen from behind), the macaron stand, the tumblers and the peonies."
+        }
+      ]
+    }
+  ]
+}

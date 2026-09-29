@@ -1,0 +1,305 @@
+{
+  "name": "hq",
+  "tile": 200,
+  "colors": 30,
+  "quality": "medium",
+  "mood": "Northstar HQ lobby: a calm, confident boutique-hotel lobby for a friendly tech company. Deep navy blue, polished brass, pale white oak, cream-and-grey marble checker floor, a single brass five-pointed star as the company emblem. Warm, architectural, a little grand.",
+  "sheets": [
+    {
+      "name": "lobby",
+      "grid": "3x2",
+      "items": [
+        {
+          "key": "reception",
+          "facing": "sw",
+          "w": 3,
+          "d": 1,
+          "h": 30,
+          "width": 128,
+          "fit": "diamond",
+          "prompt": "A long lobby reception desk three floor tiles long: a front of navy-blue lacquered panels with slim brass trim and a large inlaid brass five-pointed star in the middle, a pale white-oak top, a small brass service bell, a vase of white tulips and a slim monitor on top. Its panelled front faces along the red arrow."
+        },
+        {
+          "key": "reception",
+          "facing": "ne",
+          "w": 3,
+          "d": 1,
+          "h": 30,
+          "width": 128,
+          "fit": "diamond",
+          "prompt": "The SAME navy-and-brass reception desk seen from the receptionist's side: white-oak back with open shelves of folders, a drawer unit, the back of the monitor, the white tulips."
+        },
+        {
+          "key": "couch.blue",
+          "facing": "sw",
+          "w": 2,
+          "d": 1,
+          "h": 26,
+          "width": 96,
+          "fit": "diamond",
+          "prompt": "A sleek mid-century two-seat sofa in deep navy velvet with a low straight back, two seat cushions, thin brass-capped walnut legs.",
+          "extra": {
+            "seat": 12
+          }
+        },
+        {
+          "key": "couch.blue",
+          "facing": "ne",
+          "w": 2,
+          "d": 1,
+          "h": 26,
+          "width": 96,
+          "fit": "diamond",
+          "prompt": "The SAME navy velvet mid-century sofa seen from behind: its smooth navy back, brass-capped walnut legs.",
+          "extra": {
+            "seat": 12
+          }
+        },
+        {
+          "key": "trophy-case",
+          "facing": "sw",
+          "w": 2,
+          "d": 1,
+          "h": 44,
+          "width": 96,
+          "fit": "diamond",
+          "prompt": "A tall glass-fronted walnut trophy cabinet two tiles long with brass trim and three glass shelves holding small gold cups, a crystal award, framed certificates and a silver plate; soft light inside. Its glass front faces along the red arrow."
+        },
+        {
+          "key": "time-capsule",
+          "w": 1,
+          "d": 1,
+          "h": 34,
+          "width": 44,
+          "fill": 0.45,
+          "prompt": "A company time capsule: a sealed brass-and-steel cylinder with rivets and a round porthole, standing upright on a small navy pedestal with an engraved brass plaque (no readable text)."
+        }
+      ]
+    },
+    {
+      "name": "trophy-back",
+      "grid": "1x1",
+      "size": "1024x1024",
+      "tile": 300,
+      "refs": [
+        "out/hq/lobby/trophy-case.sw.raw.png"
+      ],
+      "note": "The second reference is this exact trophy cabinet from the front. Draw the SAME cabinet from BEHIND: its plain walnut back panel with brass corner trim; the trophies are hidden.",
+      "items": [
+        {
+          "key": "trophy-case",
+          "facing": "ne",
+          "w": 2,
+          "d": 1,
+          "h": 44,
+          "width": 96,
+          "fit": "diamond",
+          "prompt": "The walnut trophy cabinet from the reference, seen from behind.",
+          "flip": true
+        }
+      ]
+    },
+    {
+      "name": "wall",
+      "kind": "wall",
+      "grid": "3x3",
+      "size": "1536x1536",
+      "items": [
+        {
+          "key": "frame.garage",
+          "span": 1,
+          "wall": {
+            "v": [
+              14,
+              50
+            ],
+            "margin": 0.04
+          },
+          "prompt": "A small framed photo in a thin black frame, portrait 2:3: a cozy garage turned office at night — two laptops glowing on a folding table, a space heater, a whiteboard with a doodled rocket."
+        },
+        {
+          "key": "frame.customer",
+          "span": 1,
+          "wall": {
+            "v": [
+              14,
+              50
+            ],
+            "margin": 0.04
+          },
+          "prompt": "A small gilded frame, portrait 2:3, holding a framed first-dollar invoice: cream paper with a few handwritten signature squiggles and a single gold coin taped at the corner (no readable text)."
+        },
+        {
+          "key": "frame.lisbon",
+          "span": 1,
+          "wall": {
+            "v": [
+              14,
+              50
+            ],
+            "margin": 0.04
+          },
+          "prompt": "A small white-oak frame, portrait 2:3, holding a group photo on a sunny Lisbon street: a yellow tram, terracotta roofs, a crowd of tiny happy people waving."
+        },
+        {
+          "key": "frame.team",
+          "span": 1,
+          "wall": {
+            "v": [
+              14,
+              50
+            ],
+            "margin": 0.04
+          },
+          "prompt": "A small navy frame with a brass nameplate, portrait 2:3, holding a team photo of eight tiny smiling people in front of a brass star sign, confetti in the air."
+        },
+        {
+          "key": "logo-wall",
+          "span": 3,
+          "wall": {
+            "v": [
+              14,
+              50
+            ],
+            "margin": 0.1
+          },
+          "prompt": "A wide company emblem wall, about 2.3 : 1: vertical navy-blue wood slats with a large polished brass five-pointed star emblem in the centre, glowing softly with a warm halo, small brass pin lights along the top. No letters."
+        },
+        {
+          "key": "elevator",
+          "span": 2,
+          "wall": {
+            "v": [
+              0,
+              46
+            ],
+            "margin": 0.08
+          },
+          "prompt": "Art Deco elevator doors, about 1.15 : 1 (slightly wider than tall): two polished brass doors with engraved sunburst panels, a brass surround, a half-moon floor indicator dial with an arrow above, a small call button panel beside."
+        },
+        {
+          "key": "bulletin",
+          "span": 2,
+          "wall": {
+            "v": [
+              18,
+              46
+            ],
+            "margin": 0.1
+          },
+          "prompt": "A cork bulletin board in a white-oak frame, about 1.5 : 1, covered with pinned polaroid photos of smiling people, colorful sticky notes and a paper welcome pennant (no readable text)."
+        }
+      ]
+    },
+    {
+      "name": "clock",
+      "grid": "2x1",
+      "items": [
+        {
+          "key": "clock-grand",
+          "facing": "se",
+          "w": 1,
+          "d": 1,
+          "h": 64,
+          "width": 40,
+          "fill": 0.45,
+          "prompt": "A tall walnut grandfather clock with brass trim: an arched top with a small brass star finial, a cream enamel clock face with brass hands, a glass door showing a long brass pendulum, carved feet. Its face and glass door face along the red arrow."
+        },
+        {
+          "key": "clock-grand",
+          "facing": "nw",
+          "w": 1,
+          "d": 1,
+          "h": 64,
+          "width": 40,
+          "fill": 0.45,
+          "prompt": "The SAME tall walnut grandfather clock seen from directly behind: its plain walnut back panel, the arched top with the brass star finial, carved feet."
+        }
+      ]
+    },
+    {
+      "name": "museum",
+      "grid": "3x2",
+      "items": [
+        {
+          "key": "plinth",
+          "facing": "se",
+          "also_facings": [
+            "nw"
+          ],
+          "w": 1,
+          "d": 1,
+          "h": 16,
+          "width": 40,
+          "fill": 0.75,
+          "prompt": "A square museum display plinth about knee high: navy blue lacquered sides with a slim polished brass band at the foot and a brass-edged top, a flat cream marble top surface. Empty on top. Simple, elegant, symmetric."
+        },
+        {
+          "key": "bench.navy",
+          "facing": "sw",
+          "w": 2,
+          "d": 1,
+          "h": 18,
+          "width": 96,
+          "fit": "diamond",
+          "extra": {
+            "seat": 11
+          },
+          "prompt": "A long upholstered lobby bench two tiles long with no back: a deep navy velvet cushion with button tufting in a row, a slim white-oak frame and four brass-capped tapered legs. Its long side runs along the red arrow."
+        },
+        {
+          "key": "bench.navy",
+          "facing": "ne",
+          "w": 2,
+          "d": 1,
+          "h": 18,
+          "width": 96,
+          "fit": "diamond",
+          "extra": {
+            "seat": 11
+          },
+          "prompt": "The SAME backless navy velvet lobby bench seen from the other side: the tufted navy cushion, the white-oak frame, brass-capped legs."
+        },
+        {
+          "key": "planter.brass",
+          "facing": "se",
+          "also_facings": [
+            "nw"
+          ],
+          "w": 1,
+          "d": 1,
+          "h": 40,
+          "width": 40,
+          "fill": 0.45,
+          "prompt": "A tall clipped boxwood topiary ball on a slim trunk, in a square polished brass planter box with a navy band."
+        },
+        {
+          "key": "table-side.brass",
+          "facing": "se",
+          "also_facings": [
+            "nw"
+          ],
+          "w": 1,
+          "d": 1,
+          "h": 16,
+          "width": 34,
+          "fill": 0.4,
+          "prompt": "A small round side table with a white marble top on three slim brass legs, a tiny vase of white tulips and a coffee-table book on it."
+        },
+        {
+          "key": "stanchion",
+          "facing": "se",
+          "also_facings": [
+            "nw"
+          ],
+          "w": 1,
+          "d": 1,
+          "h": 30,
+          "width": 26,
+          "fill": 0.3,
+          "prompt": "A polished brass museum stanchion post on a round weighted brass base, a short loop of deep red velvet rope hanging from the top ring."
+        }
+      ]
+    }
+  ]
+}

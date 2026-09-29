@@ -1,6 +1,221 @@
 {
   "scale": 2,
   "sprites": {
+    "air-hockey": {
+      "footprint": [
+        2,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "sw": {
+          "file": "air-hockey.sw.png",
+          "anchor": [
+            32,
+            33
+          ]
+        },
+        "ne": {
+          "file": "air-hockey.ne.png",
+          "anchor": [
+            32,
+            35
+          ]
+        }
+      }
+    },
+    "arcade-cabinet": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "ne": {
+          "file": "arcade-cabinet.ne.png",
+          "anchor": [
+            26,
+            59
+          ]
+        },
+        "sw": {
+          "file": "arcade-cabinet.sw.png",
+          "anchor": [
+            26,
+            63
+          ]
+        }
+      },
+      "light": {
+        "x": 26,
+        "y": 30,
+        "r": 26
+      }
+    },
+    "arcade-cabinet.cyan": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "sw": {
+          "file": "arcade-cabinet.cyan.sw.png",
+          "anchor": [
+            26,
+            63
+          ]
+        },
+        "ne": {
+          "file": "arcade-cabinet.cyan.ne.png",
+          "anchor": [
+            26,
+            59
+          ]
+        }
+      },
+      "light": {
+        "x": 26,
+        "y": 30,
+        "r": 26
+      }
+    },
+    "arcade-cabinet.gold": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "sw": {
+          "file": "arcade-cabinet.gold.sw.png",
+          "anchor": [
+            26,
+            63
+          ]
+        },
+        "ne": {
+          "file": "arcade-cabinet.gold.ne.png",
+          "anchor": [
+            26,
+            59
+          ]
+        }
+      },
+      "light": {
+        "x": 26,
+        "y": 30,
+        "r": 26
+      }
+    },
+    "arcade-cabinet.lime": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "sw": {
+          "file": "arcade-cabinet.lime.sw.png",
+          "anchor": [
+            26,
+            63
+          ]
+        },
+        "ne": {
+          "file": "arcade-cabinet.lime.ne.png",
+          "anchor": [
+            26,
+            59
+          ]
+        }
+      },
+      "light": {
+        "x": 26,
+        "y": 30,
+        "r": 26
+      }
+    },
+    "arcade-cabinet.orange": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "sw": {
+          "file": "arcade-cabinet.orange.sw.png",
+          "anchor": [
+            26,
+            63
+          ]
+        },
+        "ne": {
+          "file": "arcade-cabinet.orange.ne.png",
+          "anchor": [
+            26,
+            59
+          ]
+        }
+      },
+      "light": {
+        "x": 26,
+        "y": 30,
+        "r": 26
+      }
+    },
+    "arcade-cabinet.pink": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "sw": {
+          "file": "arcade-cabinet.pink.sw.png",
+          "anchor": [
+            26,
+            63
+          ]
+        },
+        "ne": {
+          "file": "arcade-cabinet.pink.ne.png",
+          "anchor": [
+            26,
+            59
+          ]
+        }
+      },
+      "light": {
+        "x": 26,
+        "y": 30,
+        "r": 26
+      }
+    },
+    "armchair.green": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "se": {
+          "file": "armchair.green.se.png",
+          "anchor": [
+            31,
+            48
+          ]
+        },
+        "nw": {
+          "file": "armchair.green.nw.png",
+          "anchor": [
+            31,
+            44
+          ]
+        }
+      },
+      "seat": 12
+    },
     "armchair.mustard": {
       "footprint": [
         1,
@@ -25,6 +240,30 @@
       },
       "seat": 12
     },
+    "armchair.rust": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "se": {
+          "file": "armchair.rust.se.png",
+          "anchor": [
+            31,
+            49
+          ]
+        },
+        "nw": {
+          "file": "armchair.rust.nw.png",
+          "anchor": [
+            31,
+            45
+          ]
+        }
+      },
+      "seat": 12
+    },
     "backbar": {
       "footprint": [
         3,
@@ -44,6 +283,543 @@
         "margin": 0.06
       }
     },
+    "balloons": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "se": {
+          "file": "balloons.se.png",
+          "anchor": [
+            20,
+            55
+          ]
+        },
+        "nw": {
+          "file": "balloons.nw.png",
+          "anchor": [
+            20,
+            64
+          ]
+        }
+      }
+    },
+    "balloons.b": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "se": {
+          "file": "balloons.b.se.png",
+          "anchor": [
+            20,
+            62
+          ]
+        },
+        "nw": {
+          "file": "balloons.b.nw.png",
+          "anchor": [
+            20,
+            60
+          ]
+        }
+      }
+    },
+    "balloons.c": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "se": {
+          "file": "balloons.c.se.png",
+          "anchor": [
+            20,
+            53
+          ]
+        },
+        "nw": {
+          "file": "balloons.c.nw.png",
+          "anchor": [
+            20,
+            54
+          ]
+        }
+      }
+    },
+    "banner": {
+      "footprint": [
+        6,
+        1
+      ],
+      "fit": "anchor",
+      "file": "banner.png",
+      "anchor": [
+        0,
+        0
+      ],
+      "wall": {
+        "v": [
+          36,
+          54
+        ],
+        "margin": 0.03
+      }
+    },
+    "bar-cart": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "se": {
+          "file": "bar-cart.se.png",
+          "anchor": [
+            23,
+            26
+          ]
+        },
+        "nw": {
+          "file": "bar-cart.nw.png",
+          "anchor": [
+            23,
+            21
+          ]
+        }
+      }
+    },
+    "beanbag.cyan": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "beanbag.cyan.png",
+      "anchor": [
+        26,
+        20
+      ],
+      "seat": 8
+    },
+    "beanbag.orange": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "beanbag.orange.png",
+      "anchor": [
+        26,
+        21
+      ],
+      "seat": 8
+    },
+    "beanbag.pink": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "beanbag.pink.png",
+      "anchor": [
+        26,
+        20
+      ],
+      "seat": 8
+    },
+    "beanbag.purple": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "beanbag.purple.png",
+      "anchor": [
+        26,
+        20
+      ],
+      "seat": 8
+    },
+    "bench": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "se": {
+          "file": "bench.se.png",
+          "anchor": [
+            52,
+            73
+          ]
+        },
+        "ne": {
+          "file": "bench.ne.png",
+          "anchor": [
+            52,
+            63
+          ]
+        }
+      },
+      "seat": 12
+    },
+    "bench.navy": {
+      "footprint": [
+        2,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "sw": {
+          "file": "bench.navy.sw.png",
+          "anchor": [
+            32,
+            24
+          ]
+        },
+        "ne": {
+          "file": "bench.navy.ne.png",
+          "anchor": [
+            32,
+            25
+          ]
+        }
+      },
+      "seat": 11
+    },
+    "bike-rack": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "bike-rack.png",
+      "anchor": [
+        38,
+        44
+      ]
+    },
+    "boat.red": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "boat.red.png",
+      "anchor": [
+        56,
+        60
+      ]
+    },
+    "boat.yellow": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "boat.yellow.png",
+      "anchor": [
+        56,
+        60
+      ]
+    },
+    "bookshelf.a": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "sw": {
+          "file": "bookshelf.a.sw.png",
+          "anchor": [
+            32,
+            91
+          ]
+        },
+        "ne": {
+          "file": "bookshelf.a.ne.png",
+          "anchor": [
+            32,
+            91
+          ]
+        }
+      }
+    },
+    "bookshelf.b": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "sw": {
+          "file": "bookshelf.b.sw.png",
+          "anchor": [
+            32,
+            90
+          ]
+        },
+        "ne": {
+          "file": "bookshelf.b.ne.png",
+          "anchor": [
+            32,
+            86
+          ]
+        }
+      }
+    },
+    "bookshelf.birch": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "sw": {
+          "file": "bookshelf.birch.sw.png",
+          "anchor": [
+            32,
+            104
+          ]
+        },
+        "ne": {
+          "file": "bookshelf.birch.ne.png",
+          "anchor": [
+            32,
+            107
+          ]
+        }
+      }
+    },
+    "bookshelf.birch2": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "sw": {
+          "file": "bookshelf.birch2.sw.png",
+          "anchor": [
+            32,
+            105
+          ]
+        },
+        "ne": {
+          "file": "bookshelf.birch2.ne.png",
+          "anchor": [
+            32,
+            88
+          ]
+        }
+      }
+    },
+    "buffet": {
+      "footprint": [
+        2,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "sw": {
+          "file": "buffet.sw.png",
+          "anchor": [
+            32,
+            33
+          ]
+        },
+        "ne": {
+          "file": "buffet.ne.png",
+          "anchor": [
+            32,
+            31
+          ]
+        }
+      }
+    },
+    "building.arcade": {
+      "footprint": [
+        8,
+        5
+      ],
+      "fit": "anchor",
+      "file": "building.arcade.png",
+      "anchor": [
+        183,
+        266
+      ],
+      "glow": "building.arcade.glow.png"
+    },
+    "building.cafe": {
+      "footprint": [
+        8,
+        6
+      ],
+      "fit": "anchor",
+      "file": "building.cafe.png",
+      "anchor": [
+        229,
+        243
+      ],
+      "glow": "building.cafe.glow.png",
+      "emitters": [
+        {
+          "kind": "smoke",
+          "x": 360,
+          "y": 11
+        }
+      ]
+    },
+    "building.design": {
+      "footprint": [
+        7,
+        6
+      ],
+      "fit": "anchor",
+      "file": "building.design.png",
+      "anchor": [
+        203,
+        412
+      ],
+      "glow": "building.design.glow.png"
+    },
+    "building.eng": {
+      "footprint": [
+        11,
+        7
+      ],
+      "fit": "anchor",
+      "file": "building.eng.png",
+      "anchor": [
+        231,
+        342
+      ],
+      "glow": "building.eng.glow.png",
+      "emitters": [
+        {
+          "kind": "blink",
+          "x": 516,
+          "y": 17
+        }
+      ]
+    },
+    "building.events": {
+      "footprint": [
+        12,
+        6
+      ],
+      "fit": "anchor",
+      "file": "building.events.png",
+      "anchor": [
+        205,
+        338
+      ],
+      "glow": "building.events.glow.png"
+    },
+    "building.focus": {
+      "footprint": [
+        5,
+        7
+      ],
+      "fit": "anchor",
+      "file": "building.focus.png",
+      "anchor": [
+        273,
+        267
+      ],
+      "glow": "building.focus.glow.png",
+      "emitters": [
+        {
+          "kind": "smoke",
+          "x": 154,
+          "y": 63
+        }
+      ]
+    },
+    "building.hq": {
+      "footprint": [
+        11,
+        8
+      ],
+      "fit": "anchor",
+      "file": "building.hq.png",
+      "anchor": [
+        267,
+        516
+      ],
+      "glow": "building.hq.glow.png"
+    },
+    "building.launch": {
+      "footprint": [
+        7,
+        6
+      ],
+      "fit": "anchor",
+      "file": "building.launch.png",
+      "anchor": [
+        198,
+        361
+      ],
+      "glow": "building.launch.glow.png",
+      "emitters": [
+        {
+          "kind": "blink",
+          "x": 285,
+          "y": 13
+        }
+      ]
+    },
+    "bulletin": {
+      "footprint": [
+        2,
+        1
+      ],
+      "fit": "anchor",
+      "file": "bulletin.png",
+      "anchor": [
+        0,
+        0
+      ],
+      "wall": {
+        "v": [
+          18,
+          46
+        ],
+        "margin": 0.1
+      }
+    },
+    "bush.flower": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "bush.flower.png",
+      "anchor": [
+        32,
+        42
+      ]
+    },
+    "bush.plain": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "bush.plain.png",
+      "anchor": [
+        31,
+        38
+      ]
+    },
     "cake-stand": {
       "footprint": [
         1,
@@ -55,6 +831,29 @@
         17,
         18
       ]
+    },
+    "cake-table": {
+      "footprint": [
+        2,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "sw": {
+          "file": "cake-table.sw.png",
+          "anchor": [
+            32,
+            33
+          ]
+        },
+        "ne": {
+          "file": "cake-table.ne.png",
+          "anchor": [
+            32,
+            32
+          ]
+        }
+      }
     },
     "chair.cafe": {
       "footprint": [
@@ -80,6 +879,218 @@
       },
       "seat": 15
     },
+    "chair.office": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "se": {
+          "file": "chair.office.se.png",
+          "anchor": [
+            22,
+            46
+          ]
+        },
+        "nw": {
+          "file": "chair.office.nw.png",
+          "anchor": [
+            22,
+            42
+          ]
+        }
+      },
+      "seat": 15
+    },
+    "chair.red": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "se": {
+          "file": "chair.red.se.png",
+          "anchor": [
+            20,
+            36
+          ]
+        },
+        "nw": {
+          "file": "chair.red.nw.png",
+          "anchor": [
+            20,
+            28
+          ]
+        }
+      },
+      "seat": 15
+    },
+    "chair.wood": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "se": {
+          "file": "chair.wood.se.png",
+          "anchor": [
+            22,
+            35
+          ]
+        },
+        "nw": {
+          "file": "chair.wood.nw.png",
+          "anchor": [
+            22,
+            33
+          ]
+        }
+      },
+      "seat": 15
+    },
+    "claw-machine": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "sw": {
+          "file": "claw-machine.sw.png",
+          "anchor": [
+            26,
+            56
+          ]
+        },
+        "ne": {
+          "file": "claw-machine.ne.png",
+          "anchor": [
+            26,
+            59
+          ]
+        }
+      },
+      "light": {
+        "x": 26,
+        "y": 22,
+        "r": 26
+      }
+    },
+    "clock-grand": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "se": {
+          "file": "clock-grand.se.png",
+          "anchor": [
+            20,
+            93
+          ]
+        },
+        "nw": {
+          "file": "clock-grand.nw.png",
+          "anchor": [
+            20,
+            92
+          ]
+        }
+      }
+    },
+    "clock-wall": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "clock-wall.png",
+      "anchor": [
+        0,
+        0
+      ],
+      "wall": {
+        "v": [
+          28,
+          46
+        ],
+        "margin": 0.16
+      }
+    },
+    "coat-rack": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "se": {
+          "file": "coat-rack.se.png",
+          "anchor": [
+            17,
+            56
+          ]
+        },
+        "nw": {
+          "file": "coat-rack.nw.png",
+          "anchor": [
+            17,
+            56
+          ]
+        }
+      }
+    },
+    "cocktail-table": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "se": {
+          "file": "cocktail-table.se.png",
+          "anchor": [
+            20,
+            52
+          ]
+        },
+        "nw": {
+          "file": "cocktail-table.nw.png",
+          "anchor": [
+            20,
+            52
+          ]
+        }
+      }
+    },
+    "couch.blue": {
+      "footprint": [
+        2,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "sw": {
+          "file": "couch.blue.sw.png",
+          "anchor": [
+            32,
+            31
+          ]
+        },
+        "ne": {
+          "file": "couch.blue.ne.png",
+          "anchor": [
+            32,
+            29
+          ]
+        }
+      },
+      "seat": 12
+    },
     "couch.green": {
       "footprint": [
         2,
@@ -104,6 +1115,30 @@
       },
       "seat": 12
     },
+    "couch.purple": {
+      "footprint": [
+        2,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "sw": {
+          "file": "couch.purple.sw.png",
+          "anchor": [
+            32,
+            40
+          ]
+        },
+        "ne": {
+          "file": "couch.purple.ne.png",
+          "anchor": [
+            32,
+            29
+          ]
+        }
+      },
+      "seat": 12
+    },
     "cups": {
       "footprint": [
         1,
@@ -115,6 +1150,163 @@
         17,
         4
       ]
+    },
+    "desk": {
+      "footprint": [
+        2,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "sw": {
+          "file": "desk.sw.png",
+          "anchor": [
+            32,
+            54
+          ]
+        },
+        "ne": {
+          "file": "desk.ne.png",
+          "anchor": [
+            32,
+            51
+          ]
+        }
+      }
+    },
+    "desk.light": {
+      "footprint": [
+        2,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "sw": {
+          "file": "desk.light.sw.png",
+          "anchor": [
+            32,
+            44
+          ]
+        },
+        "ne": {
+          "file": "desk.light.ne.png",
+          "anchor": [
+            32,
+            43
+          ]
+        }
+      }
+    },
+    "desk.wood": {
+      "footprint": [
+        2,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "sw": {
+          "file": "desk.wood.sw.png",
+          "anchor": [
+            32,
+            45
+          ]
+        },
+        "ne": {
+          "file": "desk.wood.ne.png",
+          "anchor": [
+            32,
+            39
+          ]
+        }
+      }
+    },
+    "dress-form": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "se": {
+          "file": "dress-form.se.png",
+          "anchor": [
+            17,
+            54
+          ]
+        },
+        "nw": {
+          "file": "dress-form.nw.png",
+          "anchor": [
+            17,
+            53
+          ]
+        }
+      }
+    },
+    "easel": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "se": {
+          "file": "easel.se.png",
+          "anchor": [
+            23,
+            61
+          ]
+        },
+        "nw": {
+          "file": "easel.nw.png",
+          "anchor": [
+            23,
+            60
+          ]
+        }
+      }
+    },
+    "easel.b": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "se": {
+          "file": "easel.b.se.png",
+          "anchor": [
+            23,
+            58
+          ]
+        },
+        "nw": {
+          "file": "easel.b.nw.png",
+          "anchor": [
+            23,
+            69
+          ]
+        }
+      }
+    },
+    "elevator": {
+      "footprint": [
+        2,
+        1
+      ],
+      "fit": "anchor",
+      "file": "elevator.png",
+      "anchor": [
+        0,
+        0
+      ],
+      "wall": {
+        "v": [
+          0,
+          46
+        ],
+        "margin": 0.08
+      }
     },
     "espresso": {
       "footprint": [
@@ -139,6 +1331,193 @@
         }
       }
     },
+    "fireplace": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "sw": {
+          "file": "fireplace.sw.png",
+          "anchor": [
+            32,
+            58
+          ]
+        },
+        "ne": {
+          "file": "fireplace.ne.png",
+          "anchor": [
+            32,
+            68
+          ]
+        }
+      },
+      "light": {
+        "x": 37,
+        "y": 47,
+        "r": 42
+      }
+    },
+    "flower-cart": {
+      "footprint": [
+        2,
+        1
+      ],
+      "fit": "anchor",
+      "file": "flower-cart.png",
+      "anchor": [
+        59,
+        142
+      ]
+    },
+    "flower-stand": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "se": {
+          "file": "flower-stand.se.png",
+          "anchor": [
+            19,
+            38
+          ]
+        },
+        "nw": {
+          "file": "flower-stand.nw.png",
+          "anchor": [
+            19,
+            38
+          ]
+        }
+      }
+    },
+    "flowerbed.blue": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "flowerbed.blue.png",
+      "anchor": [
+        32,
+        25
+      ]
+    },
+    "flowerbed.pink": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "flowerbed.pink.png",
+      "anchor": [
+        32,
+        24
+      ]
+    },
+    "flowerbed.red": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "flowerbed.red.png",
+      "anchor": [
+        32,
+        22
+      ]
+    },
+    "flowerbed.yellow": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "flowerbed.yellow.png",
+      "anchor": [
+        32,
+        24
+      ]
+    },
+    "fountain": {
+      "footprint": [
+        3,
+        3
+      ],
+      "fit": "anchor",
+      "file": "fountain.png",
+      "anchor": [
+        96,
+        88
+      ],
+      "emitters": [
+        {
+          "kind": "spray",
+          "x": 96,
+          "y": 34
+        }
+      ]
+    },
+    "frame.customer": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "frame.customer.png",
+      "anchor": [
+        0,
+        0
+      ],
+      "wall": {
+        "v": [
+          14,
+          50
+        ],
+        "margin": 0.04
+      }
+    },
+    "frame.garage": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "frame.garage.png",
+      "anchor": [
+        0,
+        0
+      ],
+      "wall": {
+        "v": [
+          14,
+          50
+        ],
+        "margin": 0.04
+      }
+    },
+    "frame.hackathon": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "frame.hackathon.png",
+      "anchor": [
+        0,
+        0
+      ],
+      "wall": {
+        "v": [
+          22,
+          44
+        ],
+        "margin": 0.14
+      }
+    },
     "frame.lake": {
       "footprint": [
         1,
@@ -157,6 +1536,56 @@
         ],
         "margin": 0.14
       }
+    },
+    "frame.lisbon": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "frame.lisbon.png",
+      "anchor": [
+        0,
+        0
+      ],
+      "wall": {
+        "v": [
+          14,
+          50
+        ],
+        "margin": 0.04
+      }
+    },
+    "frame.team": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "frame.team.png",
+      "anchor": [
+        0,
+        0
+      ],
+      "wall": {
+        "v": [
+          14,
+          50
+        ],
+        "margin": 0.04
+      }
+    },
+    "gazebo": {
+      "footprint": [
+        3,
+        3
+      ],
+      "fit": "anchor",
+      "file": "gazebo.png",
+      "anchor": [
+        96,
+        190
+      ]
     },
     "grinder": {
       "footprint": [
@@ -328,6 +1757,53 @@
         26
       ]
     },
+    "jukebox": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "sw": {
+          "file": "jukebox.sw.png",
+          "anchor": [
+            25,
+            50
+          ]
+        },
+        "ne": {
+          "file": "jukebox.ne.png",
+          "anchor": [
+            25,
+            51
+          ]
+        }
+      },
+      "light": {
+        "x": 25,
+        "y": 30,
+        "r": 30
+      }
+    },
+    "kanban": {
+      "footprint": [
+        4,
+        1
+      ],
+      "fit": "anchor",
+      "file": "kanban.png",
+      "anchor": [
+        0,
+        0
+      ],
+      "wall": {
+        "v": [
+          16,
+          48
+        ],
+        "margin": 0.08
+      }
+    },
     "lamp": {
       "footprint": [
         1,
@@ -344,6 +1820,143 @@
         "y": 17,
         "r": 44
       }
+    },
+    "lamp-arc": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "lamp-arc.png",
+      "anchor": [
+        26,
+        56
+      ],
+      "light": {
+        "x": 40,
+        "y": 12,
+        "r": 44
+      }
+    },
+    "lamp-post": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "lamp-post.png",
+      "anchor": [
+        20,
+        82
+      ],
+      "light": {
+        "x": 25,
+        "y": 21,
+        "r": 70
+      },
+      "glow": "lamp-post.glow.png"
+    },
+    "lantern-floor": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "se": {
+          "file": "lantern-floor.se.png",
+          "anchor": [
+            15,
+            34
+          ]
+        },
+        "nw": {
+          "file": "lantern-floor.nw.png",
+          "anchor": [
+            15,
+            34
+          ]
+        }
+      },
+      "light": {
+        "x": 15,
+        "y": 14,
+        "r": 42
+      }
+    },
+    "lantern-string": {
+      "footprint": [
+        3,
+        1
+      ],
+      "fit": "anchor",
+      "file": "lantern-string.png",
+      "anchor": [
+        0,
+        0
+      ],
+      "wall": {
+        "v": [
+          40,
+          56
+        ],
+        "margin": 0.02
+      }
+    },
+    "lighthouse": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "lighthouse.png",
+      "anchor": [
+        42,
+        122
+      ],
+      "light": {
+        "x": 37,
+        "y": 42,
+        "r": 90
+      },
+      "emitters": [
+        {
+          "kind": "beam",
+          "x": 37,
+          "y": 42
+        }
+      ]
+    },
+    "logo-wall": {
+      "footprint": [
+        3,
+        1
+      ],
+      "fit": "anchor",
+      "file": "logo-wall.png",
+      "anchor": [
+        0,
+        0
+      ],
+      "wall": {
+        "v": [
+          14,
+          50
+        ],
+        "margin": 0.1
+      }
+    },
+    "mailbox": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "mailbox.png",
+      "anchor": [
+        18,
+        58
+      ]
     },
     "menu-board": {
       "footprint": [
@@ -362,6 +1975,79 @@
           47
         ],
         "margin": 0.14
+      }
+    },
+    "mission-patches": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "mission-patches.png",
+      "anchor": [
+        0,
+        0
+      ],
+      "wall": {
+        "v": [
+          26,
+          50
+        ],
+        "margin": 0.12
+      }
+    },
+    "moodboard": {
+      "footprint": [
+        4,
+        1
+      ],
+      "fit": "anchor",
+      "file": "moodboard.png",
+      "anchor": [
+        0,
+        0
+      ],
+      "wall": {
+        "v": [
+          16,
+          48
+        ],
+        "margin": 0.06
+      }
+    },
+    "noticeboard": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "noticeboard.png",
+      "anchor": [
+        35,
+        87
+      ]
+    },
+    "parts-rack": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "sw": {
+          "file": "parts-rack.sw.png",
+          "anchor": [
+            32,
+            67
+          ]
+        },
+        "ne": {
+          "file": "parts-rack.ne.png",
+          "anchor": [
+            32,
+            72
+          ]
+        }
       }
     },
     "pastry-case": {
@@ -383,6 +2069,79 @@
           "anchor": [
             21,
             22
+          ]
+        }
+      }
+    },
+    "pennant.mobile": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "pennant.mobile.png",
+      "anchor": [
+        0,
+        0
+      ],
+      "wall": {
+        "v": [
+          28,
+          46
+        ],
+        "margin": 0.2
+      }
+    },
+    "pennant.platform": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "pennant.platform.png",
+      "anchor": [
+        0,
+        0
+      ],
+      "wall": {
+        "v": [
+          28,
+          46
+        ],
+        "margin": 0.2
+      }
+    },
+    "picnic": {
+      "footprint": [
+        2,
+        1
+      ],
+      "fit": "anchor",
+      "file": "picnic.png",
+      "anchor": [
+        62,
+        84
+      ]
+    },
+    "plan-chest": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "sw": {
+          "file": "plan-chest.sw.png",
+          "anchor": [
+            32,
+            30
+          ]
+        },
+        "ne": {
+          "file": "plan-chest.ne.png",
+          "anchor": [
+            32,
+            34
           ]
         }
       }
@@ -411,6 +2170,201 @@
         68
       ]
     },
+    "plant.pothos": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "plant.pothos.png",
+      "anchor": [
+        17,
+        19
+      ]
+    },
+    "planter.brass": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "se": {
+          "file": "planter.brass.se.png",
+          "anchor": [
+            20,
+            49
+          ]
+        },
+        "nw": {
+          "file": "planter.brass.nw.png",
+          "anchor": [
+            20,
+            49
+          ]
+        }
+      }
+    },
+    "plinth": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "se": {
+          "file": "plinth.se.png",
+          "anchor": [
+            20,
+            16
+          ]
+        },
+        "nw": {
+          "file": "plinth.nw.png",
+          "anchor": [
+            20,
+            16
+          ]
+        }
+      }
+    },
+    "podium": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "sw": {
+          "file": "podium.sw.png",
+          "anchor": [
+            21,
+            49
+          ]
+        },
+        "ne": {
+          "file": "podium.ne.png",
+          "anchor": [
+            21,
+            48
+          ]
+        }
+      }
+    },
+    "pool-table": {
+      "footprint": [
+        3,
+        2
+      ],
+      "fit": "anchor",
+      "facings": {
+        "sw": {
+          "file": "pool-table.sw.png",
+          "anchor": [
+            64,
+            39
+          ]
+        },
+        "ne": {
+          "file": "pool-table.ne.png",
+          "anchor": [
+            64,
+            42
+          ]
+        }
+      }
+    },
+    "popcorn-cart": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "se": {
+          "file": "popcorn-cart.se.png",
+          "anchor": [
+            21,
+            36
+          ]
+        },
+        "nw": {
+          "file": "popcorn-cart.nw.png",
+          "anchor": [
+            21,
+            36
+          ]
+        }
+      },
+      "light": {
+        "x": 21,
+        "y": 20,
+        "r": 26
+      }
+    },
+    "prize-counter": {
+      "footprint": [
+        2,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "sw": {
+          "file": "prize-counter.sw.png",
+          "anchor": [
+            32,
+            42
+          ]
+        },
+        "ne": {
+          "file": "prize-counter.ne.png",
+          "anchor": [
+            32,
+            35
+          ]
+        }
+      },
+      "light": {
+        "x": 48,
+        "y": 30,
+        "r": 34
+      }
+    },
+    "reception": {
+      "footprint": [
+        3,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "sw": {
+          "file": "reception.sw.png",
+          "anchor": [
+            32,
+            61
+          ]
+        },
+        "ne": {
+          "file": "reception.ne.png",
+          "anchor": [
+            32,
+            47
+          ]
+        }
+      }
+    },
+    "reeds": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "reeds.png",
+      "anchor": [
+        28,
+        42
+      ]
+    },
     "register": {
       "footprint": [
         1,
@@ -434,6 +2388,179 @@
         }
       }
     },
+    "rocket-model": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "se": {
+          "file": "rocket-model.se.png",
+          "anchor": [
+            20,
+            84
+          ]
+        },
+        "nw": {
+          "file": "rocket-model.nw.png",
+          "anchor": [
+            20,
+            80
+          ]
+        }
+      }
+    },
+    "rocket-statue": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "rocket-statue.png",
+      "anchor": [
+        36,
+        83
+      ]
+    },
+    "screen.countdown": {
+      "footprint": [
+        2,
+        1
+      ],
+      "fit": "anchor",
+      "file": "screen.countdown.png",
+      "anchor": [
+        0,
+        0
+      ],
+      "wall": {
+        "v": [
+          28,
+          44
+        ],
+        "margin": 0.06
+      }
+    },
+    "server-rack": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "sw": {
+          "file": "server-rack.sw.png",
+          "anchor": [
+            32,
+            71
+          ]
+        },
+        "ne": {
+          "file": "server-rack.ne.png",
+          "anchor": [
+            32,
+            82
+          ]
+        }
+      }
+    },
+    "sign-quiet": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "sign-quiet.png",
+      "anchor": [
+        0,
+        0
+      ],
+      "wall": {
+        "v": [
+          26,
+          40
+        ],
+        "margin": 0.18
+      }
+    },
+    "signpost": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "signpost.png",
+      "anchor": [
+        33,
+        93
+      ]
+    },
+    "speaker": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "sw": {
+          "file": "speaker.sw.png",
+          "anchor": [
+            20,
+            60
+          ]
+        },
+        "ne": {
+          "file": "speaker.ne.png",
+          "anchor": [
+            20,
+            60
+          ]
+        }
+      }
+    },
+    "stanchion": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "se": {
+          "file": "stanchion.se.png",
+          "anchor": [
+            13,
+            22
+          ]
+        },
+        "nw": {
+          "file": "stanchion.nw.png",
+          "anchor": [
+            13,
+            22
+          ]
+        }
+      }
+    },
+    "star-map": {
+      "footprint": [
+        2,
+        1
+      ],
+      "fit": "anchor",
+      "file": "star-map.png",
+      "anchor": [
+        0,
+        0
+      ],
+      "wall": {
+        "v": [
+          16,
+          48
+        ],
+        "margin": 0.06
+      }
+    },
     "stool": {
       "footprint": [
         1,
@@ -447,6 +2574,107 @@
       ],
       "seat": 17
     },
+    "stool.neon": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "stool.neon.png",
+      "anchor": [
+        15,
+        31
+      ],
+      "seat": 17
+    },
+    "swatches": {
+      "footprint": [
+        3,
+        1
+      ],
+      "fit": "anchor",
+      "file": "swatches.png",
+      "anchor": [
+        0,
+        0
+      ],
+      "wall": {
+        "v": [
+          20,
+          46
+        ],
+        "margin": 0.08
+      }
+    },
+    "table-high.neon": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "se": {
+          "file": "table-high.neon.se.png",
+          "anchor": [
+            19,
+            37
+          ]
+        },
+        "nw": {
+          "file": "table-high.neon.nw.png",
+          "anchor": [
+            19,
+            37
+          ]
+        }
+      }
+    },
+    "table-long": {
+      "footprint": [
+        4,
+        2
+      ],
+      "fit": "anchor",
+      "facings": {
+        "sw": {
+          "file": "table-long.sw.png",
+          "anchor": [
+            64,
+            35
+          ]
+        },
+        "ne": {
+          "file": "table-long.ne.png",
+          "anchor": [
+            64,
+            45
+          ]
+        }
+      }
+    },
+    "table-long.light": {
+      "footprint": [
+        3,
+        2
+      ],
+      "fit": "anchor",
+      "facings": {
+        "sw": {
+          "file": "table-long.light.sw.png",
+          "anchor": [
+            64,
+            35
+          ]
+        },
+        "ne": {
+          "file": "table-long.light.ne.png",
+          "anchor": [
+            64,
+            53
+          ]
+        }
+      }
+    },
     "table-low": {
       "footprint": [
         2,
@@ -457,6 +2685,18 @@
       "anchor": [
         32,
         19
+      ]
+    },
+    "table-low.side": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "table-low.side.png",
+      "anchor": [
+        21,
+        27
       ]
     },
     "table-round": {
@@ -470,6 +2710,242 @@
         30,
         45
       ]
+    },
+    "table-side.brass": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "se": {
+          "file": "table-side.brass.se.png",
+          "anchor": [
+            17,
+            34
+          ]
+        },
+        "nw": {
+          "file": "table-side.brass.nw.png",
+          "anchor": [
+            17,
+            34
+          ]
+        }
+      }
+    },
+    "time-capsule": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "time-capsule.png",
+      "anchor": [
+        22,
+        57
+      ]
+    },
+    "tree/birch.a": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "tree/birch.a.png",
+      "anchor": [
+        39,
+        124
+      ]
+    },
+    "tree/birch.b": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "tree/birch.b.png",
+      "anchor": [
+        42,
+        107
+      ]
+    },
+    "tree/oak-big": {
+      "footprint": [
+        2,
+        2
+      ],
+      "fit": "anchor",
+      "file": "tree/oak-big.png",
+      "anchor": [
+        118,
+        200
+      ]
+    },
+    "tree/pine.a": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "tree/pine.a.png",
+      "anchor": [
+        46,
+        149
+      ]
+    },
+    "tree/pine.b": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "tree/pine.b.png",
+      "anchor": [
+        50,
+        121
+      ]
+    },
+    "tree/round.a": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "tree/round.a.png",
+      "anchor": [
+        62,
+        126
+      ]
+    },
+    "tree/round.b": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "tree/round.b.png",
+      "anchor": [
+        60,
+        122
+      ]
+    },
+    "trophy-case": {
+      "footprint": [
+        2,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "sw": {
+          "file": "trophy-case.sw.png",
+          "anchor": [
+            32,
+            82
+          ]
+        },
+        "ne": {
+          "file": "trophy-case.ne.png",
+          "anchor": [
+            32,
+            77
+          ]
+        }
+      }
+    },
+    "umbrella-table.red": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "umbrella-table.red.png",
+      "anchor": [
+        56,
+        129
+      ]
+    },
+    "umbrella-table.teal": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "umbrella-table.teal.png",
+      "anchor": [
+        56,
+        129
+      ]
+    },
+    "vending-machine": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "sw": {
+          "file": "vending-machine.sw.png",
+          "anchor": [
+            32,
+            62
+          ]
+        },
+        "ne": {
+          "file": "vending-machine.ne.png",
+          "anchor": [
+            32,
+            68
+          ]
+        }
+      },
+      "light": {
+        "x": 22,
+        "y": 30,
+        "r": 30
+      }
+    },
+    "whiteboard": {
+      "footprint": [
+        3,
+        1
+      ],
+      "fit": "anchor",
+      "file": "whiteboard.png",
+      "anchor": [
+        0,
+        0
+      ],
+      "wall": {
+        "v": [
+          16,
+          48
+        ],
+        "margin": 0.08
+      }
+    },
+    "workbench": {
+      "footprint": [
+        2,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "sw": {
+          "file": "workbench.sw.png",
+          "anchor": [
+            32,
+            47
+          ]
+        },
+        "ne": {
+          "file": "workbench.ne.png",
+          "anchor": [
+            32,
+            32
+          ]
+        }
+      }
     }
   }
 }

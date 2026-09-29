@@ -4,20 +4,22 @@
  */
 import type { Bootstrap, PublicConfig } from '@shared/api';
 import type { AvatarLoadout, PresenceStatus, SavedOutfit } from '@shared/domain/types';
-import type { KnockKind, KnockReply, Occupant, ServerMsg } from '@shared/protocol';
+import type { KnockKind, KnockReply, NpcState, Occupant, ServerMsg } from '@shared/protocol';
 import type { EmoteId } from '@shared/presence';
 import { EMOTE_IDS } from '@shared/presence';
 import { getScene, TOWN_ID, buildingForRoom } from '@shared/world';
 import { livedScene } from '@shared/world/lived';
 import { DECOR_BY_ID, decorObject, placementProblem } from '@shared/world/decor';
 import type { SceneObject } from '@shared/world/scene';
-import { isSeat } from '@shared/world/scene';
+import { seatSpotAt, seatSpots } from '@shared/world/seats';
+import { approach } from '@shared/world/interact';
 import { WalkGrid } from '@shared/world/walkGrid';
 import { findPath, type Tile } from '@shared/world/pathfinding';
 import { heldDelta, KEY_DIRS, planHeldWalk, type ScreenDir } from '@shared/world/heldWalk';
 import { WorldView, type BuildingBadge } from '../engine/WorldView';
 import { loadArt } from '../engine/sprites/art';
 import { clearSpriteCache } from '../engine/sprites/registry';
+import { setWorldClock } from '../engine/weather';
 import { api, ApiError, setActivityTransport } from './api';
 import { Realtime } from './socket';
 import { getState, loadLocal, persistLocal, setState, toast } from './store';
@@ -40,6 +42,8 @@ class Game {
   meId = '';
   private grids = new Map<string, WalkGrid>();
   private lastScene: { sceneId: string; occupants: Occupant[] } | null = null;
+  /** The current room's NPCs as the server last told us (kept across scene reloads). */
+  private npcStates = new Map<string, NpcState>();
   private sceneWaiters = new Map<string, Array<() => void>>();
   private arrival: { goal: Tile; then: () => void; started: number } | null = null;
   /** Our recently sent paths, so the server's echo of them doesn't restart our own walk. */
@@ -105,6 +109,7 @@ class Game {
 
   begin(boot: Bootstrap) {
     this.meId = boot.me.id;
+    setWorldClock({ timeZone: boot.org.timezone });
     const local = loadLocal(boot.me.id);
     const isNew = daysSinceStart(boot.me.startDate) <= 1 && !localStorage.getItem(`mw.welcomed.${boot.me.id}`);
     setState({
@@ -127,6 +132,7 @@ class Game {
   async refreshBoot() {
     try {
       const boot = await api<Bootstrap>('/bootstrap');
+      setWorldClock({ timeZone: boot.org.timezone });
       setState({ boot, membersById: new Map(boot.members.map((m) => [m.id, m])), events: boot.events });
       this.refreshBadges();
     } catch {
@@ -205,6 +211,7 @@ class Game {
     switch (m.t) {
       case 'welcome':
         this.world?.setServerOffset(this.rt!.serverOffset);
+        setWorldClock({ offsetMs: this.rt!.serverOffset });
         setState({ directory: Object.fromEntries(m.directory.map((d) => [d.memberId, d])) });
         this.refreshBadges();
         this.rt!.send({ t: 'enter', sceneId: getState().sceneId ?? this.initialScene });
@@ -212,6 +219,7 @@ class Game {
       case 'scene':
         this.world?.setObjStates(m.states);
         this.sceneStates = m.states;
+        this.npcStates = new Map((m.npcs ?? []).map((n) => [n.id, n]));
         this.loadScene(m.sceneId, m.occupants);
         break;
       case 'objstate':
@@ -239,6 +247,16 @@ class Game {
         if (m.memberId === this.meId && this.ownPaths.includes(pathKey(m.path))) break;
         w?.move(m.memberId, m.path, m.startedAt);
         break;
+      case 'moment':
+        if (m.sceneId === getState().sceneId) w?.playObject(m.objectId, m.what);
+        break;
+      case 'npc': {
+        const scene = m.sceneId === getState().sceneId ? this.scene(m.sceneId) : undefined;
+        if (!scene) break;
+        this.npcStates.set(m.npc.id, m.npc);
+        w?.updateNpc(scene, m.npc);
+        break;
+      }
       case 'updated':
         if (m.memberId === this.meId && m.patch.carrying && m.patch.carrying !== getState().occupants[this.meId]?.carrying)
           toast(m.patch.carrying === 'coffee' ? '☕ Freshly pulled — enjoy your coffee.' : 'Enjoy!', 'social', undefined, 3000);
@@ -344,6 +362,7 @@ class Game {
         bannerText: ev ? ev.title : undefined,
         party: !!ev && ev.decor === 'balloons',
       });
+      this.world.setNpcs(scene, [...this.npcStates.values()]);
       this.refreshBadges();
     }
     this.sceneWaiters.get(sceneId)?.forEach((r) => r());
@@ -449,7 +468,8 @@ class Game {
     const grid = this.grid(sceneId);
     const start = this.world.actorTile(this.meId);
     if (!grid || !start) return false;
-    const seat = getScene(sceneId)?.objects.some((o) => isSeat(o) && o.x === goal[0] && o.y === goal[1]);
+    const lived = this.scene(sceneId);
+    const seat = !!lived && !!seatSpotAt(lived, goal[0], goal[1]);
     let target = goal;
     if (!grid.walkable(goal[0], goal[1]) && !seat) {
       const n = grid.nearestWalkable(goal[0], goal[1], 3);
@@ -600,8 +620,24 @@ class Game {
   /* ------------------------------------------------------------------ objects & people */
 
   selectMember(id: string, p: { x: number; y: number }) {
+    if (id.startsWith('npc:')) {
+      const sceneId = getState().sceneId;
+      if (sceneId) setState({ selection: { kind: 'npc', sceneId, npcId: id.slice(4), x: p.x, y: p.y } });
+      this.world?.setSelected(id);
+      return;
+    }
     setState({ selection: { kind: 'member', id, x: p.x, y: p.y } });
     this.world?.setSelected(id);
+  }
+
+  /** Order from whatever an NPC runs (the barista's espresso machine). */
+  orderFrom(sceneId: string, npcId: string) {
+    const scene = this.scene(sceneId);
+    const npc = scene?.npcs?.find((n) => n.id === npcId);
+    const machine = npc?.serves ? scene?.objects.find((o) => o.sprite === npc.serves && o.actions?.some((a) => a.kind === 'vend')) : undefined;
+    if (!machine) return;
+    setState({ selection: null });
+    this.useObject(machine, () => this.rt?.send({ t: 'carry', objectId: machine.id }));
   }
 
   private onObjectClick(o: SceneObject, p: { x: number; y: number }) {
@@ -614,7 +650,8 @@ class Game {
     const kinds = new Set(o.actions?.map((a) => a.kind));
     if (kinds.has('exit')) return this.exitToTown();
     if (kinds.has('ring')) {
-      this.walkTo([o.x, o.y], () => {
+      this.useObject(o, () => {
+        this.rt?.send({ t: 'ring', objectId: o.id });
         this.emote('celebrate');
         this.say('🔔 Ding ding!');
       });
@@ -625,8 +662,8 @@ class Game {
       return;
     }
     if (kinds.has('vend')) {
-      // Like the real thing: walk up to the machine, then it's yours to carry around.
-      this.walkTo([o.x, o.y], () => this.rt?.send({ t: 'carry', objectId: o.id }));
+      // Like the real thing: walk up to the counter in front of the machine and order.
+      this.useObject(o, () => this.rt?.send({ t: 'carry', objectId: o.id }));
       return;
     }
     if (kinds.has('sit')) {
@@ -636,12 +673,54 @@ class Game {
         return;
       }
       if (!kinds.has('artifact')) {
-        this.walkTo([o.x, o.y], () => this.rt?.send({ t: 'sit', objectId: o.id }));
+        this.sitOn(o);
         return;
       }
     }
     if (kinds.has('artifact')) this.quest('artifact');
     setState({ selection: { kind: 'object', sceneId, objectId: o.id, x: p.x, y: p.y } });
+  }
+
+  /** Walk to where something is used from (in front of it, never behind a bar), face it, then act. */
+  private useObject(o: SceneObject, then: () => void) {
+    const sceneId = getState().sceneId;
+    const grid = sceneId ? this.grid(sceneId) : undefined;
+    const me = this.world?.actorTile(this.meId);
+    if (!grid || !me || !this.world) return;
+    const way = approach(grid, me, o);
+    if (!way) {
+      toast('Can’t get there from here.');
+      return;
+    }
+    const done = () => {
+      this.world?.faceObject(this.meId, o);
+      then();
+    };
+    this.arrival = { goal: way.tile, then: done, started: Date.now() };
+    if (way.path.length === 1) {
+      this.checkArrival();
+      return;
+    }
+    this.keyWalking = false;
+    this.sendOwnPath(way.path, this.serverNow());
+    this.world.showDestination(way.tile);
+  }
+
+  /** Walk to the nearest free spot on a seat (a couch has one per cushion) and sit down there. */
+  private sitOn(o: SceneObject) {
+    const sceneId = getState().sceneId;
+    const scene = sceneId ? this.scene(sceneId) : undefined;
+    const me = this.world?.actorTile(this.meId);
+    if (!scene || !me) return;
+    const occ = Object.values(getState().occupants);
+    const free = seatSpots(o, scene).filter((s) => !occ.some((p) => p.memberId !== this.meId && p.sittingOn === o.id && p.x === s.x && p.y === s.y));
+    if (!free.length) {
+      toast('Someone’s already sitting there.', 'info', undefined, 2500);
+      return;
+    }
+    free.sort((a, b) => Math.hypot(a.x - me[0], a.y - me[1]) - Math.hypot(b.x - me[0], b.y - me[1]));
+    const spot = free[0];
+    this.walkTo([spot.x, spot.y], () => this.rt?.send({ t: 'sit', objectId: o.id }));
   }
 
   private onObjectActivate(o: SceneObject) {

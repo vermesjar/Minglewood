@@ -1,0 +1,224 @@
+{
+  "name": "launch",
+  "tile": 200,
+  "colors": 30,
+  "quality": "medium",
+  "mood": "Launch Lab, Project Aurora's war room: mission control meets a maker workshop. Clean white tiles, deep navy, safety orange accents, cream paper, rocket motifs, a sense of countdown.",
+  "sheets": [
+    {
+      "name": "war-room",
+      "grid": "2x1",
+      "size": "1536x1024",
+      "tile": 180,
+      "items": [
+        {
+          "key": "table-long",
+          "w": 4,
+          "d": 2,
+          "h": 22,
+          "width": 192,
+          "fit": "diamond",
+          "prompt": "A long white war-room conference table four tiles long and two tiles deep on navy steel legs. On top: open laptops, scattered printouts and sticky notes, two coffee cups, a small orange rocket model and a cable tray down the middle. ONLY the table: absolutely NO chairs, no stools, no people around it.",
+          "facing": "sw"
+        },
+        {
+          "key": "rocket-model",
+          "w": 1,
+          "d": 1,
+          "h": 50,
+          "width": 40,
+          "fill": 0.45,
+          "prompt": "A tall hand-built cardboard model rocket painted white with a red nose cone and orange fins, covered in black marker signatures and stickers, standing on a plywood launch stand.",
+          "facing": "se"
+        }
+      ],
+      "note": "Draw only the objects listed. The table stands alone with empty floor all around it."
+    },
+    {
+      "name": "wall",
+      "kind": "wall",
+      "grid": "2x1",
+      "size": "1536x1024",
+      "items": [
+        {
+          "key": "kanban",
+          "span": 4,
+          "wall": {
+            "v": [
+              16,
+              48
+            ],
+            "margin": 0.08
+          },
+          "prompt": "A wide kanban board, about 3.8 : 1: a white board with three navy column headers (no text) and rows of yellow, pink and green sticky notes, a few cards with orange checkmarks, a paper rocket taped in the corner."
+        },
+        {
+          "key": "frame.hackathon",
+          "span": 1,
+          "wall": {
+            "v": [
+              22,
+              44
+            ],
+            "margin": 0.14
+          },
+          "prompt": "A small framed photo, portrait 2:3, in a thin navy frame: three tiny happy people holding up a giant cardboard trophy at a hackathon, laptops and pizza boxes behind them."
+        }
+      ]
+    },
+    {
+      "name": "mission",
+      "kind": "wall",
+      "grid": "1x1",
+      "size": "1536x1024",
+      "items": [
+        {
+          "key": "screen.countdown",
+          "span": 2,
+          "wall": {
+            "v": [
+              28,
+              44
+            ],
+            "margin": 0.06
+          },
+          "prompt": "A wide wall-mounted mission-control screen, about 2 : 1, in a slim navy bezel: a dark navy display with a glowing orange launch trajectory arc from a small rocket icon up to a star, a big circular countdown ring in orange and white segments on the right, thin grid lines and tiny status dots (no letters or numbers)."
+        }
+      ]
+    },
+    {
+      "name": "workshop",
+      "grid": "2x2",
+      "items": [
+        {
+          "key": "workbench",
+          "facing": "sw",
+          "w": 2,
+          "d": 1,
+          "h": 30,
+          "width": 96,
+          "fit": "diamond",
+          "prompt": "A sturdy maker's workbench two tiles long in pale plywood on navy steel legs: a small 3D printer printing a white rocket fin, a soldering iron in its stand, a green circuit board, a bench vise, a tape measure and a few tools laid out neatly, a spool of orange filament. Its working side faces along the red arrow."
+        },
+        {
+          "key": "workbench",
+          "facing": "ne",
+          "w": 2,
+          "d": 1,
+          "h": 30,
+          "width": 96,
+          "fit": "diamond",
+          "prompt": "The SAME plywood-and-navy-steel maker's workbench seen from behind: a plain plywood back panel with a power strip, the back of the 3D printer and the orange filament spool on top."
+        },
+        {
+          "key": "parts-rack",
+          "facing": "sw",
+          "w": 1,
+          "d": 1,
+          "h": 50,
+          "width": 60,
+          "fit": "diamond",
+          "prompt": "A tall navy steel shelving rack with four shelves of clear storage bins holding bolts and parts, spare white rocket fins and nose cones, spools of orange and white filament, a safety-orange toolbox on the bottom shelf. Its open front faces along the red arrow."
+        },
+        {
+          "key": "parts-rack",
+          "facing": "ne",
+          "w": 1,
+          "d": 1,
+          "h": 50,
+          "width": 60,
+          "fit": "diamond",
+          "prompt": "The SAME navy steel shelving rack seen from behind: the backs of the storage bins, filament spools and the toolbox through the open shelves."
+        }
+      ]
+    },
+    {
+      "name": "back-table-long",
+      "grid": "1x1",
+      "size": "1024x1024",
+      "tile": 300,
+      "refs": [
+        "out/launch/war-room/table-long.sw.raw.png"
+      ],
+      "note": "The second reference image shows this exact war-room table. Draw the SAME war-room table from the OPPOSITE side, turned half way round: the same shape, size, colours and pixel style, with everything on it seen from the other side (what was on the left is now on the right, what was at the back is now at the front). Its long side still runs from the upper left to the lower right.",
+      "items": [
+        {
+          "key": "table-long",
+          "w": 4,
+          "d": 2,
+          "h": 22,
+          "width": 192,
+          "fit": "diamond",
+          "facing": "ne",
+          "prompt": "The war-room table from the reference, seen from the other side."
+        }
+      ]
+    },
+    {
+      "name": "back-rocket-model",
+      "grid": "1x1",
+      "size": "1024x1024",
+      "tile": 300,
+      "refs": [
+        "out/launch/war-room/rocket-model.se.raw.png"
+      ],
+      "note": "The second reference image shows this exact cardboard model rocket on its plywood launch stand. Draw the SAME cardboard model rocket on its plywood launch stand seen from the other side, turned half way round: same shape, size, colours and pixel style.",
+      "items": [
+        {
+          "key": "rocket-model",
+          "w": 1,
+          "d": 1,
+          "h": 50,
+          "width": 40,
+          "fill": 0.45,
+          "facing": "nw",
+          "prompt": "The cardboard model rocket on its plywood launch stand from the reference, seen from the other side."
+        }
+      ]
+    },
+    {
+      "name": "wall2",
+      "kind": "wall",
+      "grid": "3x1",
+      "size": "1536x1024",
+      "items": [
+        {
+          "key": "mission-patches",
+          "span": 1,
+          "wall": {
+            "v": [
+              26,
+              50
+            ],
+            "margin": 0.12
+          },
+          "prompt": "A deep navy shadow-box frame, portrait 3:4, holding six round embroidered mission patches in two columns: rockets, stars, a lake, a small planet, each with orange, white and gold stitching (no letters)."
+        },
+        {
+          "key": "star-map",
+          "span": 2,
+          "wall": {
+            "v": [
+              16,
+              48
+            ],
+            "margin": 0.06
+          },
+          "prompt": "A wide framed star chart, about 2 : 1, in a thin brass frame: a deep navy sky with fine gold constellation lines joining white stars, a curved orbit path in orange with a tiny rocket icon on it, a small compass rose in the corner (no letters)."
+        },
+        {
+          "key": "clock-wall",
+          "span": 1,
+          "wall": {
+            "v": [
+              28,
+              46
+            ],
+            "margin": 0.16
+          },
+          "prompt": "A round industrial wall clock with a navy steel rim, a cream face with bold black tick marks and an orange second hand (no numbers)."
+        }
+      ]
+    }
+  ]
+}

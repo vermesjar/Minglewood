@@ -1,0 +1,218 @@
+{
+  "name": "design",
+  "tile": 200,
+  "colors": 30,
+  "quality": "medium",
+  "mood": "Design Loft: a sunlit creative loft. Warm light oak planks, cream walls, terracotta and mustard accents, paint, paper, fabric swatches, trailing plants. Airy, tactile, playful.",
+  "sheets": [
+    {
+      "name": "studio",
+      "grid": "3x2",
+      "items": [
+        {
+          "key": "easel",
+          "facing": "se",
+          "w": 1,
+          "d": 1,
+          "h": 50,
+          "width": 46,
+          "fill": 0.45,
+          "prompt": "A light oak studio easel holding a canvas with a bright abstract painting of terracotta and mustard shapes, a small paint-smeared tray. The painting faces along the red arrow."
+        },
+        {
+          "key": "easel",
+          "facing": "nw",
+          "w": 1,
+          "d": 1,
+          "h": 50,
+          "width": 46,
+          "fill": 0.45,
+          "prompt": "The SAME light oak studio easel seen from behind: the back of the canvas stretcher frame, the oak legs."
+        },
+        {
+          "key": "easel.b",
+          "facing": "se",
+          "w": 1,
+          "d": 1,
+          "h": 50,
+          "width": 46,
+          "fill": 0.45,
+          "prompt": "A light oak studio easel holding a large sketchpad with a pencil drawing of a character and color notes, clips at the top. The sketchpad faces along the red arrow."
+        },
+        {
+          "key": "desk.light",
+          "facing": "sw",
+          "w": 2,
+          "d": 1,
+          "h": 26,
+          "width": 96,
+          "fit": "diamond",
+          "prompt": "A light oak designer's desk two tiles long with white metal legs: a large monitor showing a colorful layout, a drawing tablet with a pen, a jar of markers, a swatch book and a small plant. The screen faces along the red arrow."
+        },
+        {
+          "key": "desk.light",
+          "facing": "ne",
+          "w": 2,
+          "d": 1,
+          "h": 26,
+          "width": 96,
+          "fit": "diamond",
+          "prompt": "The SAME light oak designer's desk seen from behind: the white back of the monitor, the jar of markers, white metal legs."
+        },
+        {
+          "key": "easel.b",
+          "facing": "nw",
+          "w": 1,
+          "d": 1,
+          "h": 50,
+          "width": 46,
+          "fill": 0.45,
+          "prompt": "A light oak studio easel seen from behind: the cardboard back of a large sketchpad clipped to it, the oak legs."
+        }
+      ]
+    },
+    {
+      "name": "worktable",
+      "grid": "1x1",
+      "size": "1536x1024",
+      "tile": 190,
+      "items": [
+        {
+          "key": "table-long.light",
+          "w": 3,
+          "d": 2,
+          "h": 24,
+          "width": 160,
+          "fit": "diamond",
+          "prompt": "A big light oak worktable three tiles long and two deep on trestle legs: unrolled paper with sketches, a green cutting mat, fabric and paint swatches, a jar of brushes, markers, a coffee cup and a small potted plant.",
+          "facing": "sw"
+        }
+      ]
+    },
+    {
+      "name": "wall",
+      "kind": "wall",
+      "grid": "2x1",
+      "size": "1536x1024",
+      "items": [
+        {
+          "key": "moodboard",
+          "span": 4,
+          "wall": {
+            "v": [
+              16,
+              48
+            ],
+            "margin": 0.06
+          },
+          "prompt": "A wide cork moodboard, about 3.8 : 1, in a light oak frame: pinned photos of warm interiors and plants, fabric swatches in terracotta, mustard and sage, torn magazine pages, a few color chips and a dried flower (no readable text)."
+        },
+        {
+          "key": "swatches",
+          "span": 3,
+          "wall": {
+            "v": [
+              20,
+              46
+            ],
+            "margin": 0.08
+          },
+          "prompt": "A row of large painted color swatch cards pinned to the wall with brass pins, about 2.8 : 1: terracotta, mustard, sage, cobalt, lilac and ink-plum, each with a small white label strip (no text)."
+        }
+      ]
+    },
+    {
+      "name": "studio2",
+      "grid": "3x2",
+      "items": [
+        {
+          "key": "dress-form",
+          "facing": "se",
+          "w": 1,
+          "d": 1,
+          "h": 50,
+          "width": 34,
+          "fill": 0.4,
+          "prompt": "A dress form mannequin on a turned oak stand with a tripod foot, draped with a half-finished mustard linen jacket pinned together, a tape measure over the shoulders. It faces along the red arrow."
+        },
+        {
+          "key": "dress-form",
+          "facing": "nw",
+          "w": 1,
+          "d": 1,
+          "h": 50,
+          "width": 34,
+          "fill": 0.4,
+          "prompt": "The SAME dress form with the mustard linen jacket seen from behind: the back of the jacket with pins along the seam, the tape measure hanging down the back, the oak tripod stand."
+        },
+        {
+          "key": "plan-chest",
+          "facing": "sw",
+          "w": 1,
+          "d": 1,
+          "h": 24,
+          "width": 62,
+          "fit": "diamond",
+          "prompt": "A low wide light-oak plan chest with five shallow drawers and brass cup handles, rolled paper plans, a jar of pencils and a small cactus on top. Its drawers face along the red arrow."
+        },
+        {
+          "key": "plan-chest",
+          "facing": "ne",
+          "w": 1,
+          "d": 1,
+          "h": 24,
+          "width": 62,
+          "fit": "diamond",
+          "prompt": "The SAME light-oak plan chest seen from behind: its plain oak back panel, the rolled plans and pencil jar on top."
+        },
+        {
+          "key": "lamp-arc",
+          "w": 1,
+          "d": 1,
+          "h": 60,
+          "width": 52,
+          "fill": 0.3,
+          "extra": {
+            "light": {
+              "x": 40,
+              "y": 12,
+              "r": 44
+            }
+          },
+          "prompt": "A tall mid-century arc floor lamp: a heavy round white marble base, a long curved brass arm, and a large dome shade in terracotta enamel glowing warmly from underneath."
+        },
+        {
+          "key": "plant.pothos",
+          "w": 1,
+          "d": 1,
+          "h": 24,
+          "width": 34,
+          "fill": 0.4,
+          "prompt": "A terracotta pot on short legs with a lush trailing pothos plant spilling over its rim."
+        }
+      ]
+    },
+    {
+      "name": "back-table-long-light",
+      "grid": "1x1",
+      "size": "1024x1024",
+      "tile": 300,
+      "refs": [
+        "out/design/worktable/table-long.light.sw.raw.png"
+      ],
+      "note": "The second reference image shows this exact light oak worktable. Draw the SAME light oak worktable from the OPPOSITE side, turned half way round: the same shape, size, colours and pixel style, with everything on it seen from the other side (what was on the left is now on the right, what was at the back is now at the front). Its long side still runs from the upper left to the lower right.",
+      "items": [
+        {
+          "key": "table-long.light",
+          "w": 3,
+          "d": 2,
+          "h": 24,
+          "width": 160,
+          "fit": "diamond",
+          "facing": "ne",
+          "prompt": "The light oak worktable from the reference, seen from the other side."
+        }
+      ]
+    }
+  ]
+}

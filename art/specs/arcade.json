@@ -1,0 +1,383 @@
+{
+  "name": "arcade",
+  "tile": 200,
+  "colors": 32,
+  "quality": "medium",
+  "mood": "Pixel Pier Arcade: a neon night arcade on the pier. Deep indigo and midnight purple, hot magenta and electric cyan neon glow, chrome trim, glossy screens. Playful, glowing, retro-futurist.",
+  "sheets": [
+    {
+      "name": "cabinets",
+      "grid": "3x2",
+      "note": "The five arcade cabinets are the SAME cabinet design in different colors, all the same size and shape.",
+      "items": [
+        {
+          "key": "arcade-cabinet.pink",
+          "facing": "sw",
+          "w": 1,
+          "d": 1,
+          "h": 50,
+          "width": 52,
+          "fill": 0.7,
+          "prompt": "A classic upright arcade cabinet in glossy hot-pink with chrome trim: a glowing marquee on top (no text), a bright screen showing a colorful pixel game, a joystick and two round buttons on the control panel, a coin door below. Its screen faces along the red arrow.",
+          "extra": {
+            "light": {
+              "x": 26,
+              "y": 30,
+              "r": 26
+            }
+          },
+          "also": [
+            "arcade-cabinet"
+          ]
+        },
+        {
+          "key": "arcade-cabinet.cyan",
+          "facing": "sw",
+          "w": 1,
+          "d": 1,
+          "h": 50,
+          "width": 52,
+          "fill": 0.7,
+          "prompt": "The SAME upright arcade cabinet in glossy electric-cyan with chrome trim, glowing marquee, bright pixel-game screen, joystick and buttons. Its screen faces along the red arrow.",
+          "extra": {
+            "light": {
+              "x": 26,
+              "y": 30,
+              "r": 26
+            }
+          }
+        },
+        {
+          "key": "arcade-cabinet.lime",
+          "facing": "sw",
+          "w": 1,
+          "d": 1,
+          "h": 50,
+          "width": 52,
+          "fill": 0.7,
+          "prompt": "The SAME upright arcade cabinet in glossy lime-green with chrome trim, glowing marquee, bright pixel-game screen, joystick and buttons. Its screen faces along the red arrow.",
+          "extra": {
+            "light": {
+              "x": 26,
+              "y": 30,
+              "r": 26
+            }
+          }
+        },
+        {
+          "key": "arcade-cabinet.orange",
+          "facing": "sw",
+          "w": 1,
+          "d": 1,
+          "h": 50,
+          "width": 52,
+          "fill": 0.7,
+          "prompt": "The SAME upright arcade cabinet in glossy tangerine-orange with chrome trim, glowing marquee, bright pixel-game screen, joystick and buttons. Its screen faces along the red arrow.",
+          "extra": {
+            "light": {
+              "x": 26,
+              "y": 30,
+              "r": 26
+            }
+          }
+        },
+        {
+          "key": "arcade-cabinet.gold",
+          "facing": "sw",
+          "w": 1,
+          "d": 1,
+          "h": 50,
+          "width": 52,
+          "fill": 0.7,
+          "prompt": "The SAME upright arcade cabinet as a champion edition in gleaming gold with black lacquer panels and chrome trim, a glowing marquee with a tiny crown icon, bright pixel-game screen, joystick and buttons. Its screen faces along the red arrow.",
+          "extra": {
+            "light": {
+              "x": 26,
+              "y": 30,
+              "r": 26
+            }
+          }
+        },
+        {
+          "key": "arcade-cabinet",
+          "facing": "ne",
+          "w": 1,
+          "d": 1,
+          "h": 50,
+          "width": 52,
+          "fill": 0.7,
+          "prompt": "The SAME upright arcade cabinet seen from behind in glossy midnight purple: its back panel with vents, a power cable and a small service door.",
+          "also": [
+            "arcade-cabinet.pink",
+            "arcade-cabinet.cyan",
+            "arcade-cabinet.lime",
+            "arcade-cabinet.orange",
+            "arcade-cabinet.gold"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "lounge",
+      "grid": "3x1",
+      "size": "1536x1024",
+      "items": [
+        {
+          "key": "pool-table",
+          "w": 3,
+          "d": 2,
+          "h": 22,
+          "width": 160,
+          "fit": "diamond",
+          "prompt": "A pool table three tiles long and two deep: bright green felt, dark mahogany rails with brass corner pockets, carved legs, racked colorful balls, a cue ball and a cue lying on top.",
+          "facing": "sw"
+        },
+        {
+          "key": "couch.purple",
+          "facing": "sw",
+          "w": 2,
+          "d": 1,
+          "h": 26,
+          "width": 96,
+          "fit": "diamond",
+          "prompt": "A curvy retro two-seat sofa in glossy purple vinyl with chrome legs and a magenta piping trim.",
+          "extra": {
+            "seat": 12
+          }
+        },
+        {
+          "key": "couch.purple",
+          "facing": "ne",
+          "w": 2,
+          "d": 1,
+          "h": 26,
+          "width": 96,
+          "fit": "diamond",
+          "prompt": "The SAME curvy purple vinyl retro sofa seen from behind: its glossy rounded back, chrome legs.",
+          "extra": {
+            "seat": 12
+          }
+        }
+      ]
+    },
+    {
+      "name": "games",
+      "grid": "3x2",
+      "items": [
+        {
+          "key": "jukebox",
+          "facing": "sw",
+          "w": 1,
+          "d": 1,
+          "h": 44,
+          "width": 50,
+          "fill": 0.6,
+          "extra": {
+            "light": {
+              "x": 25,
+              "y": 30,
+              "r": 30
+            }
+          },
+          "prompt": "A retro 1950s jukebox: a rounded arch top with glowing neon tubes in magenta and cyan, a chrome grille, a window showing records, rows of glowing selection buttons, a wood-and-chrome body. Its front faces along the red arrow."
+        },
+        {
+          "key": "jukebox",
+          "facing": "ne",
+          "w": 1,
+          "d": 1,
+          "h": 44,
+          "width": 50,
+          "fill": 0.6,
+          "prompt": "The SAME retro neon jukebox seen from behind: its rounded wooden back panel with vents and a power cord, a hint of neon glow at the edges."
+        },
+        {
+          "key": "claw-machine",
+          "facing": "sw",
+          "w": 1,
+          "d": 1,
+          "h": 52,
+          "width": 52,
+          "fill": 0.7,
+          "extra": {
+            "light": {
+              "x": 26,
+              "y": 22,
+              "r": 26
+            }
+          },
+          "prompt": "A prize claw machine: a glass box full of cute plush toys (a star, a duck, a cat) with a chrome claw hanging from a gantry, a glowing pink marquee on top (no text), a control panel with a joystick and a big button, a prize chute below. Its front faces along the red arrow."
+        },
+        {
+          "key": "claw-machine",
+          "facing": "ne",
+          "w": 1,
+          "d": 1,
+          "h": 52,
+          "width": 52,
+          "fill": 0.7,
+          "prompt": "The SAME claw machine seen from behind: its glass box with the plush toys visible through it, the back of the pink marquee, a plain panelled base."
+        },
+        {
+          "key": "air-hockey",
+          "w": 2,
+          "d": 1,
+          "h": 20,
+          "width": 96,
+          "fit": "diamond",
+          "prompt": "An air hockey table two tiles long: a glossy white playfield with a cyan centre line and circles, magenta and cyan rails, two paddles and a puck, a glowing LED strip along the sides, on chrome legs.",
+          "facing": "sw"
+        },
+        {
+          "key": "stool.neon",
+          "w": 1,
+          "d": 1,
+          "h": 22,
+          "width": 30,
+          "fill": 0.4,
+          "extra": {
+            "seat": 17
+          },
+          "prompt": "A small round chrome bar stool with a glossy magenta vinyl seat and a chrome foot ring."
+        }
+      ]
+    },
+    {
+      "name": "back-air-hockey",
+      "grid": "1x1",
+      "size": "1024x1024",
+      "tile": 300,
+      "refs": [
+        "out/arcade/games/air-hockey.sw.raw.png"
+      ],
+      "note": "The second reference image shows this exact air hockey table. Draw the SAME air hockey table from the OPPOSITE side, turned half way round: the same shape, size, colours and pixel style, with everything on it seen from the other side (what was on the left is now on the right, what was at the back is now at the front). Its long side still runs from the upper left to the lower right.",
+      "items": [
+        {
+          "key": "air-hockey",
+          "w": 2,
+          "d": 1,
+          "h": 20,
+          "width": 96,
+          "fit": "diamond",
+          "facing": "ne",
+          "prompt": "The air hockey table from the reference, seen from the other side."
+        }
+      ]
+    },
+    {
+      "name": "back-pool-table",
+      "grid": "1x1",
+      "size": "1024x1024",
+      "tile": 300,
+      "refs": [
+        "out/arcade/lounge/pool-table.sw.raw.png"
+      ],
+      "note": "The second reference image shows this exact pool table. Draw the SAME pool table from the OPPOSITE side, turned half way round: the same shape, size, colours and pixel style, with everything on it seen from the other side (what was on the left is now on the right, what was at the back is now at the front). Its long side still runs from the upper left to the lower right.",
+      "items": [
+        {
+          "key": "pool-table",
+          "w": 3,
+          "d": 2,
+          "h": 22,
+          "width": 160,
+          "fit": "diamond",
+          "facing": "ne",
+          "prompt": "The pool table from the reference, seen from the other side."
+        }
+      ]
+    },
+    {
+      "name": "snacks",
+      "grid": "3x2",
+      "items": [
+        {
+          "key": "vending-machine",
+          "facing": "sw",
+          "w": 1,
+          "d": 1,
+          "h": 54,
+          "width": 50,
+          "fit": "diamond",
+          "extra": {
+            "light": {
+              "x": 22,
+              "y": 30,
+              "r": 30
+            }
+          },
+          "prompt": "A retro snack vending machine: a tall glossy magenta cabinet, a big glowing glass front with rows of colorful snacks and soda cans on spiral coils, a lit coin panel and keypad on the right, a pickup flap at the bottom. Its glass front faces along the red arrow."
+        },
+        {
+          "key": "vending-machine",
+          "facing": "ne",
+          "w": 1,
+          "d": 1,
+          "h": 54,
+          "width": 50,
+          "fit": "diamond",
+          "prompt": "The SAME magenta snack vending machine seen from behind: its plain glossy magenta back panel with vents and a power cord, a glow at the edges."
+        },
+        {
+          "key": "prize-counter",
+          "facing": "sw",
+          "w": 2,
+          "d": 1,
+          "h": 26,
+          "width": 96,
+          "fit": "diamond",
+          "extra": {
+            "light": {
+              "x": 48,
+              "y": 30,
+              "r": 34
+            }
+          },
+          "prompt": "An arcade prize counter two tiles long: a glowing glass display case full of prizes (plush toys, a rubber duck, yo-yos, candy, a giant pencil, bouncy balls) on shelves, a chrome and magenta frame, a ticket-counting machine and a bell on top. Its glass front faces along the red arrow."
+        },
+        {
+          "key": "prize-counter",
+          "facing": "ne",
+          "w": 2,
+          "d": 1,
+          "h": 26,
+          "width": 96,
+          "fit": "diamond",
+          "prompt": "The SAME arcade prize counter seen from the attendant's side: open shelves with stacks of prize tickets, a cash drawer, the back of the ticket machine and the bell."
+        },
+        {
+          "key": "table-high.neon",
+          "facing": "se",
+          "also_facings": [
+            "nw"
+          ],
+          "w": 1,
+          "d": 1,
+          "h": 36,
+          "width": 38,
+          "fill": 0.35,
+          "prompt": "A tall round chrome bar table with a glossy black top edged in a glowing cyan neon ring, a basket of fries and two sodas with straws on it."
+        },
+        {
+          "key": "popcorn-cart",
+          "facing": "se",
+          "also_facings": [
+            "nw"
+          ],
+          "w": 1,
+          "d": 1,
+          "h": 50,
+          "width": 42,
+          "fill": 0.45,
+          "extra": {
+            "light": {
+              "x": 21,
+              "y": 20,
+              "r": 26
+            }
+          },
+          "prompt": "A little red-and-gold popcorn cart: a glass cabinet full of fluffy popcorn under a warm light, a red roof with gold trim, striped paper popcorn boxes on the shelf below, big spoked wheels."
+        }
+      ]
+    }
+  ]
+}

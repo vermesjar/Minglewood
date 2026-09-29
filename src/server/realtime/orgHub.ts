@@ -18,6 +18,8 @@ import { allScenes, buildingForRoom, getScene, TOWN_ID } from '@shared/world';
 import { livedScene } from '@shared/world/lived';
 import type { Facing, SceneDef } from '@shared/world/scene';
 import { footprint, isSeat } from '@shared/world/scene';
+import { seatSpotAt, seatSpots, stepOffTiles } from '@shared/world/seats';
+import { NpcDirector } from './npcs';
 import { WalkGrid } from '@shared/world/walkGrid';
 import { findPath, isValidPath, positionAlong, type Tile } from '@shared/world/pathfinding';
 import { sanitizeLoadout } from '@shared/avatar';
@@ -81,6 +83,10 @@ export class OrgHub extends EventEmitter<HubEvents> {
   private beforeQuiet = new Map<string, Pick<PresenceState, 'status' | 'note'>>();
   private directoryDirty = true;
   private timer: NodeJS.Timeout;
+  /** People who work in rooms (the café's barista). */
+  readonly npcs: NpcDirector;
+  /** Orders being made for someone (member → machine), so a second click doesn't order twice. */
+  private ordering = new Map<string, string>();
 
   constructor(
     readonly orgId: string,
@@ -88,11 +94,13 @@ export class OrgHub extends EventEmitter<HubEvents> {
   ) {
     super();
     this.rebuildGrids();
+    this.npcs = new NpcDirector({ scene: (id) => this.scene(id), toScene: (sceneId, msg) => this.toScene(sceneId, msg) });
     this.timer = setInterval(() => this.tick(), 1000);
   }
 
   dispose() {
     clearInterval(this.timer);
+    this.npcs.dispose();
   }
 
   /* ------------------------------------------------------------------ state helpers */
@@ -278,7 +286,13 @@ export class OrgHub extends EventEmitter<HubEvents> {
     for (const c of this.clients.values()) {
       if (c.memberId === memberId) {
         c.sceneId = sceneId;
-        c.send({ t: 'scene', sceneId, occupants: this.actorsIn(sceneId).map((x) => this.occupant(x)), states: this.statesIn(sceneId) });
+        c.send({
+          t: 'scene',
+          sceneId,
+          occupants: this.actorsIn(sceneId).map((x) => this.occupant(x)),
+          states: this.statesIn(sceneId),
+          npcs: this.npcs.statesIn(sceneId),
+        });
       }
     }
     this.toScene(sceneId, { t: 'joined', sceneId, occupant: this.occupant(actor) });
@@ -288,7 +302,8 @@ export class OrgHub extends EventEmitter<HubEvents> {
   }
 
   private arrivalSpot(scene: SceneDef, grid: WalkGrid, fromScene: string | undefined, at?: Tile) {
-    if (at && grid.walkable(at[0], at[1])) return { x: at[0], y: at[1] };
+    // a seat is furniture, but you may arrive straight onto one to sit down (sims, voice channels)
+    if (at && (grid.walkable(at[0], at[1]) || seatSpotAt(scene, at[0], at[1]))) return { x: at[0], y: at[1] };
     if (scene.id === TOWN_ID && fromScene && fromScene !== TOWN_ID) {
       const door = buildingForRoom(fromScene)?.door;
       if (door) return this.freeNear(scene.id, grid, door.x, door.y);
@@ -378,27 +393,45 @@ export class OrgHub extends EventEmitter<HubEvents> {
     this.toScene(a.sceneId, { t: 'moved', memberId: a.memberId, path, startedAt: a.pathStartedAt });
   }
 
+  /** The seat whose spot (any cushion) is at this tile. */
   seatAt(sceneId: string, x: number, y: number) {
-    return this.scene(sceneId)?.objects.find((o) => isSeat(o) && o.x === x && o.y === y);
+    const scene = this.scene(sceneId);
+    return scene ? seatSpotAt(scene, x, y)?.seat : undefined;
   }
 
+  /** Whether every spot on a seat is taken by someone else (a couch seats one per cushion). */
   seatTaken(sceneId: string, objectId: string, except?: string): boolean {
-    return this.actorsIn(sceneId).some((a) => a.sittingOn === objectId && a.memberId !== except);
+    return this.freeSpots(sceneId, objectId, except).length === 0;
   }
 
+  private freeSpots(sceneId: string, objectId: string, except?: string) {
+    const scene = this.scene(sceneId);
+    const seat = scene?.objects.find((o) => o.id === objectId);
+    if (!scene || !seat) return [];
+    const sitters = this.actorsIn(sceneId).filter((a) => a.sittingOn === objectId && a.memberId !== except);
+    return seatSpots(seat, scene).filter((s) => !sitters.some((a) => a.x === s.x && a.y === s.y));
+  }
+
+  /**
+   * Sit on the nearest free spot of a seat. You must be at it: standing next to it, or arriving on it as the
+   * last step of a walk.
+   */
   sit(memberId: string, objectId: string): boolean {
     const a = this.actors.get(memberId);
     if (!a) return false;
     const seat = this.scene(a.sceneId)?.objects.find((o) => o.id === objectId && isSeat(o));
-    if (!seat || this.seatTaken(a.sceneId, objectId, memberId)) return false;
+    if (!seat) return false;
     const pos = this.position(a);
-    if (Math.hypot(pos.x - seat.x, pos.y - seat.y) > 1.6) return false;
+    const spot = this.freeSpots(a.sceneId, objectId, memberId)
+      .map((s) => ({ s, d: Math.hypot(pos.x - s.x, pos.y - s.y) }))
+      .sort((p, q) => p.d - q.d)[0];
+    if (!spot || spot.d > 1.6) return false;
     a.path = undefined;
     a.pathStartedAt = undefined;
-    a.x = seat.x;
-    a.y = seat.y;
+    a.x = spot.s.x;
+    a.y = spot.s.y;
     a.sittingOn = seat.id;
-    a.facing = seat.facing ?? a.facing;
+    a.facing = spot.s.facing;
     this.toScene(a.sceneId, {
       t: 'updated',
       memberId,
@@ -414,22 +447,48 @@ export class OrgHub extends EventEmitter<HubEvents> {
   carry(memberId: string, objectId: string | null): boolean {
     const a = this.actors.get(memberId);
     if (!a) return false;
-    let item: string | undefined;
-    if (objectId) {
-      const o = this.scene(a.sceneId)?.objects.find((x) => x.id === objectId);
-      const vend = o?.actions?.find((x) => x.kind === 'vend');
-      if (!o || !vend || vend.kind !== 'vend' || !(CARRYABLE as readonly string[]).includes(vend.item)) return false;
-      const pos = this.position(a);
-      const f = footprint(o);
-      const dx = Math.max(f.x0 - pos.x, 0, pos.x - (f.x1 - 1));
-      const dy = Math.max(f.y0 - pos.y, 0, pos.y - (f.y1 - 1));
-      if (Math.hypot(dx, dy) > 1.6) return false;
-      item = vend.item;
+    if (!objectId) {
+      this.carrying.delete(memberId);
+      this.toScene(a.sceneId, { t: 'updated', memberId, patch: { carrying: null } });
+      return true;
     }
-    if (item) this.carrying.set(memberId, item);
-    else this.carrying.delete(memberId);
-    this.toScene(a.sceneId, { t: 'updated', memberId, patch: { carrying: item ?? null } });
+    const o = this.scene(a.sceneId)?.objects.find((x) => x.id === objectId);
+    const vend = o?.actions?.find((x) => x.kind === 'vend');
+    if (!o || !vend || vend.kind !== 'vend' || !(CARRYABLE as readonly string[]).includes(vend.item)) return false;
+    const pos = this.position(a);
+    const f = footprint(o);
+    const dx = Math.max(f.x0 - pos.x, 0, pos.x - (f.x1 - 1));
+    const dy = Math.max(f.y0 - pos.y, 0, pos.y - (f.y1 - 1));
+    if (Math.hypot(dx, dy) > 1.6) return false;
+    if (this.ordering.has(memberId)) return true; // already being made
+    this.faceToward(a, o);
+    this.toScene(a.sceneId, { t: 'updated', memberId, patch: { facing: a.facing } });
+    const item = vend.item;
+    const handOver = () => {
+      this.ordering.delete(memberId);
+      const now = this.actors.get(memberId);
+      if (!now) return;
+      this.carrying.set(memberId, item);
+      this.toScene(now.sceneId, { t: 'updated', memberId, patch: { carrying: item } });
+    };
+    // Someone works this machine (the café's barista): they make it, then hand it over.
+    if (this.npcs.serverFor(a.sceneId, o)) {
+      this.ordering.set(memberId, o.id);
+      this.npcs.serve(a.sceneId, o, memberId, handOver);
+      return true;
+    }
+    this.toScene(a.sceneId, { t: 'moment', sceneId: a.sceneId, objectId: o.id, what: 'brew', by: memberId });
+    handOver();
     return true;
+  }
+
+  /** Turn a standing actor toward an object (you face the machine you order from). */
+  private faceToward(a: Actor, o: { x: number; y: number; w?: number; d?: number }) {
+    const pos = this.position(a);
+    if (pos.moving || a.sittingOn) return;
+    const dx = o.x + (o.w ?? 1) / 2 - 0.5 - pos.x;
+    const dy = o.y + (o.d ?? 1) / 2 - 0.5 - pos.y;
+    a.facing = facingFromDir(dx, dy, a.facing);
   }
 
   statesIn(sceneId: string): Record<string, boolean> {
@@ -451,11 +510,38 @@ export class OrgHub extends EventEmitter<HubEvents> {
     return true;
   }
 
+  /** Ring something you're standing at (the launch bell): everyone in the room sees it swing. */
+  ring(memberId: string, objectId: string): boolean {
+    const a = this.actors.get(memberId);
+    if (!a) return false;
+    const o = this.scene(a.sceneId)?.objects.find((x) => x.id === objectId && x.actions?.some((k) => k.kind === 'ring'));
+    if (!o) return false;
+    const pos = this.position(a);
+    const f = footprint(o);
+    const dx = Math.max(f.x0 - pos.x, 0, pos.x - (f.x1 - 1));
+    const dy = Math.max(f.y0 - pos.y, 0, pos.y - (f.y1 - 1));
+    if (Math.hypot(dx, dy) > 1.6) return false;
+    this.toScene(a.sceneId, { t: 'moment', sceneId: a.sceneId, objectId, what: 'ring', by: memberId });
+    return true;
+  }
+
+  /** Stand up and step off the seat onto the floor in front of it (never left standing in furniture). */
   stand(memberId: string) {
     const a = this.actors.get(memberId);
     if (!a?.sittingOn) return;
+    const scene = this.scene(a.sceneId);
+    const grid = this.grids.get(a.sceneId);
+    const here = scene ? seatSpotAt(scene, a.x, a.y) : null;
     a.sittingOn = undefined;
-    this.toScene(a.sceneId, { t: 'updated', memberId, patch: { sittingOn: undefined } });
+    if (scene && grid && here) {
+      const step = stepOffTiles(here.spot).find(([x, y]) => grid.walkable(x, y));
+      const off = step ? { x: step[0], y: step[1] } : grid.nearestWalkable(a.x, a.y, 2);
+      if (off) {
+        a.x = off.x;
+        a.y = off.y;
+      }
+    }
+    this.toScene(a.sceneId, { t: 'updated', memberId, patch: { sittingOn: undefined, x: a.x, y: a.y } });
   }
 
   /* ------------------------------------------------------------------ presence & social */
@@ -616,6 +702,7 @@ export class OrgHub extends EventEmitter<HubEvents> {
 
   private tick() {
     const now = Date.now();
+    this.npcs.tick();
     // Settle finished paths so snapshots stay compact.
     for (const a of this.actors.values()) this.position(a, now);
     if (this.directoryDirty) {

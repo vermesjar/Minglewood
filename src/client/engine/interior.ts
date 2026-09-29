@@ -146,6 +146,21 @@ interface Rug {
   logo: boolean;
 }
 
+/** Distance from the centre to the edge of a five-pointed star along the direction `theta` (0 = a point). */
+function starRadius(theta: number, R: number, Ri: number): number {
+  const step = Math.PI / 5;
+  const t = ((theta % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+  const k = Math.floor(t / step);
+  const [r0, r1] = k % 2 === 0 ? [R, Ri] : [Ri, R];
+  const x0 = r0 * Math.sin(k * step);
+  const y0 = r0 * Math.cos(k * step);
+  const ex = r1 * Math.sin((k + 1) * step) - x0;
+  const ey = r1 * Math.cos((k + 1) * step) - y0;
+  const dx = Math.sin(t);
+  const dy = Math.cos(t);
+  return (x0 * ey - y0 * ex) / (dx * ey - dy * ex);
+}
+
 function rugColor(r: Rug, gx: number, gy: number, px: number): RGB | null {
   const inset = 0.1;
   const x0 = r.x0 + inset;
@@ -171,7 +186,16 @@ function rugColor(r: Rug, gx: number, gy: number, px: number): RGB | null {
   const ny = (gy - cy) / ((y1 - y0) / 2);
   const m = Math.abs(nx) + Math.abs(ny);
   if (r.logo) {
-    if (m < 0.42) return m > 0.36 ? dark(r.accent, 0.1) : r.accent;
+    // The company star, lying flat on the floor with a point toward the back wall, inside a thin gold ring.
+    const dx = gx - cx;
+    const dy = gy - cy;
+    const pp = (dx - dy) / Math.SQRT2;
+    const qq = -(dx + dy) / Math.SQRT2;
+    const rr = Math.hypot(pp, qq);
+    const R = Math.min(x1 - x0, y1 - y0) * 0.3;
+    const edge = starRadius(Math.atan2(pp, qq), R, R * 0.42);
+    if (rr < edge) return rr > edge - 0.07 ? dark(r.accent, 0.25) : rr < edge * 0.35 ? light(r.accent, 0.2) : r.accent;
+    if (Math.abs(rr - R * 1.22) < 0.035) return r.accent;
   } else {
     if (m < 0.34) return m > 0.28 ? r.border : m < 0.12 ? r.accent : light(r.base, 0.12);
     if (m > 0.4 && m < 0.44) return mixc(r.base, r.accent, 0.45);

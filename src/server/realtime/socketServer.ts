@@ -105,6 +105,9 @@ export function attachSockets(server: Server, store: Store, hubs: Map<string, Or
         case 'toggle':
           hub.toggle(memberId, msg.objectId);
           break;
+        case 'ring':
+          hub.ring(memberId, msg.objectId);
+          break;
         case 'status':
           hub.setStatus(memberId, msg.status, msg.note);
           break;
