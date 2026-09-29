@@ -134,10 +134,10 @@ describe('OrgHub', () => {
     hub.connect(client(a.id));
     hub.enter(a.id, 'cafe', 'live');
     hub.claimReward(a.id, 'ev-jonah-bday');
-    expect(store.member(ORG_ID, a.id)!.unlockedItems).not.toContain('acc.party-hat');
+    expect(store.member(ORG_ID, a.id)!.unlockedItems).not.toContain('hat.party');
     hub.enter(a.id, 'events', 'live');
     hub.claimReward(a.id, 'ev-jonah-bday');
-    expect(store.member(ORG_ID, a.id)!.unlockedItems).toContain('acc.party-hat');
+    expect(store.member(ORG_ID, a.id)!.unlockedItems).toContain('hat.party');
   });
 
   it('sanitizes avatar loadouts against the catalog and unlocks', () => {

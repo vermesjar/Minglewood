@@ -48,6 +48,9 @@ the presence, the discovery, the identity and — over years — the history.
   blocked, and everyone sees changes live.
 - Search/teleport to people, places, teams, projects and events; accessible people directory.
 - Admin: org settings, room ↔ channel bindings, Discord connection, events, audit log.
+- A deep, inclusive wardrobe: faces, 23 hairstyles with two-tone tips, headwear including hijab and
+  turban, eyewear, patterned outfits, held items, pet buddies, wheelchair and cane, any color, one-tap
+  vibes and saved looks for the "vibe of the day". Special items are earned, never sold.
 - Realtime multiplayer; Discord OAuth, membership verification, voice presence, Activity mode.
 
 ## Things we will not build

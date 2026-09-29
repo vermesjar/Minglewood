@@ -3,7 +3,7 @@
  * Product decisions about what an interaction *means* live here.
  */
 import type { Bootstrap, PublicConfig } from '@shared/api';
-import type { AvatarLoadout, PresenceStatus } from '@shared/domain/types';
+import type { AvatarLoadout, PresenceStatus, SavedOutfit } from '@shared/domain/types';
 import type { KnockKind, KnockReply, Occupant, ServerMsg } from '@shared/protocol';
 import type { EmoteId } from '@shared/presence';
 import { EMOTE_IDS } from '@shared/presence';
@@ -622,6 +622,21 @@ class Game {
   async saveAvatar(loadout: AvatarLoadout) {
     await api('/me/avatar', { method: 'PUT', json: loadout });
     this.quest('avatar');
+  }
+
+  async saveOutfits(outfits: SavedOutfit[]) {
+    const res = await api<{ outfits: SavedOutfit[] }>('/me/outfits', { method: 'PUT', json: { outfits } });
+    setState((s) => (s.boot ? { boot: { ...s.boot, me: { ...s.boot.me, outfits: res.outfits } } } : {}));
+  }
+
+  /** One tap from the menu: switch to a saved look or a vibe without opening the wardrobe. */
+  async wearLook(loadout: AvatarLoadout, label: string) {
+    try {
+      await this.saveAvatar(loadout);
+      toast(`${label} — looking good ✨`, 'celebrate', undefined, 2500);
+    } catch (e) {
+      toast(`Couldn’t change: ${(e as Error).message}`);
+    }
   }
 
   async updateProfile(patch: Record<string, unknown>) {

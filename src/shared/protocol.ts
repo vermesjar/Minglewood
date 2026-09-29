@@ -72,7 +72,30 @@ export const loadoutSchema = z.object({
   shoes: idStr,
   shoesColor: hex,
   accessory: idStr,
+  hairHighlight: z.union([hex, z.literal('')]).optional(),
+  eyes: idStr.optional(),
+  eyeColor: hex.optional(),
+  brows: idStr.optional(),
+  mouth: idStr.optional(),
+  facialHair: idStr.optional(),
+  faceDetail: idStr.optional(),
+  headwear: idStr.optional(),
+  headwearColor: hex.optional(),
+  eyewear: idStr.optional(),
+  neck: idStr.optional(),
+  neckColor: hex.optional(),
+  topAccent: hex.optional(),
+  topPattern: idStr.optional(),
+  held: idStr.optional(),
+  heldColor: hex.optional(),
+  pet: idStr.optional(),
+  petColor: hex.optional(),
+  mobility: idStr.optional(),
 });
+
+export const outfitsSchema = z
+  .array(z.object({ id: z.string().min(1).max(40), name: z.string().trim().min(1).max(24), loadout: loadoutSchema }))
+  .max(8);
 
 export const clientMsgSchema = z.discriminatedUnion('t', [
   z.object({ t: z.literal('enter'), sceneId: idStr, at: tile.optional(), near: idStr.optional() }),

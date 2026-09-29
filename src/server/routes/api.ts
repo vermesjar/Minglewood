@@ -2,7 +2,8 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { BRAND } from '@shared/brand';
 import type { Member, RoomBinding } from '@shared/domain/types';
-import { loadoutSchema } from '@shared/protocol';
+import { loadoutSchema, outfitsSchema } from '@shared/protocol';
+import { sanitizeLoadout } from '@shared/avatar';
 import { DECOR_BY_ID, MAX_DECOR_PER_ROOM, placementProblem } from '@shared/world/decor';
 import { randomUUID } from 'node:crypto';
 import { config, discordConfigured } from '../config';
@@ -12,7 +13,7 @@ import type { BindingView, PublicMember } from '@shared/api';
 
 export function toPublic(m: Member): PublicMember {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { settings, ...rest } = m;
+  const { settings, outfits, ...rest } = m;
   return rest;
 }
 
@@ -95,6 +96,16 @@ export function apiRoutes(ctx: AppContext): Router {
     if (!body.success) return res.status(400).json({ error: 'invalid loadout' });
     ctx.hubs.get(orgId)?.setAvatar(member.id, body.data);
     res.json({ avatar: ctx.store.member(orgId, member.id)?.avatar });
+  });
+
+  /** Saved looks ("vibe of the day"). Each loadout is validated against the member's unlocks. */
+  r.put('/me/outfits', auth, (req, res) => {
+    const { orgId, member } = authed(req);
+    const body = outfitsSchema.safeParse(req.body?.outfits);
+    if (!body.success) return res.status(400).json({ error: 'invalid outfits' });
+    const outfits = body.data.map((o) => ({ ...o, loadout: sanitizeLoadout(o.loadout, member.unlockedItems) }));
+    const updated = ctx.store.updateMember(orgId, member.id, { outfits });
+    res.json({ outfits: updated.outfits });
   });
 
   /** Team-owned rooms: members of the owning team (or admins) can decorate. */

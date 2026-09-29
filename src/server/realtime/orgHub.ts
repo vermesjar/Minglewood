@@ -575,7 +575,7 @@ export class OrgHub extends EventEmitter<HubEvents> {
     const m = this.member(memberId);
     if (!m) return;
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { settings, ...pub } = m;
+    const { settings, outfits, ...pub } = m;
     this.broadcast({ t: 'profile', member: pub });
     this.directoryDirty = true;
   }

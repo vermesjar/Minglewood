@@ -37,8 +37,9 @@ Requirements: Node 20+ (tested on Node 21). Port 5173 (web) and 8787 (API/realti
 5. **Stop by Lantern Hall** for the party; claim a party hat for your wardrobe.
 6. **Click the Founders' Oak, the rocket by the Launch Lab, or the frames in HQ** — organizational memory.
 7. Set yourself to **Focused** and notice knocks get held until you're free.
-8. **Decorate your team's room** — in a room your team owns, click *Decorate our space* (demo admins can decorate anywhere).
-9. **Admin console** (avatar menu → Admin): room ↔ channel bindings, the Discord capability audit, and
+8. **Open your wardrobe** (avatar menu): 23 hairstyles, faces, hats (incl. hijab and turban), eyewear, patterned tops, a pet that follows you, something to hold, wheelchair and cane options, one-tap vibes, "Surprise me", and saved looks you can switch to from the menu.
+9. **Decorate your team's room** — in a room your team owns, click *Decorate our space* (demo admins can decorate anywhere).
+10. **Admin console** (avatar menu → Admin): room ↔ channel bindings, the Discord capability audit, and
    *Company memory* — commemorate a launch and watch it appear on the Launch Lab wall for everyone.
 
 ## Scripts

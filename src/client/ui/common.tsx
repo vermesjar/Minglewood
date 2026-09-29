@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 're
 import type { AvatarLoadout, PresenceStatus } from '@shared/domain/types';
 import type { Facing } from '@shared/world/scene';
 import { STATUS_META } from '@shared/presence';
-import { avatarSprite, type Pose } from '../engine/sprites/avatar';
+import { AVATAR_CROPS, avatarSprite, type Pose } from '../engine/sprites/avatar';
 
 /** Pixel-art avatar rendered into a small canvas. `head` crops to the face. */
 export function AvatarCanvas({
@@ -11,6 +11,7 @@ export function AvatarCanvas({
   facing = 'se',
   pose = 'stand',
   head = false,
+  crop,
   className,
 }: {
   loadout: AvatarLoadout;
@@ -18,10 +19,12 @@ export function AvatarCanvas({
   facing?: Facing;
   pose?: Pose;
   head?: boolean;
+  crop?: keyof typeof AVATAR_CROPS;
   className?: string;
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
-  const [sx, sy, sw, sh] = head ? [5, 3, 16, 16] : [0, 0, 26, 44];
+  const r = AVATAR_CROPS[crop ?? (head ? 'head' : 'body')] ?? AVATAR_CROPS.full;
+  const [sx, sy, sw, sh] = [r.x, r.y, r.w, r.h];
   useEffect(() => {
     const c = ref.current;
     if (!c) return;

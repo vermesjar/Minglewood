@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { suggest, type Suggestion } from '@shared/serendipity';
 import { TOWN_ID } from '@shared/world';
 import { game, QUESTS, daysSinceStart } from '../app/game';
+import { avatarSprite } from '../engine/sprites/avatar';
+import { AVATAR_ITEMS } from '@shared/avatar';
 import { getState, setState, useStore } from '../app/store';
 import { formatTime } from './common';
 
@@ -227,4 +229,4 @@ export function Sidebar() {
 }
 
 // Keep `getState` tree-shaken import used for debugging in dev tools.
-if (import.meta.env.DEV) (window as unknown as { mw: unknown }).mw = { getState, setState, game };
+if (import.meta.env.DEV) (window as unknown as { mw: unknown }).mw = { getState, setState, game, avatarSprite, AVATAR_ITEMS };

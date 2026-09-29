@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { BRAND } from '@shared/brand';
 import { SETTABLE_STATUSES, STATUS_META } from '@shared/presence';
+import { VIBES, applyVibe } from '@shared/avatar';
 import { TOWN_ID } from '@shared/world';
 import type { PresenceStatus } from '@shared/domain/types';
 import { game } from '../app/game';
@@ -100,6 +101,21 @@ function MeMenu() {
           <button role="menuitem" className="menu-item" onClick={pick(() => setState({ panel: 'avatar' }))}>
             👕 Wardrobe & avatar
           </button>
+          <div className="menu-vibes">
+            <p className="menu-sub">Today’s vibe</p>
+            <div className="chips tight">
+              {(me.outfits ?? []).map((o) => (
+                <button key={o.id} className="chip" onClick={pick(() => void game.wearLook(o.loadout, o.name))}>
+                  {o.name}
+                </button>
+              ))}
+              {VIBES.slice(0, me.outfits?.length ? 4 : 8).map((v) => (
+                <button key={v.id} className="chip" onClick={pick(() => void game.wearLook(applyVibe(me.avatar, v, me.unlockedItems), v.name))}>
+                  {v.emoji} {v.name}
+                </button>
+              ))}
+            </div>
+          </div>
           <button role="menuitem" className="menu-item" onClick={pick(() => setState({ panel: 'profile' }))}>
             📝 Profile, privacy & accessibility
           </button>

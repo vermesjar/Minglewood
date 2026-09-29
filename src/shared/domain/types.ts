@@ -57,6 +57,8 @@ export interface Member {
   avatar: AvatarLoadout;
   /** Unlocked cosmetic item ids (event rewards, tenure, team swag). Never purchasable. */
   unlockedItems: string[];
+  /** Saved looks to switch between. */
+  outfits?: SavedOutfit[];
   /** True for seeded demo coworkers driven by the life simulator. */
   simulated?: boolean;
   settings: MemberSettings;
@@ -108,6 +110,10 @@ export interface PresenceState {
 
 /* ---------------------------------------------------------------- avatars */
 
+/**
+ * A composable look. The first ten fields are the original core; the rest were added later and
+ * are optional so older saved avatars stay valid (see `normalizeLoadout`).
+ */
 export interface AvatarLoadout {
   skin: string;
   hair: string;
@@ -118,7 +124,34 @@ export interface AvatarLoadout {
   bottomColor: string;
   shoes: string;
   shoesColor: string;
+  /** Pins, clips and small extras. */
   accessory: string;
+  hairHighlight?: string; // hex, or '' for none
+  eyes?: string;
+  eyeColor?: string;
+  brows?: string;
+  mouth?: string;
+  facialHair?: string;
+  faceDetail?: string;
+  headwear?: string;
+  headwearColor?: string;
+  eyewear?: string;
+  neck?: string;
+  neckColor?: string;
+  topAccent?: string;
+  topPattern?: string;
+  held?: string;
+  heldColor?: string;
+  pet?: string;
+  petColor?: string;
+  mobility?: string;
+}
+
+/** A saved look people can switch to — "vibe of the day". */
+export interface SavedOutfit {
+  id: string;
+  name: string;
+  loadout: AvatarLoadout;
 }
 
 /* ---------------------------------------------------------------- world */

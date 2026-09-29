@@ -14,7 +14,7 @@ import { behind, rectsOverlap, topoSort, type Box, type ScreenRect } from './dep
 import { Effects } from './effects';
 import { renderInteriorGround, renderOutdoorGround, type GroundLayer } from './ground';
 import { INK_CSS, PAPER, UI_FONT, pill, roundRect, speechBubble } from './overlays';
-import { avatarSprite, type Pose } from './sprites/avatar';
+import { AVATAR_CROPS, avatarSprite, usesWheelchair, type Pose } from './sprites/avatar';
 import { festiveFor, spriteFor } from './sprites/registry';
 import { highlightOf, type Sprite } from './sprites/painter';
 
@@ -475,6 +475,7 @@ export class WorldView {
   }
 
   private actorLift(a: ActorView): number {
+    if (usesWheelchair(a.occ.avatar)) return 0;
     if (a.occ.sittingOn && this.scene) {
       const o = this.scene.objects.find((x) => x.id === a.occ.sittingOn);
       if (o) return SEAT_LIFT[o.sprite] ?? 4;
@@ -759,7 +760,8 @@ export class WorldView {
         c.stroke();
         faces.forEach((L, i) => {
           const spr = avatarSprite(L, 'se', 'stand');
-          c.drawImage(spr.canvas, 6, 4, 14, 14, fx + 5 + i * 13, fy + 1, 14, 14);
+          const fc = AVATAR_CROPS.face;
+          c.drawImage(spr.canvas, fc.x, fc.y, fc.w, fc.h, fx + 5 + i * 13, fy + 1, 14, 14);
         });
         c.font = `800 11px ${UI_FONT}`;
         c.fillStyle = '#ffffff';

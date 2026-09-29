@@ -153,7 +153,7 @@ const P: PersonSeed[] = [
 
   // Sales & Success
   { id: 'm-marcus', name: 'Marcus Bell', pronouns: 'he/him', title: 'Head of Sales', dept: 'dep-sales', team: 'team-sales', manager: 'm-grace', location: 'Chicago', tz: 'America/Chicago', start: '2020-08-03', ask: ['pricing', 'enterprise deals'], interests: ['jazz', 'grilling'], bio: 'Closed Northstar’s 1,000th customer and got a bench named after it.', look: L(5, 'short', '#2b1d16', 'blazer', '#5b5fc7', 'chinos', '#3a3a46', 'none', 'shoes.loafers', '#2b1d16'), sim: { start: 'hq', haunts: ['hq', 'cafe'], status: 'meeting', note: 'customer call', sociability: 0.4 } },
-  { id: 'm-jonah', name: 'Jonah Park', pronouns: 'he/him', title: 'Account Executive', dept: 'dep-sales', team: 'team-sales', manager: 'm-marcus', location: 'Seattle', tz: 'America/Los_Angeles', start: '2022-03-21', ask: ['demos', 'customer stories'], interests: ['birthday cake', 'running', 'K-dramas'], bio: 'It’s his birthday today. He will pretend not to know about the party.', look: L(1, 'swoop', '#5a3825', 'shirt', '#7cc576', 'chinos', '#8e8a84', 'party-hat'), sim: { start: 'events', haunts: ['events', 'cafe'], status: 'open', note: '🎂 birthday!', sociability: 1 }, unlocks: ['acc.party-hat'] },
+  { id: 'm-jonah', name: 'Jonah Park', pronouns: 'he/him', title: 'Account Executive', dept: 'dep-sales', team: 'team-sales', manager: 'm-marcus', location: 'Seattle', tz: 'America/Los_Angeles', start: '2022-03-21', ask: ['demos', 'customer stories'], interests: ['birthday cake', 'running', 'K-dramas'], bio: 'It’s his birthday today. He will pretend not to know about the party.', look: L(1, 'swoop', '#5a3825', 'shirt', '#7cc576', 'chinos', '#8e8a84', 'party-hat'), sim: { start: 'events', haunts: ['events', 'cafe'], status: 'open', note: '🎂 birthday!', sociability: 1 }, unlocks: ['hat.party'] },
   { id: 'm-chris', name: 'Chris Okafor', pronouns: 'he/him', title: 'Customer Success Lead', dept: 'dep-sales', team: 'team-sales', manager: 'm-marcus', location: 'Lagos → Toronto', tz: 'America/Toronto', start: '2021-05-10', ask: ['onboarding customers', 'support tooling'], interests: ['afrobeats', 'football'], bio: 'Support won the Customer Hero Award under Chris. The trophy lives in HQ.', look: L(6, 'crop', '#2b1d16', 'hoodie', '#f2c14e', 'jeans', '#1f2a44', 'headphones'), sim: { start: 'cafe', haunts: ['cafe', 'hq', 'arcade'], status: 'open', note: 'grabbing coffee', sociability: 0.8 } },
   { id: 'm-elena', name: 'Elena Petrova', pronouns: 'she/her', title: 'Solutions Engineer', dept: 'dep-sales', team: 'team-sales', manager: 'm-marcus', location: 'Berlin', tz: 'Europe/Berlin', start: '2023-01-09', ask: ['integrations', 'security reviews'], interests: ['chess', 'techno'], bio: 'Speaks four languages and fluent SAML.', look: L(0, 'long', '#e8c16d', 'sweater', '#9b6bd6', 'jeans', '#3a3a46', 'glasses'), sim: { start: 'hq', haunts: ['hq', 'eng', 'cafe'], status: 'available', sociability: 0.5 } },
 
@@ -197,6 +197,43 @@ const P: PersonSeed[] = [
   { id: 'm-tomas', name: 'Tomás Silva', pronouns: 'he/him', title: 'Designer, Marketing', dept: 'dep-design', team: 'team-design', manager: 'm-leo', location: 'São Paulo', tz: 'America/Sao_Paulo', start: '2024-07-01', ask: ['landing pages', 'illustration'], interests: ['skateboarding', 'samba'], bio: 'Makes the launch posters. Ask him for a sneak peek of the Aurora 2.0 one.', look: L(4, 'swoop', '#2b1d16', 'tee', '#f2c14e', 'shorts', '#3a3a46', 'cap', 'shoes.sneakers', '#e0503f'), sim: { start: 'cafe', haunts: ['cafe', 'design', 'arcade'], status: 'available', sociability: 0.8 } },
 ];
 
+/** Personal touches layered on top of each base look (the catalog grew after the seed was written). */
+const EXTRAS: Record<string, Partial<AvatarLoadout>> = {
+  'm-grace': { eyes: 'eyes.lashes', neck: 'neck.necklace', faceDetail: 'fd.mole' },
+  'm-omar': { facialHair: 'fh.beard', brows: 'brows.bold', held: 'held.coffee' },
+  'm-rosa': { eyes: 'eyes.happy', faceDetail: 'fd.freckles', held: 'held.balloon', heldColor: '#e27ca7' },
+  'm-hana': { eyes: 'eyes.wide', eyeColor: '#5a3825', held: 'held.boba' },
+  'm-dev': { accessory: 'acc.none', headwear: 'hat.turban', headwearColor: '#e0503f', facialHair: 'fh.beard', mouth: 'mouth.grin' },
+  'm-marcus': { facialHair: 'fh.goatee', neck: 'neck.tie', neckColor: '#f2c14e' },
+  'm-jonah': { eyes: 'eyes.happy', mouth: 'mouth.grin' },
+  'm-chris': { held: 'held.coffee', mouth: 'mouth.grin' },
+  'm-elena': { eyes: 'eyes.lashes', accessory: 'acc.earrings', eyewear: 'eye.round' },
+  'm-sofia': { hairHighlight: '#e27ca7', mouth: 'mouth.smirk' },
+  'm-wes': { pet: 'pet.dog', petColor: '#c98f4a', held: 'held.coffee' },
+  'm-mira': { held: 'held.book', heldColor: '#9b6bd6', eyes: 'eyes.lashes' },
+  'm-jordan': { faceDetail: 'fd.freckles', held: 'held.laptop', topPattern: 'pat.check', topAccent: '#1f2a44' },
+  'm-noor': { headwear: 'hat.hijab', headwearColor: '#2bb3a3', eyes: 'eyes.lashes' },
+  'm-maya': { pet: 'pet.cat', petColor: '#3a3a46', held: 'held.coffee' },
+  'm-leo': { facialHair: 'fh.stubble' },
+  'm-aiko': { held: 'held.plant', hairHighlight: '#9b6bd6', eyes: 'eyes.sparkle' },
+  'm-ava': { faceDetail: 'fd.freckles', accessory: 'acc.rainbow-pin' },
+  'm-ben': { pet: 'pet.dog', petColor: '#e8a15a', facialHair: 'fh.stubble', eyes: 'eyes.sleepy' },
+  'm-priya': { hair: 'hair.braids', eyes: 'eyes.lashes', accessory: 'acc.earrings' },
+  'm-kenji': { hair: 'hair.undercut', mouth: 'mouth.neutral' },
+  'm-lena': { hair: 'hair.bangs' },
+  'm-arjun': { facialHair: 'fh.mustache' },
+  'm-zoe': { hair: 'hair.pixie', faceDetail: 'fd.blush' },
+  'm-kai': { pet: 'pet.duck', petColor: '#fffaf0', mouth: 'mouth.tongue' },
+  'm-theo': { accessory: 'acc.hearing-aid', headwear: 'hat.capback', headwearColor: '#e0503f' },
+  'm-nia': { hair: 'hair.afro', shoes: 'shoes.skates', shoesColor: '#e27ca7' },
+  'm-sam': { hair: 'hair.curlyshort', held: 'held.icecream' },
+  'm-felix': { mobility: 'mob.wheelchair' },
+  'm-luca': { held: 'held.coffee' },
+  'm-alex': { hairHighlight: '#9fe3e0', eyes: 'eyes.wide', eyeColor: '#3f7fbf' },
+  'm-diego': { held: 'held.coffee', hair: 'hair.locs' },
+  'm-tomas': { hair: 'hair.mullet', held: 'held.book', heldColor: '#f2c14e' },
+};
+
 /** Deterministic mock calendar for demo coworkers (see calendar provider abstraction). */
 export const DEMO_CALENDAR: Array<{ memberIds: string[]; title: string; offsetMin: number; durationMin: number; roomId?: string }> = [
   { memberIds: ['m-noor', 'm-marcus'], title: 'Product review', offsetMin: -10, durationMin: 40 },
@@ -222,7 +259,7 @@ export function buildSeed(now = new Date()) {
     interests: p.interests,
     bio: p.bio,
     role: p.role ?? 'member',
-    avatar: p.look,
+    avatar: { ...p.look, ...EXTRAS[p.id] },
     unlockedItems: p.unlocks ?? [],
     simulated: true,
     settings: { locationVisibility: 'everyone', knocksWhileFocused: false },
@@ -241,7 +278,7 @@ export function buildSeed(now = new Date()) {
       endsAt: at(240),
       hostIds: ['m-rosa', 'm-dev'],
       description: 'Cake at Lantern Hall! Drop by, sign the card, grab a party hat.',
-      rewardItemId: 'acc.party-hat',
+      rewardItemId: 'hat.party',
       decor: 'balloons',
     },
     {
