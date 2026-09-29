@@ -272,10 +272,16 @@ function ObjectCard({ sceneId, objectId, x, y }: { sceneId: string; objectId: st
   return null;
 }
 
+const ORDER_EMOJI: Record<string, string> = { coffee: '☕', plush: '🧸', popcorn: '🍿', soda: '🥤' };
+
 /** A room NPC (the café's barista): clearly not a coworker — no presence, no profile, just what they do here. */
 function NpcCard({ sceneId, npcId, x, y }: { sceneId: string; npcId: string; x: number; y: number }) {
-  const npc = game.scene(sceneId)?.npcs?.find((n) => n.id === npcId);
+  const scene = game.scene(sceneId);
+  const npc = scene?.npcs?.find((n) => n.id === npcId);
   if (!npc) return null;
+  // what they make, from the machine they run: "Get a coffee", "Trade in your tickets"
+  const vend = npc.serves ? scene?.objects.find((o) => o.sprite === npc.serves)?.actions?.find((a) => a.kind === 'vend') : undefined;
+  const order = vend && vend.kind === 'vend' ? `${ORDER_EMOJI[vend.item] ?? '✨'} ${vend.label}` : null;
   return (
     <Popover x={x} y={y} onClose={close} label={`${npc.name}, ${npc.role} (NPC)`}>
       <div className="info-card npc-card">
@@ -289,9 +295,9 @@ function NpcCard({ sceneId, npcId, x, y }: { sceneId: string; npcId: string; x: 
           </div>
         </div>
         <p>{npc.blurb}</p>
-        {npc.serves && (
+        {order && (
           <button className="btn primary full" onClick={() => game.orderFrom(sceneId, npcId)}>
-            ☕ Order a coffee
+            {order}
           </button>
         )}
         <p className="fineprint">Part of the room — not a coworker.</p>

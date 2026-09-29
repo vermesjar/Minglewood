@@ -94,3 +94,53 @@ people standing there, in priority order:
    avatar kit and `CARRYABLE`, then the counter gets `actions: [{ kind: 'vend', item: 'plush', label: 'Trade in
    tickets' }]` and Pip gets `serves: 'prize-counter'`. Same pattern would work for `popcorn-cart` (`held.popcorn`)
    and the snack `vending-machine` (`held.soda`). I have *not* added these actions, since the items don't exist yet.
+
+## Done (engine / café agent)
+
+All of P1–P3 is live (WorldView.ts, effects.ts, art.ts, animations.ts). How to use each:
+
+1. **Ducks** are derived from the scene: open water 2–4 tiles from shore (BFS distance), picked with
+   `hash2` so every client sees the same ducks, ≥ 6 tiles apart, loop radius kept inside the water; the first
+   has a companion. No markers needed. **Water glints** twinkle over the scene's own `w`/`W` tiles (count
+   scales with the lake, ≤ 60) — and switch themselves off when the ground layer brings its own animated
+   `water` frames (your `drawWaterMotion`), so the lake never gets two sets of sparkles.
+2. **Emitters**: `manifest.sprites[key].emitters` are read per drawing (`Sprite.emitters`, mirrored with the
+   art) and placed at `static.dx + x / scale, static.dy + y / scale`. `smoke` → chimney smoke, `spray` →
+   fountain spray, `blink` → a red beacon pulsing ~1 Hz with a halo at night, `beam` → the lighthouse lamp.
+   A drawing **with art and no emitters gives off nothing** (the procedural chimney fallback only runs for
+   buildings still drawn in code), so add an emitter to any building that should smoke.
+3. **Outdoor dusk/night**: the same tints as interiors (`drawAmbience` now runs outdoors). Street lamps use
+   the `light` contract and only light up from dusk (`NIGHTNESS`: night 1, dusk 0.6, dawn 0.3, day 0); the pool
+   radius scales with `light.r` (≥ 78 px). **Glow masks** (`glow` in the manifest, preloaded by art.ts,
+   `Sprite.glow`, mirrored with the art) are composited occlusion-correctly: collected in depth order on their
+   own layer (everything drawn in front erases what it covers — a tree or a person in front of a lit window
+   hides it), then added with `lighter` at night 0.9 / dusk 0.6 / dawn 0.25. The haze around the town follows
+   the phase too. The **lighthouse** beam sweeps once every 9 s at night from the `beam` point (brighter when
+   it swings toward the viewer); by day the lamp just winks.
+4. **Ground at 2×**: `renderOutdoorGround(scene, 2)` when `devicePixelRatio > 1 || innerWidth > 1200`, else 1;
+   WorldView draws it with `this.ground.scale`.
+5. See 1 (glints).
+6. **Trees sway**: `tree/*` crowns lean by whole sprite pixels (top third ±2, middle ±1, trunk still) on a
+   slow per-object sine, mostly at rest. Off with reduced motion. Potted `plant`s within two tiles of a window
+   stir too (animations.ts `bandSway`).
+7–8. **Linter**: both suggestions applied — diamond-filling pieces (base ≥ 70 % of the footprint over its lower
+   30 %) skip the narrow-base check; `building.*` get a 24 px apron tolerance. Town pieces are checked in their
+   authored orientation only, and "needs every rotation" only applies to keys placed in rooms. Keys with `/`
+   are written as `tree__birch.a.png`. The whole manifest now passes (`npx tsx --tsconfig tsconfig.json
+   scripts/furniture-review.ts`).
+
+### NPC behaviours — done
+
+1. **Greet**: `NpcDef.greeting?: string[]` (Margot and Pip have lines; Wren has none). A live player entering
+   the room gets one hello per visit (~0.9 s after arriving); walking up to within ~2 tiles of the NPC gets
+   another only after 45 s; an NPC says hello at most every 6 s however busy the door. Standing NPCs turn
+   toward the person and wave (`doing: 'greet'` → wave pose) for 1.6 s with a speech bubble (`NpcState.say`,
+   sent once, never replayed to newcomers); seated ones just speak. Then they return to what they were doing.
+2. **Per-spot work**: `spots[].doing: 'work'` → the `work` pose while idle there (Margot types at (6,1), Wren
+   shelves at (3,1), Pip tidies the counter at (0,9)). Work and seat spots hold them longer (14 s+).
+3. **Seated NPCs**: `spots[].sit: objectId` → they sit on it (sit pose, seat height, depth like a guest).
+   Margot spends some idle turns in `hq-desk-chair`.
+4. **Counter service**: carryables `plush`, `popcorn`, `soda` added to `CARRYABLE`; the prize counter
+   (`vend: plush`, served by Pip: he steps to the counter, works, hands it over), the popcorn cart (`popcorn`) and
+   the vending machine (`soda`) are self-serve (a 0.7 s moment at the machine — the cart throws up a flurry of
+   kernels — then it's yours). The kit draws `held.plush`, `held.popcorn`, `held.soda`.

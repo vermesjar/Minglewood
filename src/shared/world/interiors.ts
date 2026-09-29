@@ -369,8 +369,10 @@ export function buildInteriors(): SceneDef[] {
       },
       spots: [
         { x: 7, y: 1, facing: 'sw' },
-        { x: 6, y: 1, facing: 'sw' },
+        { x: 6, y: 1, facing: 'sw', doing: 'work' },
+        { x: 8, y: 1, facing: 'sw', sit: 'hq-desk-chair' },
       ],
+      greeting: ['Welcome to Northstar!', 'Looking for someone? I can point you there.', 'Good to see you — make yourself at home.'],
     },
   ];
 
@@ -770,14 +772,32 @@ export function buildInteriors(): SceneDef[] {
       { sprite: 'pool-table', x: 3, y: 4, w: 3, d: 2, facing: 'sw', label: 'Pool table' },
       { id: 'arcade-air-hockey', sprite: 'air-hockey', x: 8, y: 4, w: 2, d: 1, facing: 'sw', label: 'Air hockey' },
       // Snacks and prizes by the door: the vending machine, the prize counter, a high table with stools.
-      { id: 'arcade-vending', sprite: 'vending-machine', x: 0, y: 5, facing: 'se', label: 'Snack machine' },
-      { id: 'arcade-prizes', sprite: 'prize-counter', x: 1, y: 8, w: 1, d: 2, facing: 'se', label: 'Prize counter' },
+      {
+        id: 'arcade-vending',
+        sprite: 'vending-machine',
+        x: 0,
+        y: 5,
+        facing: 'se',
+        label: 'Snack machine',
+        actions: [{ kind: 'vend', item: 'soda', label: 'Get a soda' }],
+      },
+      {
+        id: 'arcade-prizes',
+        sprite: 'prize-counter',
+        x: 1,
+        y: 8,
+        w: 1,
+        d: 2,
+        facing: 'se',
+        label: 'Prize counter',
+        actions: [{ kind: 'vend', item: 'plush', label: 'Trade in your tickets' }],
+      },
       { id: 'arcade-snack-rug', sprite: 'rug', x: 2, y: 7, w: 5, d: 3, flat: true, variant: 'neon' },
       { id: 'arcade-high-table', sprite: 'table-high', variant: 'neon', x: 4, y: 8 },
       { id: 'arcade-stool-3', sprite: 'stool', variant: 'neon', x: 3, y: 8, actions: sit },
       { id: 'arcade-stool-4', sprite: 'stool', variant: 'neon', x: 5, y: 8, actions: sit },
       { id: 'arcade-stool-5', sprite: 'stool', variant: 'neon', x: 4, y: 9, actions: sit },
-      { id: 'arcade-popcorn', sprite: 'popcorn-cart', x: 6, y: 7, label: 'Popcorn' },
+      { id: 'arcade-popcorn', sprite: 'popcorn-cart', x: 6, y: 7, label: 'Popcorn', actions: [{ kind: 'vend', item: 'popcorn', label: 'Grab some popcorn' }] },
       // Beanbags round a side table in the front corner.
       { id: 'arcade-lounge-rug', sprite: 'rug', x: 8, y: 6, w: 4, d: 4, flat: true, variant: 'cyan' },
       { id: 'arcade-side-table', sprite: 'table-low', x: 9, y: 8, w: 1, d: 1, variant: 'side' },
@@ -891,8 +911,10 @@ export function buildInteriors(): SceneDef[] {
       },
       spots: [
         { x: 0, y: 8, facing: 'se' },
-        { x: 0, y: 9, facing: 'se' },
+        { x: 0, y: 9, facing: 'se', doing: 'work' },
       ],
+      serves: 'prize-counter',
+      greeting: ['Welcome to Pixel Pier!', 'Tickets? Prizes are this way!', 'High score to beat is on cabinet two.'],
     },
   ];
 
@@ -926,7 +948,7 @@ export function buildInteriors(): SceneDef[] {
       },
       spots: [
         { x: 1, y: 1, facing: 'sw' },
-        { x: 3, y: 1, facing: 'ne' },
+        { x: 3, y: 1, facing: 'ne', doing: 'work' },
       ],
     },
   ];

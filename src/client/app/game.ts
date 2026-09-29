@@ -36,6 +36,14 @@ export const QUESTS: Array<{ id: string; label: string; hint: string }> = [
   { id: 'party', label: 'Stop by the party in Lantern Hall', hint: 'There’s cake.' },
 ];
 
+/** What you hear when something lands in your hands. */
+const GOT: Record<string, string> = {
+  coffee: '☕ Freshly pulled — enjoy your coffee.',
+  plush: '🧸 A prize! It’s yours to carry around.',
+  popcorn: '🍿 Fresh popcorn — careful, it’s hot.',
+  soda: '🥤 Ice cold.',
+};
+
 class Game {
   world: WorldView | null = null;
   rt: Realtime | null = null;
@@ -259,7 +267,7 @@ class Game {
       }
       case 'updated':
         if (m.memberId === this.meId && m.patch.carrying && m.patch.carrying !== getState().occupants[this.meId]?.carrying)
-          toast(m.patch.carrying === 'coffee' ? '☕ Freshly pulled — enjoy your coffee.' : 'Enjoy!', 'social', undefined, 3000);
+          toast(GOT[m.patch.carrying] ?? 'Enjoy!', 'social', undefined, 3000);
         w?.patch(m.memberId, m.patch);
         setState((s) => {
           const cur = s.occupants[m.memberId];

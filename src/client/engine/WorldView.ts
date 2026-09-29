@@ -62,8 +62,8 @@ interface ActorView {
   bubble?: { text: string; start: number; until: number };
   emotes: Array<{ emoji: string; start: number }>;
   waveUntil: number;
-  /** Set for a room NPC (a barista): who they are and what they're doing. */
-  npc?: { def: NpcDef; doing?: NpcState['doing'] };
+  /** Set for a room NPC (a barista): who they are, what they're doing and what's in their hands. */
+  npc?: { def: NpcDef; doing?: NpcState['doing']; holding?: string };
   /** Next idle blink (performance.now ms) and when the current one ends. */
   blinkAt: number;
   blinkUntil: number;
@@ -100,6 +100,15 @@ const OUTDOOR_BG: Record<Sky['phase'], [string, string]> = {
   dawn: ['#f3cdbd', '#fbe6cc'],
   dusk: ['#7d6a9a', '#e9ae90'],
   night: ['#161c36', '#262c4c'],
+};
+/**
+ * The town's light by phase (multiplied over it, lamp pools cut out). Deeper than indoors: outside at night
+ * the street lamps and lit windows should carry the picture.
+ */
+const OUTDOOR_MOOD: Record<string, [string, number] | undefined> = {
+  night: ['#3f4a8c', 0.84],
+  dusk: ['#e79c7c', 0.48],
+  dawn: ['#ffcdb8', 0.28],
 };
 /** How dark it is outside, by phase (effects: beacons, the lighthouse beam). */
 const NIGHTNESS: Record<Sky['phase'], number> = { night: 1, dusk: 0.6, dawn: 0.3, day: 0 };
@@ -282,11 +291,14 @@ export class WorldView {
       });
     }
     this.statics = topoSort(statics);
-    this.anims.load(this.statics);
+    this.anims.load(this.statics, scene);
+    this.anims.loadWalls(scene);
     this.actors.clear();
     for (const o of occupants) this.upsert(o);
     this.effects.reducedMotion = this.reducedMotion;
     this.effects.load(scene, { party: opts.party }, this.statics);
+    // the ground's own moving water already sparkles; don't add a second set of glints
+    this.effects.glints = !('water' in this.ground && this.ground.water);
 
     const W = scene.width;
     const H = scene.height;
@@ -494,21 +506,21 @@ export class WorldView {
       facing: st.facing,
       path: st.path,
       pathStartedAt: st.pathStartedAt,
+      sittingOn: st.path ? undefined : st.sittingOn,
       status: 'available',
       avatar: def.avatar,
       via: 'sim',
     };
-    const before = this.actors.get(id);
     this.upsert(occ);
     const a = this.actors.get(id)!;
     if (!st.path) {
-      a.occ = { ...a.occ, path: undefined, pathStartedAt: undefined };
+      a.occ = { ...a.occ, path: undefined, pathStartedAt: undefined, sittingOn: st.sittingOn };
       a.x = st.x;
       a.y = st.y;
-    }
+    } else a.occ = { ...a.occ, sittingOn: undefined };
     a.facing = st.facing;
-    a.npc = { def, doing: st.doing };
-    if (before && !before.npc) a.npc = { def, doing: st.doing };
+    a.npc = { def, doing: st.doing, holding: st.holding };
+    if (st.say) this.say(id, st.say);
   }
 
   /** A one-off moment on a piece of furniture: an espresso machine pulling a shot, the bell being rung. */
@@ -649,9 +661,10 @@ export class WorldView {
   }
 
   private pose(a: ActorView): Pose {
-    if (a.npc?.doing === 'serve' && !a.moving) return 'wave';
-    if (a.npc?.doing === 'brew' && !a.moving) return 'work';
+    const doing = a.moving ? undefined : a.npc?.doing;
+    if ((doing === 'serve' || doing === 'greet') && !a.occ.sittingOn) return 'wave';
     if (a.occ.sittingOn && !a.moving) return 'sit';
+    if (doing === 'brew' || doing === 'work') return 'work';
     if (performance.now() < a.waveUntil) return 'wave';
     if (a.moving) {
       const f = Math.floor(a.walkClock * 8) % 4;
@@ -691,6 +704,7 @@ export class WorldView {
     if (shell) this.drawWindowViews(c, shell, sky);
     const gk = this.ground.scale ?? 1;
     c.drawImage(this.ground.canvas, this.ground.minX, this.ground.minY, this.ground.canvas.width / gk, this.ground.canvas.height / gk);
+    if ('water' in this.ground && this.ground.water) this.drawWaterMotion(c, this.ground.water);
     if (shell) {
       // Sunlight through the windows follows the weather; passing clouds make it breathe a little.
       c.save();
@@ -702,6 +716,9 @@ export class WorldView {
       for (const l of shell.lamps) if (this.isOn(l.id)) c.drawImage(l.pool, l.ax, l.ay, l.pool.width / gk, l.pool.height / gk);
       c.restore();
     }
+
+    // the life on the walls (a countdown, lanterns, neon) — behind everything standing in the room
+    this.anims.drawWalls(c, this.reducedMotion);
 
     // hover tile + destination marker
     if (this.hoverTile && !this.hover) this.diamond(this.hoverTile[0], this.hoverTile[1], 'rgba(255,255,255,0.35)', 1);
@@ -746,8 +763,11 @@ export class WorldView {
     // depth-sorted statics + actors
     const order = this.buildDrawOrder();
     const now = performance.now() / 1000;
+    const view = this.visibleArt();
     for (const d of order) {
       if ('obj' in d) {
+        // off-screen things aren't drawn (the town has ~1,000 of them; a view shows a fraction)
+        if (d.rect.r < view.l || d.rect.l > view.r || d.rect.b < view.t || d.rect.t > view.b) continue;
         const hovered = this.hover?.kind === 'object' && this.hover.id === d.obj.id;
         const [nx, ny] = this.anims.offset(d.obj.id, this.reducedMotion);
         const ox = d.dx + d.sprite.ax / (d.sprite.scale ?? 1) + nx;
@@ -755,7 +775,7 @@ export class WorldView {
         const sway = this.reducedMotion ? 0 : swayOf(d.obj, now);
         if (hovered) blit(c, d.sprite, ox, oy, highlightOf(d.sprite), 2);
         else if (sway) drawSwaying(c, d.sprite, ox, oy, sway);
-        else blit(c, d.sprite, ox, oy);
+        else if (!this.anims.drawSprite(c, d.obj.id, ox, oy, this.reducedMotion)) blit(c, d.sprite, ox, oy);
         this.anims.drawFor(c, d.obj.id, this.reducedMotion);
         if (d.festive) c.drawImage(d.festive.canvas, d.dx, d.dy);
         if (gl) {
@@ -874,10 +894,11 @@ export class WorldView {
    * person is seated — drawn with them it would float at seat height inside the furniture.
    */
   private look(a: ActorView): AvatarLoadout {
-    if (a.npc?.doing) return { ...a.occ.avatar, held: 'coffee' };
+    // an NPC holds what they're making; anyone holds what they picked up (carryable ids → held items)
+    if (a.npc?.holding) return { ...a.occ.avatar, held: `held.${a.npc.holding}` };
     const seated = !!a.occ.sittingOn && !a.moving;
     if (!a.occ.carrying && !seated) return a.occ.avatar;
-    return { ...a.occ.avatar, ...(a.occ.carrying ? { held: a.occ.carrying } : {}), ...(seated ? { pet: 'pet.none' } : {}) };
+    return { ...a.occ.avatar, ...(a.occ.carrying ? { held: `held.${a.occ.carrying}` } : {}), ...(seated ? { pet: 'pet.none' } : {}) };
   }
 
   /**
@@ -1083,7 +1104,7 @@ export class WorldView {
       dusk: ['#f2b89a', 0.45],
       dawn: ['#ffd2bf', 0.25],
     };
-    let mood = tint[sky.phase];
+    let mood = this.scene?.kind === 'outdoor' ? OUTDOOR_MOOD[sky.phase] : tint[sky.phase];
     if (!mood && sky.weather === 'rain') mood = ['#b9c0d6', 0.4];
     else if (!mood && (sky.weather === 'clouds' || sky.weather === 'snow')) mood = ['#dfe2ec', 0.22];
     const now = performance.now();
@@ -1155,19 +1176,113 @@ export class WorldView {
     c.restore();
   }
 
+  /** The part of the world on screen (art space), with a margin for sway, smoke and overhangs. */
+  private visibleArt(): { l: number; t: number; r: number; b: number } {
+    const [l, t] = this.camera.toWorld(0, 0, this.vw, this.vh);
+    const [r, b] = this.camera.toWorld(this.vw, this.vh, this.vw, this.vh);
+    const m = 24;
+    return { l: l - m, t: t - m, r: r + m, b: b + m };
+  }
+
+  /**
+   * The lake moves: its ripple crests travel slowly across the water (cross-fading between the ground's
+   * pre-rendered phases), sparkles winking on and off along them. Still when motion is reduced.
+   */
+  private drawWaterMotion(c: CanvasRenderingContext2D, water: NonNullable<GroundLayer['water']>) {
+    const n = water.frames.length;
+    const t = this.reducedMotion ? 0 : (performance.now() / 1000) * 0.55;
+    const f = Math.floor(t) % n;
+    const k = t - Math.floor(t);
+    c.save();
+    c.globalAlpha = 1 - k;
+    c.drawImage(water.frames[f], water.x, water.y);
+    if (k > 0.01) {
+      c.globalAlpha = k;
+      c.drawImage(water.frames[(f + 1) % n], water.x, water.y);
+    }
+    c.restore();
+  }
+
+  /** Whether a world point is covered by the drawing of any building other than `own`. */
+  private onOtherBuilding(own: Static, wx: number, wy: number): boolean {
+    for (const st of this.statics) {
+      if (st === own || !st.obj.building) continue;
+      const k = st.sprite.scale ?? 1;
+      const px = Math.floor((wx - st.dx) * k);
+      const py = Math.floor((wy - st.dy) * k);
+      const { width: W, height: H } = st.sprite.canvas;
+      if (px < 0 || py < 0 || px >= W || py >= H) continue;
+      if (st.sprite.mask[py * W + px]) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Where a building's place label goes (screen px; its bottom-centre). Preferably just above its own roof;
+   * when that spot is over another building (the arcade stands in front of HQ), the label comes down onto its
+   * own roof or sign instead — never over a different building, never over another label — so it always
+   * reads as belonging to the building under it, at every zoom and camera position.
+   */
+  private labelSpot(st: Static, w: number, h: number, placed: Array<{ x: number; y: number; w: number; h: number }>): [number, number] {
+    const o = st.obj;
+    const z = this.camera.zoom;
+    const k = st.sprite.scale ?? 1;
+    const { width: W, height: H } = st.sprite.canvas;
+    const cx = isoToScreen(o.x + (o.w ?? 1) / 2, o.y + (o.d ?? 1) / 2).x;
+    // the roof's top above the footprint's centre (skip thin masts: need a few solid pixels in the row)
+    const col = Math.floor((cx - st.dx) * k);
+    let top = 0;
+    for (let y = 0; y < H; y++) {
+      let n = 0;
+      for (let x = Math.max(0, col - 12); x < Math.min(W, col + 12); x++) n += st.sprite.mask[y * W + x];
+      if (n >= 8) {
+        top = y;
+        break;
+      }
+    }
+    const roofY = st.dy + top / k;
+    const [sx0, sy0] = this.camera.toScreen(cx, roofY, this.vw, this.vh);
+    const clear = (bx: number, by: number) => {
+      const x0 = bx - w / 2;
+      const y0 = by - h;
+      for (const r of placed) if (x0 < r.x + r.w + 4 && r.x < x0 + w + 4 && y0 < r.y + r.h + 3 && r.y < y0 + h + 3) return false;
+      for (let i = 0; i <= 6; i++)
+        for (let j = 0; j <= 3; j++) {
+          const [wx, wy] = this.camera.toWorld(x0 + (w * i) / 6, y0 + (h * j) / 3, this.vw, this.vh);
+          if (this.onOtherBuilding(st, wx, wy)) return false;
+        }
+      return true;
+    };
+    const drop = (H / k) * 0.6 * z; // how far down its own drawing a label may come
+    for (let dy = -4; dy <= drop; dy += 6)
+      for (const dx of [0, -0.25, 0.25, -0.5, 0.5]) {
+        const bx = Math.round(sx0 + dx * w);
+        const by = Math.round(sy0 + dy);
+        if (clear(bx, by)) return [bx, by];
+      }
+    return [Math.round(sx0), Math.round(sy0 + drop * 0.3)];
+  }
+
   private drawBadges() {
     const c = this.ctx;
     const z = this.camera.zoom;
-    for (const s of this.statics) {
+    const placed: Array<{ x: number; y: number; w: number; h: number }> = [];
+    // front-most buildings choose first (they hide the ones behind them)
+    const buildings = this.statics.filter((st) => st.obj.building && st.obj.roomId).sort((a, b) => b.obj.x + b.obj.y - (a.obj.x + a.obj.y));
+    for (const s of buildings) {
       const o = s.obj;
-      if (!o.building || !o.roomId) continue;
+      if (!o.roomId) continue;
       const b = this.badges.get(o.roomId);
-      const cxArt = isoToScreen(o.x + (o.w ?? 1) / 2, o.y + (o.d ?? 1) / 2).x;
-      const [sx, sy] = this.camera.toScreen(cxArt, s.dy + 8, this.vw, this.vh);
-      if (sx < -200 || sx > this.vw + 200 || sy < -60 || sy > this.vh + 100) continue;
       const hovered = this.hover?.kind === 'object' && this.hover.id === o.id;
       const label = z < 1.4 ? `${b?.emoji ?? ''} ${b?.count ?? 0}` : `${b?.emoji ?? ''} ${b?.name ?? o.label ?? ''}`;
-      const main = pill(c, sx, sy, label, { size: z < 1.4 ? 11 : 12, bg: hovered ? '#ffffff' : PAPER });
+      const size = z < 1.4 ? 11 : 12;
+      c.font = `800 ${size}px ${UI_FONT}`;
+      const lw = Math.ceil(c.measureText(label).width) + 14 + (b && b.count > 0 && z >= 1.4 ? Math.min(4, b.faces.length) * 13 + 22 : 0);
+      const lh = size + 9 + (b?.event ? size + 13 : 0);
+      const [sx, sy] = this.labelSpot(s, lw, lh, placed);
+      if (sx < -200 || sx > this.vw + 200 || sy < -60 || sy > this.vh + 100) continue;
+      placed.push({ x: sx - lw / 2, y: sy - lh, w: lw, h: lh });
+      const main = pill(c, sx, sy, label, { size, bg: hovered ? '#ffffff' : PAPER });
       this.badgeRects.push({ r: main, obj: o });
       let right = main.x + main.w - 4;
       if (b && b.count > 0 && z >= 1.4) {

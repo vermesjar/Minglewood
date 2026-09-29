@@ -133,10 +133,16 @@ export interface NpcDef {
   /** One line for their info card. */
   blurb: string;
   avatar: AvatarLoadout;
-  /** Where they work, home first; they drift between these (inside the room's staff area). */
-  spots: Array<{ x: number; y: number; facing: Facing }>;
+  /**
+   * Where they work, home first; they drift between these (inside the room's staff area). At a spot they may
+   * be busy with something (`doing: 'work'`: typing, shelving — the work pose) or sit on a chair (`sit`: its
+   * object id; a chair guests can't take).
+   */
+  spots: Array<{ x: number; y: number; facing: Facing; doing?: 'work'; sit?: string }>;
   /** The sprite of the machine they run (a vend object): orders there are theirs to make. */
   serves?: string;
+  /** Lines for saying hello to people who come in or walk up (one picked each time). Quiet NPCs have none. */
+  greeting?: string[];
 }
 
 export interface InteriorTheme {

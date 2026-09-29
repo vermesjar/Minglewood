@@ -5,6 +5,7 @@ import { DEFAULT_LOADOUT } from '@shared/avatar';
 import { getScene } from '@shared/world';
 import { WalkGrid } from '@shared/world/walkGrid';
 import { seatSpots, stepOffTiles } from '@shared/world/seats';
+import { approach } from '@shared/world/interact';
 import type { Tile } from '@shared/world/pathfinding';
 import { Store } from '../store/store';
 import { MemoryPersistence } from '../store/jsonFile';
@@ -194,6 +195,29 @@ describe('OrgHub', () => {
     expect(handed).toBeGreaterThan(brew);
     expect(working && working.t === 'npc' && [working.npc.x, working.npc.y]).toEqual([machine.x, 0]);
     expect(carried()).toBe(1);
+    vi.useRealTimers();
+  });
+
+  it('hands out a prize from Pip, and popcorn and a soda from the machines, after a moment', () => {
+    vi.useFakeTimers();
+    const a = newMember(store, 'Ada');
+    const cb = client(a.id);
+    hub.connect(cb);
+    const arcade = getScene('arcade')!;
+    const got = () => cb.msgs.filter((m) => m.t === 'updated' && m.memberId === a.id && m.patch.carrying).map((m) => m.t === 'updated' && m.patch.carrying);
+    for (const [sprite, item] of [
+      ['prize-counter', 'plush'],
+      ['popcorn-cart', 'popcorn'],
+      ['vending-machine', 'soda'],
+    ] as const) {
+      const o = arcade.objects.find((x) => x.sprite === sprite)!;
+      const way = approach(new WalkGrid(arcade), [o.x, o.y], o)!;
+      hub.enter(a.id, 'arcade', 'live', way.tile);
+      expect(hub.carry(a.id, o.id)).toBe(true);
+      expect(got().pop()).not.toBe(item); // not instantly
+      vi.advanceTimersByTime(6000);
+      expect(got().pop()).toBe(item);
+    }
     vi.useRealTimers();
   });
 

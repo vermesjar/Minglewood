@@ -21,9 +21,12 @@ import { footprint, isSeat } from '@shared/world/scene';
 import { seatSpotAt, seatSpots, stepOffTiles } from '@shared/world/seats';
 import { NpcDirector } from './npcs';
 import { WalkGrid } from '@shared/world/walkGrid';
-import { findPath, isValidPath, positionAlong, type Tile } from '@shared/world/pathfinding';
+import { findPath, isValidPath, pathLength, positionAlong, WALK_SPEED, type Tile } from '@shared/world/pathfinding';
 import { sanitizeLoadout } from '@shared/avatar';
 import type { Store } from '../store/store';
+
+/** A self-serve machine's moment: the scoop, the thunk of the can. */
+export const SELF_SERVE_MS = 700;
 
 /** How far back a client may date a path it is extending (a little more than one diagonal step plus latency). */
 const MAX_PATH_BACKDATE_MS = 1500;
@@ -101,6 +104,7 @@ export class OrgHub extends EventEmitter<HubEvents> {
   dispose() {
     clearInterval(this.timer);
     this.npcs.dispose();
+    for (const t of this.selfServe) clearTimeout(t);
   }
 
   /* ------------------------------------------------------------------ state helpers */
@@ -297,6 +301,8 @@ export class OrgHub extends EventEmitter<HubEvents> {
     }
     this.toScene(sceneId, { t: 'joined', sceneId, occupant: this.occupant(actor) });
     this.directoryDirty = true;
+    // whoever works here says hello to people who come in
+    if (via === 'live') this.npcs.arrived(sceneId, memberId, [actor.x, actor.y]);
     this.emit('entered', memberId, sceneId, via);
     return actor;
   }
@@ -342,6 +348,7 @@ export class OrgHub extends EventEmitter<HubEvents> {
     const a = this.actors.get(memberId);
     if (!a) return;
     this.actors.delete(memberId);
+    this.npcs.left(memberId);
     this.toScene(a.sceneId, { t: 'left', sceneId: a.sceneId, memberId, toSceneId });
     const p = this.presenceOf(memberId);
     if (!toSceneId) p.sceneId = undefined;
@@ -368,6 +375,8 @@ export class OrgHub extends EventEmitter<HubEvents> {
     const seatAtEnd = this.seatAt(a.sceneId, last[0], last[1]);
     if (!isValidPath(grid, path, !!seatAtEnd)) return false;
     this.startPath(a, path, start);
+    // walking up to someone who works here: they turn and say hello when you get there
+    if (a.via === 'live') this.npcs.walking(a.sceneId, memberId, last, start + pathLength(path) / WALK_SPEED * 1000 - Date.now());
     return true;
   }
 
@@ -462,7 +471,7 @@ export class OrgHub extends EventEmitter<HubEvents> {
     if (Math.hypot(dx, dy) > 1.6) return false;
     if (this.ordering.has(memberId)) return true; // already being made
     this.faceToward(a, o);
-    this.toScene(a.sceneId, { t: 'updated', memberId, patch: { facing: a.facing } });
+    this.toScene(a.sceneId, { t: 'updated', memberId, patch: { x: a.x, y: a.y, facing: a.facing, path: undefined } });
     const item = vend.item;
     const handOver = () => {
       this.ordering.delete(memberId);
@@ -474,20 +483,38 @@ export class OrgHub extends EventEmitter<HubEvents> {
     // Someone works this machine (the café's barista): they make it, then hand it over.
     if (this.npcs.serverFor(a.sceneId, o)) {
       this.ordering.set(memberId, o.id);
-      this.npcs.serve(a.sceneId, o, memberId, handOver);
+      this.npcs.serve(a.sceneId, o, memberId, handOver, item);
       return true;
     }
+    // self-serve (the popcorn cart, the snack machine): a brief moment at the machine, then it's yours
+    this.ordering.set(memberId, o.id);
     this.toScene(a.sceneId, { t: 'moment', sceneId: a.sceneId, objectId: o.id, what: 'brew', by: memberId });
-    handOver();
+    const t = setTimeout(() => {
+      this.selfServe.delete(t);
+      handOver();
+    }, SELF_SERVE_MS);
+    this.selfServe.add(t);
     return true;
   }
 
+  /** Self-serve hand-overs in flight (cleared on dispose). */
+  private selfServe = new Set<ReturnType<typeof setTimeout>>();
+
   /** Turn a standing actor toward an object (you face the machine you order from). */
   private faceToward(a: Actor, o: { x: number; y: number; w?: number; d?: number }) {
-    const pos = this.position(a);
-    if (pos.moving || a.sittingOn) return;
-    const dx = o.x + (o.w ?? 1) / 2 - 0.5 - pos.x;
-    const dy = o.y + (o.d ?? 1) / 2 - 0.5 - pos.y;
+    if (a.sittingOn) return;
+    // Someone who orders the moment they arrive may still be finishing the last step here (their own client
+    // got there first): they've arrived — settle them on the tile, or the walk's last step would turn them
+    // back round when it ends.
+    if (this.position(a).moving && a.path) {
+      const [x, y] = a.path[a.path.length - 1];
+      a.path = undefined;
+      a.pathStartedAt = undefined;
+      a.x = x;
+      a.y = y;
+    }
+    const dx = o.x + (o.w ?? 1) / 2 - 0.5 - a.x;
+    const dy = o.y + (o.d ?? 1) / 2 - 0.5 - a.y;
     a.facing = facingFromDir(dx, dy, a.facing);
   }
 

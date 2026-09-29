@@ -40,12 +40,21 @@ export interface NpcState {
   facing: Facing;
   path?: Tile[];
   pathStartedAt?: number;
-  /** 'brew': working the machine; 'serve': handing something over. */
-  doing?: 'brew' | 'serve';
+  /**
+   * 'brew': making an order at their machine; 'serve': handing it over; 'work': busy at their spot (typing,
+   * shelving); 'greet': turned to someone, waving hello.
+   */
+  doing?: 'brew' | 'serve' | 'work' | 'greet';
+  /** Sitting on this object (a desk chair). */
+  sittingOn?: string;
+  /** What's in their hands while making or handing over an order (a carryable id: 'coffee'). */
+  holding?: string;
+  /** Something they say now (a speech bubble). Sent once, never replayed. */
+  say?: string;
 }
 
 /** What the world can hand you; each must also be a `held` item the avatar renderer can draw. */
-export const CARRYABLE = ['coffee', 'boba', 'icecream'] as const;
+export const CARRYABLE = ['coffee', 'boba', 'icecream', 'plush', 'popcorn', 'soda'] as const;
 
 export type DirectoryEntry = Pick<PresenceState, 'memberId' | 'status' | 'note' | 'sceneId' | 'voice' | 'until'> & {
   online: boolean;

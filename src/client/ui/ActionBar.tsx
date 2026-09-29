@@ -3,7 +3,7 @@ import { EMOTES, EMOTE_IDS } from '@shared/presence';
 import { game } from '../app/game';
 import { useStore } from '../app/store';
 
-const CARRY_EMOJI: Record<string, string> = { coffee: '☕', boba: '🧋', icecream: '🍦' };
+const CARRY_EMOJI: Record<string, string> = { coffee: '☕', boba: '🧋', icecream: '🍦', plush: '🧸', popcorn: '🍿', soda: '🥤' };
 
 export function ActionBar() {
   const [text, setText] = useState('');

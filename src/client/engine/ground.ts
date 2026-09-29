@@ -27,7 +27,23 @@ export interface GroundLayer {
   wallHits: WallHit[];
   /** Canvas px per art px (outdoor terrain can be rasterized at the 2× art density). */
   scale?: number;
+  /**
+   * Moving water (outdoors): ripple-crest and sparkle frames over the lake at art density (1 px = 1 art px),
+   * phases of one travelling wave; the view cross-fades them. `x`, `y`: the frames' top-left in art space.
+   */
+  water?: { frames: HTMLCanvasElement[]; x: number; y: number };
+  /** Still streaming in (outdoors): the detailed raster fills in over a flat first coat, a slice per frame. */
+  pending?: boolean;
+  /** Resolves when the layer is complete. */
+  done?: Promise<void>;
+  /** Finish the remaining work synchronously (review renders). */
+  finishNow?: () => void;
 }
+
+/** The travelling ripple on open water at phase `ph` (radians); crests where it exceeds ~1.4. */
+const rippleAt = (px: number, py: number, ph: number) =>
+  Math.sin(px * 0.16 + py * 0.62 + Math.sin(py * 0.05 + px * 0.01) * 3 + ph) + 0.6 * Math.sin(px * 0.035 - py * 0.21 + ph * 0.5);
+const RIPPLE_FRAMES = 6;
 
 type RGB = [number, number, number];
 const C = (hex: string): RGB => hexToRgb(hex);
@@ -61,6 +77,11 @@ const PAL = {
   stone: C('#8f8578'),
 };
 
+const FLOWER_Y = C('#ffd23f');
+const FLOWER_P = C('#ff9ec4');
+const FLOWER_W = C('#fffaf0');
+const LILY_FLOWER = C('#f7a8c8');
+
 function shade([r, g, b]: RGB, k: number): RGB {
   return [r * k, g * k, b * k];
 }
@@ -69,6 +90,28 @@ const frac = (v: number) => v - Math.floor(v);
 const isWater = (c: string) => c === 'w' || c === 'W';
 const isLand = (c: string) => c !== ' ' && !isWater(c);
 const isPaved = (c: string) => c === 'p' || c === 'P' || c === 'd';
+
+/** Hashed lattice values, cached per seed (value noise reads each one thousands of times). */
+const LAT = 160;
+const LAT_OFF = 8;
+const lattices = new Map<number, Float32Array>();
+function lattice(x: number, y: number, seed: number): number {
+  const ix = x + LAT_OFF;
+  const iy = y + LAT_OFF;
+  if (ix < 0 || iy < 0 || ix >= LAT || iy >= LAT) return hash2(x, y, seed);
+  let a = lattices.get(seed);
+  if (!a) {
+    a = new Float32Array(LAT * LAT).fill(-1);
+    lattices.set(seed, a);
+  }
+  const i = iy * LAT + ix;
+  let v = a[i];
+  if (v < 0) {
+    v = hash2(x, y, seed);
+    a[i] = v;
+  }
+  return v;
+}
 
 /** Smooth value noise over tile space (bilinear between hashed lattice points), 0..1. */
 function vnoise(x: number, y: number, cell: number, seed: number): number {
@@ -80,10 +123,10 @@ function vnoise(x: number, y: number, cell: number, seed: number): number {
   const fy = gy - y0;
   const sx = fx * fx * (3 - 2 * fx);
   const sy = fy * fy * (3 - 2 * fy);
-  const a = hash2(x0, y0, seed);
-  const b = hash2(x0 + 1, y0, seed);
-  const c = hash2(x0, y0 + 1, seed);
-  const d = hash2(x0 + 1, y0 + 1, seed);
+  const a = lattice(x0, y0, seed);
+  const b = lattice(x0 + 1, y0, seed);
+  const c = lattice(x0, y0 + 1, seed);
+  const d = lattice(x0 + 1, y0 + 1, seed);
   return (a * (1 - sx) + b * sx) * (1 - sy) + (c * (1 - sx) + d * sx) * sy;
 }
 
@@ -113,8 +156,8 @@ function grassColor(c: string, s: Sample): RGB {
   else if (h < 0.018) base = shade(base, 1.12);
   if (c === 'm') {
     const f = hash2(s.px >> 1, s.py >> 1, 4);
-    if (f > 0.985) return hash2(s.px, s.py, 5) > 0.5 ? C('#ffd23f') : C('#ff9ec4');
-    if (f < 0.012) return C('#fffaf0');
+    if (f > 0.985) return hash2(s.px, s.py, 5) > 0.5 ? FLOWER_Y : FLOWER_P;
+    if (f < 0.012) return FLOWER_W;
   }
   return base;
 }
@@ -190,11 +233,9 @@ function waterColor(depth: number, s: Sample): RGB {
   // dithered so they read as a gradient in pixel art, not stair-steps
   const d = depth + (dither(s.sx, s.sy) - 0.5) * 0.35;
   let base = d < 0.9 ? PAL.shallow : d < 2.0 ? PAL.water : d < 3.4 ? PAL.mid : d < 4.8 ? PAL.deep : PAL.abyss;
-  // long soft ripple lines (lighter) and a few sparkles on the crests
-  const wave = Math.sin(s.px * 0.16 + s.py * 0.62 + Math.sin(s.py * 0.05 + s.px * 0.01) * 3) + 0.6 * Math.sin(s.px * 0.035 - s.py * 0.21);
-  if (wave > 1.42) base = shade(base, 1.12);
-  if (wave > 1.5 && hash2(s.px >> 1, s.py, 41) > 0.93) return C('#f4fbff');
-  if (wave < -1.45) base = shade(base, 0.95);
+  // the troughs of the ripple stay in the ground (a slow texture); crests and sparkles move on their own
+  // layer (GroundLayer.water)
+  if (rippleAt(s.px, s.py, 0) < -1.45) base = shade(base, 0.95);
   return base;
 }
 
@@ -202,7 +243,27 @@ function waterColor(depth: number, s: Sample): RGB {
  * Outdoor terrain rasterizer. `scale` is canvas px per art px: 2 matches the art density (64 px per floor
  * tile); the layer reports it so the view can draw it at world size.
  */
+/**
+ * The town's ground is expensive to rasterize (millions of pixels) and never changes while you're there:
+ * built once per scene (and object layout, which casts the contact shadows) and scale, then reused.
+ */
+const outdoorCache = new Map<string, { key: string; layer: GroundLayer }>();
+/** How long the last town ground took to build (ms): the terrain raster and the lake's ripple frames. */
+export const groundStats = { raster: 0, water: 0 };
+
 export function renderOutdoorGround(scene: SceneDef, scale = 1): GroundLayer {
+  let sig = 0;
+  for (const o of scene.objects) sig = (Math.imul(sig, 31) + o.x * 131 + o.y * 7 + (o.w ?? 1) * 3 + (o.eventDecor ? 1 : 0) + o.id.length) | 0;
+  const key = `${scale}|${scene.width}x${scene.height}|${scene.objects.length}|${sig}|${scene.tiles.join('').length}`;
+  const hit = outdoorCache.get(scene.id);
+  if (hit && hit.key === key) return hit.layer;
+  const layer = rasterizeOutdoor(scene, scale);
+  outdoorCache.set(scene.id, { key, layer });
+  return layer;
+}
+
+function rasterizeOutdoor(scene: SceneDef, scale: number): GroundLayer {
+  const t0 = performance.now();
   const { width: W, height: H } = scene;
   const S = scale;
   const minX = -H * 16 - 8;
@@ -213,8 +274,6 @@ export function renderOutdoorGround(scene: SceneDef, scale = 1): GroundLayer {
   const ch = Math.ceil((maxY - minY) * S);
   const canvas = makeCanvas(cw, ch);
   const ctx = canvas.getContext('2d')!;
-  const img = ctx.createImageData(cw, ch);
-  const d = img.data;
   const T = (x: number, y: number) => terrainAt(scene, x, y);
   // Natural edges (water, sand, grass) are drawn from a smoothed field, not tile by tile, so shores curve;
   // streets, the plaza and the pier keep their crisp tile edges. Only tiles near water pay for it.
@@ -290,19 +349,59 @@ export function renderOutdoorGround(scene: SceneDef, scale = 1): GroundLayer {
     return (v(x0, y0) * (1 - fx) + v(x0 + 1, y0) * fx) * (1 - fy) + (v(x0, y0 + 1) * (1 - fx) + v(x0 + 1, y0 + 1) * fx) * fy;
   };
 
-  for (let sy = 0; sy < ch; sy++) {
+  // Only the map's diamond and the bank / cliff band under its front edges hold pixels: for each canvas
+  // column, the rows between the diamond's top and its bottom plus the cliff (half the canvas is empty).
+  const rowLo = new Int32Array(cw);
+  const rowHi = new Int32Array(cw);
+  for (let sx = 0; sx < cw; sx++) {
+    const u = (minX + (sx + 0.5) / S) / 16; // x - y at this column
+    const lo = Math.abs(u); // x + y at the diamond's top edge
+    const hi = Math.min(2 * W - u, 2 * H + u); // …and its bottom edge
+    if (hi < lo) {
+      rowLo[sx] = 1;
+      rowHi[sx] = 0;
+      continue;
+    }
+    rowLo[sx] = Math.max(0, Math.floor((lo * 8 - minY) * S) - 1);
+    rowHi[sx] = Math.min(ch - 1, Math.ceil((hi * 8 + CLIFF + WATER_DROP + 2 - minY) * S));
+  }
+  const iso = { x: 0, y: 0 };
+  const toIso = (ax: number, ay: number) => {
+    const a = ax / 16;
+    const b = ay / 8;
+    iso.x = (a + b) / 2;
+    iso.y = (b - a) / 2;
+    return iso;
+  };
+  const smp: Sample = { gx: 0, gy: 0, tx: 0, ty: 0, px: 0, py: 0, sx: 0, sy: 0 };
+
+  /** Rasterize canvas rows [ya, yb) into `d` (a band buffer cw wide). */
+  const rasterRows = (ya: number, yb: number, d: Uint8ClampedArray) => {
+  for (let sy = ya; sy < yb; sy++) {
     for (let sx = 0; sx < cw; sx++) {
+      if (sy < rowLo[sx] || sy > rowHi[sx]) continue;
       const ax = minX + (sx + 0.5) / S;
       const ay = minY + (sy + 0.5) / S;
       const px = Math.floor(ax - minX);
       const py = Math.floor(ay - minY);
       let rgb: RGB | null = null;
 
-      const g = screenToIso(ax, ay);
-      const tx = Math.floor(g.x);
-      const ty = Math.floor(g.y);
-      const c = classAt(g.x, g.y);
-      const smp: Sample = { gx: g.x, gy: g.y, tx, ty, px: Math.floor((ax - minX) * 2), py: Math.floor((ay - minY) * 2), sx, sy };
+      const gi = toIso(ax, ay);
+      const gx0 = gi.x;
+      const gy0 = gi.y;
+      const tx = Math.floor(gx0);
+      const ty = Math.floor(gy0);
+      const inMap = tx >= 0 && ty >= 0 && tx < W && ty < H;
+      const c = inMap ? classAt(gx0, gy0) : ' ';
+      smp.gx = gx0;
+      smp.gy = gy0;
+      smp.tx = tx;
+      smp.ty = ty;
+      smp.px = Math.floor((ax - minX) * 2);
+      smp.py = Math.floor((ay - minY) * 2);
+      smp.sx = sx;
+      smp.sy = sy;
+      const g = { x: gx0, y: gy0 };
       if (isLand(c)) {
         rgb = landColor(c, smp, T, fountain);
         if (c === 's' && wet[ty * W + tx]) {
@@ -320,11 +419,12 @@ export function renderOutdoorGround(scene: SceneDef, scale = 1): GroundLayer {
       } else {
         // Bank below a land tile edge?
         for (let k = 1; k <= WATER_DROP + 1 && !rgb; k++) {
-          const u = screenToIso(ax, ay - k);
-          if (isLand(classAt(u.x, u.y))) rgb = k <= 1 ? PAL.dirt : PAL.dirtDark;
+          const u = toIso(ax, ay - k);
+          if (Math.floor(u.x) < W && Math.floor(u.y) < H && isLand(classAt(u.x, u.y))) rgb = k <= 1 ? PAL.dirt : PAL.dirtDark;
         }
         if (!rgb) {
-          const wv = screenToIso(ax, ay - WATER_DROP);
+          const wv0 = toIso(ax, ay - WATER_DROP);
+          const wv = { x: wv0.x, y: wv0.y };
           const wx = Math.floor(wv.x);
           const wy = Math.floor(wv.y);
           const wc = classAt(wv.x, wv.y);
@@ -348,7 +448,7 @@ export function renderOutdoorGround(scene: SceneDef, scale = 1): GroundLayer {
                 const r = Math.hypot(ox, oy);
                 if (r < 0.3 && !(ox > 0.02 && Math.abs(oy) < 0.05)) {
                   rgb = r > 0.22 ? PAL.lilyDark : PAL.lily;
-                  if (r < 0.08 && hash2(cx, cy, 22) > 0.6) rgb = C('#f7a8c8');
+                  if (r < 0.08 && hash2(cx, cy, 22) > 0.6) rgb = LILY_FLOWER;
                 }
               }
             }
@@ -358,11 +458,12 @@ export function renderOutdoorGround(scene: SceneDef, scale = 1): GroundLayer {
       if (!rgb) {
         // Diorama cliff under the map's front edges.
         for (let k = 1; k <= CLIFF && !rgb; k++) {
-          const u = screenToIso(ax, ay - k);
+          if (inMap) break; // the cliff hangs only below the map's front edges
+          const u = toIso(ax, ay - k);
           const ux = Math.floor(u.x);
           const uy = Math.floor(u.y);
-          const inMap = ux >= 0 && uy >= 0 && ux < W && uy < H;
-          if (!inMap) continue;
+          const onMap = ux >= 0 && uy >= 0 && ux < W && uy < H;
+          if (!onMap) continue;
           const onFront = ux === W - 1 || uy === H - 1;
           if (!onFront) continue;
           const tc = T(ux, uy);
@@ -374,35 +475,197 @@ export function renderOutdoorGround(scene: SceneDef, scale = 1): GroundLayer {
         }
       }
       if (!rgb) continue;
-      const i = (sy * cw + sx) * 4;
+      const i = ((sy - ya) * cw + sx) * 4;
       d[i] = rgb[0];
       d[i + 1] = rgb[1];
       d[i + 2] = rgb[2];
       d[i + 3] = 255;
     }
   }
-  ctx.putImageData(img, 0, 0);
+  };
 
-  // Soft contact shadows under objects.
+  // Soft contact shadows under objects, bucketed by the canvas rows they touch (drawn with their band).
+  const shadows = scene.objects
+    .filter((o) => !(o.sprite === 'reeds' || o.sprite === 'boat' || o.eventDecor))
+    .map((o) => {
+      const fp = footprint(o);
+      const cx = (fp.x0 + fp.x1) / 2;
+      const cy = (fp.y0 + fp.y1) / 2;
+      const rw = ((fp.x1 - fp.x0 + fp.y1 - fp.y0) / 2) * 16 * (o.building ? 1.08 : 0.8);
+      const x = (cx - cy) * 16 + (o.building ? -4 : 0);
+      const y = (cx + cy) * 8 + (o.building ? 3 : 1);
+      return { x, y, rw, building: !!o.building, y0: (y - rw / 2 - minY) * S, y1: (y + rw / 2 - minY) * S };
+    });
+  const shadowRows = (ya: number, yb: number) => {
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, ya, cw, yb - ya);
+    ctx.clip();
+    ctx.scale(S, S);
+    ctx.translate(-minX, -minY);
+    for (const sh of shadows) {
+      if (sh.y1 < ya || sh.y0 > yb) continue;
+      ctx.fillStyle = sh.building ? 'rgba(40,30,50,0.20)' : 'rgba(40,30,50,0.16)';
+      ctx.beginPath();
+      ctx.ellipse(sh.x, sh.y, sh.rw, sh.rw / 2, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  };
+
+  // A flat first coat, instantly: every tile its terrain's base colour, so the town is there from the first
+  // frame while the detailed raster streams in over it, band by band, from the middle out.
   ctx.save();
   ctx.scale(S, S);
   ctx.translate(-minX, -minY);
-  for (const o of scene.objects) {
-    if (o.sprite === 'reeds' || o.sprite === 'boat' || o.eventDecor) continue;
-    const fp = footprint(o);
-    const cx = (fp.x0 + fp.x1) / 2;
-    const cy = (fp.y0 + fp.y1) / 2;
-    const ssx = (cx - cy) * 16;
-    const ssy = (cx + cy) * 8;
-    const rw = ((fp.x1 - fp.x0 + fp.y1 - fp.y0) / 2) * 16 * (o.building ? 1.08 : 0.8);
-    ctx.fillStyle = o.building ? 'rgba(40,30,50,0.20)' : 'rgba(40,30,50,0.16)';
-    ctx.beginPath();
-    ctx.ellipse(ssx + (o.building ? -4 : 0), ssy + (o.building ? 3 : 1), rw, rw / 2, 0, 0, Math.PI * 2);
-    ctx.fill();
-  }
+  const flat: Record<string, RGB> = { g: PAL.grass, h: PAL.grass2, m: PAL.meadow, p: PAL.path, P: PAL.plaza, s: PAL.sand, w: PAL.water, W: PAL.deep, d: PAL.dock };
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      const col = flat[T(x, y)] ?? PAL.grass;
+      ctx.fillStyle = `rgb(${col[0]},${col[1]},${col[2]})`;
+      ctx.beginPath();
+      ctx.moveTo((x - y) * 16, (x + y) * 8 - 0.5);
+      ctx.lineTo((x + 1 - y) * 16 + 0.5, (x + 1 + y) * 8);
+      ctx.lineTo((x - y) * 16, (x + y + 2) * 8 + 0.5);
+      ctx.lineTo((x - y - 1) * 16 - 0.5, (x + y + 1) * 8);
+      ctx.closePath();
+      ctx.fill();
+    }
   ctx.restore();
 
-  return { canvas, minX, minY, wallHits: [], scale: S };
+  const BAND = 48;
+  const bands: number[] = [];
+  for (let y = 0; y < ch; y += BAND) bands.push(y);
+  bands.sort((a, b) => Math.abs(a + BAND / 2 - ch / 2) - Math.abs(b + BAND / 2 - ch / 2));
+  const buf = new ImageData(cw, BAND);
+  let next = 0;
+  let rasterMs = 0;
+  const layer: GroundLayer = { canvas, minX, minY, wallHits: [], scale: S };
+  const water = waterMotionJob(scene, classAt, shoreAt, minX, minY);
+  /** Do up to `budget` ms of the remaining work; true once everything is done. */
+  const step = (budget: number): boolean => {
+    const start = performance.now();
+    while (next < bands.length && performance.now() - start < budget) {
+      const ya = bands[next++];
+      const yb = Math.min(ch, ya + BAND);
+      const t = performance.now();
+      buf.data.fill(0);
+      rasterRows(ya, yb, buf.data);
+      // keep the flat coat where the raster leaves nothing (outside the diamond, it's all transparent anyway)
+      ctx.putImageData(buf, 0, ya, 0, 0, cw, yb - ya);
+      shadowRows(ya, yb);
+      rasterMs += performance.now() - t;
+    }
+    if (next < bands.length) return false;
+    groundStats.raster = rasterMs;
+    if (!layer.water) {
+      const t = performance.now();
+      const doneWater = water.step(Math.max(1, budget - (performance.now() - start)));
+      groundStats.water += performance.now() - t;
+      if (!doneWater) return false;
+      layer.water = water.result();
+    }
+    layer.pending = false;
+    return true;
+  };
+  groundStats.raster = 0;
+  groundStats.water = 0;
+  layer.pending = true;
+  layer.finishNow = () => {
+    while (!step(1e9));
+  };
+  layer.done = new Promise<void>((resolve) => {
+    const ch2 = new MessageChannel();
+    ch2.port1.onmessage = () => {
+      if (step(8)) resolve();
+      else ch2.port2.postMessage(0);
+    };
+    ch2.port2.postMessage(0);
+  });
+  void t0;
+  return layer;
+}
+
+/**
+ * Ripple frames for the lake: for every open-water art pixel (not the bank drop), a light crest where the
+ * travelling ripple peaks at that frame's phase, and a rare bright sparkle on a crest.
+ */
+function waterMotionJob(
+  scene: SceneDef,
+  classAt: (gx: number, gy: number) => string,
+  shoreAt: (gx: number, gy: number) => number,
+  gMinX: number,
+  gMinY: number,
+): { step: (budget: number) => boolean; result: () => GroundLayer['water'] } {
+  const { width: W, height: H } = scene;
+  let x0 = Infinity;
+  let y0 = Infinity;
+  let x1 = -Infinity;
+  let y1 = -Infinity;
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      if (!isWater(terrainAt(scene, x, y))) continue;
+      x0 = Math.min(x0, (x - y - 1) * 16);
+      x1 = Math.max(x1, (x - y + 1) * 16);
+      y0 = Math.min(y0, (x + y) * 8);
+      y1 = Math.max(y1, (x + y + 2) * 8 + WATER_DROP);
+    }
+  if (x0 === Infinity) return { step: () => true, result: () => undefined };
+  const w = Math.ceil(x1 - x0);
+  const h = Math.ceil(y1 - y0);
+  const frames = Array.from({ length: RIPPLE_FRAMES }, () => {
+    const cv = makeCanvas(w, h);
+    return { cv, img: cv.getContext('2d')!.createImageData(w, h) };
+  });
+  const iso = { x: 0, y: 0 };
+  const toIso = (ax: number, ay: number) => {
+    const a = ax / 16;
+    const b = ay / 8;
+    iso.x = (a + b) / 2;
+    iso.y = (b - a) / 2;
+    return iso;
+  };
+  let py = 0;
+  const step = (budget: number) => {
+    const start = performance.now();
+    for (; py < h && performance.now() - start < budget; py++)
+      for (let px = 0; px < w; px++) {
+        const ax = x0 + px + 0.5;
+        const ay = y0 + py + 0.5;
+        const wv = toIso(ax, ay - WATER_DROP);
+        const wx = wv.x;
+        const wy = wv.y;
+        const tt = terrainAt(scene, Math.floor(wx), Math.floor(wy));
+        if (tt !== 'w' && tt !== 'W' && tt !== 's') continue; // grass and paths: no water here
+        if (!isWater(classAt(wx, wy))) continue;
+        // not on the bank drop under a land edge
+        let bank = false;
+        for (let k = 1; k <= WATER_DROP + 1 && !bank; k++) {
+          const u = toIso(ax, ay - k);
+          if (isLand(classAt(u.x, u.y))) bank = true;
+        }
+        if (bank || shoreAt(wx, wy) < 0.55) continue;
+        // same art-space hashing coordinates as the ground rasterizer
+        const hx = Math.floor((ax - gMinX) * 2);
+        const hy = Math.floor((ay - gMinY) * 2);
+        const i = (py * w + px) * 4;
+        for (let f = 0; f < RIPPLE_FRAMES; f++) {
+          const wave = rippleAt(hx, hy, (f / RIPPLE_FRAMES) * Math.PI * 2);
+          if (wave <= 1.42) continue;
+          const d = frames[f].img.data;
+          const spark = wave > 1.5 && hash2(hx >> 1, hy + f * 131, 41) > 0.94;
+          d[i] = spark ? 244 : 214;
+          d[i + 1] = spark ? 251 : 240;
+          d[i + 2] = 255;
+          d[i + 3] = spark ? 235 : 70;
+        }
+      }
+    return py >= h;
+  };
+  return {
+    step,
+    result: () => ({ frames: frames.map(({ cv, img }) => (cv.getContext('2d')!.putImageData(img, 0, 0), cv)), x: x0, y: y0 }),
+  };
 }
 
 /* -------------------------------------------------------------------- interiors */

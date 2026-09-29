@@ -57,7 +57,18 @@ def glow_mask(img: Image.Image) -> Image.Image:
     hsv = cv2.cvtColor(a[..., :3].astype(np.uint8).reshape(-1, 1, 3), cv2.COLOR_RGB2HSV).reshape(a.shape[0], a.shape[1], 3)
     hue, sat, val = hsv[..., 0].astype(int) * 2, hsv[..., 1] / 255, hsv[..., 2] / 255
     # lamp-lit glass is a saturated yellow-gold at full brightness (not peach stucco, not orange paint)
-    warm = (al > 0) & (hue >= 34) & (hue <= 58) & (sat > 0.42) & (val > 0.86)
+    cand = (al > 0) & (hue >= 33) & (hue <= 58) & (sat > 0.42) & (val > 0.84)
+    # orange paint (Launch Lab's stripes) is darker than lamp-lit glass of the same hue
+    cand &= ~((hue < 40) & (val < 0.93))
+    # ...and it comes in small pieces (panes, lanterns, bulbs): a painted wall is one big pale region
+    n, lab, st, _ = cv2.connectedComponentsWithStats(cand.astype(np.uint8), connectivity=4)
+    warm = np.zeros_like(cand)
+    for i in range(1, n):
+        m = lab == i
+        area = st[i, cv2.CC_STAT_AREA]
+        msat = float(sat[m].mean())
+        if (area <= 700 and msat >= 0.55) or (area <= 120 and msat >= 0.45) or msat >= 0.78:
+            warm |= m
     out = np.zeros_like(a)
     out[warm] = a[warm]
     out[warm, 3] = 255

@@ -149,6 +149,8 @@ export class Effects {
   private blinks: Array<{ x: number; y: number; phase: number }> = [];
   /** How dark it is outside, 0 (day) … 1 (night): beacons, the lighthouse beam. Set every frame. */
   night = 0;
+  /** Twinkles on the water (off when the ground animates its own water). */
+  glints = true;
   private cloudSpan = 1400;
 
   /**
@@ -303,7 +305,7 @@ export class Effects {
     }
     // glints on the water: a few at a time, each a short-lived two-pixel twinkle somewhere on the lake
     const n = this.water.length;
-    if (n && !this.reducedMotion) {
+    if (n && this.glints && !this.reducedMotion) {
       const count = Math.min(60, Math.round(n / 12));
       for (let i = 0; i < count; i++) {
         const k = Math.floor(t * 0.9 + i * 7.3);

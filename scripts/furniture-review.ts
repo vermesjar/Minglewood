@@ -192,7 +192,7 @@ export const footCentre = (p: Placed): [number, number] => [p.ax + 16 * (p.w - p
  * counter, lamps, ornaments) must have its base centred on the footprint. A LARGE piece fills its footprint:
  * it must not spill past the footprint's left, right or front vertex.
  */
-export function placement(p: Placed, town = false): { kind: 'small'; dx: number; dy: number } | { kind: 'large'; spill: string[] } {
+export function placement(p: Placed, town = false, key = ''): { kind: 'small'; dx: number; dy: number } | { kind: 'large'; spill: string[] } {
   const fc = footCentre(p);
   const bc = footingCentre(p.img);
   if (bc && isSmall(p.img, p.w, p.d)) return { kind: 'small', dx: bc[0] - fc[0], dy: bc[1] - fc[1] };
@@ -212,9 +212,11 @@ export function placement(p: Placed, town = false): { kind: 'small'; dx: number;
   const right = p.ax + 32 * p.w;
   const front = p.ay + 16 * (p.w + p.d);
   const spill: string[] = [];
-  if (r >= 0 && l < left - 4) spill.push(`base left by ${left - l}px`);
-  if (r >= 0 && r > right + 4) spill.push(`base right by ${r - right}px`);
-  if (e.b > front + 4) spill.push(`front by ${e.b - front}px`);
+  // a building's stoop (steps, planters, a parked bike) may stand on the kept-clear apron in front of it
+  const slack = key.startsWith('building.') ? 24 : 4;
+  if (r >= 0 && l < left - slack) spill.push(`base left by ${left - l}px`);
+  if (r >= 0 && r > right + slack) spill.push(`base right by ${r - right}px`);
+  if (e.b > front + slack) spill.push(`front by ${e.b - front}px`);
   // …and a town piece standing on a narrow base (a trunk, a post) stands on the footprint's centre. (Room
   // furniture on legs reads as narrow at its very bottom, so this only applies outdoors.)
   if (town && bc && r >= 0 && p.w * p.d <= 4) {
@@ -226,7 +228,10 @@ export function placement(p: Placed, town = false): { kind: 'small'; dx: number;
           bl = Math.min(bl, x);
           br = Math.max(br, x);
         }
-    const narrow = br - bl < (p.w + p.d) * 32 * 0.5;
+    // pieces that fill their diamond (a flowerbed) end in its front vertex: narrow at the very bottom by
+    // construction, so only a base that is narrow over its lower 30 % counts
+    const wide = r - l >= (p.w + p.d) * 32 * 0.7;
+    const narrow = !wide && br - bl < (p.w + p.d) * 32 * 0.5;
     // where the trunk or post meets the ground: the middle of its very bottom rows
     const dx = (bl + br) / 2 - fc[0];
     const dy = e.b - (br - bl) / 4 - fc[1];
@@ -319,7 +324,7 @@ export function reviewEntry(key: string, e: Entry, sprites: string) {
     if (!p) continue;
     // town pieces stand as authored (se): only that orientation is theirs to answer for
     if (!ROOM_KEYS.has(key) && facing !== 'se') continue;
-    const fit = placement(p, !ROOM_KEYS.has(key));
+    const fit = placement(p, !ROOM_KEYS.has(key), key);
     if (fit.kind === 'small') {
       // small pieces are centred on their footprint at runtime (art.ts + footing.ts); record how far off the
       // drawing's own anchor was

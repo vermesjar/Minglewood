@@ -7,7 +7,8 @@
  * Particle effects (steam, flames, bubbles, notes) go through Effects; the rest is drawn right after the
  * object in depth order, clipped to its glass or screen.
  */
-import type { SceneObject } from '@shared/world/scene';
+import type { SceneDef, SceneObject } from '@shared/world/scene';
+import { wallArt } from './sprites/art';
 import type { Effects } from './effects';
 import type { Sprite } from './sprites/painter';
 import { worldTimeNow } from './weather';
@@ -48,7 +49,24 @@ export type AnimSpec =
   /** The whole piece bobs gently (balloons). */
   | { kind: 'bob'; amp: number; period: number }
   /** Rung (the launch bell): the piece shakes and rings spread from a point. */
-  | { kind: 'ring'; at: P };
+  | { kind: 'ring'; at: P }
+  /** An LED strip along a rail: a soft highlight travelling along it. */
+  | { kind: 'strip'; from: P; to: P; color: string; speed: number }
+  /** Kernels popping behind the glass of a popcorn cart. */
+  | { kind: 'popcorn'; glass: Quad; rate: number }
+  /** Part of the drawing (a hanging lantern, a claw) sways by a pixel on a slow sine: [x0, y0, x1, y1]. */
+  | { kind: 'regionSway'; rect: [number, number, number, number]; amp: number; period: number }
+  /** The top of the drawing (leaves) stirs in a breeze from a nearby window. */
+  | { kind: 'bandSway'; top: number; period: number };
+
+/** Wall things (painted into the room's wall): where they are is worked out per scene, see loadWalls. */
+type WallSpec =
+  /** A countdown ring whose segments light one by one, and a dot flying along the trajectory arc. */
+  | { kind: 'countdown'; ring: P; r: number; arc: [P, P, P] }
+  /** Paper lanterns glowing softly, each on its own breath. */
+  | { kind: 'lanterns'; at: P[]; r: number }
+  /** A neon sign: a steady buzz, and now and then one letter dips for a couple of frames. */
+  | { kind: 'neon'; letters: number };
 
 const ARCADE_SW: AnimSpec[] = [
   { kind: 'screen', quad: [[13, 25], [32, 31], [32, 48], [13, 43]] },
@@ -111,7 +129,36 @@ const BY_FILE: Record<string, AnimSpec[]> = {
   'balloons.b.png': [{ kind: 'bob', amp: 1, period: 3.4 }],
   'balloons.c.png': [{ kind: 'bob', amp: 1, period: 2.7 }],
   'heirloom-bell.png': [{ kind: 'ring', at: [22, 26] }],
-  'claw-machine.sw.png': [{ kind: 'chase', from: [7, 12], to: [44, 13], n: 9, colors: ['#ffe66b', '#ff6bd5'] }],
+  'air-hockey.sw.png': [
+    { kind: 'strip', from: [9, 26], to: [48, 48], color: '90,230,255', speed: 0.35 },
+    { kind: 'strip', from: [86, 41], to: [70, 50], color: '90,230,255', speed: 0.5 },
+    { kind: 'strip', from: [40, 4], to: [58, 13], color: '255,110,210', speed: 0.45 },
+    { kind: 'strip', from: [63, 15], to: [86, 26], color: '255,110,210', speed: 0.4 },
+  ],
+  'popcorn-cart.se.png': [
+    { kind: 'popcorn', glass: [[8, 12], [33, 10], [33, 32], [8, 34]], rate: 5 },
+    { kind: 'glow', at: [20, 22], r: 12, color: '255,220,140', speed: 0.9 },
+  ],
+  'popcorn-cart.nw.png': [
+    { kind: 'popcorn', glass: [[8, 12], [33, 10], [33, 32], [8, 34]], rate: 5 },
+    { kind: 'glow', at: [20, 22], r: 12, color: '255,220,140', speed: 0.9 },
+  ],
+  'vending-machine.sw.png': [
+    { kind: 'glow', at: [15, 38], r: 18, color: '130,165,255', speed: 0.5 },
+    { kind: 'blink', at: [[31, 70]], colors: ['#ff8ad8'] },
+  ],
+  'lantern-floor.se.png': [
+    { kind: 'regionSway', rect: [7, 6, 31, 40], amp: 1, period: 5.5 },
+    { kind: 'glow', at: [18, 15], r: 12, color: '255,190,140', speed: 0.7 },
+  ],
+  'lantern-floor.nw.png': [
+    { kind: 'regionSway', rect: [7, 6, 31, 40], amp: 1, period: 5.5 },
+    { kind: 'glow', at: [18, 15], r: 12, color: '255,190,140', speed: 0.7 },
+  ],
+  'claw-machine.sw.png': [
+    { kind: 'chase', from: [7, 12], to: [44, 13], n: 9, colors: ['#ffe66b', '#ff6bd5'] },
+    { kind: 'regionSway', rect: [18, 24, 30, 38], amp: 1, period: 3.2 },
+  ],
   'claw-machine.ne.png': [{ kind: 'chase', from: [3, 11], to: [40, 11], n: 9, colors: ['#ffe66b', '#ff6bd5'] }],
   'arcade-cabinet.sw.png': ARCADE_SW,
   'arcade-cabinet.ne.png': ARCADE_NE,
@@ -150,6 +197,8 @@ interface Live {
   fill?: string;
   /** When it was last rung (this.t seconds). */
   rungAt?: number;
+  /** Popcorn in the air (drawing px). */
+  kernels: Array<{ x: number; y: number; vx: number; vy: number; floor: number }>;
 }
 
 const KOI: Array<[string, string]> = [
@@ -168,16 +217,18 @@ export class ObjectAnimations {
   ) {}
 
   /** Pick up every object in the scene that has something to do. */
-  load(statics: Array<{ obj: SceneObject; sprite: Sprite; dx: number; dy: number }>) {
+  load(statics: Array<{ obj: SceneObject; sprite: Sprite; dx: number; dy: number }>, scene?: SceneDef) {
     this.live.clear();
     for (const st of statics) {
-      const specs = st.sprite.file ? BY_FILE[st.sprite.file] : undefined;
+      let specs = st.sprite.file ? BY_FILE[st.sprite.file] : undefined;
+      // a potted plant by a window stirs in the breeze coming in
+      if (scene && st.obj.sprite === 'plant' && nearWindow(scene, st.obj)) specs = [...(specs ?? []), { kind: 'bandSway', top: 0.42, period: 4.5 }];
       if (!specs?.length) continue;
       const k = st.sprite.scale ?? 1;
       const w = st.sprite.canvas.width;
       const at = (p: P): [number, number] => [st.dx + (st.sprite.mirrored ? w - p[0] : p[0]) / k, st.dy + p[1] / k];
       const seed = (st.obj.x * 31 + st.obj.y * 17) % 97;
-      const live: Live = { obj: st.obj, sprite: st.sprite, dx: st.dx, dy: st.dy, specs, at, clock: specs.map((_, i) => (seed * 0.37 + i) % 3), fish: [], seed };
+      const live: Live = { obj: st.obj, sprite: st.sprite, dx: st.dx, dy: st.dy, specs, at, clock: specs.map((_, i) => (seed * 0.37 + i) % 3), fish: [], seed, kernels: [] };
       for (const s of specs) {
         if (s.kind === 'fish')
           for (let i = 0; i < s.n; i++) {
@@ -199,6 +250,13 @@ export class ObjectAnimations {
       return;
     }
     for (const s of l.specs) {
+      // a scoop from the popcorn cart: a flurry of kernels
+      if (s.kind === 'popcorn')
+        for (let i = 0; i < 10; i++) {
+          const u = 0.15 + Math.random() * 0.7;
+          const [x, y] = lerp2(lerp2(s.glass[3], s.glass[2], u), lerp2(s.glass[0], s.glass[1], u), 0.35);
+          l.kernels.push({ x, y, vx: (Math.random() - 0.5) * 18, vy: -30 - Math.random() * 20, floor: y });
+        }
       if (s.kind !== 'brew' || what !== 'brew') continue;
       for (const p of s.at) {
         const [x, y] = l.at(p);
@@ -246,6 +304,20 @@ export class ObjectAnimations {
           this.effects.add({ x, y, vx: (Math.random() - 0.3) * 4, vy: -7, max: 2.2, size: 2, color: Math.random() > 0.5 ? '#ff8ad8' : '#8ae2ff', gravity: 0, kind: 'note' });
         }
       });
+      for (const s of l.specs) {
+        if (s.kind !== 'popcorn' || !on) continue;
+        if (Math.random() < s.rate * dt) {
+          const u = 0.15 + Math.random() * 0.7;
+          const [x, y] = lerp2(lerp2(s.glass[3], s.glass[2], u), lerp2(s.glass[0], s.glass[1], u), 0.35);
+          l.kernels.push({ x, y, vx: (Math.random() - 0.5) * 14, vy: -26 - Math.random() * 18, floor: y });
+        }
+      }
+      for (const k of l.kernels) {
+        k.vy += 90 * dt;
+        k.x += k.vx * dt;
+        k.y += k.vy * dt;
+      }
+      l.kernels = l.kernels.filter((k) => k.y <= k.floor || k.vy < 0);
       for (const f of l.fish) {
         f.u += f.dir * f.speed * dt;
         if (f.u > 0.88 || f.u < 0.12) {
@@ -257,6 +329,153 @@ export class ObjectAnimations {
       }
     }
   }
+
+  /**
+   * Draw an object's drawing itself when part of it moves (a swaying lantern, a claw, leaves by a window):
+   * the still parts are drawn as they are and the moving part shifted by whole pixels. Returns false when
+   * the object has nothing like that, so the caller draws it normally.
+   */
+  drawSprite(c: CanvasRenderingContext2D, objectId: string, x: number, y: number, reducedMotion: boolean): boolean {
+    const l = this.live.get(objectId);
+    if (!l || reducedMotion) return false;
+    const sp = l.sprite;
+    const k = sp.scale ?? 1;
+    const W = sp.canvas.width;
+    const H = sp.canvas.height;
+    const x0 = x - sp.ax / k;
+    const y0 = y - sp.ay / k;
+    const part = (sx: number, sy: number, sw: number, sh: number, dx = 0) => {
+      if (sw > 0 && sh > 0) c.drawImage(sp.canvas, sx, sy, sw, sh, x0 + (sx + dx) / k, y0 + sy / k, sw / k, sh / k);
+    };
+    for (const s of l.specs) {
+      if (s.kind === 'regionSway') {
+        const v = Math.sin((this.t / s.period) * Math.PI * 2 + l.seed);
+        const d = (v > 0.55 ? 1 : v < -0.55 ? -1 : 0) * s.amp * (sp.mirrored ? -1 : 1);
+        if (!d) return false;
+        const [ax0, ry0, ax1, ry1] = s.rect;
+        const [rx0, rx1] = sp.mirrored ? [W - ax1, W - ax0] : [ax0, ax1];
+        part(0, 0, W, ry0);
+        part(0, ry0, rx0, ry1 - ry0);
+        part(rx0, ry0, rx1 - rx0, ry1 - ry0, d);
+        part(rx1, ry0, W - rx1, ry1 - ry0);
+        part(0, ry1, W, H - ry1);
+        return true;
+      }
+      if (s.kind === 'bandSway') {
+        const v = Math.sin((this.t / s.period) * Math.PI * 2 + l.seed) + 0.4 * Math.sin(this.t * 1.7 + l.seed * 2);
+        const d = v > 0.8 ? 1 : v < -0.8 ? -1 : 0;
+        if (!d) return false;
+        const cut = Math.round(H * s.top);
+        part(0, 0, W, cut, d);
+        part(0, cut, W, H - cut);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /** Find the scene's animated wall things (painted into the walls) and where their drawings land. */
+  loadWalls(scene: SceneDef) {
+    this.walls = [];
+    for (const o of scene.objects) {
+      if (!o.wall) continue;
+      const key = o.variant ? `${o.sprite}.${o.variant}` : o.sprite;
+      const spec = WALL_SPECS[key] ?? WALL_SPECS[o.sprite];
+      if (!spec) continue;
+      const face = o.wall;
+      const u0 = face === 'right' ? o.x : o.y;
+      const span = face === 'right' ? (o.w ?? 1) : (o.d ?? o.w ?? 1);
+      const onWall = (u: number, v: number): [number, number] => (face === 'right' ? [u * 16, u * 8 - v] : [-u * 16, u * 8 - v]);
+      const art = wallArt(o);
+      let at: (p: P) => [number, number];
+      if (art) {
+        const m = art.margin ?? 0.08;
+        const [v0, v1] = art.v;
+        at = ([ix, iy]) => onWall(u0 + m + (ix / art.img.width) * (span - 2 * m), v1 - (iy / art.img.height) * (v1 - v0));
+      } else {
+        // procedural signs: (u across the span 0…1, v art px up from the floor)
+        at = ([u, v]) => onWall(u0 + u * span, v);
+      }
+      this.walls.push({ obj: o, spec, at, seed: (o.x * 13 + o.y * 7) % 23, span });
+    }
+  }
+
+  /** Draw the wall things' life; called after the room's shell, before anything stands in front of it. */
+  drawWalls(c: CanvasRenderingContext2D, reducedMotion: boolean) {
+    const t = reducedMotion ? 0 : this.t;
+    for (const w of this.walls) {
+      const s = w.spec;
+      if (s.kind === 'lanterns') {
+        c.save();
+        c.globalCompositeOperation = 'lighter';
+        s.at.forEach((p, i) => {
+          const [x, y] = w.at(p);
+          const a = 0.2 + 0.09 * Math.sin(t * 0.9 + i * 1.7 + w.seed) + 0.04 * Math.sin(t * 2.3 + i);
+          const g = c.createRadialGradient(x, y, 0, x, y, s.r);
+          g.addColorStop(0, `rgba(255,200,130,${a})`);
+          g.addColorStop(1, 'rgba(255,200,130,0)');
+          c.fillStyle = g;
+          c.fillRect(x - s.r, y - s.r, s.r * 2, s.r * 2);
+        });
+        c.restore();
+      } else if (s.kind === 'countdown') {
+        // the ring: twelve segments lighting one by one around the dial, then a beat, then again
+        const [cx, cy] = w.at(s.ring);
+        const lit = Math.floor((t * 2) % 16);
+        for (let i = 0; i < 12; i++) {
+          if (i >= lit) break;
+          const a = (i / 12) * Math.PI * 2 - Math.PI / 2;
+          const [ex, ey] = w.at([s.ring[0] + Math.cos(a) * s.r, s.ring[1] + Math.sin(a) * s.r]);
+          c.fillStyle = i === lit - 1 ? '#fff4c0' : 'rgba(255,170,80,0.9)';
+          c.fillRect(ex - 0.25, ey - 0.25, 0.75, 0.75);
+        }
+        if (lit >= 12) {
+          c.fillStyle = `rgba(255,236,170,${0.25 + 0.25 * Math.sin(t * 12)})`;
+          c.beginPath();
+          c.arc(cx, cy, 1.4, 0, Math.PI * 2);
+          c.fill();
+        }
+        // a dot flying along the trajectory
+        const k = (t * 0.25 + w.seed * 0.1) % 1;
+        const [a, m, b] = s.arc;
+        const q = (1 - k) * (1 - k);
+        const px = q * a[0] + 2 * (1 - k) * k * m[0] + k * k * b[0];
+        const py = q * a[1] + 2 * (1 - k) * k * m[1] + k * k * b[1];
+        const [dx, dy] = w.at([px, py]);
+        c.fillStyle = '#ffe9a8';
+        c.fillRect(dx - 0.5, dy - 0.5, 1, 1);
+      } else if (s.kind === 'neon') {
+        // a steady buzz of pink light; every ~8 s one letter stutters for two frames
+        const [cx, cy] = w.at([0.5, 35]);
+        c.save();
+        c.globalCompositeOperation = 'lighter';
+        const g = c.createRadialGradient(cx, cy, 0, cx, cy, 26);
+        g.addColorStop(0, `rgba(255,95,209,${0.12 + 0.03 * Math.sin(t * 7)})`);
+        g.addColorStop(1, 'rgba(255,95,209,0)');
+        c.fillStyle = g;
+        c.fillRect(cx - 26, cy - 26, 52, 52);
+        c.restore();
+        const cycle = t % 8;
+        if (!reducedMotion && cycle > 7.85) {
+          const i = Math.floor(t / 8 + w.seed) % s.letters;
+          const lw = 0.56 / w.span; // one letter, as a fraction of the sign's span
+          const u = 0.5 + (i - (s.letters - 1) / 2) * lw;
+          const [lx, ly] = w.at([u - lw / 2, 42]);
+          const [rx, ry] = w.at([u + lw / 2, 29]);
+          c.fillStyle = 'rgba(40,20,60,0.6)';
+          c.beginPath();
+          c.moveTo(lx, ly);
+          c.lineTo(rx, ly + (ry - ly) - (42 - 29));
+          c.lineTo(rx, ry);
+          c.lineTo(lx, ry - (ry - ly) + (42 - 29));
+          c.closePath();
+          c.fill();
+        }
+      }
+    }
+  }
+
+  private walls: Array<{ obj: SceneObject; spec: WallSpec; at: (p: P) => [number, number]; seed: number; span: number }> = [];
 
   /** How far to nudge an object's whole drawing this frame (world px): balloons bob, a rung bell shakes. */
   offset(objectId: string, reducedMotion: boolean): [number, number] {
@@ -464,6 +683,40 @@ export class ObjectAnimations {
           });
           break;
         }
+        case 'strip': {
+          // the strip glows faintly all along, with a brighter bead of light travelling its length
+          const [ax, ay] = l.at(s.from);
+          const [bx, by] = l.at(s.to);
+          const k = (t * s.speed + l.seed * 0.13) % 1;
+          c.save();
+          c.globalCompositeOperation = 'lighter';
+          c.strokeStyle = `rgba(${s.color},${0.1 + 0.05 * Math.sin(t * 1.3 + l.seed)})`;
+          c.lineWidth = px * 2;
+          c.beginPath();
+          c.moveTo(ax, ay);
+          c.lineTo(bx, by);
+          c.stroke();
+          const g = c.createRadialGradient(ax + (bx - ax) * k, ay + (by - ay) * k, 0, ax + (bx - ax) * k, ay + (by - ay) * k, px * 7);
+          g.addColorStop(0, `rgba(${s.color},0.55)`);
+          g.addColorStop(1, `rgba(${s.color},0)`);
+          c.fillStyle = g;
+          c.fillRect(ax + (bx - ax) * k - px * 7, ay + (by - ay) * k - px * 7, px * 14, px * 14);
+          c.restore();
+          break;
+        }
+        case 'popcorn': {
+          c.save();
+          clipQuad(c, s.glass.map(l.at) as Quad);
+          for (const k of l.kernels) {
+            const [x, y] = l.at([k.x, k.y]);
+            c.fillStyle = '#fff6d8';
+            c.fillRect(x - px, y - px, px * 2, px * 2);
+            c.fillStyle = '#e8b848';
+            c.fillRect(x, y, px, px);
+          }
+          c.restore();
+          break;
+        }
         case 'ring': {
           if (l.rungAt === undefined) break;
           const age = t - l.rungAt;
@@ -485,6 +738,22 @@ export class ObjectAnimations {
   }
 }
 
+
+/** Wall things by manifest key (or sprite). Coordinates are in the wall drawing's own pixels. */
+const WALL_SPECS: Record<string, WallSpec> = {
+  'screen.countdown': { kind: 'countdown', ring: [49, 14], r: 6, arc: [[9, 22], [22, 10], [37, 9]] },
+  'lantern-string': { kind: 'lanterns', at: [[6, 11], [19, 15], [30, 18], [47, 19], [60, 18], [74, 14], [87, 11]], r: 5 },
+  neon: { kind: 'neon', letters: 4 },
+};
+
+/** Whether a floor object stands within a couple of tiles of a window in its room. */
+function nearWindow(scene: SceneDef, o: SceneObject): boolean {
+  return scene.objects.some((w) => {
+    if (w.sprite !== 'window' || !w.wall) return false;
+    if (w.wall === 'right') return o.y <= 2 && o.x >= w.x - 1 && o.x <= w.x + (w.w ?? 1);
+    return o.x <= 2 && o.y >= w.y - 1 && o.y <= w.y + (w.d ?? w.w ?? 1);
+  });
+}
 
 /** A colour sliding slowly around a cycle of "r,g,b" colours. */
 function mixCycle(colors: string[], t: number): string {
