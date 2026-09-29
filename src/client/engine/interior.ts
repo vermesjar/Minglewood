@@ -45,14 +45,19 @@ export interface WindowView {
 }
 
 export interface LampLight {
+  id: string;
   x: number;
   y: number;
+  /** This lamp's warm pool on the floor (screen-blended while the lamp is on). */
+  pool: HTMLCanvasElement;
+  /** Art-space position of the pool canvas's top-left corner. */
+  ax: number;
+  ay: number;
 }
 
 export interface InteriorLayer extends GroundLayer {
   scale: number;
-  /** Sunlight through the windows and lamp pools, drawn with 'screen' at weather-dependent strength. */
-  light: HTMLCanvasElement;
+  /** Sunlight through the windows, drawn with 'screen' at weather-dependent strength. */
   sun: HTMLCanvasElement;
   windows: WindowView[];
   lamps: LampLight[];
@@ -359,13 +364,10 @@ export function renderInteriorShell(scene: SceneDef, rc: InteriorRenderContext):
   const cw = Math.ceil((maxX - minX) * S);
   const ch = Math.ceil((maxY - minY) * S);
   const canvas = makeCanvas(cw, ch);
-  const lightCanvas = makeCanvas(cw, ch);
   const sunCanvas = makeCanvas(cw, ch);
   const ctx = canvas.getContext('2d')!;
   const img = ctx.createImageData(cw, ch);
   const d = img.data;
-  const lightImg = lightCanvas.getContext('2d')!.createImageData(cw, ch);
-  const ld = lightImg.data;
   const sunImg = sunCanvas.getContext('2d')!.createImageData(cw, ch);
   const sd = sunImg.data;
 
@@ -392,7 +394,22 @@ export function renderInteriorShell(scene: SceneDef, rc: InteriorRenderContext):
       const k = small ? 0.62 : 0.92;
       return { cx: (f.x0 + f.x1) / 2 + 0.1, cy: (f.y0 + f.y1) / 2 + 0.06, rx: ((f.x1 - f.x0) / 2) * k, ry: ((f.y1 - f.y0) / 2) * k };
     });
-  const lamps: LampLight[] = scene.objects.filter((o) => o.sprite === 'lamp').map((o) => ({ x: o.x + 0.5, y: o.y + 0.5 }));
+  // Each lamp gets its own small pool canvas so it can be switched on and off on its own.
+  const POOL = 2.8;
+  const lampPools = scene.objects
+    .filter((o) => o.sprite === 'lamp')
+    .map((o) => {
+      const x = o.x + 0.5;
+      const y = o.y + 0.5;
+      const cxA = (x - y) * 16;
+      const cyA = (x + y) * 8;
+      const ax = cxA - POOL * 23;
+      const ay = cyA - POOL * 12;
+      const w = Math.ceil(POOL * 46 * S);
+      const h = Math.ceil(POOL * 24 * S);
+      const img = new ImageData(w, h);
+      return { id: o.id, x, y, ax, ay, w, h, img };
+    });
   // Sun patches: each window's light falls into the room as a parallelogram, split by the mullions.
   const patches = windows.map((w) => {
     const reach = 2.4;
@@ -458,15 +475,18 @@ export function renderInteriorShell(scene: SceneDef, rc: InteriorRenderContext):
         }
         put(i, rgb);
         // light layers (floor only)
-        for (const l of lamps) {
+        for (const l of lampPools) {
           const r = Math.hypot(g.x - l.x, g.y - l.y);
-          const a = r < 0.8 ? 120 : r < 1.5 ? 80 : r < 2.2 ? 46 : r < 2.8 ? 20 : 0;
-          if (a > ld[i + 3]) {
-            ld[i] = 255;
-            ld[i + 1] = 196;
-            ld[i + 2] = 120;
-            ld[i + 3] = a;
-          }
+          const a = r < 0.8 ? 120 : r < 1.5 ? 80 : r < 2.2 ? 46 : r < POOL ? 20 : 0;
+          if (!a) continue;
+          const lx = Math.floor((ax - l.ax) * S);
+          const ly = Math.floor((ay - l.ay) * S);
+          if (lx < 0 || ly < 0 || lx >= l.w || ly >= l.h) continue;
+          const k = (ly * l.w + lx) * 4;
+          l.img.data[k] = 255;
+          l.img.data[k + 1] = 196;
+          l.img.data[k + 2] = 120;
+          l.img.data[k + 3] = a;
         }
         for (const p of patches) {
           const w = p.w;
@@ -614,8 +634,12 @@ export function renderInteriorShell(scene: SceneDef, rc: InteriorRenderContext):
       od[k * 4 + 3] = 255;
     }
   ctx.putImageData(out, 0, 0);
-  lightCanvas.getContext('2d')!.putImageData(lightImg, 0, 0);
   sunCanvas.getContext('2d')!.putImageData(sunImg, 0, 0);
+  const lamps: LampLight[] = lampPools.map((l) => {
+    const pool = makeCanvas(l.w, l.h);
+    pool.getContext('2d')!.putImageData(l.img, 0, 0);
+    return { id: l.id, x: l.x, y: l.y, pool, ax: l.ax, ay: l.ay };
+  });
 
-  return { canvas, minX, minY, wallHits, scale: S, light: lightCanvas, sun: sunCanvas, windows, lamps };
+  return { canvas, minX, minY, wallHits, scale: S, sun: sunCanvas, windows, lamps };
 }

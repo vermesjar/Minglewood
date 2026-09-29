@@ -115,6 +115,26 @@ describe('OrgHub', () => {
     expect(last && last.t === 'updated' && last.patch.carrying).toBeNull();
   });
 
+  it('switches a lamp for the whole room and tells newcomers how it was left', () => {
+    const a = newMember(store, 'Ada');
+    const b = newMember(store, 'Bo');
+    const cb = client(b.id);
+    hub.connect(client(a.id));
+    hub.connect(cb);
+    const lamp = getScene('cafe')!.objects.find((o) => o.sprite === 'lamp')!;
+    hub.enter(a.id, 'cafe', 'live');
+    hub.enter(b.id, 'cafe', 'live');
+    expect(hub.toggle(a.id, lamp.id)).toBe(true);
+    expect(cb.msgs.some((m) => m.t === 'objstate' && m.objectId === lamp.id && m.on === false)).toBe(true);
+    const c = newMember(store, 'Cy');
+    const cc = client(c.id);
+    hub.connect(cc);
+    hub.enter(c.id, 'cafe', 'live');
+    const scene = cc.msgs.find((m) => m.t === 'scene');
+    expect(scene && scene.t === 'scene' && scene.states?.[lamp.id]).toBe(false);
+    expect(hub.toggle(a.id, getScene('cafe')!.objects.find((o) => o.sprite === 'chair')!.id)).toBe(false);
+  });
+
   it('holds knocks for focused people and delivers them when they are free', () => {
     const a = newMember(store, 'Ada');
     const b = newMember(store, 'Bo');

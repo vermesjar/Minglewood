@@ -26,9 +26,9 @@ const STYLES: Record<string, CounterStyle> = {
     groove: '#7a4a2e',
     lite: '#d39a60',
     base: '#5a3522',
-    top: '#f4f0ea',
-    topSide: '#ddd5d0',
-    vein: '#b9aec4',
+    top: '#e9e2da',
+    topSide: '#cfc5c0',
+    vein: '#a99db6',
     rail: '#d99a2b',
   },
 };

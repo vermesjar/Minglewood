@@ -16,7 +16,12 @@ function room(
   objs: Obj[],
 ): SceneDef {
   let n = 0;
-  const objects: SceneObject[] = objs.map((o) => ({ ...o, id: o.id ?? `${id}-${++n}` }));
+  const objects: SceneObject[] = objs.map((o) => ({
+    ...o,
+    id: o.id ?? `${id}-${++n}`,
+    // Lamps are switchable by anyone in the room.
+    actions: o.actions ?? (o.sprite === 'lamp' ? [{ kind: 'toggle', label: 'Switch the lamp' }] : undefined),
+  }));
   objects.push({
     id: `${id}-door`,
     sprite: 'door',
@@ -81,9 +86,10 @@ export function buildInteriors(): SceneDef[] {
         label: 'Espresso machine',
         actions: [{ kind: 'vend', item: 'coffee', label: 'Get a coffee' }],
       },
-      { sprite: 'cups', x: 5, y: 1, z: COUNTER_TOP },
+      { sprite: 'grinder', x: 5, y: 1, z: COUNTER_TOP, label: 'Coffee grinder' },
       { sprite: 'register', x: 6, y: 1, z: COUNTER_TOP, facing: 'sw' },
       { sprite: 'jar', x: 7, y: 1, z: COUNTER_TOP, label: 'Biscotti' },
+      { sprite: 'backbar', wall: 'right', x: 5, y: 0, w: 3, label: 'Back bar' },
       { sprite: 'stool', x: 6, y: 2, actions: sit },
       { sprite: 'stool', x: 7, y: 2, actions: sit },
       { sprite: 'menu-board', wall: 'right', x: 3, y: 0, w: 2, label: 'Today: oat flat white' },

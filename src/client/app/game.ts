@@ -97,6 +97,8 @@ class Game {
   }
 
   private startAttempts = 0;
+  /** Switch states for the current scene, kept so a re-attached view can restore them. */
+  private sceneStates: Record<string, boolean> | undefined;
   /** Finished art (public/art) loads alongside the bootstrap; procedural sprites fill any gaps. */
   private artReady = loadArt().then(clearSpriteCache);
   private activityStarted = false;
@@ -143,6 +145,7 @@ class Game {
       nameOf: (id) => getState().membersById.get(id)?.displayName ?? 'Someone',
     });
     this.applyPrefs();
+    this.world.setObjStates(this.sceneStates);
     if (this.lastScene) this.loadScene(this.lastScene.sceneId, this.lastScene.occupants);
     this.keyHandler = (e) => this.onKey(e);
     this.keyUpHandler = (e) => {
@@ -207,7 +210,15 @@ class Game {
         this.rt!.send({ t: 'enter', sceneId: getState().sceneId ?? this.initialScene });
         break;
       case 'scene':
+        this.world?.setObjStates(m.states);
+        this.sceneStates = m.states;
         this.loadScene(m.sceneId, m.occupants);
+        break;
+      case 'objstate':
+        if (m.sceneId === getState().sceneId) {
+          w?.setObjState(m.objectId, m.on);
+          this.sceneStates = { ...this.sceneStates, [m.objectId]: m.on };
+        }
         break;
       case 'joined':
         if (m.sceneId !== getState().sceneId) break;
@@ -602,6 +613,10 @@ class Game {
     }
     const kinds = new Set(o.actions?.map((a) => a.kind));
     if (kinds.has('exit')) return this.exitToTown();
+    if (kinds.has('toggle')) {
+      this.rt?.send({ t: 'toggle', objectId: o.id });
+      return;
+    }
     if (kinds.has('vend')) {
       // Like the real thing: walk up to the machine, then it's yours to carry around.
       this.walkTo([o.x, o.y], () => this.rt?.send({ t: 'carry', objectId: o.id }));

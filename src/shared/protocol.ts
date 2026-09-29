@@ -44,7 +44,8 @@ export type KnockReply = 'join' | 'soon' | 'no';
 
 export type ServerMsg =
   | { t: 'welcome'; you: string; serverTime: number; directory: DirectoryEntry[] }
-  | { t: 'scene'; sceneId: string; occupants: Occupant[] }
+  | { t: 'scene'; sceneId: string; occupants: Occupant[]; states?: Record<string, boolean> }
+  | { t: 'objstate'; sceneId: string; objectId: string; on: boolean }
   | { t: 'joined'; sceneId: string; occupant: Occupant }
   | { t: 'left'; sceneId: string; memberId: string; toSceneId?: string }
   | { t: 'moved'; memberId: string; path: Tile[]; startedAt: number }
@@ -109,6 +110,7 @@ export const clientMsgSchema = z.discriminatedUnion('t', [
   z.object({ t: z.literal('sit'), objectId: idStr }),
   z.object({ t: z.literal('stand') }),
   z.object({ t: z.literal('carry'), objectId: idStr.nullable() }),
+  z.object({ t: z.literal('toggle'), objectId: idStr }),
   z.object({
     t: z.literal('status'),
     status: z.enum(['available', 'open', 'focused', 'meeting', 'away']),

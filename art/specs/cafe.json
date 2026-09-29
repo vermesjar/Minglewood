@@ -343,6 +343,94 @@
           "prompt": "A small glass tip jar with a few coins and a folded note, and a tiny potted succulent beside it."
         }
       ]
+    },
+    {
+      "name": "countertop2",
+      "grid": "3x2",
+      "quality": "high",
+      "note": "These are SMALL things that stand on top of a caf\u00e9 counter, so each must be compact and fit well within one floor tile, drawn at the same scale as each other. Clear, readable silhouettes; crisp details.",
+      "items": [
+        {
+          "key": "espresso",
+          "facing": "sw",
+          "w": 1,
+          "d": 1,
+          "h": 20,
+          "width": 40,
+          "fill": 0.18,
+          "prompt": "A compact vintage espresso machine in polished brass and cream enamel with a domed brass top where three tiny white cups warm, one portafilter with a walnut handle, a steam wand and a round pressure gauge. Its front (the portafilter) faces along the red arrow."
+        },
+        {
+          "key": "espresso",
+          "facing": "ne",
+          "w": 1,
+          "d": 1,
+          "h": 20,
+          "width": 40,
+          "fill": 0.18,
+          "prompt": "The SAME compact brass-and-cream espresso machine seen from behind: smooth cream enamel back panel with a little brass plate (no text), the domed top with tiny cups, the tip of the steam wand."
+        },
+        {
+          "key": "pastry-case",
+          "facing": "sw",
+          "w": 1,
+          "d": 1,
+          "h": 16,
+          "width": 42,
+          "fill": 0.2,
+          "prompt": "A small domed glass cake-and-pastry display bell on a round walnut board: three golden croissants and two pink macarons inside, a brass knob on top of the glass dome."
+        },
+        {
+          "key": "pastry-case",
+          "facing": "ne",
+          "w": 1,
+          "d": 1,
+          "h": 16,
+          "width": 42,
+          "fill": 0.2,
+          "prompt": "The SAME small domed glass pastry bell on a walnut board, seen from the other side (the same croissants and macarons seen through the glass)."
+        },
+        {
+          "key": "register",
+          "facing": "sw",
+          "w": 1,
+          "d": 1,
+          "h": 14,
+          "width": 30,
+          "fill": 0.18,
+          "prompt": "A small antique brass cash register with scrollwork and a little bell on top; its round keys face along the red arrow. No text or numbers."
+        },
+        {
+          "key": "grinder",
+          "w": 1,
+          "d": 1,
+          "h": 16,
+          "width": 20,
+          "fill": 0.15,
+          "prompt": "A small coffee grinder with a clear glass hopper full of dark coffee beans on a brass-and-walnut base."
+        }
+      ]
+    },
+    {
+      "name": "backbar",
+      "kind": "wall",
+      "grid": "1x1",
+      "size": "1536x1024",
+      "quality": "high",
+      "items": [
+        {
+          "key": "backbar",
+          "span": 3,
+          "wall": {
+            "v": [
+              28,
+              50
+            ],
+            "margin": 0.06
+          },
+          "prompt": "A wide, low walnut caf\u00e9 back-bar wall shelf with two shelves (about 3.2 : 1, much wider than tall), neatly holding: glass jars of coffee beans with brass lids, stacked white cups and saucers, a row of small bottles of syrup in amber and green glass, a little potted trailing plant spilling over the edge, a tiny chalk sign with a coffee cup doodle. Brass shelf brackets."
+        }
+      ]
     }
   ]
 }

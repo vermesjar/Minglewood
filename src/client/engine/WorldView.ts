@@ -86,6 +86,24 @@ export class WorldView {
   private ground: GroundLayer | InteriorLayer | null = null;
   /** Scratch layer for the room's dimness with lamp-shaped holes. */
   private shade: HTMLCanvasElement | null = null;
+  /** Switch states of toggleable things in this scene (lamps); absent = the object's default. */
+  private objStates = new Map<string, boolean>();
+
+  setObjStates(states: Record<string, boolean> | undefined) {
+    this.objStates = new Map(Object.entries(states ?? {}));
+  }
+
+  setObjState(id: string, on: boolean) {
+    this.objStates.set(id, on);
+  }
+
+  isOn(id: string): boolean {
+    const known = this.objStates.get(id);
+    if (known !== undefined) return known;
+    const o = this.scene?.objects.find((x) => x.id === id);
+    const t = o?.actions?.find((a) => a.kind === 'toggle');
+    return t && t.kind === 'toggle' ? (t.on ?? true) : true;
+  }
   private statics: Static[] = [];
   private actors = new Map<string, ActorView>();
   private meId = '';
@@ -559,7 +577,7 @@ export class WorldView {
       c.globalAlpha = Math.min(1, sky.sun * breathe);
       if (c.globalAlpha > 0.02) c.drawImage(shell.sun, shell.minX, shell.minY, shell.sun.width / gk, shell.sun.height / gk);
       c.globalAlpha = sky.lamp;
-      c.drawImage(shell.light, shell.minX, shell.minY, shell.light.width / gk, shell.light.height / gk);
+      for (const l of shell.lamps) if (this.isOn(l.id)) c.drawImage(l.pool, l.ax, l.ay, l.pool.width / gk, l.pool.height / gk);
       c.restore();
     }
 
@@ -812,7 +830,7 @@ export class WorldView {
     const now = performance.now();
     const flicker = 0.95 + 0.05 * Math.sin(now / 170) * Math.sin(now / 530);
     const lamps = this.statics
-      .filter((st) => st.obj.sprite === 'lamp')
+      .filter((st) => st.obj.sprite === 'lamp' && this.isOn(st.obj.id))
       .map((st) => {
         const L = artLight(st.obj) ?? { dx: 0, dy: -30, r: 22 };
         const p = isoToScreen(st.obj.x, st.obj.y, st.obj.z ?? 0);

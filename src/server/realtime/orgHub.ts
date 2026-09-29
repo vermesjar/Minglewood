@@ -72,6 +72,8 @@ export class OrgHub extends EventEmitter<HubEvents> {
   private actors = new Map<string, Actor>();
   /** What people are carrying (memberId → held item); live state, cleared when they leave. */
   private carrying = new Map<string, string>();
+  /** Switchable things (lamps) per scene: objectId → on. Live room state, like a real room's lamps. */
+  private objStates = new Map<string, Map<string, boolean>>();
   private presence = new Map<string, PresenceState>();
   private grids = new Map<string, WalkGrid>();
   private knocks = new Map<string, Knock>();
@@ -276,7 +278,7 @@ export class OrgHub extends EventEmitter<HubEvents> {
     for (const c of this.clients.values()) {
       if (c.memberId === memberId) {
         c.sceneId = sceneId;
-        c.send({ t: 'scene', sceneId, occupants: this.actorsIn(sceneId).map((x) => this.occupant(x)) });
+        c.send({ t: 'scene', sceneId, occupants: this.actorsIn(sceneId).map((x) => this.occupant(x)), states: this.statesIn(sceneId) });
       }
     }
     this.toScene(sceneId, { t: 'joined', sceneId, occupant: this.occupant(actor) });
@@ -427,6 +429,25 @@ export class OrgHub extends EventEmitter<HubEvents> {
     if (item) this.carrying.set(memberId, item);
     else this.carrying.delete(memberId);
     this.toScene(a.sceneId, { t: 'updated', memberId, patch: { carrying: item ?? null } });
+    return true;
+  }
+
+  statesIn(sceneId: string): Record<string, boolean> {
+    return Object.fromEntries(this.objStates.get(sceneId) ?? []);
+  }
+
+  /** Flip a lamp (or anything with a toggle action) for everyone in the room. */
+  toggle(memberId: string, objectId: string): boolean {
+    const a = this.actors.get(memberId);
+    if (!a) return false;
+    const o = this.scene(a.sceneId)?.objects.find((x) => x.id === objectId);
+    const t = o?.actions?.find((x) => x.kind === 'toggle');
+    if (!o || !t || t.kind !== 'toggle') return false;
+    let states = this.objStates.get(a.sceneId);
+    if (!states) this.objStates.set(a.sceneId, (states = new Map()));
+    const on = !(states.get(objectId) ?? t.on ?? true);
+    states.set(objectId, on);
+    this.toScene(a.sceneId, { t: 'objstate', sceneId: a.sceneId, objectId, on });
     return true;
   }
 

@@ -25,6 +25,25 @@
       },
       "seat": 12
     },
+    "backbar": {
+      "footprint": [
+        3,
+        1
+      ],
+      "fit": "anchor",
+      "file": "backbar.png",
+      "anchor": [
+        0,
+        0
+      ],
+      "wall": {
+        "v": [
+          28,
+          50
+        ],
+        "margin": 0.06
+      }
+    },
     "cake-stand": {
       "footprint": [
         1,
@@ -107,15 +126,15 @@
         "sw": {
           "file": "espresso.sw.png",
           "anchor": [
-            23,
-            24
+            20,
+            28
           ]
         },
         "ne": {
           "file": "espresso.ne.png",
           "anchor": [
-            23,
-            24
+            20,
+            23
           ]
         }
       }
@@ -138,6 +157,18 @@
         ],
         "margin": 0.14
       }
+    },
+    "grinder": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "grinder.png",
+      "anchor": [
+        10,
+        15
+      ]
     },
     "jar": {
       "footprint": [
@@ -197,15 +228,15 @@
         "sw": {
           "file": "pastry-case.sw.png",
           "anchor": [
-            28,
-            39
+            21,
+            22
           ]
         },
         "ne": {
           "file": "pastry-case.ne.png",
           "anchor": [
-            28,
-            40
+            21,
+            22
           ]
         }
       }
@@ -244,8 +275,8 @@
         "sw": {
           "file": "register.sw.png",
           "anchor": [
-            18,
-            19
+            15,
+            13
           ]
         },
         "ne": {
