@@ -33,6 +33,8 @@ export interface AvatarItem {
   unlock?: { kind: 'event' | 'tenure' | 'team' | 'launch'; description: string };
   /** Hides the hair (hijab, turban). */
   coversHair?: boolean;
+  /** Hides the ears as well (a hijab wraps them; a turban leaves them out). */
+  coversEars?: boolean;
   /** Replaces the bottoms (dresses, long coats show them only below the hem). */
   fullLength?: boolean;
 }
@@ -199,7 +201,7 @@ export const AVATAR_ITEMS: AvatarItem[] = [
   I('headwear', 'cowboy', 'Cowboy hat'),
   I('headwear', 'sun-hat', 'Sun hat'),
   I('headwear', 'crown', 'Crown'),
-  I('headwear', 'hijab', 'Hijab', { coversHair: true }),
+  I('headwear', 'hijab', 'Hijab', { coversHair: true, coversEars: true }),
   I('headwear', 'turban', 'Turban', { coversHair: true }),
   I('headwear', 'party', 'Party hat', { unlock: { kind: 'event', description: 'Came to a celebration in Lantern Hall' } }),
 

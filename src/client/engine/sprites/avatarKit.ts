@@ -12,14 +12,15 @@ import { frameFor, type Body, type Frame, type Pose, type View } from './avatarF
 import { GOLD, H, LINE, M, PINK, PLUM, Pix, W, WHITE, hx, lightOf, lineOf, lum, mix, outline, paint, shadowOf, type RGB } from './pixkit';
 import TOP_LIB from './topLib.json';
 import HAT_LIB from './hatLib.json';
-import { HAIR, HAIR_ORIGIN } from './avatarHair';
+import { HAIR, HAIR_ORIGIN, formBackHair, type PlacedMap } from './avatarHair';
 import HAIR_LIB from './hairLib.json';
 import FACE_LIB from './faceLib.json';
 import PET_LIB from './petLib.json';
 
 /**
  * Paint a hand-drawn tone map at (x0, y0): '#' base, 'h' light, 's' shade, 'd' deep, '.' empty, tinted from
- * `base`; every pixel on the map's boundary becomes the line colour, so pieces are outlined like the rest.
+ * `base` (or from a part's own ramp, `tones`); every pixel on the map's boundary becomes the line colour, so pieces
+ * are outlined like the rest.
  */
 function paintMap(
   P: Pix,
@@ -29,10 +30,11 @@ function paintMap(
   base: RGB,
   tint?: (x: number, y: number, c: RGB) => RGB,
   clip?: (x: number, y: number) => boolean,
+  tones?: Record<string, RGB>,
 ) {
   // clipped pixels count as empty, so the part's own edge line follows the clip
   const at = (r: number, c: number) => (rows[r]?.[c] ?? '.') !== '.' && !clip?.(x0 + c, y0 + r);
-  const tone: Record<string, RGB> = { '#': base, h: lightOf(base), s: shadowOf(base), d: mix(base, LINE, 0.55), l: mix(base, LINE, 0.8) };
+  const tone: Record<string, RGB> = tones ?? { '#': base, h: lightOf(base), s: shadowOf(base), d: mix(base, LINE, 0.55), l: mix(base, LINE, 0.8) };
   rows.forEach((row, r) => {
     for (let c = 0; c < row.length; c++) {
       const ch = row[c];
@@ -84,23 +86,89 @@ function hairStyle(L: FullLoadout): HairLook | null {
  * Two-tone tips: the lower part of the style's own length takes the highlight colour, in two steps (as a
  * pixel artist would blend), so short styles show it at the ends and long styles along the lengths.
  */
-function hairTint(L: FullLoadout, top: number, height: number) {
+function hairTint(L: FullLoadout, top: number, height: number, back?: { x: number; ends: number[][] }) {
   if (!L.hairHighlight) return undefined;
   const tip = hx(L.hairHighlight);
+  if (back) {
+    // seen from behind the back-view form says where the ends are, and the tip colour carries the hair's own
+    // shading (its locks and creases read through it, never a flat band)
+    const base = lum(hx(L.hairColor));
+    return (x: number, y: number, c: RGB) => {
+      const k = back.ends[y - top]?.[x - back.x] ?? 0;
+      if (!k) return c;
+      const f = lum(c) / Math.max(0.06, base);
+      return mix(c, [Math.min(255, tip[0] * f), Math.min(255, tip[1] * f), Math.min(255, tip[2] * f)], k);
+    };
+  }
   return (_x: number, y: number, c: RGB) => {
     const t = (y - top) / Math.max(1, height);
     return t > 0.78 ? mix(c, tip, 0.72) : t > 0.6 ? mix(c, tip, 0.38) : c;
   };
 }
 
+/** Back-view hair forms by style and hat, relative to the head box. */
+const BACK_FORMS = new Map<string, PlacedMap>();
+
 function drawHair(P: Pix, F: Frame, L: FullLoadout, layer: 'behind' | 'front') {
   const st = hairStyle(L);
   if (!st) return;
   const v = layer === 'behind' ? (F.view === 'front' ? st.behindFront : st.behindBack) : F.view === 'front' ? st.front : st.back;
   if (!v) return;
-  const m = placed(v, hairOrigin(F), headShift(F));
-  paintMap(P, m.x, m.y, m.rows, hx(L.hairColor), hairTint(L, m.y, m.rows.length), underHat(F, L));
+  const clip = underHat(F, L);
+  let m: PlacedMap = placed(v, hairOrigin(F), headShift(F));
+  // seen from behind, the hair is given form by the standard's shading pass (avatarHair.ts formBackHair); it sits
+  // on the head box, so it depends only on the style and the hat over it: made once, placed on the head each time
+  const back = F.view === 'back' && layer === 'front';
+  if (back) {
+    const [x0, y0] = F.head;
+    // keyed by the maps themselves (the Design Lab edits drafts in place of a library entry)
+    const hat = clip ? HATS[L.headwear.replace('hat.', '')]?.[F.view] : undefined;
+    const rowsOf = (lv?: LibView) => (!lv ? '' : Array.isArray(lv) ? lv.join('/') : `${lv.x},${lv.y}:${lv.rows.join('/')}`);
+    const key = `${L.hair}|${m.x - x0},${m.y - y0}|${rowsOf(v)}|${clip ? L.headwear : ''}|${rowsOf(hat)}`;
+    let f = BACK_FORMS.get(key);
+    if (!f) {
+      const made = formBackHair(m, F, L.hair.replace('hair.', ''), clip);
+      f = { ...made, x: made.x - x0, y: made.y - y0 };
+      if (BACK_FORMS.size > 400) BACK_FORMS.clear();
+      BACK_FORMS.set(key, f);
+    }
+    m = { ...f, x: f.x + x0, y: f.y + y0 };
+  }
+  // the scalp tint ('k') shows where hair is clipped to the skin (a buzz's fade, a mohawk's sides)
+  const scalp = mix(hx(L.skin), hx(L.hairColor), 0.6);
+  const tones = back ? { ...hairTones(hx(L.hairColor)), k: scalp, K: shadowOf(scalp) } : undefined;
+  const tint = hairTint(L, m.y, m.rows.length, back && m.ends ? { x: m.x, ends: m.ends } : undefined);
+  paintMap(P, m.x, m.y, m.rows, hx(L.hairColor), tint, clip, tones);
 }
+
+/**
+ * The hair ramp, relative to the player's colour and spaced so every step reads on any colour: pale blonde
+ * gets a near-white sheen and firm shade; near-black hair is lifted a touch so its shade and lock lines can
+ * read below it (the way black hair is drawn as a very dark grey with a sheen).
+ */
+function hairTones(base: RGB): Record<string, RGB> {
+  const toward = (c: RGB, target: RGB, v: number) => {
+    const d = lum(target) - lum(c);
+    return Math.abs(d) < 1e-6 ? c : mix(c, target, Math.max(0, Math.min(1, (v - lum(c)) / d)));
+  };
+  const LIFT: RGB = [168, 160, 172];
+  const body = lum(base) < 0.15 ? toward(base, LIFT, 0.15) : base;
+  const v = lum(body);
+  const down = (dv: number) => {
+    const want = Math.max(lum(LINE) + 0.01, v - dv);
+    return toward(body, want > lum(PLUM) + 0.02 ? PLUM : LINE, want);
+  };
+  const up = (dv: number) => toward(body, CREAM_LIGHT, Math.min(0.96, v + dv));
+  return {
+    '#': body,
+    h: up(Math.max(0.07, (1 - v) * 0.18)),
+    H: up(Math.max(0.1, (1 - v) * 0.32)),
+    s: down(Math.max(0.06, v * 0.2)),
+    d: down(Math.max(0.09, v * 0.34)),
+    l: down(Math.max(0.1, v * 0.48)),
+  };
+}
+const CREAM_LIGHT: RGB = [255, 250, 232];
 
 /** Hats that sit over the crown: hair can't rise above them (a bun, a quiff or a mohawk goes under the hat). */
 const CROWN_HATS = new Set(['cap', 'capback', 'beanie', 'bucket', 'cowboy', 'beret', 'sun-hat']);
@@ -275,7 +343,8 @@ function drawHeadBase(P: Pix, F: Frame, L: FullLoadout) {
     const [nx, ny] = F.noseTip;
     P.stamp(nx - 1, ny - 1, ['s', 'sl', 'l'], { s: skin, l: lineOf(skin) });
     P.set(nx, ny - 1, lineOf(skin));
-  } else {
+  } else if (!ITEM_BY_ID.get(L.headwear)?.coversEars) {
+    // seen from behind, the far ear shows at the side of the head (unless it's wrapped, as in a hijab)
     const [ex, ey] = F.ear;
     paint(P, M().rrect(ex - 1, ey - 3, ex + 3, ey + 3, 1.5), skin, { flat: true });
   }
@@ -858,8 +927,38 @@ function drawHat(P: Pix, F: Frame, L: FullLoadout) {
   if (id === 'none') return;
   const map = HATS[id]?.[F.view];
   if (!map) return;
-  const m = placed(map, hairOrigin(F), headShift(F));
+  let m = placed(map, hairOrigin(F), headShift(F));
+  // a hat that hides the hair (a hijab, a turban) wraps the whole back of the head down to the nape: skull its
+  // map leaves open (generation can leave a hole where the neck was) is filled with its fabric
+  if (F.view === 'back' && ITEM_BY_ID.get(L.headwear)?.coversHair) m = wrapSkull(m, F);
   paintMap(P, m.x, m.y, m.rows, hx(L.headwearColor));
+}
+
+/** A back-view map grown to cover the back of the skull down to the nape hairline (the scalp zone). */
+function wrapSkull(m: { x: number; y: number; rows: string[] }, F: Frame) {
+  const head = headMaskOf(F);
+  const [x0, y0] = F.head;
+  const x = Math.min(m.x, x0);
+  const y = Math.min(m.y, y0);
+  const w = Math.max(m.x + Math.max(...m.rows.map((r) => r.length)), x0 + 22) - x;
+  const h = Math.max(m.y + m.rows.length, y0 + 18) - y;
+  const g = Array.from({ length: h }, (_, r) => Array.from({ length: w }, (_, c) => m.rows[y + r - m.y]?.[x + c - m.x] ?? '.'));
+  for (let yy = y0; yy < y0 + 18; yy++)
+    for (let xx = x0; xx < x0 + 22; xx++) {
+      if (!head.has(xx, yy)) continue;
+      const ch = g[yy - y][xx - x];
+      if (ch !== '.' && ch !== '#') continue;
+      // the fabric over the skull is lit as the head is: from the upper left, shading round the far side and under
+      const nx = Math.max(-1, Math.min(1, (xx - x0 - 10.5) / 11.5));
+      const ny = Math.max(-1, Math.min(1, (yy - y0 - 10.5) / 11.5));
+      const lit = -0.45 * nx - 0.5 * ny + 0.74 * Math.sqrt(Math.max(0, 1 - nx * nx - ny * ny));
+      g[yy - y][xx - x] = lit > 0.95 ? 'h' : lit > 0.3 ? '#' : 's';
+    }
+  // its folds are fabric creases in shade, not drawn lines
+  const on = (r: number, c: number) => (g[r]?.[c] ?? '.') !== '.';
+  const inner = (r: number, c: number) => on(r, c) && on(r - 1, c) && on(r + 1, c) && on(r, c - 1) && on(r, c + 1);
+  g.forEach((row, r) => row.forEach((ch, c) => ch === 'l' && inner(r, c) && (g[r][c] = 'd')));
+  return { x, y, rows: g.map((r) => r.join('')) };
 }
 
 function drawNeckwear(P: Pix, F: Frame, L: FullLoadout) {

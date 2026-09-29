@@ -26,7 +26,7 @@ torso outline (and arm offsets) in `avatarFrame.ts` plus a catalogue entry; the 
 
 | zone | rule |
 | --- | --- |
-| scalp | covered by any hairstyle (or a hat that hides hair) |
+| scalp | covered by any hairstyle (or a hat that hides hair); behind, the whole back of the skull down to the nape hairline |
 | features | eyes and mouth: nothing but eyewear on top |
 | head region | no see-through pockets (a waving arm or held item may frame real open air) |
 | chest | covered by every top |
@@ -48,6 +48,30 @@ held item → cane → pocket sealing → outline → pinhole sealing.
 - **Coats** open at the front over trousers; dresses and skirts hide them; hems follow the legs in every pose.
 - Held balloons and umbrellas float clear of the head; from behind, held things hide behind the body.
 - Enclosed see-through pockets framed by hair/hats are sealed with the part's shadow tone at draw time.
+- **Hats that hide the hair** (hijab, turban) wrap the whole back of the head down to the nape, lit like the
+  head; a hijab (`coversEars`) hides the ear too.
+
+## Hair from behind (avatarHair.ts `formBackHair`)
+
+Seen from behind — what other players see most, since people sit facing away — every back-view hair map goes
+through one form pass, so every style, colour, body, pose and hat gets the same treatment:
+
+- **The mass** is the style's silhouette, cleaned (strays, threads, pinholes) and always covering the back of
+  the skull to the nape hairline (`NAPE`): skin shows only at the neck and the ear. Styles whose structure *is*
+  their silhouette are constructed from the head box instead (`HAIR_FORM[id].build`): ponytail, pigtails, bun,
+  space buns (ties with a tail or a bun), braids and locs (a curtain of ropes), mohawk (the crest kept, the sides
+  clipped to a scalp tint).
+- **The light**: one volume lit from the upper left, a sheen band across the upper back of the head, the far
+  side and the nape in shade. Under a crown hat the hair below the brim is in its shadow.
+- **The texture** (`HAIR_FORM[id].texture`): straight locks fan from the crown, light streaks run down their
+  crests and shade creases rise from the ends, which part in notches; wavy locks swing, with lit wave crests;
+  curls are scattered lit crescents; braids are plaited beads; locs are rounded segments; gathered hair runs to
+  its tie; clipped hair (buzz) fades to a scalp tint at the nape.
+- **Tones are relative** (`hairTones` in avatarKit.ts): the ramp is built from the player's colour so every step
+  reads on pale blonde and on near-black alike. Two-tone highlights land on the ends (a tail, a bun, the lower
+  lengths) and keep the hair's shading.
+
+Review the back views with the sheet, every style at play scale and 3×: `art/review/hair-back-after.png`.
 
 ## Parts from image generation (art/)
 

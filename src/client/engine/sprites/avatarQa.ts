@@ -71,7 +71,8 @@ export function zonesFor(F: Frame): Zones {
   const head = headMaskOf(F);
   const [x0, y0] = F.head;
   const scalp = M();
-  const scalpRows = F.view === 'front' ? 6 : 15;
+  // behind, the back of the skull is hair down to the nape hairline (avatarHair.ts NAPE): skin shows only at the neck and ear
+  const scalpRows = F.view === 'front' ? 6 : 18;
   for (let y = y0; y < y0 + scalpRows; y++)
     for (let x = x0; x < x0 + 22; x++) {
       if (F.view === 'back' && x >= x0 + 20) continue; // the ear stays clear
