@@ -65,3 +65,6 @@
   world state persisted to the cloud. Dockerfile + render.yaml for deploy. Contract test mirrors the cloud API.
 - Remaining (operator-only, needs secrets): Discord app, Lovable secrets + republish, Render deploy,
   register commands. See docs/HOSTING.md.
+- 2026-09-29: LIVE end-to-end. Discord app configured, Minglewood Cloud secrets set, game server on
+  https://minglewood.onrender.com. First install ("Minglewood Test") created its world within a minute; the
+  installer signed in via Discord and landed as admin. Bot intentionally has only View Channels.
