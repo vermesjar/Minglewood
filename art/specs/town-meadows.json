@@ -1,0 +1,50 @@
+{
+  "name": "town-meadows",
+  "colors": 32,
+  "quality": "high",
+  "mood": "Northstar Town, a cozy lakeside company town on a bright spring morning. Storybook, handcrafted, premium; lush layered greens, warm wood, black cast iron, weathered stone, brass. Everything sized for a town where a person is about as tall as a lamp post's lower half.",
+  "sheets": [
+    {
+      "name": "garden",
+      "grid": "3x2",
+      "size": "1536x1024",
+      "tile": 150,
+      "items": [
+        {"key": "garden-bed.veg", "w": 1, "d": 1, "h": 24, "fit": "diamond", "rotation": "radial", "prompt": "A square raised vegetable bed built from weathered cedar planks, filling its floor diamond, planted in tidy rows: frilly lettuces, feathery carrot tops, a few red tomatoes on a little cane, dark rich soil between the rows."},
+        {"key": "garden-bed.flowers", "w": 1, "d": 1, "h": 30, "fit": "diamond", "rotation": "radial", "prompt": "A square raised bed built from weathered cedar planks, filling its floor diamond, packed with cutting flowers: tall sunflowers in the middle, pink cosmos and orange zinnias around them."},
+        {"key": "garden-bed.herbs", "w": 1, "d": 1, "h": 22, "fit": "diamond", "rotation": "radial", "prompt": "A square raised herb bed built from weathered cedar planks, filling its floor diamond: mounds of purple-flowering lavender, silvery sage, bright green basil and chives with little purple pompoms."},
+        {"key": "beehive", "w": 1, "d": 1, "h": 40, "width": 44, "fill": 0.3, "rotation": "radial", "prompt": "Two stacked white-painted wooden beehive boxes with a pitched honey-brown roof on a low stone stand, a couple of tiny bees; symmetric, the same from every side."},
+        {"key": "tree/apple.a", "w": 1, "d": 1, "h": 96, "width": 116, "fill": 0.2, "rotation": "radial", "prompt": "A small orchard apple tree: a rounded crown of fresh green leaves dotted with shiny red apples, a short gnarled trunk, a few fallen apples in the grass at its base."},
+        {"key": "tree/apple.b", "w": 1, "d": 1, "h": 90, "width": 110, "fill": 0.2, "rotation": "radial", "prompt": "A small orchard pear tree: a rounded crown of glossy leaves with golden-green pears and a few white blossoms, a short gnarled trunk, a woven basket of pears at its base."}
+      ]
+    },
+    {
+      "name": "lawn",
+      "grid": "3x2",
+      "size": "1536x1024",
+      "tile": 150,
+      "items": [
+        {"key": "blanket.red", "w": 2, "d": 2, "h": 14, "fit": "diamond", "rotation": "radial", "prompt": "A square red-and-white gingham picnic blanket spread flat on the grass, filling its floor diamond, with a wicker picnic basket, a plate of sandwiches, two lemonade glasses and a bowl of strawberries in the middle."},
+        {"key": "blanket.blue", "w": 2, "d": 2, "h": 14, "fit": "diamond", "rotation": "radial", "prompt": "A square blue-and-cream striped picnic blanket spread flat on the grass, filling its floor diamond, with a wicker basket, an open book, a teapot and two cups, and a little bunch of wildflowers in the middle."},
+        {"key": "sculpture.sphere", "w": 1, "d": 1, "h": 72, "width": 58, "fill": 0.3, "rotation": "radial", "prompt": "An outdoor bronze armillary sphere sculpture: interlocking polished bronze rings with a verdigris patina, on a round weathered stone plinth; symmetric, the same from every side."},
+        {"key": "sculpture.cairn", "w": 1, "d": 1, "h": 62, "width": 50, "fill": 0.3, "rotation": "radial", "prompt": "A tall balanced-stone cairn sculpture: smooth river stones of warm grey and ochre stacked in a graceful tapering column on a round stone base, a little moss at the bottom; the same from every side."},
+        {"key": "sculpture.star", "w": 1, "d": 1, "h": 76, "width": 56, "fill": 0.3, "rotation": "radial", "prompt": "A modern outdoor sculpture of a faceted brushed-brass five-pointed star standing upright on a slim dark steel post over a round pale stone plinth, catching the sun."},
+        {"key": "birdbath", "w": 1, "d": 1, "h": 40, "width": 46, "fill": 0.3, "rotation": "radial", "prompt": "A round carved stone bird bath on a fluted pedestal, a shallow bowl of blue water with a little sparrow perched on its rim and some ivy curling round the pedestal."}
+      ]
+    },
+    {
+      "name": "grove",
+      "grid": "3x2",
+      "size": "1536x1024",
+      "tile": 150,
+      "items": [
+        {"key": "wildflowers.a", "w": 1, "d": 1, "h": 22, "width": 70, "fill": 0.35, "rotation": "radial", "prompt": "A loose drift of meadow wildflowers growing in the grass: red poppies, blue cornflowers and white ox-eye daisies on slender stems, airy and natural, no pot or edging."},
+        {"key": "wildflowers.b", "w": 1, "d": 1, "h": 30, "width": 66, "fill": 0.35, "rotation": "radial", "prompt": "A loose clump of tall cottage-garden wildflowers growing in the grass: purple lupins, pink foxgloves and a few yellow buttercups, no pot or edging."},
+        {"key": "fire-ring", "w": 1, "d": 1, "h": 24, "width": 68, "fill": 0.35, "rotation": "radial", "prompt": "A round campfire ring of grey fieldstones with split logs stacked in a tepee in the middle and small warm flames and glowing embers; symmetric, the same from every side."},
+        {"key": "garden-lantern", "w": 1, "d": 1, "h": 48, "width": 26, "fill": 0.2, "rotation": "radial", "prompt": "A short black cast-iron garden lantern on a slim post, a square glass lamp with a little pointed cap and a warm candle glow inside; symmetric, the same from every side."},
+        {"key": "stump", "w": 1, "d": 1, "h": 16, "width": 46, "fill": 0.3, "rotation": "radial", "prompt": "A round tree-stump seat with pale sawn rings on top, rough dark bark, a little moss and a mushroom at its foot; the same from every side."},
+        {"key": "scarecrow", "w": 1, "d": 1, "h": 70, "width": 56, "fill": 0.3, "views": "mirror", "prompt": "A friendly garden scarecrow on a wooden post: straw hat, patched plaid shirt with straw poking out of the cuffs, a stitched smiling burlap face, arms out on a crossbar, a crow perched on one arm.", "prompts": {"nw": "The same friendly garden scarecrow seen from BEHIND: the back of its straw hat and burlap head, the back of its patched plaid shirt with straw poking out, arms out on the crossbar, the wooden post, a crow on one arm."}}
+      ]
+    }
+  ]
+}

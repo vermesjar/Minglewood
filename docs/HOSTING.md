@@ -91,10 +91,14 @@ Discord → you're the admin of a brand-new world with a housewarming party goin
 - Presence is never persisted — `org_state` holds the world (rooms, bindings, members' profiles and
   avatars, artifacts, decorations), not activity.
 
-## Slack and Microsoft Teams next
+## Slack
 
-The same pattern extends: a **Slack app install** (OAuth v2 with `team.id`) creates the
-organization in Minglewood Cloud; sign-in uses *Sign in with Slack* (OpenID) and routes by team id;
-huddles/channels bind to rooms through a `SlackProvider` implementing `CommunicationProvider`.
-Nothing in the world engine changes — tenants just gain a `slack_team_id` beside
-`discord_guild_id`.
+Slack runs on the game server: Sign in with Slack, the in-app *Add to Slack* install, huddles mapped to rooms,
+`/minglewood`, link previews and knock DMs. See [docs/slack.md](slack.md) for setup. On Render, add the `SLACK_*`
+variables from `render.yaml`. Still to do: a Slack install that creates a *new* company in Minglewood Cloud (like
+the Discord install does) and a `slack_team_id` on tenants. Until then, a workspace connects to the world the admin is
+signed in to, and its install token lives on the game server.
+
+## Microsoft Teams next
+
+The same pattern extends through a provider implementing `CommunicationProvider`; nothing in the world engine changes.

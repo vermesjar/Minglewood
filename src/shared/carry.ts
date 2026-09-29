@@ -19,6 +19,9 @@ export const CARRY_META: Record<string, CarryMeta> = {
   plush: { emoji: '🧸', name: 'Plush', got: '🧸 You won a prize! It’s yours to carry around.', handOff: 'A prize for you, {name}! 🧸' },
   popcorn: { emoji: '🍿', name: 'Popcorn', got: '🍿 Popcorn in hand — careful, it’s hot.', handOff: 'Fresh popcorn, {name} 🍿' },
   soda: { emoji: '🥤', name: 'Soda', got: '🥤 Soda in hand — ice cold.', handOff: 'One soda, {name} 🥤' },
+  book: { emoji: '📖', name: 'Book', got: '📖 Borrowed a book — put it back whenever you like.', handOff: 'Enjoy the read, {name} 📖' },
+  water: { emoji: '💧', name: 'Water', got: '💧 A cup of water — stay hydrated.', handOff: 'Here’s some water, {name} 💧' },
+  apple: { emoji: '🍎', name: 'Apple', got: '🍎 An apple from the bowl — crunchy.', handOff: 'An apple for you, {name} 🍎' },
 };
 
 export function carryMeta(item: string | null | undefined): CarryMeta | undefined {

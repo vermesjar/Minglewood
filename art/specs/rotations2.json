@@ -1,0 +1,319 @@
+{
+  "name": "rotations2",
+  "note": "Second takes of turnaround views drawn as mirror images instead of turned.",
+  "mood": "The Minglewood house style: warm, glossy, detailed pixel art furniture.",
+  "colors": 28,
+  "quality": "high",
+  "sheets": [
+    {
+      "name": "espresso-se",
+      "grid": "2x1",
+      "size": "1536x1024",
+      "tile": 280,
+      "refs": [
+        "out/cafe/countertop2/espresso.sw.raw.png"
+      ],
+      "items": [
+        {
+          "facing": "sw",
+          "w": 1,
+          "d": 1,
+          "h": 22,
+          "fill": 0.35,
+          "prompt": "The vintage brass-and-cream espresso machine exactly as in the reference. Its front faces the LOWER LEFT.",
+          "width": 40
+        },
+        {
+          "facing": "se",
+          "w": 1,
+          "d": 1,
+          "h": 22,
+          "fill": 0.35,
+          "prompt": "The SAME espresso machine. Its front faces the LOWER RIGHT. Its FRONT is the face toward the LOWER RIGHT. Reading that front face from left to right on the page: the round pressure gauge high up at its LEFT end (near the middle of the machine on the page), then the group head with the walnut-handled portafilter sticking out toward the lower right, a little right of centre. The face toward the LOWER LEFT is the machine's plain cream-enamel side panel with brass trim. The steam wand is on the far side, only its tip peeking out at the top right. White cups on top. No text.",
+          "width": 40,
+          "key": "espresso"
+        }
+      ],
+      "note": "The extra reference images are finished drawings of this exact piece. EVERY cell shows the SAME piece, same size, materials and colours, seen from a different side as each cell says. Reference: the machine with its front to the lower left. The right cell shows it turned so its front faces the lower right; it is NOT a mirror image of the reference."
+    },
+    {
+      "name": "vending-se",
+      "grid": "2x1",
+      "size": "1536x1024",
+      "tile": 280,
+      "refs": [
+        "out/arcade/snacks/vending-machine.sw.raw.png"
+      ],
+      "items": [
+        {
+          "facing": "sw",
+          "w": 1,
+          "d": 1,
+          "h": 54,
+          "fill": 1.0,
+          "prompt": "The magenta neon snack vending machine exactly as in the reference. Its front faces the LOWER LEFT.",
+          "width": 50
+        },
+        {
+          "facing": "se",
+          "w": 1,
+          "d": 1,
+          "h": 54,
+          "fill": 1.0,
+          "prompt": "The SAME vending machine. Its front faces the LOWER RIGHT. Its FRONT is the tall face toward the LOWER RIGHT: on it, the big glowing glass window full of snacks fills the LEFT part and the narrow button panel with the coin slot runs down the RIGHT part; the dark pickup flap along the bottom of the front. The face toward the LOWER LEFT is a plain magenta side panel with a few vents near the bottom. No text.",
+          "width": 50,
+          "key": "vending-machine"
+        }
+      ],
+      "note": "The extra reference images are finished drawings of this exact piece. EVERY cell shows the SAME piece, same size, materials and colours, seen from a different side as each cell says. Reference: the machine with its front to the lower left. The right cell shows it turned so its front faces the lower right."
+    },
+    {
+      "name": "piano-se",
+      "grid": "2x1",
+      "size": "1536x1024",
+      "tile": 260,
+      "refs": [
+        "out/heirlooms/grand/heirloom-piano.sw.raw.png"
+      ],
+      "items": [
+        {
+          "facing": "sw",
+          "w": 2,
+          "d": 2,
+          "h": 34,
+          "fill": 1.0,
+          "prompt": "The black-lacquer grand piano with gold trim exactly as in the reference. Its front faces the LOWER LEFT.",
+          "width": 124
+        },
+        {
+          "facing": "se",
+          "w": 2,
+          "d": 2,
+          "h": 34,
+          "fill": 1.0,
+          "prompt": "The SAME grand piano. The keyboard runs along the LOWER-RIGHT edge, with the red velvet bench in front of it at the bottom right. The long tail of the piano points to the UPPER LEFT. The case's STRAIGHT side runs along the LOWER-LEFT edge, from the bottom corner up to the tail. The big CURVED bulge of the case is along the UPPER-RIGHT edge. The lid is hinged along the straight lower-left side and propped open, rising on the upper-right (curved) side.",
+          "width": 124,
+          "key": "heirloom-piano"
+        }
+      ],
+      "note": "The extra reference images are finished drawings of this exact piece. EVERY cell shows the SAME piece, same size, materials and colours, seen from a different side as each cell says. Reference: the grand piano with its keyboard to the lower left. The right cell shows it turned so its keyboard faces the lower right; it is NOT a mirror image of the reference."
+    },
+    {
+      "name": "piano-nw",
+      "grid": "2x1",
+      "size": "1536x1024",
+      "tile": 260,
+      "refs": [
+        "out/heirlooms/grand/heirloom-piano.ne.raw.png"
+      ],
+      "items": [
+        {
+          "facing": "ne",
+          "w": 2,
+          "d": 2,
+          "h": 34,
+          "fill": 1.0,
+          "prompt": "The black-lacquer grand piano with gold trim exactly as in the reference. Seen from BEHIND: its front faces away from us, to the UPPER RIGHT.",
+          "width": 124
+        },
+        {
+          "facing": "nw",
+          "w": 2,
+          "d": 2,
+          "h": 34,
+          "fill": 1.0,
+          "prompt": "The SAME grand piano seen from its tail end. The keyboard and bench are along the far UPPER-LEFT edge, mostly hidden. The rounded tail points toward us, to the LOWER RIGHT. The case's STRAIGHT side runs along the UPPER-RIGHT edge. The big CURVED bulge is along the LOWER-LEFT edge. The lid is hinged along the straight upper-right side and propped open, rising on the lower-left (curved) side.",
+          "width": 124,
+          "key": "heirloom-piano"
+        }
+      ],
+      "note": "The extra reference images are finished drawings of this exact piece. EVERY cell shows the SAME piece, same size, materials and colours, seen from a different side as each cell says. Reference: the grand piano seen from its tail end, its keyboard away to the upper right. The right cell shows it turned so its keyboard faces the upper left; it is NOT a mirror image of the reference."
+    },
+    {
+      "name": "dragonlamp-sw",
+      "grid": "2x1",
+      "size": "1536x1024",
+      "tile": 280,
+      "refs": [
+        "out/heirlooms/hall/heirloom-dragonlamp.se.raw.png"
+      ],
+      "items": [
+        {
+          "facing": "se",
+          "w": 1,
+          "d": 1,
+          "h": 52,
+          "fill": 0.35,
+          "prompt": "The jade dragon lamp exactly as in the reference.",
+          "height_px": 84
+        },
+        {
+          "facing": "sw",
+          "w": 1,
+          "d": 1,
+          "h": 52,
+          "fill": 0.35,
+          "prompt": "The SAME jade dragon lamp turned so the dragon's head and its glowing round paper lantern face US: the lantern hangs directly IN FRONT of the pole, centred on it, covering the middle of the pole and the dragon's coils, low above the round rosewood base; the dragon's head leans toward us just above the lantern.",
+          "height_px": 84,
+          "key": "heirloom-dragonlamp"
+        }
+      ],
+      "note": "The extra reference images are finished drawings of this exact piece. EVERY cell shows the SAME piece, same size, materials and colours, seen from a different side as each cell says. Reference: the lamp with its lantern hanging out to the right of the pole.",
+      "model": {
+        "base": "centred"
+      }
+    },
+    {
+      "name": "lamp-arc-sw-ne",
+      "grid": "2x1",
+      "size": "1536x1024",
+      "tile": 280,
+      "refs": [
+        "out/design/studio2/lamp-arc.raw.png"
+      ],
+      "items": [
+        {
+          "facing": "sw",
+          "w": 1,
+          "d": 1,
+          "h": 60,
+          "fill": 0.3,
+          "prompt": "The SAME brass arc floor lamp on its round white marble base, turned so the arc swings straight TOWARD US: the copper dome shade hangs directly IN FRONT of the pole, centred on it and low, just above the marble base, its glowing opening facing down; the brass stem curves over from the top of the pole toward us.",
+          "height_px": 77
+        },
+        {
+          "facing": "ne",
+          "w": 1,
+          "d": 1,
+          "h": 60,
+          "fill": 0.3,
+          "prompt": "The SAME brass arc floor lamp on its round white marble base, turned so the arc swings straight AWAY from us: the copper dome shade hangs directly BEHIND the top of the pole, centred on it and high, partly hidden by the pole; the stem curves away from us over the top.",
+          "height_px": 77,
+          "key": "lamp-arc"
+        }
+      ],
+      "note": "The extra reference images are finished drawings of this exact piece. EVERY cell shows the SAME piece, same size, materials and colours, seen from a different side as each cell says. Reference: the arc lamp with its arc and shade out to the right of its pole.",
+      "model": {
+        "base": "centred"
+      }
+    },
+    {
+      "name": "water-cooler-2",
+      "grid": "2x2",
+      "size": "1536x1024",
+      "tile": 280,
+      "refs": [
+        "out/eng/kitchen/water-cooler.se.raw.png"
+      ],
+      "items": [
+        {
+          "facing": "sw",
+          "w": 1,
+          "d": 1,
+          "h": 40,
+          "fill": 0.4,
+          "prompt": "The white office water cooler exactly as in the reference. Its front faces the LOWER LEFT.",
+          "height_px": 74
+        },
+        {
+          "facing": "se",
+          "w": 1,
+          "d": 1,
+          "h": 40,
+          "fill": 0.4,
+          "prompt": "The SAME water cooler. Its front faces the LOWER RIGHT. Its FRONT (toward the LOWER RIGHT) has the red hot tap on the LEFT, the blue cold tap on the RIGHT and the drip tray below. The side panel toward the LOWER LEFT is plain white with a vent grille: NO cup holder on it (the cup holder is on the far side, hidden). The big blue water bottle upside down on top.",
+          "height_px": 74,
+          "key": "water-cooler"
+        },
+        {
+          "facing": "nw",
+          "w": 1,
+          "d": 1,
+          "h": 40,
+          "fill": 0.4,
+          "prompt": "The SAME water cooler seen from behind. Seen from BEHIND: its front faces away from us, to the UPPER LEFT. The face toward the LOWER RIGHT is its plain white back panel with a vent grille and a power cord. The side panel toward the LOWER LEFT carries the paper-cup holder. No taps visible. The big blue water bottle on top.",
+          "height_px": 74,
+          "key": "water-cooler"
+        },
+        {
+          "facing": "ne",
+          "w": 1,
+          "d": 1,
+          "h": 40,
+          "fill": 0.4,
+          "prompt": "The SAME water cooler seen from behind. Seen from BEHIND: its front faces away from us, to the UPPER RIGHT. The face toward the LOWER LEFT is its plain white back panel with a vent grille and a power cord. The side panel toward the LOWER RIGHT is plain white: NO cup holder (it is on the far side, hidden). No taps visible. The big blue water bottle on top.",
+          "height_px": 74,
+          "key": "water-cooler"
+        }
+      ],
+      "note": "The extra reference images are finished drawings of this exact piece. EVERY cell shows the SAME piece, same size, materials and colours, seen from a different side as each cell says. Reference: the cooler with its taps facing the lower left; its paper-cup holder is on its side panel toward the lower right."
+    },
+    {
+      "name": "lamp-arc-sw-a",
+      "grid": "2x1",
+      "size": "1536x1024",
+      "tile": 280,
+      "refs": [
+        "out/design/studio2/lamp-arc.raw.png"
+      ],
+      "items": [
+        {
+          "facing": "se",
+          "w": 1,
+          "d": 1,
+          "h": 60,
+          "fill": 0.3,
+          "prompt": "The brass arc floor lamp exactly as in the reference.",
+          "height_px": 77
+        },
+        {
+          "facing": "sw",
+          "w": 1,
+          "d": 1,
+          "h": 60,
+          "fill": 0.3,
+          "prompt": "The SAME brass arc floor lamp, seen so its arc reaches straight toward the viewer: the round white marble base and the upright brass pole are at the BACK, and the copper dome shade hangs IN FRONT of them, horizontally centred on the pole, its glowing opening facing down; the shade overlaps and hides the middle of the pole. The stem rises from the base, bends over at the top and comes forward and down to the shade. Nothing reaches out to the left or right.",
+          "height_px": 77,
+          "key": "lamp-arc"
+        }
+      ],
+      "note": "The extra reference images are finished drawings of this exact piece. EVERY cell shows the SAME piece, same size, materials and colours, seen from a different side as each cell says. Reference: the arc lamp with its arc and shade out to the right of its pole. The right cell shows it turned a quarter-turn so the arc reaches toward the viewer.",
+      "model": {
+        "base": "centred"
+      }
+    },
+    {
+      "name": "lamp-arc-sw-b",
+      "grid": "2x1",
+      "size": "1536x1024",
+      "tile": 280,
+      "refs": [
+        "out/design/studio2/lamp-arc.raw.png"
+      ],
+      "items": [
+        {
+          "facing": "se",
+          "w": 1,
+          "d": 1,
+          "h": 60,
+          "fill": 0.3,
+          "prompt": "The brass arc floor lamp exactly as in the reference.",
+          "height_px": 77
+        },
+        {
+          "facing": "sw",
+          "w": 1,
+          "d": 1,
+          "h": 60,
+          "fill": 0.3,
+          "prompt": "The SAME brass arc floor lamp, seen so its arc reaches straight toward the viewer: the round white marble base and the upright brass pole are at the BACK, and the copper dome shade hangs IN FRONT of them, horizontally centred on the pole, its glowing opening facing down; the shade overlaps and hides the middle of the pole. The stem rises from the base, bends over at the top and comes forward and down to the shade. Nothing reaches out to the left or right.",
+          "height_px": 77
+        }
+      ],
+      "note": "The extra reference images are finished drawings of this exact piece. EVERY cell shows the SAME piece, same size, materials and colours, seen from a different side as each cell says. Reference: the arc lamp with its arc and shade out to the right of its pole. The right cell shows it turned a quarter-turn so the arc reaches toward the viewer.",
+      "model": {
+        "base": "centred"
+      }
+    }
+  ]
+}

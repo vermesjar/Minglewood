@@ -5,8 +5,9 @@ import { BRAND } from '@shared/brand';
 import { MEMORY_SLOTS } from '@shared/world/memory';
 import { api } from '../app/api';
 import { useStore } from '../app/store';
+import { SlackTab } from './SlackTab';
 
-type Tab = 'overview' | 'rooms' | 'memory' | 'discord' | 'events' | 'audit';
+type Tab = 'overview' | 'rooms' | 'memory' | 'slack' | 'discord' | 'events' | 'audit';
 
 /** [capability, label, how, possible on Discord at all] — verified against current Discord docs. */
 const CAPS: Array<[keyof ProviderCapabilities, string, string, boolean]> = [
@@ -62,6 +63,7 @@ export function AdminConsole() {
             ['overview', 'Organization'],
             ['rooms', 'Rooms & channels'],
             ['memory', 'Company memory'],
+            ['slack', 'Slack'],
             ['discord', 'Discord'],
             ['events', 'Events'],
             ['audit', 'Audit log'],
@@ -78,6 +80,7 @@ export function AdminConsole() {
           {tab === 'overview' && <OrgTab data={data} reload={load} />}
           {tab === 'rooms' && <RoomsTab data={data} reload={load} />}
           {tab === 'memory' && <MemoryTab data={data} reload={load} />}
+          {tab === 'slack' && <SlackTab data={data} reload={load} />}
           {tab === 'discord' && <DiscordTab data={data} reload={load} />}
           {tab === 'events' && <EventsTab data={data} reload={load} />}
           {tab === 'audit' && <AuditTab data={data} />}
@@ -169,9 +172,13 @@ function OrgTab({ data, reload }: TabProps) {
   );
 }
 
+type Provider = 'demo' | 'discord' | 'slack';
+/** Slack bindings are channels whose huddle is the room's voice; Discord's are voice channels. */
+const channelMark = (provider: Provider, c: ExternalChannel) => (c.kind === 'text' ? '#' : provider === 'slack' ? '🎧 #' : '🔊 ');
+
 function RoomRow({ room, data, channels, reload }: { room: Room; data: AdminOverview; channels: Record<string, ExternalChannel[]>; reload: () => void }) {
   const binding = data.bindings.find((b) => b.roomId === room.id);
-  const [provider, setProvider] = useState<'demo' | 'discord'>(binding?.provider === 'discord' ? 'discord' : 'demo');
+  const [provider, setProvider] = useState<Provider>(binding?.provider ?? 'demo');
   const [channelId, setChannelId] = useState(binding?.externalChannelId ?? '');
   const [desc, setDesc] = useState(room.description);
   const [status, setStatus] = useState('');
@@ -187,7 +194,7 @@ function RoomRow({ room, data, channels, reload }: { room: Room; data: AdminOver
             provider,
             kind: ch?.kind === 'stage' ? 'stage' : ch?.kind === 'text' ? 'text' : 'voice',
             externalChannelId: channelId,
-            label: ch ? `${ch.kind === 'text' ? '#' : '🔊 '}${ch.name}` : channelId,
+            label: ch ? `${channelMark(provider, ch)}${ch.name}` : channelId,
           },
         });
       }
@@ -210,8 +217,11 @@ function RoomRow({ room, data, channels, reload }: { room: Room; data: AdminOver
         <textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={2} />
       </td>
       <td>
-        <select value={provider} onChange={(e) => (setProvider(e.target.value as 'demo' | 'discord'), setChannelId(''))}>
+        <select value={provider} onChange={(e) => (setProvider(e.target.value as Provider), setChannelId(''))}>
           <option value="demo">Demo</option>
+          <option value="slack" disabled={!data.slack.team}>
+            Slack
+          </option>
           <option value="discord" disabled={!data.connections.some((c) => c.provider === 'discord')}>
             Discord
           </option>
@@ -223,7 +233,7 @@ function RoomRow({ room, data, channels, reload }: { room: Room; data: AdminOver
           {list.map((c) => (
             <option key={c.id} value={c.id}>
               {c.parentName ? `${c.parentName} / ` : ''}
-              {c.kind === 'text' ? '#' : '🔊 '}
+              {channelMark(provider, c)}
               {c.name}
             </option>
           ))}
@@ -248,7 +258,11 @@ function RoomsTab({ data, reload }: TabProps) {
       void api<{ channels: ExternalChannel[] }>('/admin/channels?provider=discord')
         .then((r) => setChannels((c) => ({ ...c, discord: r.channels })))
         .catch(() => undefined);
-  }, [data.connections]);
+    if (data.slack.team)
+      void api<{ channels: ExternalChannel[] }>('/admin/channels?provider=slack')
+        .then((r) => setChannels((c) => ({ ...c, slack: r.channels })))
+        .catch(() => undefined);
+  }, [data.connections, data.slack.team]);
   return (
     <section className="apanel wide">
       <h2>Rooms & conversation bindings</h2>

@@ -19,11 +19,11 @@ are `crit-crop-*`, `crit-seat-*`. Before/after pairs are `crit-before-*` / `crit
 | 7 | Studio pipeline (seats) | Back views of seats could come out leaning like their fronts (the model draws the wrong diagonal), leaving chairs sideways to their desks. | **Guarded**: `studio.py build` now compares each one-tile seat's back-view lean with its front's and flips it before publishing (same test as `check_facings.py`). |
 | 7a | Town, every building | **You could stand inside building fronts** ("I can stand on the box out of the front [of Lantern Hall] that looks like a pillar"): the art's column plinths, planters, stair side blocks and the Engineering stoop bike reach over walkable tiles in front of the doors. | **Fixed**: 35 stoop tiles across 7 buildings are blocked (invisible flat blockers, `STOOP_BLOCKS` in `northstarTown.ts`); door tiles and the tile each door opens onto stay free, long walks still pass. **Guarded**: `scripts/town-stoops.ts` (in the gate) measures each building's drawing over the tiles in front of its two visible faces and fails if a covered tile is walkable. |
 | 7b | Eng, Launch, Arcade | **Beanbags faced the wrong way** when their sitter faced away: one front drawing (hump behind the sitter) served every facing. | **Fixed**: back views generated for all four colours (hump toward the camera), published as facings {se, nw} (`crit-after-bb-launch.png`, `crit-after-bb-eng.png`). **Guarded**: `check_facings.py` now fails any single-drawing seat with a back or hump (chairs, armchairs, couches, benches, thrones, beanbags) or whose seat outline isn't symmetric. |
-| 8 | Town | **Empty meadow** north-east of the café (the corner between the cherry grove and the forest, `crit-town-57-19-day.png`, `crit-town-70-10-day.png`) and an empty lawn west of Launch Lab (`crit-town-19-57-day.png`): big plain grass with one lone birch. Reads unfinished next to the dressed plaza. | Open — see "Next". |
-| 9 | Town | The café terrace paving meets the shore in **right-angle steps** (`crit-town-57-38-day.png`, around the pier root). | Open — ground.ts shore/paving blend. |
-| 10 | Town | The island is a thin slab: a 1-band brown cliff on a flat cream void at the map corners. | Open — a deeper earth/rock skirt would sell it. |
-| 11 | Rooms, night | The night tint is a flat blue multiply that greys every colour equally; rooms read dim but flat except inside lamp pools (`crit-eng-night-2x.png`). | Open — engine (WorldView ambience): a warmer, less desaturating night (keep hues, drop value), and let windows cast cool moonlight patches. |
-| 12 | Town, day | Buildings' window glow is baked into the art, so windows read lit at noon (HQ especially). | Open — low priority; would need a day variant of the facades. |
+| 8 | Town | **Empty meadow** north-east of the café (the corner between the cherry grove and the forest, `crit-town-57-19-day.png`, `crit-town-70-10-day.png`) and an empty lawn west of Launch Lab (`crit-town-19-57-day.png`): big plain grass with one lone birch. Reads unfinished next to the dressed plaza. | **Fixed** (town round 2): Orchard Lane (a gravel footpath, soft-edged `t` tiles) from HQ's forecourt to a community garden (8 raised beds, scarecrow, bird bath, lanterns), an apple and pear orchard, and a picnic lawn with a bench on the lake's north shore. West of the studios is the Sculpture Walk, with a picnic lawn, a cairn, an armillary sphere, and a campfire circle whose four benches face all four ways round. Everything is laid out where the studio roofs don't hide it (`town2-after-ne-meadow.png`, `town2-after-west.png`). |
+| 9 | Town | The café terrace paving meets the shore in **right-angle steps** (`crit-town-57-38-day.png`, around the pier root). | **Fixed**: the terrace runs straight to Main Street and ends in a stone quay (coping stones on the paving and a dressed-stone face down to the water, `ground.ts`). The promenade ends square too (`town2-after-terrace.png`, `town2-grid-terrace.png`). |
+| 10 | Town | The island is a thin slab: a 1-band brown cliff on a flat cream void at the map corners. | **Fixed**: the island stands in a sea. It has a 46 px skirt: a grass lip with tufts, roots through the topsoil, wavy strata, then bedrock wet at the waterline, with foam and shallows at its foot. Beyond it the sea pales to a misty horizon with far hills, and there are stars at night; all of it follows the time of day (`surroundings.ts`; `town2-after-corner.png`, `town2-after-overview*.png`). |
+| 11 | Rooms, night | The night tint is a flat blue multiply that greys every colour equally; rooms read dim but flat except inside lamp pools (`crit-eng-night-2x.png`). | **Fixed**: one light model for rooms and town (`MOODS` in WorldView). A near-neutral multiply keeps hue and saturation and drops value, then a blue-purple ambient is screened over it; rooms take the same light, less deep (`town2-after-night.png`). |
+| 12 | Town, day | Buildings' window glow is baked into the art, so windows read lit at noon (HQ especially). | **Fixed**: the facades are published glazed for daylight (sky-reflecting glass with a glint, `town_conform.py --day-glass`). Lantern glass is clear, paper lanterns and gilded stars are left alone. Night glow masks cover each whole pane, so the windows light up from dusk (`town2-after-noon-hq.png`). |
 
 Seated-in-context audit, everything else: no depth or position errors found. Chair backs, armrests, table
 tops, desk monitors, counter fronts and sofa backs all draw in front of / behind their sitters correctly in
@@ -38,8 +38,17 @@ exceptions are wingbacks beside a side table, which is intended).
 - **Status dots**: every person in town has a small blue dot floating over their head at all times; at town zoom
   it reads as noise (HUD).
 
-## Next
+## Town round 2 (also done)
 
-1. Dress the empty town meadows (#8): an orchard or community garden, a meandering path with benches, wildflower
-   patches, a picnic lawn. Reuse existing props; generate a garden bed / orchard tree if needed.
-2. Shore blend (#9) and a deeper island skirt (#10) in `ground.ts`.
+- **The ground shows the tile grid**: plaza and terrace paving is one flagstone per tile, with a joint on every
+  tile edge. Streets are 2×2 setts per tile with clearly stronger joints on the tile edges. The pier's planks butt
+  on tile edges. Verified with `gridLab` (`town2-grid-*.png`).
+- **Seats get room**: `scripts/town-seats.ts` (in the gate) checks that every town seat has a clear row in front
+  of its working face and that no other drawing overlaps it. Changes: the plaza benches form a true pinwheel
+  about the fountain, the flower cart moved to the foot of Orchard Lane, plaza lamps stand at the corners, and
+  the park benches were moved out from under Lantern Hall's roof and the oak's crown. Random trees and bushes
+  keep off seats.
+- **Life**: butterflies over the flower beds, plaza pigeons that take off when someone walks up, flocks with
+  ground shadows, falling leaves and blossom, fireflies at dusk and night (`townLife.ts`). Sims stroll to named
+  places (`TOWN_SPOTS`), keeping to paths where they lead the right way, and linger or sit.
+

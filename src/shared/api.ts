@@ -47,6 +47,8 @@ export interface PublicConfig {
   brand: { name: string; tagline: string };
   demoMode: boolean;
   discord: { enabled: boolean; clientId: string | null };
+  /** Sign in with Slack is available. */
+  slack: { enabled: boolean };
   /** "Add to Discord" page on Minglewood Cloud, when hosted. */
   installUrl: string | null;
 }
@@ -63,8 +65,9 @@ export interface Bootstrap {
   artifacts: HistoricalArtifact[];
   decorations: Decoration[];
   me: Member;
-  capabilities: { discord: ProviderCapabilities | null; demo: ProviderCapabilities };
+  capabilities: { discord: ProviderCapabilities | null; slack: ProviderCapabilities | null; demo: ProviderCapabilities };
   discordConnected: boolean;
+  slackConnected: boolean;
 }
 
 export interface ExternalChannel {
@@ -87,4 +90,21 @@ export interface AdminOverview {
   audit: AuditEntry[];
   memberCount: number;
   discord: { configured: boolean; botConfigured: boolean; installUrl: string | null; capabilities: ProviderCapabilities };
+  slack: SlackAdminStatus;
+}
+
+export interface SlackAdminStatus {
+  /** Client id + secret + signing secret set: sign-in and the workspace install work. */
+  configured: boolean;
+  /** A bot token is available (env or from the install): channels, presence events, DMs, unfurls. */
+  botConfigured: boolean;
+  /** Where an admin adds Minglewood to their workspace (OAuth v2), when configured. */
+  installUrl: string | null;
+  /** Local mock transport (SLACK_MOCK): outgoing Slack calls are recorded, not sent. */
+  mock: boolean;
+  /** The workspace this company's rooms bind to: its connection, or SLACK_TEAM_ID on a single-workspace server. */
+  team: string | null;
+  capabilities: ProviderCapabilities;
+  /** The URLs to paste into the Slack app's settings. */
+  endpoints: { events: string; commands: string; interactions: string; signInRedirect: string; installRedirect: string };
 }

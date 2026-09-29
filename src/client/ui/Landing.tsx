@@ -16,6 +16,8 @@ const ERRORS: Record<string, string> = {
   no_install: 'Minglewood isn’t in any of your Discord servers yet. Ask a server admin to add it — it takes a minute.',
   oauth_state: 'The sign-in link expired. Please try again.',
   oauth_failed: 'Discord sign-in failed. Please try again.',
+  slack_no_install: 'Minglewood isn’t connected to that Slack workspace yet. Ask a workspace admin to add it.',
+  slack_failed: 'Slack sign-in failed. Please try again.',
   activity_auth: 'Minglewood needs your OK in Discord to know who you are. Relaunch the Activity to try again.',
 };
 
@@ -155,6 +157,11 @@ export function Landing() {
         <div className="or">
           <span>or</span>
         </div>
+        {config?.slack?.enabled && (
+          <a className="btn slack big" href="/api/slack/auth/start">
+            <span aria-hidden>💬</span> Continue with Slack
+          </a>
+        )}
         {config?.discord.enabled ? (
           <>
             <a className="btn discord big" href={discordHref}>
@@ -166,7 +173,7 @@ export function Landing() {
               </p>
             )}
           </>
-        ) : (
+        ) : config?.slack?.enabled ? null : (
           <p className="muted small">
             Discord sign-in isn’t configured on this server yet. Add your app credentials to <code>.env</code> — see{' '}
             <code>docs/DISCORD.md</code>.

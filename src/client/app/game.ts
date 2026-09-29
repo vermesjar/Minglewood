@@ -5,7 +5,7 @@
 import { carryMeta } from '@shared/carry';
 import type { Bootstrap, PublicConfig } from '@shared/api';
 import type { AvatarLoadout, PresenceStatus, SavedOutfit } from '@shared/domain/types';
-import type { KnockKind, KnockReply, NpcState, Occupant, ServerMsg } from '@shared/protocol';
+import { NOTE_MAX_CHARS, fromWirePatch, type KnockKind, type KnockReply, type NpcState, type Occupant, type ServerMsg, type WirePatch } from '@shared/protocol';
 import type { EmoteId } from '@shared/presence';
 import { EMOTE_IDS } from '@shared/presence';
 import { getScene, TOWN_ID, buildingForRoom } from '@shared/world';
@@ -59,10 +59,13 @@ class Game {
   private keyWalking = false;
   private arrivalTimer: number | null = null;
   initialScene = TOWN_ID;
+  /** From a link (`?to=<memberId>`: Slack's "join me", an unfurl's Join button): arrive next to them. */
+  private linkTo: string | null = null;
 
   /* ------------------------------------------------------------------ lifecycle */
 
   async start() {
+    this.readLink();
     try {
       if (isInDiscordActivity()) {
         setState({ inDiscord: true });
@@ -100,6 +103,23 @@ class Game {
       if (this.startAttempts > 20) setState({ phase: 'landing' });
       else setTimeout(() => void this.start(), Math.min(4000, 400 * this.startAttempts));
     }
+  }
+
+  /**
+   * Links into the world (Slack unfurls, /minglewood, shared URLs): `?room=<roomId>` opens that room,
+   * `?to=<memberId>` puts you next to that person. Read once, then tidied out of the address bar.
+   */
+  private readLink() {
+    const q = new URLSearchParams(location.search);
+    const room = q.get('room');
+    const to = q.get('to');
+    if (!room && !to) return;
+    if (room && /^[a-z0-9-]{1,40}$/.test(room)) this.initialScene = room;
+    if (to && /^[\w-]{1,60}$/.test(to)) this.linkTo = to;
+    q.delete('room');
+    q.delete('to');
+    const rest = q.toString();
+    history.replaceState(null, '', `${location.pathname}${rest ? `?${rest}` : ''}${location.hash}`);
   }
 
   private startAttempts = 0;
@@ -216,13 +236,26 @@ class Game {
         setWorldClock({ offsetMs: this.rt!.serverOffset });
         setState({ directory: Object.fromEntries(m.directory.map((d) => [d.memberId, d])) });
         this.refreshBadges();
-        this.rt!.send({ t: 'enter', sceneId: getState().sceneId ?? this.initialScene });
+        {
+          // a link to someone (?to=) lands you next to them if they share where they are
+          const to = this.linkTo;
+          this.linkTo = null;
+          const theirs = to ? m.directory.find((d) => d.memberId === to)?.sceneId : undefined;
+          this.rt!.send({ t: 'enter', sceneId: getState().sceneId ?? theirs ?? this.initialScene, near: theirs ? to! : undefined });
+        }
         break;
       case 'scene':
         this.world?.setObjStates(m.states);
         this.sceneStates = m.states;
         this.npcStates = new Map((m.npcs ?? []).map((n) => [n.id, n]));
+        setState({ notes: m.notes ?? [] });
         this.loadScene(m.sceneId, m.occupants);
+        this.world?.setNotes(getState().notes);
+        break;
+      case 'notes':
+        if (m.sceneId !== getState().sceneId) break;
+        setState((s) => ({ notes: [...s.notes.filter((n) => n.objectId !== m.objectId), ...m.notes] }));
+        w?.setNotes(getState().notes, true);
         break;
       case 'objstate':
         if (m.sceneId === getState().sceneId) {
@@ -250,7 +283,7 @@ class Game {
         w?.move(m.memberId, m.path, m.startedAt);
         break;
       case 'moment':
-        if (m.sceneId === getState().sceneId) w?.playObject(m.objectId, m.what);
+        if (m.sceneId === getState().sceneId) w?.playObject(m.objectId, m.what, m.by, m.detail);
         break;
       case 'npc': {
         const scene = m.sceneId === getState().sceneId ? this.scene(m.sceneId) : undefined;
@@ -259,15 +292,18 @@ class Game {
         w?.updateNpc(scene, m.npc);
         break;
       }
-      case 'updated':
-        if (m.memberId === this.meId && m.patch.carrying && m.patch.carrying !== getState().occupants[this.meId]?.carrying)
-          this.handedOver(m.patch.carrying);
-        w?.patch(m.memberId, m.patch);
+      case 'updated': {
+        // cleared fields arrive as null (JSON has no undefined): standing up clears sittingOn, arriving clears path
+        const patch = fromWirePatch(m.patch as WirePatch);
+        if (m.memberId === this.meId && patch.carrying && patch.carrying !== getState().occupants[this.meId]?.carrying)
+          this.handedOver(patch.carrying);
+        w?.patch(m.memberId, patch);
         setState((s) => {
           const cur = s.occupants[m.memberId];
-          return cur ? { occupants: { ...s.occupants, [m.memberId]: { ...cur, ...m.patch } } } : {};
+          return cur ? { occupants: { ...s.occupants, [m.memberId]: { ...cur, ...patch } } } : {};
         });
         break;
+      }
       case 'emote':
         w?.emote(m.memberId, m.emote);
         break;
@@ -684,12 +720,28 @@ class Game {
     }
     const kinds = new Set(o.actions?.map((a) => a.kind));
     if (kinds.has('exit')) return this.exitToTown();
+    if (kinds.has('note')) {
+      // the board's notes open at once; you walk up to it to pin one
+      setState({ selection: { kind: 'object', sceneId, objectId: o.id, x: p.x, y: p.y } });
+      this.useObject(o, () => undefined);
+      return;
+    }
     if (kinds.has('ring')) {
       this.useObject(o, () => {
         this.rt?.send({ t: 'ring', objectId: o.id });
         this.emote('celebrate');
         this.say('🔔 Ding ding!');
       });
+      return;
+    }
+    if (kinds.has('use')) {
+      // walk up to its working face, turn to it and use it (the server picks the song, the score, the city)
+      this.useObject(o, () => this.rt?.send({ t: 'use', objectId: o.id }));
+      // an heirloom's story or an artifact stays in the info stand
+      if (kinds.has('info') || kinds.has('artifact')) {
+        if (kinds.has('artifact')) this.quest('artifact');
+        setState({ selection: { kind: 'object', sceneId, objectId: o.id, x: p.x, y: p.y } });
+      }
       return;
     }
     if (kinds.has('toggle')) {
@@ -766,7 +818,14 @@ class Game {
     const ref = prefer ?? me;
     free.sort((a, b) => Math.hypot(a.x - ref[0], a.y - ref[1]) - Math.hypot(b.x - ref[0], b.y - ref[1]));
     const spot = free[0];
-    this.walkTo([spot.x, spot.y], () => this.rt?.send({ t: 'sit', objectId: o.id }));
+    const sit = () => this.rt?.send({ t: 'sit', objectId: o.id, at: [spot.x, spot.y] });
+    // already on this couch or bench: slide over to the cushion (the seat's tiles aren't walked on; the server
+    // moves you along the seat and every screen glides you there)
+    if (getState().occupants[this.meId]?.sittingOn === o.id) {
+      sit();
+      return;
+    }
+    this.walkTo([spot.x, spot.y], sit);
   }
 
   private onObjectActivate(o: SceneObject) {
@@ -775,6 +834,16 @@ class Game {
   }
 
   /* ------------------------------------------------------------------ social actions */
+
+  /** Pin a note on a board (you need to be standing at it; the server checks). */
+  postNote(objectId: string, text: string) {
+    this.rt?.send({ t: 'note', objectId, text: text.slice(0, NOTE_MAX_CHARS) });
+  }
+
+  /** Take one of your notes down (an admin can take down anyone's). */
+  removeNote(noteId: string) {
+    this.rt?.send({ t: 'unnote', noteId });
+  }
 
   /** Put down whatever you picked up. */
   putDown() {

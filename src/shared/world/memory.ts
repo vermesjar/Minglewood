@@ -15,7 +15,7 @@ export interface MemorySlot {
 /** Free wall spots per interior: clear of authored wall items, and not hidden behind tall furniture. */
 export const MEMORY_SLOTS: Record<string, MemorySlot[]> = {
   hq: [{ wall: 'right', at: 9 }, { wall: 'right', at: 0 }, { wall: 'left', at: 10 }, { wall: 'left', at: 11 }],
-  cafe: [{ wall: 'right', at: 0 }, { wall: 'left', at: 0 }, { wall: 'right', at: 10 }, { wall: 'left', at: 9 }],
+  cafe: [{ wall: 'right', at: 10 }, { wall: 'left', at: 9 }, { wall: 'left', at: 4 }, { wall: 'left', at: 6 }],
   eng: [{ wall: 'right', at: 1 }, { wall: 'right', at: 8 }, { wall: 'left', at: 5 }, { wall: 'left', at: 6 }, { wall: 'left', at: 8 }],
   launch: [{ wall: 'right', at: 8 }, { wall: 'right', at: 11 }, { wall: 'right', at: 0 }, { wall: 'left', at: 6 }],
   events: [{ wall: 'right', at: 11 }, { wall: 'right', at: 15 }, { wall: 'left', at: 1 }, { wall: 'left', at: 5 }],

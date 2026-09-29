@@ -122,8 +122,18 @@ export function buildInteriors(): SceneDef[] {
       { sprite: 'armchair', x: 11, y: 7, facing: 'nw', variant: 'mustard', actions: sit },
       { sprite: 'armchair', x: 11, y: 5, facing: 'nw', variant: 'mustard', actions: sit },
       plant(11, 1, 'b'),
-      plant(1, 1),
+      plant(0, 1),
       { sprite: 'lamp', x: 11, y: 9 },
+      // The house machine, made in the Design Lab: a brass-and-copper showpiece by the window, self-serve.
+      {
+        id: 'cafe-steampunk',
+        sprite: 'steampunk-coffee-machine',
+        x: 0,
+        y: 0,
+        facing: 'se',
+        label: 'The house machine',
+        actions: [{ kind: 'vend', item: 'coffee', label: 'Pull a shot' }],
+      },
     ],
   );
   // The lane behind the bar is the barista's: guests order across the counter, they don't walk behind it.
@@ -454,7 +464,7 @@ export function buildInteriors(): SceneDef[] {
         actions: [{ kind: 'vend', item: 'coffee', label: 'Get a coffee' }],
       },
       { id: 'eng-fruit', sprite: 'fruit-bowl', x: 0, y: 2, z: COUNTER_TOP, label: 'Fruit bowl' },
-      { id: 'eng-water', sprite: 'water-cooler', x: 1, y: 0, label: 'Water cooler' },
+      { id: 'eng-water', sprite: 'water-cooler', x: 0, y: 3, facing: 'se', label: 'Water cooler' },
       // The pairing station against the left wall, a rolling whiteboard beside it.
       { id: 'eng-pair-desk', sprite: 'desk', x: 0, y: 6, w: 1, d: 2, facing: 'se', label: 'Pairing station' },
       { id: 'eng-pair-chair-1', ...chair(1, 6, 'nw', 'office') },
@@ -701,8 +711,9 @@ export function buildInteriors(): SceneDef[] {
       ambient: 'dim',
     },
     [
-      // A wall of walnut shelving either side of the window.
-      ...[1, 2, 3, 4, 8, 9].map((x, i) => ({
+      // A wall of walnut shelving from the corner to the window and one beyond it (none beside the hearth, where
+      // the fireside chairs would stand in front of it).
+      ...[0, 1, 2, 3, 4, 8].map((x, i) => ({
         sprite: 'bookshelf',
         x,
         y: 0,
@@ -710,16 +721,16 @@ export function buildInteriors(): SceneDef[] {
         variant: i % 2 ? 'b' : 'a',
       })),
       { sprite: 'window', wall: 'right', x: 5, y: 0, w: 2 },
-      // Wren's stacks: an ivy stand in the corner, returns piled at the end of the shelves.
-      { id: 'focus-ivy', sprite: 'plant', variant: 'ivy', x: 0, y: 0 },
-      { id: 'focus-returns', sprite: 'book-stack', x: 4, y: 1, label: 'Returns' },
+      // Wren's stacks: an ivy stand by the window, returns piled under it at the end of the shelves.
+      { id: 'focus-ivy', sprite: 'plant', variant: 'ivy', x: 7, y: 0 },
+      { id: 'focus-returns', sprite: 'book-stack', x: 5, y: 0, label: 'Returns' },
       // Fireside: two green wingbacks in an L round the hearth, a lamp-lit side table between them.
       { sprite: 'rug', x: 9, y: 1, w: 3, d: 2, flat: true, variant: 'cream' },
       { sprite: 'fireplace', x: 10, y: 0, w: 1, d: 1, facing: 'sw', label: 'Fireplace', actions: [{ kind: 'toggle', label: 'Light the fire' }] },
       { sprite: 'armchair', x: 9, y: 1, facing: 'se', variant: 'green', actions: sit },
       { sprite: 'armchair', x: 11, y: 1, facing: 'nw', variant: 'green', actions: sit },
       { id: 'focus-fire-table', sprite: 'side-table', variant: 'walnut', x: 9, y: 2, actions: [{ kind: 'toggle', label: 'Switch the lamp' }] },
-      { id: 'focus-fern-1', sprite: 'plant', variant: 'fern', x: 11, y: 0 },
+      { id: 'focus-fern-1', sprite: 'plant', variant: 'fern', x: 11, y: 2 },
       // The window nook: a rust wingback and a banker's lamp.
       { sprite: 'armchair', x: 5, y: 1, facing: 'sw', variant: 'rust', actions: sit },
       { id: 'focus-nook-table', sprite: 'side-table', variant: 'walnut', x: 6, y: 1, actions: [{ kind: 'toggle', label: 'Switch the lamp' }] },
@@ -987,8 +998,9 @@ export function buildInteriors(): SceneDef[] {
     },
   ];
 
-  // The corner of the stacks is the librarian's: Wren shelves returns and keeps the grove quiet.
-  focus.staff = [{ x: 1, y: 1, w: 3, d: 1 }];
+  // The aisle along the stacks is the librarian's: Wren shelves returns and keeps the grove quiet, a step back
+  // from the shelves so people can still reach them.
+  focus.staff = [{ x: 1, y: 2, w: 3, d: 1 }];
   focus.npcs = [
     {
       id: 'librarian',
@@ -1016,8 +1028,8 @@ export function buildInteriors(): SceneDef[] {
         accessory: 'acc.none',
       },
       spots: [
-        { x: 1, y: 1, facing: 'sw' },
-        { x: 3, y: 1, facing: 'ne', doing: 'work' },
+        { x: 1, y: 2, facing: 'sw' },
+        { x: 3, y: 2, facing: 'ne', doing: 'work' },
       ],
     },
   ];

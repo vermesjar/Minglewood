@@ -3,6 +3,7 @@ import { isoToScreen } from '@shared/iso';
 import { terrainAt, type SceneDef, type SceneObject } from '@shared/world/scene';
 import { hash2 } from '@shared/world/builders';
 import { makeCanvas, type Sprite } from './sprites/painter';
+import { TownLife } from './townLife';
 
 interface Particle {
   x: number;
@@ -14,7 +15,11 @@ interface Particle {
   size: number;
   color: string;
   gravity: number;
-  kind: 'square' | 'circle' | 'heart' | 'note';
+  /**
+   * square, circle; heart; note (a big one, outlined, from size 3); star (a four-point glint, arms of `size`);
+   * ripple (a ring spreading on water, from `size` wide); drop (a falling drop of water).
+   */
+  kind: 'square' | 'circle' | 'heart' | 'note' | 'star' | 'ripple' | 'drop';
   spin?: number;
 }
 
@@ -154,6 +159,10 @@ export class Effects {
   private cloudSpan = 1400;
   /** The outdoor map's size in tiles (cloud shadows are clipped to it). */
   private ground: { w: number; h: number } | null = null;
+  /** Birds, butterflies, leaves and fireflies about the town (townLife.ts). */
+  private life = new TownLife();
+  /** Where people are standing (tiles): pigeons take off when someone walks up. Set every frame. */
+  people: Array<{ x: number; y: number }> = [];
 
   /**
    * Set up a scene's ambient life. Things with finished art give off smoke, spray and light from the points
@@ -169,6 +178,7 @@ export class Effects {
     this.lighthouse = null;
     this.outdoor = scene.kind === 'outdoor';
     this.ground = this.outdoor ? { w: scene.width, h: scene.height } : null;
+    this.life.load(scene, statics);
     const at = (x: number, y: number, z: number) => {
       const s = isoToScreen(x, y, z);
       return { x: s.x, y: s.y };
@@ -266,6 +276,7 @@ export class Effects {
       c.x += c.v * dt;
       if (c.x > this.cloudSpan) c.x = -this.cloudSpan;
     }
+    if (this.outdoor && !this.reducedMotion) this.life.update(dt, this.people, this.night);
   }
 
   private emit(e: Emitter) {
@@ -324,6 +335,11 @@ export class Effects {
     }
   }
 
+  /** Drawn in world space after the time of day has dimmed the scene: things that glow (fireflies). */
+  drawLights(ctx: CanvasRenderingContext2D) {
+    if (this.outdoor) this.life.drawLights(ctx, this.night, this.reducedMotion);
+  }
+
   /** Drawn in world space after objects. */
   drawOver(ctx: CanvasRenderingContext2D) {
     for (const p of this.particles) {
@@ -338,9 +354,43 @@ export class Effects {
         // an eighth note: head, stem, flag
         const x = Math.round(p.x);
         const y = Math.round(p.y + Math.sin(p.life * 5) * 0.8);
-        ctx.fillRect(x - 1, y, 2, 2);
-        ctx.fillRect(x + 1, y - 4, 1, 5);
-        ctx.fillRect(x + 2, y - 4, 1, 1);
+        if (p.size >= 3) {
+          // a big one, outlined so it reads over anything
+          const glyph = (dx: number, dy: number) => {
+            ctx.fillRect(x - 2 + dx, y + dy, 3, 2);
+            ctx.fillRect(x + dx, y - 5 + dy, 1, 6);
+            ctx.fillRect(x + 1 + dx, y - 5 + dy, 1, 1);
+            ctx.fillRect(x + 2 + dx, y - 4 + dy, 1, 1);
+          };
+          ctx.fillStyle = '#2a1f2d';
+          for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) glyph(dx, dy);
+          ctx.fillStyle = p.color;
+          glyph(0, 0);
+        } else {
+          ctx.fillRect(x - 1, y, 2, 2);
+          ctx.fillRect(x + 1, y - 4, 1, 5);
+          ctx.fillRect(x + 2, y - 4, 1, 1);
+        }
+      } else if (p.kind === 'star') {
+        // a glint: a bright centre and four arms that twinkle
+        const x = Math.round(p.x);
+        const y = Math.round(p.y);
+        const arm = Math.sin(p.life * 14) > -0.3 ? p.size : Math.max(1, p.size - 1);
+        ctx.fillRect(x - arm, y, arm * 2 + 1, 1);
+        ctx.fillRect(x, y - arm, 1, arm * 2 + 1);
+      } else if (p.kind === 'ripple') {
+        // a ring spreading on water
+        const k = p.life / p.max;
+        ctx.globalAlpha = Math.max(0, 1 - k) * 0.9;
+        ctx.strokeStyle = p.color;
+        ctx.lineWidth = 0.75;
+        ctx.beginPath();
+        ctx.ellipse(p.x, p.y, p.size * (1 + k * 2.5), p.size * (1 + k * 2.5) * 0.5, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      } else if (p.kind === 'drop') {
+        ctx.fillRect(Math.round(p.x * 2) / 2, Math.round(p.y * 2) / 2, 1, 2);
+        ctx.fillStyle = 'rgba(255,255,255,0.8)';
+        ctx.fillRect(Math.round(p.x * 2) / 2, Math.round(p.y * 2) / 2, 0.5, 0.5);
       } else if (p.kind === 'heart') {
         const x = Math.round(p.x);
         const y = Math.round(p.y);
@@ -353,6 +403,7 @@ export class Effects {
       }
     }
     ctx.globalAlpha = 1;
+    if (this.outdoor) this.life.draw(ctx, this.night, this.reducedMotion);
     // beacons: a small red light pulsing about once a second, with a halo that shows at night
     for (const b of this.blinks) {
       const k = 0.5 + 0.5 * Math.sin((this.t + b.phase) * Math.PI * 2);

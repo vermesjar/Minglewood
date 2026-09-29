@@ -54,13 +54,14 @@ class Heap {
 
 /**
  * 8-directional A* without corner cutting. Returns the path including start and goal,
- * or null if unreachable. `allowGoal` lets you path onto an otherwise-blocked goal.
+ * or null if unreachable. `allowGoal` lets you path onto an otherwise-blocked goal. `cost`: how much
+ * stepping onto a tile costs (1 or more), e.g. to keep a stroll to the paths rather than across the grass.
  */
 export function findPath(
   grid: WalkGrid,
   start: Tile,
   goal: Tile,
-  opts: { allowGoal?: boolean; maxNodes?: number } = {},
+  opts: { allowGoal?: boolean; maxNodes?: number; cost?: (x: number, y: number) => number } = {},
 ): Tile[] | null {
   const { width, height } = grid;
   const [sx, sy] = start;
@@ -104,7 +105,7 @@ export function findPath(
       if (!grid.inBounds(nx, ny) || !passable(nx, ny)) continue;
       if (dx !== 0 && dy !== 0 && (!passable(cx + dx, cy) || !passable(cx, cy + dy))) continue;
       const ni = idx(nx, ny);
-      const ng = g[cur] + cost;
+      const ng = g[cur] + cost * (opts.cost ? opts.cost(nx, ny) : 1);
       if (ng < g[ni]) {
         g[ni] = ng;
         came[ni] = cur;

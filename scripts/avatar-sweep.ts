@@ -41,7 +41,8 @@ const PAIRS: Array<[keyof FullLoadout, string, keyof FullLoadout, string]> = [
   ['hair', 'hair', 'body', 'body'],
   ['neck', 'neck', 'body', 'body'],
 ];
-const POSES: Pose[] = ['stand', 'walk1', 'sit', 'wave'];
+// arms over the head (cheer) and the far arm across the chest (clap) are where parts collide most
+const POSES: Pose[] = ['stand', 'walk1', 'sit', 'wave', 'cheer1', 'clap2'];
 const lines: string[] = ['# Pairwise sweep', ''];
 let frames = 0;
 let fails = 0;

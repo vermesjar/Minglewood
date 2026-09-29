@@ -17,6 +17,7 @@ const PURPOSE: Record<string, string> = {
 
 function JoinConversation({ binding, speaking }: { binding: BindingView; speaking: number }) {
   const demo = binding.provider === 'demo';
+  const slack = binding.provider === 'slack';
   const join = () => {
     if (binding.join.kind === 'deeplink' && binding.join.webUrl) openLink(binding.join.webUrl);
     else toast('Demo mode: in a connected workspace this opens the Discord voice channel for this room. Here the chatter is simulated.', 'info', undefined, 8000);
@@ -30,13 +31,17 @@ function JoinConversation({ binding, speaking }: { binding: BindingView; speakin
         <div>
           <strong>{binding.label}</strong>
           <p className="muted small">
-            {demo ? 'Demo voice channel (simulated)' : `Discord ${binding.kind === 'stage' ? 'stage' : binding.kind} channel`}
+            {demo
+              ? 'Demo voice channel (simulated)'
+              : slack
+                ? `Slack ${binding.kind === 'text' ? 'channel' : 'huddle'}`
+                : `Discord ${binding.kind === 'stage' ? 'stage' : binding.kind} channel`}
             {speaking > 0 && ` · ${speaking} talking`}
           </p>
         </div>
       </div>
       <button className="btn primary full" onClick={join}>
-        {binding.kind === 'text' ? 'Open channel' : 'Join the conversation'}
+        {slack ? (binding.kind === 'text' ? 'Open in Slack' : 'Join in Slack') : binding.kind === 'text' ? 'Open channel' : 'Join the conversation'}
       </button>
       <p className="fineprint">{binding.join.explainer}</p>
     </div>
@@ -146,7 +151,7 @@ export function RoomPanel() {
                 <span className="person-text">
                   <strong>
                     {me ? 'You' : m.displayName}
-                    {p.via === 'provider' && <em className="tag">in Discord voice</em>}
+                    {p.via === 'provider' && <em className="tag">{binding?.provider === 'slack' ? 'in the Slack huddle' : 'in Discord voice'}</em>}
                   </strong>
                   <small>
                     <StatusDot status={p.status} size={8} /> {p.note ?? STATUS_META[p.status].label}

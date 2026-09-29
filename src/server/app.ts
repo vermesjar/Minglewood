@@ -18,6 +18,11 @@ import { VoicePresenceSync } from './providers/voiceSync';
 import { apiRoutes } from './routes/api';
 import { authRoutes } from './routes/auth';
 import { adminRoutes } from './routes/admin';
+import { MockSlack, SlackApi } from './slack/api';
+import { SlackProvider } from './slack/provider';
+import { slackRoutes } from './slack/routes';
+import { SlackService } from './slack/service';
+import { SlackTokens } from './slack/tokens';
 import type { AppContext } from './context';
 import { ORG_ID } from '@shared/seed/northstar';
 import type { ControlPlane } from './cloud/controlPlane';
@@ -31,6 +36,8 @@ export interface AppOptions {
   demo?: boolean;
   /** Minglewood Cloud: installs + tenant state. Without it, the server runs single-org. */
   cloud?: ControlPlane;
+  /** Where Slack workspace tokens from the in-app install are kept (a gitignored file); in memory if omitted. */
+  slackTokenFile?: string;
 }
 
 export interface App {
@@ -79,7 +86,13 @@ export async function createApp(opts: AppOptions): Promise<App> {
     return undefined;
   };
 
-  const ctx: AppContext = { store, hubs, discord: new DiscordProvider(), demo: new DemoProvider(), resolveGuild };
+  // Slack: real Web API, or the recording mock for local development (SLACK_MOCK=true)
+  const slackMock = config.slack.mock ? new MockSlack() : undefined;
+  const slackTokens = new SlackTokens(() => config.slack.botToken || (slackMock ? 'xoxb-mock' : ''), opts.slackTokenFile);
+  const slack = new SlackService(store, ensureHub, new SlackProvider(new SlackApi(slackMock?.transport), slackTokens));
+  slack.start();
+
+  const ctx: AppContext = { store, hubs, discord: new DiscordProvider(), demo: new DemoProvider(), slack, resolveGuild };
 
   // Events start and end on their own; tell clients when the set of active events changes.
   const activeKey = new Map<string, string>();
@@ -127,7 +140,18 @@ export async function createApp(opts: AppOptions): Promise<App> {
   const app = express();
   app.disable('x-powered-by');
   app.set('trust proxy', 1);
+  // Slack signs the raw request bytes, so its routes read the body themselves (before the JSON parser).
+  app.use('/api/slack', slackRoutes(ctx, slackMock));
   app.use(express.json({ limit: '64kb' }));
+  if (!config.isProd) {
+    // Dev only: the Design Lab (src/client/studio.html), localhost only (routes/devLab.ts labGuard). Loaded on
+    // first use and never in production; ahead of the API rate limit because its sandbox loads every sprite.
+    let lab: Promise<{ guard: express.RequestHandler; router: express.Router }> | null = null;
+    app.use('/api/dev/lab', (req, res, next) => {
+      lab ??= import('./routes/devLab').then((m) => ({ guard: m.labGuard, router: m.devLabRoutes() }));
+      lab.then(({ guard, router }) => guard(req, res, (err?: unknown) => (err ? next(err) : router(req, res, next)))).catch(next);
+    });
+  }
   const apiLimiter = new KeyedLimiter(600, 60_000);
   app.use('/api', (req, res, next) => {
     if (!apiLimiter.allow(req.ip ?? 'unknown')) {
@@ -175,6 +199,7 @@ export async function createApp(opts: AppOptions): Promise<App> {
     ctx,
     async close() {
       clearInterval(eventTimer);
+      slack.stop();
       tenants?.stop();
       sims.forEach((s) => s.stop());
       hubs.forEach((h) => h.dispose());

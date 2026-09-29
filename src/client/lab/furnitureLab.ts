@@ -4,6 +4,7 @@
  *
  *   await flab.seats({ zoom: 4 })          every seat type in all four facings, each occupied
  *   await flab.room('cafe', { zoom: 4 })   a real room with someone on every seat
+ *   await flab.sitFilm('couch', 'purple', 'ne')   walk up, sit down, stand up and step off, frame by frame
  */
 import type { AvatarLoadout } from '@shared/domain/types';
 import type { NpcState, Occupant } from '@shared/protocol';
@@ -43,7 +44,7 @@ const FACINGS: Facing[] = ['se', 'sw', 'ne', 'nw'];
 
 /** Seat kinds to test: sprite, variant, footprint along its facing (long couches). */
 /** Every kind of seat that appears in any room (a new seat can never slip past the sheet). */
-const ROOMS = ['cafe', 'hq', 'eng', 'launch', 'events', 'focus', 'arcade', 'design'];
+const ROOMS = ['cafe', 'hq', 'eng', 'launch', 'events', 'focus', 'arcade', 'design', 'town'];
 const SEATS: Array<{ sprite: string; variant?: string; long?: boolean }> = (() => {
   const out = new Map<string, { sprite: string; variant?: string; long?: boolean }>();
   for (const id of ROOMS)
@@ -327,6 +328,108 @@ async function film(sceneId: string, objectId: string, o: { frames?: number; dt?
   return snap(sheet, o.name ?? `film-${sceneId}-${ob.sprite}`);
 }
 
+/**
+ * The sit-down / stand-up motion, filmed: someone walks up to a seat and onto its cushion, the server's "sat"
+ * arrives a moment later, they sit a while, then stand and step off onto the floor. One frame every `dt` ms
+ * on a fake clock (the lab tab may be hidden, so nothing waits on real frames).
+ */
+async function sitFilm(
+  sprite: string,
+  variant: string | undefined,
+  facing: Facing,
+  o: { zoom?: number; dt?: number; name?: string; look?: AvatarLoadout; long?: boolean; from?: 'front' | 'behind' | 'side' } = {},
+) {
+  const zoom = o.zoom ?? 4;
+  const dt = o.dt ?? 40;
+  const across = facing === 'ne' || facing === 'sw';
+  const seat: SceneObject = { id: 'seat', sprite, variant, facing, x: 3, y: 3, w: o.long && across ? 2 : 1, d: o.long && !across ? 2 : 1, actions: [{ kind: 'sit' }] };
+  const scene: SceneDef = {
+    id: 'film',
+    kind: 'interior',
+    name: 'film',
+    width: 8,
+    height: 8,
+    tiles: Array.from({ length: 8 }, () => '........'),
+    spawn: { x: 0, y: 0 },
+    objects: [seat],
+    interior: { floor: '#c9a47e', floorAlt: '#bf9872', floorPattern: 'planks', wall: '#f3dcb8', wallTop: '#8a5a3b', trim: '#6b3f2a', doorY: 0, ambient: 'bright' },
+  };
+  const spot = seatSpots(seat, scene)[0];
+  const v4: Record<Facing, [number, number]> = { se: [1, 0], sw: [0, 1], ne: [0, -1], nw: [-1, 0] };
+  const [fx, fy] = v4[facing];
+  // the way up to the cushion: from in front of it, from behind it, or along its side (a couch's free end)
+  const [sx, sy] = o.from === 'behind' ? [-fx, -fy] : o.from === 'side' ? ((seat.w ?? 1) > 1 ? [-1, 0] : (seat.d ?? 1) > 1 ? [0, -1] : [fy, fx]) : [fx, fy];
+  const path: Array<[number, number]> = [[spot.x + 2 * sx, spot.y + 2 * sy], [spot.x + sx, spot.y + sy], [spot.x, spot.y]];
+  const realNow = performance.now.bind(performance);
+  const realDate = Date.now;
+  let t = 1_000_000;
+  performance.now = () => t;
+  Date.now = () => t;
+  const frames: HTMLCanvasElement[] = [];
+  const cellW = 90 * zoom;
+  const cellH = 110 * zoom;
+  const canvas = freshCanvas(900, 700);
+  try {
+    const view = new WorldView(canvas, { onGroundClick: noop, onActorClick: noop, onObjectClick: noop, onObjectActivate: noop, nameOf: () => '' });
+    const look = o.look ?? seed.members[0].avatar;
+    view.loadScene(scene, [{ memberId: 'm', x: path[0][0], y: path[0][1], facing, status: 'available', avatar: look, via: 'sim' }], { meId: '', activeDecor: new Set(), festiveRooms: new Set(), party: false });
+    const v = view as unknown as { camera: { zoom: number; tzoom: number; x: number; y: number; tx: number; ty: number }; update(dt: number): void; draw(): void; drawActorOverlays(): void };
+    v.drawActorOverlays = noop;
+    const c = isoToScreen(spot.x + 0.5, spot.y + 0.5, 16);
+    const shoot = () => {
+      v.update(dt / 1000);
+      v.camera.zoom = v.camera.tzoom = zoom;
+      v.camera.x = v.camera.tx = c.x;
+      v.camera.y = v.camera.ty = c.y;
+      v.draw();
+      const f = document.createElement('canvas');
+      f.width = cellW;
+      f.height = cellH;
+      const dpr = window.devicePixelRatio || 1;
+      f.getContext('2d')!.drawImage(canvas, canvas.width / 2 - (cellW * dpr) / 2, canvas.height / 2 - (cellH * dpr) / 2, cellW * dpr, cellH * dpr, 0, 0, cellW, cellH);
+      frames.push(f);
+    };
+    const walkMs = ((path.length - 1) / 4.2) * 1000;
+    view.move('m', path, t);
+    const run = (ms: number) => {
+      for (const end = t + ms; t < end; ) {
+        t += dt;
+        shoot();
+      }
+    };
+    run(walkMs - 3 * dt); // the last steps of the walk
+    run(3 * dt + 80); // arrived: crouch, into the seat (the server hasn't said yet)
+    view.patch('m', { x: spot.x, y: spot.y, sittingOn: seat.id, facing: spot.facing, path: undefined });
+    run(240); // seated
+    let at = spot;
+    const next = seatSpots(seat, scene)[1];
+    if (next) {
+      // shift over to the next cushion
+      view.move('m', [[spot.x, spot.y], [next.x, next.y]], t);
+      run(280);
+      view.patch('m', { x: next.x, y: next.y, sittingOn: seat.id, facing: next.facing, path: undefined });
+      run(160);
+      at = next;
+    }
+    view.patch('m', { sittingOn: undefined, x: at.x + fx, y: at.y + fy }); // stood up, put on the floor in front
+    run(520);
+    view.destroy();
+  } finally {
+    performance.now = realNow;
+    Date.now = realDate;
+  }
+  const cols = Math.min(frames.length, 10);
+  const rows = Math.ceil(frames.length / cols);
+  const sheet = document.createElement('canvas');
+  sheet.width = cols * cellW;
+  sheet.height = rows * cellH;
+  const sc = sheet.getContext('2d')!;
+  sc.fillStyle = '#1b1623';
+  sc.fillRect(0, 0, sheet.width, sheet.height);
+  frames.forEach((f, i) => sc.drawImage(f, (i % cols) * cellW, Math.floor(i / cols) * cellH));
+  return snap(sheet, o.name ?? `sitfilm-${sprite}${variant ? '.' + variant : ''}-${facing}${o.from && o.from !== 'front' ? '-' + o.from : ''}`);
+}
+
 const ready = loadArt().then(clearSpriteCache);
 const flab = {
   ready,
@@ -342,6 +445,11 @@ const flab = {
   seatSheet: async (o?: Parameters<typeof seatSheet>[0]) => {
     await ready;
     return seatSheet(o);
+  },
+  /** Walk up, sit down, stand up, step off: the seat motion frame by frame. */
+  sitFilm: async (sprite: string, variant: string | undefined, facing: Facing, o?: Parameters<typeof sitFilm>[3]) => {
+    await ready;
+    return sitFilm(sprite, variant, facing, o);
   },
   /** Film strip of an object's animation in a room. */
   film: async (sceneId: string, objectId: string, o?: Parameters<typeof film>[2]) => {

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { allScenes, getScene } from './index';
 import { findPath, isValidPath } from './pathfinding';
 import { approach, approachTiles } from './interact';
-import { seatFacing, seatSpotAt, seatSpots, stepOffTiles } from './seats';
+import { SEAT_FIELDS, seatFacing, seatProfile, seatSpotAt, seatSpots, seenFromBehind, sitterLift, sitterPoint, sitThigh, stepOffTiles } from './seats';
 import { isSeat } from './scene';
 import { WalkGrid } from './walkGrid';
 
@@ -47,6 +47,39 @@ describe('seat standard', () => {
   it('keeps guests out of the lane behind the café bar', () => {
     const grid = new WalkGrid(cafe);
     for (const a of cafe.staff ?? []) for (let x = a.x; x < a.x + a.w; x++) expect(grid.walkable(x, a.y)).toBe(false);
+  });
+});
+
+describe('seat profiles', () => {
+  it('fills a seat’s profile from its family, its own values first', () => {
+    expect(seatProfile('stool')).toMatchObject({ sitStyle: 'stool', backrest: false, seatDepth: 0 });
+    expect(seatProfile('couch')).toMatchObject({ sitStyle: 'lounge', backrest: true });
+    expect(seatProfile('beanbag')).toMatchObject({ sitStyle: 'floor', backrest: true });
+    const own = seatProfile('chair', { seat: 16.9, seatDepth: 0.09 });
+    expect(own).toMatchObject({ seat: 16.9, seatDepth: 0.09, sitStyle: 'chair' });
+    // seen from behind, the hips sit where they do from the front unless the art says otherwise
+    expect(own.backDepth).toBe(0.09);
+    expect(seatProfile('chair', { seatDepth: 0.2, backDepth: -0.1 }).backDepth).toBe(-0.1);
+  });
+
+  it('lifts a sitter so the underside of their thighs rests on the cushion', () => {
+    // the sitting figure's thighs sit (104 − (82 + drop + 3)) / 2 world px above its feet anchor
+    expect(sitThigh('chair')).toBe(6.5);
+    expect(sitterLift(seatProfile('chair', { seat: 12 }))).toBe(5.5);
+    expect(sitterLift(seatProfile('beanbag', { seat: 9.5 }))).toBeCloseTo(9.5 - sitThigh('floor'));
+  });
+
+  it('puts the hips forward along the seat facing: the front depth seen from the front, the back depth from behind', () => {
+    const p = seatProfile('couch', { seatDepth: 0.25, backDepth: 0.1 });
+    expect(sitterPoint({ x: 3, y: 4, facing: 'se' }, p)).toEqual({ x: 3.75, y: 4.5 });
+    expect(sitterPoint({ x: 3, y: 4, facing: 'sw' }, p)).toEqual({ x: 3.5, y: 4.75 });
+    expect(sitterPoint({ x: 3, y: 4, facing: 'ne' }, p)).toEqual({ x: 3.5, y: 4.4 });
+    expect(sitterPoint({ x: 3, y: 4, facing: 'nw' }, p)).toEqual({ x: 3.4, y: 4.5 });
+    expect(['se', 'sw', 'ne', 'nw'].filter((f) => seenFromBehind(f as never))).toEqual(['ne', 'nw']);
+  });
+
+  it('names every field the manifest carries for a seat', () => {
+    expect([...SEAT_FIELDS]).toEqual(['seat', 'seatDepth', 'backDepth', 'sitStyle', 'backrest', 'backLine']);
   });
 });
 

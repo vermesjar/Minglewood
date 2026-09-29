@@ -8,7 +8,7 @@
  */
 import { z } from 'zod';
 import type { AvatarLoadout, HistoricalArtifact, Member, OrgEvent, PresenceState, PresenceStatus } from './domain/types';
-import type { Facing } from './world/scene';
+import type { Facing, UseKind } from './world/scene';
 import type { Decoration } from './world/decor';
 import type { Tile } from './world/pathfinding';
 import { EMOTE_IDS, type EmoteId } from './presence';
@@ -54,7 +54,25 @@ export interface NpcState {
 }
 
 /** What the world can hand you; each must also be a `held` item the avatar renderer can draw. */
-export const CARRYABLE = ['coffee', 'boba', 'icecream', 'plush', 'popcorn', 'soda'] as const;
+export const CARRYABLE = ['coffee', 'boba', 'icecream', 'plush', 'popcorn', 'soda', 'book', 'water', 'apple'] as const;
+
+/** A note someone left on a board (a whiteboard) for the room to read. */
+export interface BoardNote {
+  id: string;
+  sceneId: string;
+  objectId: string;
+  /** Who left it (only they, or an admin, can take it down). */
+  by: string;
+  text: string;
+  at: string;
+}
+
+/** How long a note can be, and how many a board holds (the oldest comes down to make room). */
+export const NOTE_MAX_CHARS = 80;
+export const NOTES_PER_BOARD = 6;
+
+/** A one-off moment on a piece of furniture: a drink made, the bell rung, or a thing used (uses.ts). */
+export type MomentKind = 'brew' | 'ring' | UseKind;
 
 export type DirectoryEntry = Pick<PresenceState, 'memberId' | 'status' | 'note' | 'sceneId' | 'voice' | 'until'> & {
   online: boolean;
@@ -63,14 +81,40 @@ export type DirectoryEntry = Pick<PresenceState, 'memberId' | 'status' | 'note' 
 export type KnockKind = 'chat' | 'coffee';
 export type KnockReply = 'join' | 'soon' | 'no';
 
+/**
+ * An occupant patch as it crosses the wire. JSON drops `undefined`, so a field being cleared (standing up is
+ * `sittingOn: undefined`, arriving is `path: undefined`) travels as null — or it would vanish, and every client
+ * would keep you seated.
+ */
+export type WirePatch = { [K in keyof Occupant]?: Occupant[K] | null };
+
+/** Server side, as it's sent: every cleared field as null. */
+export function toWirePatch(p: Partial<Occupant>): WirePatch {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(p)) out[k] = v === undefined ? null : v;
+  return out as WirePatch;
+}
+
+/**
+ * Client side, as it arrives: null back to cleared (undefined, the key kept so `'path' in patch` still sees it),
+ * except `carrying`, where null is a value of its own ("put it down").
+ */
+export function fromWirePatch(p: WirePatch): Partial<Occupant> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(p)) out[k] = v === null && k !== 'carrying' ? undefined : v;
+  return out as Partial<Occupant>;
+}
+
 export type ServerMsg =
   | { t: 'welcome'; you: string; serverTime: number; directory: DirectoryEntry[] }
-  | { t: 'scene'; sceneId: string; occupants: Occupant[]; states?: Record<string, boolean>; npcs?: NpcState[] }
+  | { t: 'scene'; sceneId: string; occupants: Occupant[]; states?: Record<string, boolean>; npcs?: NpcState[]; notes?: BoardNote[] }
+  /** A board's notes as they are now (one was left or taken down). */
+  | { t: 'notes'; sceneId: string; objectId: string; notes: BoardNote[] }
   /** Where a room's NPC is and what it's doing (see SceneDef.npcs). */
   | { t: 'npc'; sceneId: string; npc: NpcState }
   | { t: 'objstate'; sceneId: string; objectId: string; on: boolean }
   /** A one-off moment on a piece of furniture everyone in the room sees (a shot being pulled, the bell rung). */
-  | { t: 'moment'; sceneId: string; objectId: string; what: 'brew' | 'ring'; by?: string }
+  | { t: 'moment'; sceneId: string; objectId: string; what: MomentKind; by?: string; detail?: string }
   | { t: 'joined'; sceneId: string; occupant: Occupant }
   | { t: 'left'; sceneId: string; memberId: string; toSceneId?: string }
   | { t: 'moved'; memberId: string; path: Tile[]; startedAt: number }
@@ -133,11 +177,15 @@ export const clientMsgSchema = z.discriminatedUnion('t', [
   z.object({ t: z.literal('enter'), sceneId: idStr, at: tile.optional(), near: idStr.optional() }),
   // `startedAt` (server epoch ms) lets a held-key walk extend its path without restarting it.
   z.object({ t: z.literal('move'), path: z.array(tile).min(1).max(400), startedAt: z.number().finite().optional() }),
-  z.object({ t: z.literal('sit'), objectId: idStr }),
+  // `at`: the cushion you walked to (a couch or bench has one per tile)
+  z.object({ t: z.literal('sit'), objectId: idStr, at: z.tuple([z.number().int(), z.number().int()]).optional() }),
   z.object({ t: z.literal('stand') }),
   z.object({ t: z.literal('carry'), objectId: idStr.nullable() }),
   z.object({ t: z.literal('toggle'), objectId: idStr }),
   z.object({ t: z.literal('ring'), objectId: idStr }),
+  z.object({ t: z.literal('use'), objectId: idStr }),
+  z.object({ t: z.literal('note'), objectId: idStr, text: z.string().min(1).max(NOTE_MAX_CHARS * 2) }),
+  z.object({ t: z.literal('unnote'), noteId: idStr }),
   z.object({
     t: z.literal('status'),
     status: z.enum(['available', 'open', 'focused', 'meeting', 'away']),

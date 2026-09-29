@@ -237,6 +237,45 @@ function inLake(x: number, y: number): number {
   return Math.min(a, b) + wob;
 }
 
+/** Where the two park benches stand (see the park below). */
+const PARK_BENCHES: Array<[number, number]> = [
+  [50, 53],
+  [52, 69],
+];
+/** The plaza's lamps: at its edges, clear of the benches' drawings. */
+const PLAZA_LAMPS: Array<[number, number]> = [
+  [30, 29],
+  [41, 30],
+  [40, 41],
+  [29, 40],
+];
+
+/** The community garden's gravel yard (raised beds in a grid, a scarecrow in the middle). */
+const GARDEN = { x: 58, y: 13, w: 7, d: 7 };
+/** Places composed by hand, where the random woods don't grow: the NE garden, orchard and lakeside lawn; the west meadow. */
+const COMPOSED: Array<[number, number, number, number]> = [
+  [55, 6, 17, 21],
+  [8, 42, 13, 30],
+];
+const composed = (x: number, y: number) => COMPOSED.some(([zx, zy, zw, zd]) => x >= zx && y >= zy && x < zx + zw && y < zy + zd);
+
+/**
+ * Where people go when they stroll the town (the sims walk to one, linger, and move on): a tile to head for
+ * and a name.
+ */
+export const TOWN_SPOTS: Array<{ x: number; y: number; label: string }> = [
+  { x: 61, y: 20, label: 'the community garden' },
+  { x: 66, y: 23, label: 'the picnic lawn' },
+  { x: 53, y: 18, label: 'the orchard' },
+  { x: 13, y: 47, label: 'the west meadow' },
+  { x: 14, y: 55, label: 'the sculpture walk' },
+  { x: 11, y: 62, label: 'the campfire' },
+  { x: 36, y: 38, label: 'the fountain' },
+  { x: 70, y: 35, label: 'the end of the pier' },
+  { x: 44, y: 49, label: 'the bandstand' },
+  { x: 58, y: 32, label: 'the café terrace' },
+];
+
 export function buildTown(): SceneDef {
   const t = new TileCanvas(W, H, 'g');
 
@@ -292,7 +331,10 @@ export function buildTown(): SceneDef {
   t.rect(29, 29, 13, 13, 'P'); // the plaza
   // HQ forecourt, the café terrace and the promenade.
   t.rect(31, 23, 9, 3, 'P');
-  t.rect(52, 30, 10, 3, 'P');
+  // The café terrace runs down to Main Street and ends in a straight stone quay on the lake (ground.ts draws
+  // its seawall), with the pier leading off it: no paving stepping raggedly into the water.
+  t.rect(52, 30, 10, 4, 'P');
+  t.rect(59, 34, 3, 3, 'p');
   // Pier: Main Street continues onto the lake.
   for (let x = 62; x <= 71; x++) for (let k = 0; k < 3; k++) if (['w', 'W', 's'].includes(t.get(x, 34 + k))) t.set(x, 34 + k, 'd');
 
@@ -334,8 +376,19 @@ export function buildTown(): SceneDef {
   road(byRoom('focus'), [22, 12], [22, 33]);
   // Lakeside promenade: from Grove Lane past Lantern Hall's doors to the shore.
   t.path(35, 66, 54, 66, 'p', 2);
+  // …which ends square on the water, a little quay (ground.ts draws its stone face)
+  t.set(52, 66, 'p');
   // A park path from the plaza down through the park to the hall.
   t.path(38, 42, 38, 57, 'p', 2);
+  // Gravel footpaths to the places off the streets (soft-edged, see ground.ts). Orchard Lane leaves HQ's
+  // forecourt, skirts the cherry orchard into the community garden and runs down to the picnic lawn on the
+  // lake's north shore, then along the water back to the café terrace.
+  t.trail([[39.5, 24.5], [42.5, 23], [46, 21], [50.5, 19.6], [54.5, 19.3], [57.6, 17.6]]);
+  t.rect(GARDEN.x, GARDEN.y, GARDEN.w, GARDEN.d, 't');
+  t.trail([[64.5, 19.5], [65.8, 22.3], [65, 24.6], [62.8, 26.2], [61.6, 28.4], [61.5, 30.4]]);
+  // The Sculpture Walk: from Main Street down through the west meadow (picnic lawn, sculptures, the campfire
+  // circle) and round behind Launch Lab to Grove Lane.
+  t.trail([[12.5, 36.5], [12.5, 40], [12.8, 44], [13.2, 48.5], [13.6, 53], [14.6, 58], [15.4, 62.3], [16.6, 66.2], [19, 69.6], [24, 70.5], [30, 70], [33.6, 69.4]]);
 
   const blocked = new Set<string>();
   const block = (x: number, y: number, w = 1, d = 1) => {
@@ -352,6 +405,9 @@ export function buildTown(): SceneDef {
     const id = o.id ?? `o${++n}`;
     objects.push({ ...o, id });
     block(o.x, o.y, o.w ?? 1, o.d ?? 1);
+    // a seat keeps clear ground around it: nothing placed at random (trees, bushes, reeds, lamps) within two
+    // tiles, so its drawing and the people on it read at a glance (scripts/town-seats.ts checks it)
+    if (o.actions?.some((a) => a.kind === 'sit')) block(o.x - 2, o.y - 2, (o.w ?? 1) + 4, (o.d ?? 1) + 4);
   };
 
   // Stoops: invisible blockers on the tiles a building's front stands on (see STOOP_BLOCKS).
@@ -360,11 +416,12 @@ export function buildTown(): SceneDef {
 
   // Plaza: the fountain at the crossroads, benches facing it, flower beds at the corners.
   add({ id: 'fountain', sprite: 'fountain', x: 34, y: 34, w: 3, d: 3, label: 'Founders’ Fountain' });
-  // park benches seat two, their length across the way they face (se/nw: along y; sw/ne: along x)
-  add({ sprite: 'bench', x: 31, y: 32, d: 2, facing: 'se', actions: [{ kind: 'sit' }] });
-  add({ sprite: 'bench', x: 39, y: 32, w: 2, facing: 'sw', actions: [{ kind: 'sit' }] });
-  add({ sprite: 'bench', x: 31, y: 39, w: 2, facing: 'ne', actions: [{ kind: 'sit' }] });
-  add({ sprite: 'bench', x: 39, y: 39, d: 2, facing: 'nw', actions: [{ kind: 'sit' }] });
+  // park benches seat two, their length across the way they face (se/nw: along y; sw/ne: along x). A pinwheel
+  // about the fountain, each bench a quarter-turn of the last, all off the two streets crossing the plaza.
+  add({ sprite: 'bench', x: 30, y: 32, d: 2, facing: 'se', actions: [{ kind: 'sit' }] });
+  add({ sprite: 'bench', x: 37, y: 30, w: 2, facing: 'sw', actions: [{ kind: 'sit' }] });
+  add({ sprite: 'bench', x: 32, y: 40, w: 2, facing: 'ne', actions: [{ kind: 'sit' }] });
+  add({ sprite: 'bench', x: 40, y: 37, d: 2, facing: 'nw', actions: [{ kind: 'sit' }] });
   add({ sprite: 'flowerbed', x: 29, y: 29, variant: 'pink' });
   add({ sprite: 'flowerbed', x: 41, y: 29, variant: 'yellow' });
   add({ sprite: 'flowerbed', x: 29, y: 41, variant: 'blue' });
@@ -384,12 +441,12 @@ export function buildTown(): SceneDef {
     ],
   });
 
-  // Plaza life: a flower seller and the town notice board.
-  add({ sprite: 'flower-cart', x: 38, y: 30, w: 2, d: 2, label: 'Flower cart' });
+  // Plaza life: a flower seller (at the foot of Orchard Lane, clear of the benches) and the town notice board.
+  add({ sprite: 'flower-cart', x: 40, y: 25, w: 2, d: 2, label: 'Flower cart' });
   add({
     id: 'noticeboard',
     sprite: 'noticeboard',
-    x: 30,
+    x: 28,
     y: 37,
     label: 'Town notice board',
     actions: [{ kind: 'info', title: 'Town notice board', body: 'Lost scarf (teal), found by the fountain. Book club Thursday at the Quiet Grove. Lantern Hall hosts the next all-hands.' }],
@@ -402,11 +459,11 @@ export function buildTown(): SceneDef {
   // Café terrace by the water.
   add({ sprite: 'umbrella-table', x: 53, y: 31, variant: 'red', solid: true });
   add({ sprite: 'umbrella-table', x: 59, y: 31, variant: 'teal', solid: true });
-  // the café's own bentwood chairs, carried out onto the terrace
+  // the café's own bentwood chairs, carried out onto the terrace: a pair across each table
   add({ sprite: 'chair', x: 54, y: 31, facing: 'nw', actions: [{ kind: 'sit' }], variant: 'cafe' });
-  add({ sprite: 'chair', x: 53, y: 32, facing: 'ne', actions: [{ kind: 'sit' }], variant: 'cafe' });
+  add({ sprite: 'chair', x: 52, y: 31, facing: 'se', actions: [{ kind: 'sit' }], variant: 'cafe' });
   add({ sprite: 'chair', x: 58, y: 31, facing: 'se', actions: [{ kind: 'sit' }], variant: 'cafe' });
-  add({ sprite: 'chair', x: 59, y: 32, facing: 'ne', actions: [{ kind: 'sit' }], variant: 'cafe' });
+  add({ sprite: 'chair', x: 60, y: 31, facing: 'nw', actions: [{ kind: 'sit' }], variant: 'cafe' });
 
   // Organizational memory in the landscape.
   add({
@@ -463,9 +520,10 @@ export function buildTown(): SceneDef {
   for (let oy = 0; oy < 3; oy++)
     for (let ox = 0; ox < 4; ox++) add({ sprite: 'tree/round', x: 47 + ox * 3, y: 8 + oy * 3 + (ox % 2), variant: 'b' });
   // The park south of the hall: picnic, benches, boats at the shore.
-  add({ sprite: 'picnic', x: 47, y: 51, w: 2, d: 2 });
-  add({ sprite: 'bench', x: 41, y: 49, w: 2, facing: 'ne', actions: [{ kind: 'sit' }] });
-  add({ sprite: 'bench', x: 46, y: 44, w: 2, facing: 'sw', actions: [{ kind: 'sit' }] });
+  add({ sprite: 'picnic', x: 46, y: 51, w: 2, d: 2 });
+  // (both look out over the lake from its west shore, clear of Lantern Hall's roof and the oak's crown)
+  add({ sprite: 'bench', x: PARK_BENCHES[0][0], y: PARK_BENCHES[0][1], d: 2, facing: 'se', actions: [{ kind: 'sit' }] });
+  add({ sprite: 'bench', x: PARK_BENCHES[1][0], y: PARK_BENCHES[1][1], d: 2, facing: 'se', actions: [{ kind: 'sit' }] });
   add({ sprite: 'flowerbed', x: 40, y: 44, variant: 'yellow' });
   add({ sprite: 'flowerbed', x: 45, y: 49, variant: 'blue' });
   // Rowboats moored in open water: one beside the pier, one off the park shore.
@@ -477,9 +535,64 @@ export function buildTown(): SceneDef {
   add({ sprite: 'bike-rack', x: 33, y: 45 });
   add({ sprite: 'mailbox', x: 28, y: 36 });
 
+  // ── The community garden, north-east of the café: raised beds on a gravel yard, the scarecrow keeping watch.
+  const beds = ['veg', 'flowers', 'herbs', 'herbs', 'veg', 'flowers', 'flowers', 'veg'];
+  let bi = 0;
+  for (const by of [1, 3, 5])
+    for (const bx of [1, 3, 5]) {
+      if (bx === 3 && by === 3) continue;
+      const x = GARDEN.x + bx;
+      const y = GARDEN.y + by;
+      add({ id: `garden-bed-${x}-${y}`, sprite: 'garden-bed', variant: beds[bi++], x, y, label: 'Raised bed' });
+    }
+  add({ id: 'scarecrow', sprite: 'scarecrow', x: GARDEN.x + 3, y: GARDEN.y + 3, facing: 'sw', label: 'Scarecrow' });
+  add({ id: 'garden-lantern-w1', sprite: 'garden-lantern', x: 56, y: 17 });
+  add({ id: 'garden-lantern-w2', sprite: 'garden-lantern', x: 56, y: 20 });
+  add({ id: 'garden-birdbath', sprite: 'birdbath', x: 66, y: 17, label: 'Bird bath' });
+  add({ id: 'garden-bench', sprite: 'bench', x: 59, y: 21, w: 2, facing: 'ne', actions: [{ kind: 'sit' }] });
+  // ── The orchard: apple and pear trees in rows, carrying the cherry orchard on east.
+  for (let oy = 0; oy < 2; oy++)
+    for (let ox = 0; ox < 4; ox++) {
+      const x = 59 + ox * 3;
+      const y = 7 + oy * 3 + (ox % 2);
+      add({ id: `orchard-${x}-${y}`, sprite: 'tree/apple', variant: (ox + oy) % 2 ? 'b' : 'a', x, y });
+    }
+  // ── The picnic lawn on the lake's north shore: blankets on the grass, benches looking out over the water.
+  add({ id: 'lawn-blanket-1', sprite: 'blanket', variant: 'red', x: 62, y: 22, w: 2, d: 2, label: 'Picnic blanket' });
+  add({ id: 'lawn-blanket-2', sprite: 'blanket', variant: 'blue', x: 68, y: 20, w: 2, d: 2, label: 'Picnic blanket' });
+  add({ id: 'lawn-bench-1', sprite: 'bench', x: 67, y: 25, w: 2, facing: 'sw', actions: [{ kind: 'sit' }] });
+  add({ id: 'lawn-lantern', sprite: 'garden-lantern', x: 70, y: 24 });
+  for (const [x, y, v] of [[57, 13, 'a'], [66, 14, 'b'], [65, 20, 'a'], [71, 20, 'b'], [57, 23, 'b'], [70, 17, 'a']] as const)
+    add({ id: `ne-flowers-${x}-${y}`, sprite: 'wildflowers', variant: v, x, y, solid: false });
+
+  // ── The west meadow, behind the studios, along the Sculpture Walk: a picnic lawn, sculptures on the grass,
+  // and a campfire circle with a bench on each side (one bench, all four ways round). Laid out west of the
+  // studios' roofs, which hide whatever stands close behind them.
+  add({ id: 'meadow-blanket-1', sprite: 'blanket', variant: 'blue', x: 8, y: 44, w: 2, d: 2, label: 'Picnic blanket' });
+  add({ id: 'meadow-picnic', sprite: 'picnic', x: 8, y: 48, w: 2, d: 2 });
+  add({ id: 'meadow-blanket-2', sprite: 'blanket', variant: 'red', x: 10, y: 51, w: 2, d: 2, label: 'Picnic blanket' });
+  add({ id: 'meadow-birdbath', sprite: 'birdbath', x: 8, y: 53, label: 'Bird bath' });
+  add({ id: 'sculpture-cairn', sprite: 'sculpture', variant: 'cairn', x: 9, y: 56, label: 'River-stone cairn' });
+  add({ id: 'sculpture-sphere', sprite: 'sculpture', variant: 'sphere', x: 12, y: 59, label: 'The armillary' });
+  add({ id: 'sculpture-bench', sprite: 'bench', x: 8, y: 59, d: 2, facing: 'se', actions: [{ kind: 'sit' }] });
+  add({ id: 'campfire', sprite: 'fire-ring', x: 11, y: 66, label: 'Campfire' });
+  add({ id: 'campfire-bench-n', sprite: 'bench', x: 10, y: 63, w: 2, facing: 'sw', actions: [{ kind: 'sit' }] });
+  add({ id: 'campfire-bench-s', sprite: 'bench', x: 11, y: 69, w: 2, facing: 'ne', actions: [{ kind: 'sit' }] });
+  add({ id: 'campfire-bench-w', sprite: 'bench', x: 8, y: 65, d: 2, facing: 'se', actions: [{ kind: 'sit' }] });
+  add({ id: 'campfire-bench-e', sprite: 'bench', x: 14, y: 66, d: 2, facing: 'nw', actions: [{ kind: 'sit' }] });
+  add({ id: 'campfire-stump-1', sprite: 'stump', x: 13, y: 63 });
+  add({ id: 'campfire-stump-2', sprite: 'stump', x: 8, y: 69 });
+  for (const [x, y] of [[11, 47], [11, 55], [8, 62], [16, 70]] as const) add({ id: `meadow-lantern-${x}-${y}`, sprite: 'garden-lantern', x, y });
+  for (const [x, y] of [[11, 43], [16, 45], [15, 49], [17, 53], [10, 58], [16, 61], [18, 65], [13, 72], [9, 41]] as const)
+    add({ id: `meadow-flowers-${x}-${y}`, sprite: 'wildflowers', variant: (x + y) % 2 ? 'a' : 'b', x, y, solid: false });
+  // a few shade trees framing the meadow
+  for (const [x, y, sp] of [[18, 62, 'tree/round'], [17, 57, 'tree/birch'], [18, 50, 'tree/birch'], [16, 43, 'tree/round']] as const)
+    add({ id: `meadow-tree-${x}-${y}`, sprite: sp, x, y, variant: 'a' });
+
+  for (const [x, y] of PLAZA_LAMPS) add({ id: `plaza-lamp-${x}-${y}`, sprite: 'lamp-post', x, y });
   // Lamp posts along both roads, every six tiles.
   for (let x = 8; x <= 60; x += 6) {
-    if (!blocked.has(`${x},37`) && t.get(x, 37) !== 'w') add({ sprite: 'lamp-post', x, y: 37 });
+    if (!blocked.has(`${x},37`) && t.get(x, 37) !== 'w' && t.get(x, 37) !== 'P') add({ sprite: 'lamp-post', x, y: 37 });
   }
   for (let y = 26; y <= 70; y += 6) {
     if (!blocked.has(`37,${y}`) && !['w', 'W', 'P', 'p'].includes(t.get(37, y))) add({ sprite: 'lamp-post', x: 37, y });
@@ -497,6 +610,15 @@ export function buildTown(): SceneDef {
     }
   }
 
+  const seats = objects.filter((o) => o.actions?.some((a) => a.kind === 'sit'));
+  /** A tree here would stand in front of a seat, its crown over the seat's drawing. */
+  const shades = (x: number, y: number) =>
+    seats.some((o) => {
+      const cx = o.x + (o.w ?? 1) / 2;
+      const cy = o.y + (o.d ?? 1) / 2;
+      const depth = x + 0.5 + y + 0.5 - cx - cy;
+      return Math.abs(x + 0.5 - (y + 0.5) - (cx - cy)) < 3.5 && depth > 0 && depth < 13;
+    });
   // Forest: a deep wood at the north and west edges and around the Quiet Grove, scattered park trees elsewhere.
   for (let y = 0; y < H; y++) {
     for (let x = 0; x < W; x++) {
@@ -507,6 +629,8 @@ export function buildTown(): SceneDef {
       const nearRoad = [-1, 0, 1].some((dy) => [-1, 0, 1].some((dx) => ['p', 'P', 'd'].includes(t.get(x + dx, y + dy))));
       if (nearRoad) continue;
       if (Math.hypot(x - 64.5, y - 60.5) < 3.2) continue; // the lighthouse island stays clear
+      if (composed(x, y)) continue; // the garden, the orchard, the lawns: laid out by hand above
+      if (shades(x, y)) continue;
       // every entrance keeps an open approach (no tree on the steps or right in front of the door)
       if (BUILDINGS.some((b) => Math.abs(doorTile(b).x - x) <= 3 && Math.abs(doorTile(b).y - y) <= 3)) continue;
       // the far edges too: a treeline across the water closes the valley

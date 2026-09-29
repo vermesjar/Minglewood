@@ -2,3 +2,5 @@ out/
 .venv/
 __pycache__/
 review/
+drafts/*
+!drafts/README.md

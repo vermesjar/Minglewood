@@ -7,8 +7,11 @@
  * Particle effects (steam, flames, bubbles, notes) go through Effects; the rest is drawn right after the
  * object in depth order, clipped to its glass or screen.
  */
-import type { SceneDef, SceneObject } from '@shared/world/scene';
+import type { SceneDef, SceneObject, UseKind } from '@shared/world/scene';
+import type { BoardNote, MomentKind } from '@shared/protocol';
+import { noteColor } from '@shared/world/uses';
 import { wallArt } from './sprites/art';
+import { TABLES, TableGame, label } from './tabletop';
 import type { Effects } from './effects';
 import type { Sprite } from './sprites/painter';
 import { worldTimeNow } from './weather';
@@ -89,6 +92,32 @@ const BY_FILE: Record<string, AnimSpec[]> = {
     { kind: 'steam', at: [20, 6], every: 3.6 },
     { kind: 'brew', at: [[20, 6]] },
   ],
+  // the four-rotation standard's new sides (docs/furniture.md): every drawing of an animated piece animates
+  'espresso.se.png': [
+    { kind: 'steam', at: [37, 23], every: 3.2 },
+    { kind: 'brew', at: [[26, 31], [37, 23]] },
+  ],
+  'espresso.nw.png': [
+    { kind: 'steam', at: [20, 5], every: 3.6 },
+    { kind: 'brew', at: [[20, 5]] },
+  ],
+  // the house machine (the Design Lab's steampunk one): the dome's finial breathes steam, a puff at the spout
+  'steampunk-coffee-machine.sw.png': [
+    { kind: 'steam', at: [37, 1], every: 3.4 },
+    { kind: 'brew', at: [[22, 60], [37, 1]] },
+  ],
+  'steampunk-coffee-machine.se.png': [
+    { kind: 'steam', at: [27, 1], every: 3.4 },
+    { kind: 'brew', at: [[44, 60], [27, 1]] },
+  ],
+  'steampunk-coffee-machine.ne.png': [
+    { kind: 'steam', at: [32, 2], every: 3.8 },
+    { kind: 'brew', at: [[32, 2]] },
+  ],
+  'steampunk-coffee-machine.nw.png': [
+    { kind: 'steam', at: [30, 2], every: 3.8 },
+    { kind: 'brew', at: [[30, 2]] },
+  ],
   'heirloom-aquarium.sw.png': [
     { kind: 'shimmer', glass: [[10, 19], [64, 34], [64, 60], [10, 45]] },
     { kind: 'fish', glass: [[10, 19], [64, 34], [64, 60], [10, 45]], n: 3 },
@@ -100,8 +129,13 @@ const BY_FILE: Record<string, AnimSpec[]> = {
     { kind: 'bubbles', glass: [[10, 23], [66, 39], [66, 66], [10, 51]], every: 0.9 },
   ],
   'fireplace.sw.png': [{ kind: 'flames', at: [30, 60], spread: 7, rate: 10 }],
+  // town meadows: the campfire crackles, the garden lanterns breathe
+  'fire-ring.png': [{ kind: 'flames', at: [34, 27], spread: 8, rate: 9 }],
+  'garden-lantern.png': [{ kind: 'glow', at: [13, 17], r: 7, color: '255,200,130', speed: 0.8 }],
   'heirloom-dragonlamp.se.png': [{ kind: 'glow', at: [40, 37], r: 9, color: '255,214,140', speed: 1.3 }],
   'heirloom-dragonlamp.nw.png': [{ kind: 'glow', at: [10, 27], r: 9, color: '255,214,140', speed: 1.3 }],
+  'heirloom-dragonlamp.sw.png': [{ kind: 'glow', at: [17, 39], r: 9, color: '255,214,140', speed: 1.3 }],
+  'heirloom-dragonlamp.ne.png': [{ kind: 'glow', at: [29, 22], r: 8, color: '255,214,140', speed: 1.3 }],
   'server-rack.sw.png': [
     { kind: 'blink', at: [[6, 31], [6, 37], [6, 44], [7, 51], [7, 57], [7, 62], [7, 67], [19, 78], [20, 84]], colors: ['#6bff8e', '#6bff8e', '#ffb347'] },
   ],
@@ -119,6 +153,7 @@ const BY_FILE: Record<string, AnimSpec[]> = {
   'desk.light.sw.png': DESK_SW,
   'desk.wood.sw.png': DESK_SW,
   'cake-table.sw.png': [{ kind: 'candles', at: [[21, 2], [24, 1], [27, 2]] }],
+  'cake-table.ne.png': [{ kind: 'candles', at: [[19, 3], [24, 2], [27, 3]] }],
   'balloons.se.png': [{ kind: 'bob', amp: 1, period: 3 }],
   'balloons.nw.png': [{ kind: 'bob', amp: 1, period: 3 }],
   'balloons.b.se.png': [{ kind: 'bob', amp: 1, period: 3.4 }],
@@ -135,25 +170,43 @@ const BY_FILE: Record<string, AnimSpec[]> = {
     { kind: 'strip', from: [40, 4], to: [58, 13], color: '255,110,210', speed: 0.45 },
     { kind: 'strip', from: [63, 15], to: [86, 26], color: '255,110,210', speed: 0.4 },
   ],
+  'air-hockey.ne.png': [
+    { kind: 'strip', from: [10, 28], to: [49, 48], color: '90,230,255', speed: 0.35 },
+    { kind: 'strip', from: [87, 44], to: [70, 53], color: '90,230,255', speed: 0.5 },
+    { kind: 'strip', from: [43, 5], to: [62, 14], color: '255,110,210', speed: 0.45 },
+    { kind: 'strip', from: [66, 18], to: [88, 29], color: '255,110,210', speed: 0.4 },
+  ],
   'popcorn-cart.se.png': [
     { kind: 'popcorn', glass: [[8, 12], [33, 10], [33, 32], [8, 34]], rate: 5 },
     { kind: 'glow', at: [20, 22], r: 12, color: '255,220,140', speed: 0.9 },
   ],
-  'popcorn-cart.nw.png': [
-    { kind: 'popcorn', glass: [[8, 12], [33, 10], [33, 32], [8, 34]], rate: 5 },
-    { kind: 'glow', at: [20, 22], r: 12, color: '255,220,140', speed: 0.9 },
+  'popcorn-cart.ne.png': [
+    { kind: 'popcorn', glass: [[9, 17], [37, 16], [37, 30], [9, 33]], rate: 5 },
+    { kind: 'glow', at: [22, 24], r: 12, color: '255,220,140', speed: 0.9 },
   ],
   'vending-machine.sw.png': [
     { kind: 'glow', at: [15, 38], r: 18, color: '130,165,255', speed: 0.5 },
     { kind: 'blink', at: [[31, 70]], colors: ['#ff8ad8'] },
   ],
+  'vending-machine.se.png': [
+    { kind: 'glow', at: [27, 44], r: 18, color: '130,165,255', speed: 0.5 },
+    { kind: 'blink', at: [[44, 60]], colors: ['#ff8ad8'] },
+  ],
   'lantern-floor.se.png': [
     { kind: 'regionSway', rect: [7, 6, 31, 40], amp: 1, period: 5.5 },
     { kind: 'glow', at: [18, 15], r: 12, color: '255,190,140', speed: 0.7 },
   ],
+  'lantern-floor.sw.png': [
+    { kind: 'regionSway', rect: [0, 11, 22, 42], amp: 1, period: 5.5 },
+    { kind: 'glow', at: [10, 21], r: 12, color: '255,190,140', speed: 0.7 },
+  ],
+  'lantern-floor.ne.png': [
+    { kind: 'regionSway', rect: [3, 5, 22, 32], amp: 1, period: 5.5 },
+    { kind: 'glow', at: [12, 13], r: 10, color: '255,190,140', speed: 0.7 },
+  ],
   'lantern-floor.nw.png': [
-    { kind: 'regionSway', rect: [7, 6, 31, 40], amp: 1, period: 5.5 },
-    { kind: 'glow', at: [18, 15], r: 12, color: '255,190,140', speed: 0.7 },
+    { kind: 'regionSway', rect: [0, 6, 21, 36], amp: 1, period: 5.5 },
+    { kind: 'glow', at: [10, 15], r: 12, color: '255,190,140', speed: 0.7 },
   ],
   'claw-machine.sw.png': [
     { kind: 'chase', from: [7, 12], to: [44, 13], n: 9, colors: ['#ffe66b', '#ff6bd5'] },
@@ -199,6 +252,18 @@ interface Live {
   rungAt?: number;
   /** Popcorn in the air (drawing px). */
   kernels: Array<{ x: number; y: number; vx: number; vy: number; floor: number }>;
+  /** The drawing's opaque bounds (canvas px). */
+  box: { x0: number; y0: number; x1: number; y1: number };
+  /** When each kind of moment last happened here (this.t), and what it said (a score, a song). */
+  moments: Partial<Record<MomentKind, { at: number; detail?: string }>>;
+  /** A pool or air-hockey table's game, played on its own drawing (tabletop.ts). */
+  table?: TableGame;
+  /** Where its moments happen on the drawing (MOMENT_SPOTS). */
+  spot?: Spots;
+  /** The drawing darkened (a server rack switched off), made when first needed. */
+  dark?: HTMLCanvasElement;
+  /** Things to do a little later in a moment (the splash after the coin, the sparkle when the globe stops). */
+  pending: Array<{ at: number; fn: () => void }>;
 }
 
 const KOI: Array<[string, string]> = [
@@ -223,12 +288,31 @@ export class ObjectAnimations {
       let specs = st.sprite.file ? BY_FILE[st.sprite.file] : undefined;
       // a potted plant by a window stirs in the breeze coming in
       if (scene && st.obj.sprite === 'plant' && nearWindow(scene, st.obj)) specs = [...(specs ?? []), { kind: 'bandSway', top: 0.42, period: 4.5 }];
-      if (!specs?.length) continue;
+      const usable = !!st.obj.actions?.some((a) => a.kind === 'use' || a.kind === 'note') || (!!st.sprite.file && !!MOMENT_SPOTS[st.sprite.file]);
+      if (!specs?.length && !usable) continue;
+      specs ??= [];
       const k = st.sprite.scale ?? 1;
       const w = st.sprite.canvas.width;
       const at = (p: P): [number, number] => [st.dx + (st.sprite.mirrored ? w - p[0] : p[0]) / k, st.dy + p[1] / k];
       const seed = (st.obj.x * 31 + st.obj.y * 17) % 97;
-      const live: Live = { obj: st.obj, sprite: st.sprite, dx: st.dx, dy: st.dy, specs, at, clock: specs.map((_, i) => (seed * 0.37 + i) % 3), fish: [], seed, kernels: [] };
+      const live: Live = {
+        obj: st.obj,
+        sprite: st.sprite,
+        dx: st.dx,
+        dy: st.dy,
+        specs,
+        at,
+        clock: specs.map((_, i) => (seed * 0.37 + i) % 3),
+        fish: [],
+        seed,
+        kernels: [],
+        box: maskBox(st.sprite),
+        moments: {},
+        pending: [],
+      };
+      const table = st.sprite.file ? TABLES[st.sprite.file] : undefined;
+      if (table) live.table = new TableGame(st.sprite, table, this.effects);
+      live.spot = st.sprite.file ? MOMENT_SPOTS[st.sprite.file] : undefined;
       for (const s of specs) {
         if (s.kind === 'fish')
           for (let i = 0; i < s.n; i++) {
@@ -241,13 +325,30 @@ export class ObjectAnimations {
     }
   }
 
-  /** A one-off moment on an object: 'brew' (an espresso machine pulling a shot), 'ring' (the bell). */
-  trigger(objectId: string, what: 'brew' | 'ring') {
+  /**
+   * A one-off moment on an object: 'brew' (an espresso machine pulling a shot), 'ring' (the bell), or a thing
+   * being used (uses.ts: the jukebox, the claw, a plant being watered…).
+   */
+  trigger(objectId: string, what: MomentKind, detail?: string) {
     const l = this.live.get(objectId);
     if (!l) return;
+    l.moments[what] = { at: this.t, detail };
     if (what === 'ring') {
       l.rungAt = this.t;
       return;
+    }
+    if (what !== 'brew') {
+      this.startUse(l, what);
+      return;
+    }
+    // a cup filled at the cooler: the jug glugs
+    const jug = l.spot?.jug;
+    if (jug) {
+      const [x, y] = l.at(jug);
+      for (let i = 0; i < 7; i++)
+        this.later(l, i * 0.14, () =>
+          this.effects.add({ x: x + (Math.random() - 0.5) * 6, y, vx: (Math.random() - 0.5) * 2, vy: -9 - Math.random() * 4, max: 1.1, size: 0.9 + Math.random() * 0.6, color: 'rgba(225,245,255,0.9)', gravity: 0, kind: 'circle' }),
+        );
     }
     for (const s of l.specs) {
       // a scoop from the popcorn cart: a flurry of kernels
@@ -271,6 +372,7 @@ export class ObjectAnimations {
     if (reducedMotion) return;
     for (const l of this.live.values()) {
       const on = this.isOn(l.obj.id);
+      this.updateUse(l, dt);
       l.specs.forEach((s, i) => {
         l.clock[i] += dt;
         if (s.kind === 'steam' && l.clock[i] > s.every) {
@@ -325,6 +427,8 @@ export class ObjectAnimations {
           f.u = Math.max(0.12, Math.min(0.88, f.u));
         }
         f.v += Math.sin(this.t * 0.7 + f.phase) * 0.02 * dt;
+        // fed: they come up to the surface for the flakes
+        if (this.age(l, 'feed') < 6) f.v += (0.22 - f.v) * Math.min(1, dt * 1.6);
         f.v = Math.max(0.2, Math.min(0.8, f.v));
       }
     }
@@ -344,10 +448,51 @@ export class ObjectAnimations {
     const H = sp.canvas.height;
     const x0 = x - sp.ax / k;
     const y0 = y - sp.ay / k;
-    const part = (sx: number, sy: number, sw: number, sh: number, dx = 0) => {
-      if (sw > 0 && sh > 0) c.drawImage(sp.canvas, sx, sy, sw, sh, x0 + (sx + dx) / k, y0 + sy / k, sw / k, sh / k);
+    const part = (sx: number, sy: number, sw: number, sh: number, dx = 0, dy = 0) => {
+      if (sw > 0 && sh > 0) c.drawImage(sp.canvas, sx, sy, sw, sh, x0 + (sx + dx) / k, y0 + (sy + dy) / k, sw / k, sh / k);
     };
+    // a game on the table: the pieces lifted off it (drawn over it in drawFor)
+    if (l.table?.drawBase(c, x0, y0, this.t)) return true;
+    // switched off: the whole rack goes dark for a moment
+    if (this.age(l, 'reboot') < 0.6) {
+      c.drawImage(sp.canvas, x0, y0, W / k, H / k);
+      c.drawImage(darkOf(l), x0, y0, W / k, H / k);
+      return true;
+    }
+    // the model rocket lifts off its pad (the flame between them is drawn in drawFor) and settles back
+    const cut = l.spot?.liftoff?.cut;
+    const h = this.hop(l);
+    if (cut !== undefined && h > 0) {
+      part(0, cut, W, H - cut);
+      part(0, 0, W, cut, 0, -h * k);
+      return true;
+    }
+    // watered: the leaves shiver for a moment
+    const wa = this.age(l, 'water');
+    if (wa < 1.2) {
+      const d = Math.floor(wa * 10) % 2 ? 1 : -1;
+      const cut = Math.round(l.box.y0 + (l.box.y1 - l.box.y0) * 0.45);
+      part(0, 0, W, cut, d);
+      part(0, cut, W, H - cut);
+      return true;
+    }
     for (const s of l.specs) {
+      // the claw: down into the prizes, a pause to grab, back up
+      const cl = this.age(l, 'claw');
+      if (s.kind === 'regionSway' && cl < 1.9) {
+        const drop = cl < 0.8 ? cl / 0.8 : cl < 1.1 ? 1 : 1 - (cl - 1.1) / 0.8;
+        const [ax0, ry0, ax1, ry1] = s.rect;
+        const [rx0, rx1] = sp.mirrored ? [W - ax1, W - ax0] : [ax0, ax1];
+        part(0, 0, W, ry0);
+        part(0, ry0, rx0, ry1 - ry0);
+        part(rx1, ry0, W - rx1, ry1 - ry0);
+        part(0, ry1, W, H - ry1);
+        const dy = Math.round(drop * 8);
+        // the gap the claw leaves: its top row (the cable, the glass behind) stretched down to it
+        if (dy > 0) c.drawImage(sp.canvas, rx0, ry0, rx1 - rx0, 1, x0 + rx0 / k, y0 + ry0 / k, (rx1 - rx0) / k, (dy + 1) / k);
+        part(rx0, ry0, rx1 - rx0, ry1 - ry0, 0, dy);
+        return true;
+      }
       if (s.kind === 'regionSway') {
         const v = Math.sin((this.t / s.period) * Math.PI * 2 + l.seed);
         const d = (v > 0.55 ? 1 : v < -0.55 ? -1 : 0) * s.amp * (sp.mirrored ? -1 : 1);
@@ -377,11 +522,13 @@ export class ObjectAnimations {
   /** Find the scene's animated wall things (painted into the walls) and where their drawings land. */
   loadWalls(scene: SceneDef) {
     this.walls = [];
+    this.boards = [];
     for (const o of scene.objects) {
       if (!o.wall) continue;
       const key = o.variant ? `${o.sprite}.${o.variant}` : o.sprite;
       const spec = WALL_SPECS[key] ?? WALL_SPECS[o.sprite];
-      if (!spec) continue;
+      const board = o.actions?.some((a) => a.kind === 'note') && wallArt(o);
+      if (!spec && !board) continue;
       const face = o.wall;
       const u0 = face === 'right' ? o.x : o.y;
       const span = face === 'right' ? (o.w ?? 1) : (o.d ?? o.w ?? 1);
@@ -396,13 +543,81 @@ export class ObjectAnimations {
         // procedural signs: (u across the span 0…1, v art px up from the floor)
         at = ([u, v]) => onWall(u0 + u * span, v);
       }
-      this.walls.push({ obj: o, spec, at, seed: (o.x * 13 + o.y * 7) % 23, span });
+      if (board) {
+        // sticky notes go along the top of the board, clear of what's drawn on it
+        const W = board.img.width;
+        const H = board.img.height;
+        const slot = (i: number): Quad => {
+          const x = W * (0.09 + i * 0.14);
+          const y = H * 0.07;
+          return [at([x, y]), at([x + W * 0.1, y]), at([x + W * 0.1, y + H * 0.13]), at([x, y + H * 0.13])];
+        };
+        this.boards.push({ id: o.id, slot });
+      }
+      if (spec) this.walls.push({ obj: o, spec, at, seed: (o.x * 13 + o.y * 7) % 23, span });
     }
+  }
+
+  /** Boards on the walls that people pin notes to, and where each note goes (world px). */
+  private boards: Array<{ id: string; slot: (i: number) => Quad }> = [];
+  /** The colours of the notes on each board, and when one was last pinned (this.t). */
+  private notes = new Map<string, { colors: string[]; pinnedAt: number }>();
+
+  private pinned = new Set<string>();
+
+  /**
+   * The notes on the boards in the room (from the server), drawn as sticky notes on each board. `pop`: a new
+   * one was just pinned (not a room being walked into), so it pops on.
+   */
+  setNotes(notes: BoardNote[], pop = false) {
+    const next = new Map<string, { colors: string[]; pinnedAt: number }>();
+    for (const n of notes) {
+      const cur = next.get(n.objectId) ?? { colors: [], pinnedAt: this.notes.get(n.objectId)?.pinnedAt ?? -Infinity };
+      cur.colors.push(noteColor(n.by));
+      if (pop && !this.pinned.has(n.id)) cur.pinnedAt = this.t;
+      next.set(n.objectId, cur);
+    }
+    this.pinned = new Set(notes.map((n) => n.id));
+    this.notes = next;
+  }
+
+  /** Sticky notes on a board, the newest popping on when it's just been pinned. */
+  private drawNotes(c: CanvasRenderingContext2D, id: string, slot: (i: number) => Quad) {
+    const on = this.notes.get(id);
+    if (!on) return;
+    on.colors.forEach((color, i) => {
+      let q = slot(i);
+      const age = this.t - on.pinnedAt;
+      if (i === on.colors.length - 1 && age < 0.35) {
+        const k = 0.4 + 0.6 * ease(age / 0.35) + Math.sin((age / 0.35) * Math.PI) * 0.25;
+        const cx = (q[0][0] + q[2][0]) / 2;
+        const cy = (q[0][1] + q[2][1]) / 2;
+        q = q.map(([x, y]) => [cx + (x - cx) * k, cy + (y - cy) * k]) as Quad;
+      }
+      c.fillStyle = 'rgba(42,31,45,0.55)';
+      c.beginPath();
+      q.forEach(([x, y], j) => (j ? c.lineTo(x + 0.5, y + 0.5) : c.moveTo(x + 0.5, y + 0.5)));
+      c.fill();
+      c.fillStyle = color;
+      c.beginPath();
+      q.forEach(([x, y], j) => (j ? c.lineTo(x, y) : c.moveTo(x, y)));
+      c.fill();
+      // a line of writing
+      c.strokeStyle = 'rgba(42,31,45,0.45)';
+      c.lineWidth = 0.5;
+      c.beginPath();
+      const a = lerp2(q[0], q[3], 0.45);
+      const b = lerp2(q[1], q[2], 0.45);
+      c.moveTo(...lerp2(a, b, 0.15));
+      c.lineTo(...lerp2(a, b, 0.8));
+      c.stroke();
+    });
   }
 
   /** Draw the wall things' life; called after the room's shell, before anything stands in front of it. */
   drawWalls(c: CanvasRenderingContext2D, reducedMotion: boolean) {
     const t = reducedMotion ? 0 : this.t;
+    for (const b of this.boards) this.drawNotes(c, b.id, b.slot);
     for (const w of this.walls) {
       const s = w.spec;
       if (s.kind === 'lanterns') {
@@ -521,22 +736,36 @@ export class ObjectAnimations {
           break;
         }
         case 'blink': {
+          // rebooted: dark, then all amber while it starts up, then green again light by light
+          const rb = this.age(l, 'reboot');
           s.at.forEach((p, i) => {
             const period = 1.1 + ((l.seed + i * 13) % 7) * 0.35;
-            const lit = ((t + i * 0.37) % period) / period < 0.62;
+            let lit = ((t + i * 0.37) % period) / period < 0.62;
+            let color = s.colors[i % s.colors.length];
+            if (rb < 0.6) lit = false;
+            else if (rb < 1.6) {
+              lit = true;
+              color = '#ffb347';
+            } else if (rb < 2.8) {
+              lit = i < ((rb - 1.6) / 1.2) * s.at.length + 1;
+              color = '#6bff8e';
+            }
             if (!lit) return;
             const [x, y] = l.at(p);
-            c.fillStyle = s.colors[i % s.colors.length];
-            c.fillRect(x - px / 2, y - px / 2, px, px);
+            const d = rb < 2.8 ? px * 2 : px;
+            c.fillStyle = color;
+            c.fillRect(x - d / 2, y - d / 2, d, d);
           });
           break;
         }
         case 'glow': {
-          if (!on) break;
+          // a song on: the jukebox's lights pump to the beat
+          const song = this.age(l, 'song') < SONG_S;
+          if (!on && !song) break;
           const [x, y] = l.at(s.at);
-          const color = s.cycle ? mixCycle(s.cycle, t * 0.12 + l.seed * 0.1) : s.color;
-          const a = 0.16 + 0.1 * Math.sin(t * s.speed + l.seed) + 0.04 * Math.sin(t * 3.1 * s.speed);
-          const r = s.r * px;
+          const color = s.cycle ? mixCycle(s.cycle, t * (song ? 0.6 : 0.12) + l.seed * 0.1) : s.color;
+          const a = song ? 0.3 + 0.28 * Math.abs(Math.sin(t * Math.PI * 2.1)) : 0.16 + 0.1 * Math.sin(t * s.speed + l.seed) + 0.04 * Math.sin(t * 3.1 * s.speed);
+          const r = s.r * px * (song ? 1.8 : 1);
           const g = c.createRadialGradient(x, y, 0, x, y, r);
           g.addColorStop(0, `rgba(${color},${a})`);
           g.addColorStop(1, `rgba(${color},0)`);
@@ -548,12 +777,15 @@ export class ObjectAnimations {
           break;
         }
         case 'chase': {
+          // a game on: the marquee lights race and flash, bigger
+          const play = this.age(l, 'claw') < CLAW_S + 0.6;
+          const d = play ? px * 2 : px;
           for (let i = 0; i < s.n; i++) {
-            const lit = Math.floor(t * 4) % 3 === i % 3;
+            const lit = play ? Math.floor(t * 12) % 2 === i % 2 : Math.floor(t * 4) % 3 === i % 3;
             const [x, y] = l.at(lerp2(s.from, s.to, i / (s.n - 1)));
             c.fillStyle = lit ? s.colors[0] : s.colors[1];
             c.globalAlpha = lit ? 1 : 0.55;
-            c.fillRect(x - px / 2, y - px / 2, px, px);
+            c.fillRect(x - d / 2, y - d / 2, d, d);
           }
           c.globalAlpha = 1;
           break;
@@ -572,6 +804,18 @@ export class ObjectAnimations {
           const band = top + ((t * 9 + l.seed) % (bottom - top + 6)) - 3;
           c.fillStyle = 'rgba(255,255,255,0.13)';
           c.fillRect(left, band, right - left, px * 2);
+          // a game being played: flashes and little invaders marching
+          const ga = this.age(l, 'arcade');
+          if (ga < 2.2) {
+            c.fillStyle = `rgba(255,255,255,${Math.floor(ga * 8) % 2 ? 0.28 : 0.08})`;
+            c.fillRect(left, top, right - left, bottom - top);
+            for (let i = 0; i < 6; i++) {
+              const ix = left + ((i * 0.17 + ga * 0.35) % 1) * (right - left);
+              const iy = top + (0.2 + (i % 3) * 0.2 + ga * 0.12) * (bottom - top);
+              c.fillStyle = i % 2 ? '#7cff9a' : '#ff6bd5';
+              c.fillRect(ix, iy, px * 2, px);
+            }
+          }
           c.restore();
           break;
         }
@@ -735,7 +979,477 @@ export class ObjectAnimations {
         }
       }
     }
+    this.drawUse(c, l);
   }
+
+  /* ------------------------------------------------------------------ things being used (uses.ts) */
+
+  /** Seconds since a moment last happened here (Infinity if never). */
+  private age(l: Live, what: MomentKind): number {
+    const m = l.moments[what];
+    return m ? this.t - m.at : Infinity;
+  }
+
+  /** A point in the drawing's opaque bounds, by fraction (world px). */
+  private boxAt(l: Live, fx: number, fy: number): [number, number] {
+    const k = l.sprite.scale ?? 1;
+    const b = l.box;
+    return [l.dx + (b.x0 + (b.x1 - b.x0) * fx) / k, l.dy + (b.y0 + (b.y1 - b.y0) * fy) / k];
+  }
+
+  private later(l: Live, delay: number, fn: () => void) {
+    l.pending.push({ at: this.t + delay, fn });
+  }
+
+  /** A note floating up (a big outlined one for a moment someone made). */
+  private note(x: number, y: number, big = false) {
+    this.effects.add({
+      x,
+      y,
+      vx: (Math.random() - 0.5) * 6,
+      vy: -8 - Math.random() * 4,
+      max: 2 + Math.random() * 0.6,
+      size: big ? 3 : 2,
+      color: ['#ff8ad8', '#8ae2ff', '#ffe066'][Math.floor(Math.random() * (big ? 3 : 2))],
+      gravity: 0,
+      kind: 'note',
+    });
+  }
+
+  /** The start of a moment: what flies out at once, and what's scheduled for a beat later. */
+  private startUse(l: Live, what: UseKind) {
+    const fx = this.effects;
+    const detail = l.moments[what]?.detail;
+    switch (what) {
+      case 'song': {
+        const [x, y] = this.notesAt(l);
+        for (let i = 0; i < 6; i++) this.later(l, i * 0.18, () => this.note(x + (Math.random() - 0.5) * 8, y, true));
+        break;
+      }
+      case 'piano': {
+        // a run up the keys: notes rising along the lid, left to right
+        for (let i = 0; i < 8; i++) {
+          const [x, y] = this.boxAt(l, 0.25 + i * 0.07, 0.18);
+          this.later(l, i * 0.18, () => this.note(x, y, true));
+        }
+        break;
+      }
+      case 'pool':
+      case 'hockey':
+        l.table?.start(this.t, detail);
+        break;
+      case 'feed': {
+        // flakes scattered on the water: rings where they land, then they drift down to the fish
+        const spec = l.specs.find((s) => s.kind === 'fish' || s.kind === 'shimmer');
+        for (let i = 0; i < 16; i++) {
+          const u = 0.2 + Math.random() * 0.6;
+          const [x, y] = spec && (spec.kind === 'fish' || spec.kind === 'shimmer') ? l.at(lerp2(spec.glass[0], spec.glass[1], u)) : this.boxAt(l, u, 0.25);
+          this.later(l, i * 0.06, () => {
+            fx.add({ x, y: y + 1, vx: (Math.random() - 0.5) * 1.2, vy: 2 + Math.random() * 2.5, max: 3.2 + Math.random(), size: 1, color: i % 3 ? '#ffb23f' : '#ffe08a', gravity: 0, kind: 'square' });
+            if (i % 4 === 0) fx.add({ x, y: y + 1, max: 0.9, size: 1.5, color: 'rgba(255,255,255,0.95)', kind: 'ripple' });
+          });
+        }
+        break;
+      }
+      case 'spin':
+        this.later(l, SPIN_S, () => {
+          const [x, y, r] = this.globeAt(l);
+          for (let i = 0; i < 5; i++)
+            fx.add({ x: x + (Math.random() - 0.5) * r * 1.6, y: y - r * 0.4 + (Math.random() - 0.5) * r, vy: -4, max: 0.9, size: 2, color: '#fff4b0', kind: 'star' });
+        });
+        break;
+      case 'water': {
+        // the can tips over the leaves and pours; the plant perks up with a green glint
+        for (let i = 0; i < 22; i++)
+          this.later(l, 0.3 + i * 0.045, () => {
+            const [x, y] = this.spoutAt(l);
+            fx.add({ x: x + (Math.random() - 0.5) * 1.5, y, vx: -2 + (Math.random() - 0.5) * 3, vy: 12, max: 0.55, size: 1, color: '#5ab8ff', gravity: 60, kind: 'drop' });
+          });
+        this.later(l, 1.35, () => {
+          for (let i = 0; i < 5; i++) {
+            const [x, y] = this.boxAt(l, 0.25 + Math.random() * 0.5, 0.1 + Math.random() * 0.3);
+            fx.add({ x, y, vy: -5, max: 1, size: i % 2 ? 2 : 1, color: '#9cff8a', kind: 'star' });
+          }
+        });
+        break;
+      }
+      case 'wish': {
+        // the coin (drawUse) lands: a splash, rings on the water, and the wish glinting up out of it
+        const [cx, cy] = this.coinPath(l, WISH_T);
+        this.later(l, WISH_T, () => {
+          for (let i = 0; i < 8; i++)
+            fx.add({ x: cx + (Math.random() - 0.5) * 2, y: cy, vx: (Math.random() - 0.5) * 16, vy: -14 - Math.random() * 12, max: 0.55, size: 1, color: 'rgba(225,245,255,0.95)', gravity: 70, kind: 'drop' });
+          for (let i = 0; i < 3; i++) this.later(l, i * 0.25, () => fx.add({ x: cx, y: cy + 1, max: 1.2, size: 2, color: 'rgba(255,255,255,0.95)', kind: 'ripple' }));
+          for (let i = 0; i < 4; i++)
+            this.later(l, 0.3 + i * 0.15, () => fx.add({ x: cx + (Math.random() - 0.5) * 8, y: cy - 3, vy: -9, max: 1.1, size: 2, color: '#ffe066', kind: 'star' }));
+        });
+        break;
+      }
+      case 'rocket': {
+        // smoke billows off the pad as it lifts
+        const [x, y] = this.nozzleAt(l, 0);
+        for (let i = 0; i < 16; i++)
+          this.later(l, Math.random() * 0.5, () =>
+            fx.add({ x: x + (Math.random() - 0.5) * 4, y, vx: (Math.random() - 0.5) * 22, vy: -1 - Math.random() * 3, max: 1.2 + Math.random() * 0.8, size: 1.8 + Math.random() * 1.4, color: 'rgba(240,240,240,0.8)', gravity: -1 }),
+          );
+        break;
+      }
+      case 'chime':
+        l.rungAt = this.t;
+        break;
+      case 'toast': {
+        // glasses up: confetti over the podium, twice
+        const [x, y] = this.boxAt(l, 0.5, 0);
+        fx.burst(x, y - 6, 'confetti', 26);
+        this.later(l, 0.5, () => fx.burst(x, y - 10, 'confetti', 18));
+        break;
+      }
+      case 'claw':
+        // a win: a sparkle at the prize chute when the claw's back up
+        if (detail === 'win')
+          this.later(l, CLAW_S, () => {
+            const [x, y] = this.spotAt(l, l.spot?.chute) ?? this.boxAt(l, 0.3, 0.8);
+            for (let i = 0; i < 6; i++) fx.add({ x: x + (Math.random() - 0.5) * 10, y: y - Math.random() * 6, vy: -8, max: 1, size: 2, color: i % 2 ? '#fff4b0' : '#ff9fe0', kind: 'star' });
+          });
+        break;
+      default:
+        // arcade, reboot: drawn from their moment (drawUse, drawSprite, and the blink and screen specs)
+        break;
+    }
+  }
+
+  /** Where a jukebox's notes come from: its own notes point, else the top of the drawing. */
+  private notesAt(l: Live): [number, number] {
+    const spec = l.specs.find((s) => s.kind === 'notes');
+    return spec && spec.kind === 'notes' ? l.at(spec.at) : this.boxAt(l, 0.5, 0.05);
+  }
+
+  /** A point of the drawing's moment spots in world px, if the drawing has it. */
+  private spotAt(l: Live, p: P | undefined): [number, number] | undefined {
+    return p ? l.at(p) : undefined;
+  }
+
+  /** The globe's ball: centre and radius (world px). */
+  private globeAt(l: Live): [number, number, number] {
+    const g = l.spot?.globe;
+    if (g) return [...l.at(g.at), g.r / (l.sprite.scale ?? 1)];
+    const [x, y] = this.boxAt(l, 0.5, 0.33);
+    return [x, y, ((l.box.x1 - l.box.x0) / (l.sprite.scale ?? 1)) * 0.36];
+  }
+
+  /** Where the watering can's rose is (world px), above and beside the leaves. */
+  private spoutAt(l: Live): [number, number] {
+    const [x, y] = this.boxAt(l, 0.55, 0);
+    return [x - 1, y - 3];
+  }
+
+  /** The coin's arc from the rim at the front into the water of the basin, `a` seconds in. */
+  private coinPath(l: Live, a: number): [number, number] {
+    const [sx, sy] = this.boxAt(l, 0.55, 0.98);
+    const [cx, cy] = this.boxAt(l, 0.38, 0.8);
+    const k = Math.min(1, a / WISH_T);
+    return [sx + (cx - sx) * k, sy + (cy - sy) * k - Math.sin(k * Math.PI) * 26];
+  }
+
+  /** How far the rocket is off its pad (world px), and where its nozzle is. */
+  private hop(l: Live): number {
+    const a = this.age(l, 'rocket');
+    if (a >= ROCKET_S) return 0;
+    const up = a < 0.45 ? ease(a / 0.45) : a < ROCKET_S - 0.5 ? 1 : 1 - ease((a - (ROCKET_S - 0.5)) / 0.5);
+    return Math.round(up * 7 * 2) / 2;
+  }
+
+  private nozzleAt(l: Live, hop: number): [number, number] {
+    const n = l.spot?.liftoff?.nozzle;
+    const [x, y] = n ? l.at(n) : this.boxAt(l, 0.5, 0.8);
+    return [x, y - hop];
+  }
+
+  /** A moment's life between frames: scheduled bits, a game on a table, a jukebox that keeps playing. */
+  private updateUse(l: Live, dt: number) {
+    if (l.pending.length) {
+      const due = l.pending.filter((p) => p.at <= this.t);
+      l.pending = l.pending.filter((p) => p.at > this.t);
+      for (const p of due) p.fn();
+    }
+    l.table?.update(dt, this.t);
+    // a song on: the jukebox keeps giving off notes for a while
+    if (this.age(l, 'song') < SONG_S && Math.random() < dt * 2.4) {
+      const [x, y] = this.notesAt(l);
+      this.note(x + (Math.random() - 0.5) * 6, y, true);
+    }
+    // the rocket's exhaust while it's up
+    if (this.hop(l) > 1 && Math.random() < dt * 14) {
+      const [x, y] = this.nozzleAt(l, 0);
+      this.effects.add({ x: x + (Math.random() - 0.5) * 3, y, vx: (Math.random() - 0.5) * 14, vy: -1, max: 0.9, size: 1.5 + Math.random(), color: 'rgba(235,235,235,0.7)', gravity: -1 });
+    }
+  }
+
+  /** What a moment draws over its object: a table's game, the score, a globe spinning, a can, a coin, a flame. */
+  private drawUse(c: CanvasRenderingContext2D, l: Live) {
+    l.table?.drawOver(c, l.dx, l.dy, l.at, this.t);
+    // the arcade score, rising over the cabinet
+    const ga = this.age(l, 'arcade');
+    const score = l.moments.arcade?.detail;
+    if (ga < 2.4 && score) {
+      const [x, y] = this.boxAt(l, 0.5, 0);
+      label(c, score, x, y - 3 - ga * 4, Math.min(1, (2.4 - ga) * 2), '#ffe66b');
+    }
+    const board = l.spot?.board;
+    if (board) {
+      const bq = board;
+      this.drawNotes(c, l.obj.id, (i) => {
+        const u = 0.1 + (i % 3) * 0.28;
+        const v = 0.08 + Math.floor(i / 3) * 0.24;
+        const at = (du: number, dv: number) => l.at(lerp2(lerp2(bq[0], bq[1], u + du), lerp2(bq[3], bq[2], u + du), v + dv));
+        return [at(0, 0), at(0.22, 0), at(0.22, 0.2), at(0, 0.2)];
+      });
+    }
+    this.drawSpotlight(c, l);
+    this.drawGlobe(c, l);
+    this.drawCan(c, l);
+    this.drawCoin(c, l);
+    this.drawFlame(c, l);
+    this.drawPrize(c, l);
+    this.drawReboot(c, l);
+    // the clock striking three: rings spreading from its face, one for each stroke
+    const ch = this.age(l, 'chime');
+    if (ch < 2.6 && !l.specs.some((s) => s.kind === 'ring')) {
+      const face = l.specs.find((s) => s.kind === 'clockface');
+      const [x, y] = face && face.kind === 'clockface' ? l.at(face.at) : this.boxAt(l, 0.5, 0.3);
+      for (let i = 0; i < 3; i++) {
+        const k = (ch - i * 0.7) / 1.1;
+        if (k <= 0 || k > 1) continue;
+        c.strokeStyle = `rgba(255,233,150,${(1 - k) * 0.95})`;
+        c.lineWidth = 1;
+        c.beginPath();
+        c.ellipse(x, y, 4 + k * 13, (4 + k * 13) * 0.62, 0, 0, Math.PI * 2);
+        c.stroke();
+      }
+    }
+  }
+
+  /** A toast at the podium: a warm light on it while the room raises a glass. */
+  private drawSpotlight(c: CanvasRenderingContext2D, l: Live) {
+    const a = this.age(l, 'toast');
+    if (a >= 3.5) return;
+    const k = Math.min(1, a * 4, (3.5 - a) * 1.5);
+    const [x, y] = this.boxAt(l, 0.5, 0.35);
+    const [, top] = this.boxAt(l, 0.5, 0);
+    const r = 26;
+    c.save();
+    c.globalCompositeOperation = 'lighter';
+    // the beam down from above, and a pool of light round the podium
+    const beam = c.createLinearGradient(0, top - 60, 0, y + 10);
+    beam.addColorStop(0, 'rgba(255,236,180,0)');
+    beam.addColorStop(1, `rgba(255,236,180,${0.22 * k})`);
+    c.fillStyle = beam;
+    c.beginPath();
+    c.moveTo(x - 5, top - 60);
+    c.lineTo(x + 5, top - 60);
+    c.lineTo(x + r * 0.8, y + 8);
+    c.lineTo(x - r * 0.8, y + 8);
+    c.closePath();
+    c.fill();
+    const pool = c.createRadialGradient(x, y + 8, 0, x, y + 8, r);
+    pool.addColorStop(0, `rgba(255,236,180,${0.3 * k})`);
+    pool.addColorStop(1, 'rgba(255,236,180,0)');
+    c.fillStyle = pool;
+    c.fillRect(x - r, y + 8 - r, r * 2, r * 2);
+    c.restore();
+  }
+
+  /** The globe spinning: its continents race round and slow to a stop, then a pin and where it landed. */
+  private drawGlobe(c: CanvasRenderingContext2D, l: Live) {
+    const a = this.age(l, 'spin');
+    if (a >= SPIN_S + 2.6) return;
+    const [cx, cy, r] = this.globeAt(l);
+    if (a < SPIN_S) {
+      const turn = 4 * (1 - Math.pow(1 - a / SPIN_S, 2));
+      c.save();
+      c.beginPath();
+      c.arc(cx, cy, r, 0, Math.PI * 2);
+      c.clip();
+      // meridians of land and light sweeping across the ball: squeezed at its edges, wide in the middle
+      for (let i = 0; i < 6; i++) {
+        const th = ((turn + i / 6) % 1) * Math.PI * 2 - Math.PI;
+        if (Math.cos(th) <= 0.05) continue;
+        const x = cx + Math.sin(th) * r;
+        const w = Math.max(0.5, r * 0.32 * Math.cos(th));
+        c.fillStyle = i % 2 ? 'rgba(46,104,58,0.5)' : 'rgba(255,248,214,0.45)';
+        c.fillRect(x - w / 2, cy - r, w, r * 2);
+      }
+      c.restore();
+      // motion arcs either side while it's going fast
+      const fast = 1 - a / SPIN_S;
+      if (fast > 0.35) {
+        c.strokeStyle = `rgba(255,255,255,${(fast - 0.35) * 1.3})`;
+        c.lineWidth = 0.75;
+        for (const side of [-1, 1]) {
+          c.beginPath();
+          c.arc(cx, cy, r + 2, side > 0 ? -0.5 : Math.PI - 0.5, side > 0 ? 0.5 : Math.PI + 0.5);
+          c.stroke();
+        }
+      }
+      return;
+    }
+    // stopped: a pin where it landed and the city rising over it
+    const b = a - SPIN_S;
+    const city = l.moments.spin?.detail;
+    const seed = [...(city ?? '')].reduce((n, ch) => n + ch.charCodeAt(0), 0);
+    const px = Math.round(cx + (((seed % 7) - 3) / 6) * r);
+    const py = Math.round(cy - r * 0.2 + ((seed % 5) - 2) * 0.12 * r);
+    const drop = b < 0.2 ? (0.2 - b) * 20 : 0;
+    c.globalAlpha = Math.min(1, (2.6 - b) * 2);
+    c.fillStyle = '#2a1f2d';
+    c.fillRect(px - 1, py - 4 - drop, 3, 3);
+    c.fillRect(px, py - 2 - drop, 1, 3);
+    c.fillStyle = '#ff4d5e';
+    c.fillRect(px - 0.5, py - 3.5 - drop, 2, 2);
+    c.globalAlpha = 1;
+    if (city) label(c, city, cx, cy - r - 3 - b * 3, Math.min(1, (2.6 - b) * 2), '#fff4b0');
+  }
+
+  /** The watering can, tipping over the plant and pouring (the drops are particles from its rose). */
+  private drawCan(c: CanvasRenderingContext2D, l: Live) {
+    const a = this.age(l, 'water');
+    if (a >= 1.6) return;
+    const [rx, ry] = this.spoutAt(l);
+    const tipped = a > 0.25 && a < 1.3;
+    const rows = tipped ? CAN_TIPPED : CAN_LEVEL;
+    // the rose (where the water comes out) sits on the spout point; the rest of the can up and to the right
+    const rose = tipped ? [0, 7] : [0, 2];
+    const x0 = Math.round(rx) - rose[0];
+    const y0 = Math.round(ry) - rose[1];
+    c.globalAlpha = Math.min(1, a * 5, (1.6 - a) * 4);
+    const paint = (dx: number, dy: number, only?: string) =>
+      rows.forEach((row, y) =>
+        [...row].forEach((ch, x) => {
+          if (ch === '.') return;
+          c.fillStyle = only ?? CAN_COLORS[ch];
+          c.fillRect(x0 + x + dx, y0 + y + dy, 1, 1);
+        }),
+      );
+    // a dark edge all round so it reads over leaves and walls, then the can
+    for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) paint(dx, dy, '#1b2a2a');
+    paint(0, 0);
+    c.globalAlpha = 1;
+  }
+
+  /** The wishing coin in the air: gold, flashing as it turns over. */
+  private drawCoin(c: CanvasRenderingContext2D, l: Live) {
+    const a = this.age(l, 'wish');
+    if (a >= WISH_T) return;
+    const [x, y] = this.coinPath(l, a);
+    const edge = Math.floor(a * 16) % 2 === 1;
+    c.fillStyle = '#2a1f2d';
+    c.fillRect(Math.round(x) - 1.5, Math.round(y) - 1.5, edge ? 2 : 3, 3);
+    c.fillStyle = '#ffd23f';
+    c.fillRect(Math.round(x) - 1, Math.round(y) - 1, edge ? 1 : 2, 2);
+    if (!edge) {
+      c.fillStyle = '#fffbe0';
+      c.fillRect(Math.round(x) - 1, Math.round(y) - 1, 1, 1);
+    }
+  }
+
+  /** The rocket's flame between its nozzle and the pad while it's up. */
+  private drawFlame(c: CanvasRenderingContext2D, l: Live) {
+    const h = this.hop(l);
+    if (h < 1) return;
+    const [x, y] = this.nozzleAt(l, h);
+    const flick = Math.floor(this.t * 20) % 2;
+    c.fillStyle = '#ff7a2f';
+    c.fillRect(Math.round(x) - 2, y, 4, h + flick);
+    c.fillStyle = '#ffe066';
+    c.fillRect(Math.round(x) - 1, y, 2, Math.max(1, h - 1 - flick));
+  }
+
+  /** A prize coming up in the claw when it's a win. */
+  private drawPrize(c: CanvasRenderingContext2D, l: Live) {
+    const a = this.age(l, 'claw');
+    const tip = l.spot?.tip;
+    if (a >= CLAW_S || a < 1.05 || !tip || l.moments.claw?.detail !== 'win') return;
+    const drop = a < 1.1 ? 1 : 1 - (a - 1.1) / 0.8;
+    const [x, y] = l.at([tip[0], tip[1] + drop * 8 + 3]);
+    // a little bear: round body, two ears
+    const [bx, by] = [Math.round(x), Math.round(y)];
+    c.fillStyle = '#2a1f2d';
+    c.fillRect(bx - 3, by - 3, 6, 5);
+    c.fillStyle = '#ff9fe0';
+    c.fillRect(bx - 2, by - 1, 4, 2);
+    c.fillRect(bx - 2, by - 2, 1, 1);
+    c.fillRect(bx + 1, by - 2, 1, 1);
+    c.fillStyle = '#ffd6f2';
+    c.fillRect(bx - 1, by - 1, 1, 1);
+  }
+
+  /** Turned off and on again: a boot bar over the rack fills amber, then goes green with an OK. */
+  private drawReboot(c: CanvasRenderingContext2D, l: Live) {
+    const a = this.age(l, 'reboot');
+    if (a < 0.6 || a >= 3.4) return;
+    const [x, y] = this.boxAt(l, 0.5, 0);
+    const w = 16;
+    const bx = Math.round(x - w / 2);
+    const by = Math.round(y - 7);
+    c.globalAlpha = Math.min(1, (3.4 - a) * 3);
+    c.fillStyle = '#2a1f2d';
+    c.fillRect(bx - 1, by - 1, w + 2, 5);
+    c.fillStyle = '#4a4a58';
+    c.fillRect(bx, by, w, 3);
+    const k = Math.min(1, (a - 0.6) / 1.6);
+    c.fillStyle = a < 2.2 ? '#ffb347' : '#6bff8e';
+    c.fillRect(bx, by, Math.round(w * k), 3);
+    if (a >= 2.2) label(c, 'OK', x, by - 2, Math.min(1, (a - 2.2) * 4, (3.4 - a) * 3), '#6bff8e');
+    c.globalAlpha = 1;
+  }
+}
+
+/**
+ * A watering can in world px, spout to the left: level (coming in, going away) and tipped (pouring).
+ * b body, L its shine, d its shadow side, h the handle, s the spout, r the rose.
+ */
+const CAN_LEVEL = ['......hhhh..', '.....h....h.', 'rr...bbbbbbh', 'r.s..bLbbbbb', '...s.bLbbbbd', '....sbLbbbbd', '.....bbbbbbd', '.....ddddddd'];
+const CAN_TIPPED = ['........hhh.', '.......h...h', '......bbbbb.', '.....bLbbbbb', '...sbLbbbbbd', '..s.bLbbbbd.', '.s..bbbbbd..', 'rr...dddd...', 'r...........'];
+const CAN_COLORS: Record<string, string> = { b: '#3fb7a8', L: '#a6f2e4', d: '#23766c', h: '#23766c', s: '#2f9c8f', r: '#dfe8ea' };
+
+/** How long each moment runs (seconds). */
+const SONG_S = 8;
+const SPIN_S = 2.1;
+const WISH_T = 0.65;
+const ROCKET_S = 1.5;
+const CLAW_S = 1.9;
+
+function ease(k: number) {
+  const x = Math.max(0, Math.min(1, k));
+  return x * x * (3 - 2 * x);
+}
+
+/**
+ * Where a moment happens on a drawing, in its own pixels (unmirrored): the globe's ball, the rocket's cut
+ * above its pad and its nozzle, the claw's tip and the prize chute. Not idle life, so kept out of BY_FILE.
+ */
+const MOMENT_SPOTS: Record<string, Spots> = {
+  'globe-stand.se.png': { globe: { at: [19, 21], r: 14 } },
+  'globe-stand.nw.png': { globe: { at: [19, 21], r: 14 } },
+  'heirloom-globe.png': { globe: { at: [21.5, 23], r: 17 } },
+  'rocket-model.se.png': { liftoff: { cut: 84, nozzle: [20, 84] } },
+  'rocket-model.nw.png': { liftoff: { cut: 82, nozzle: [19, 82] } },
+  'claw-machine.sw.png': { tip: [24, 38], chute: [15, 66] },
+  'claw-machine.ne.png': { chute: [22, 20] },
+  'whiteboard-stand.sw.png': { board: [[11, 4], [37, 15], [37, 40], [11, 28]] },
+  'water-cooler.se.png': { jug: [16, 25] },
+  'water-cooler.nw.png': { jug: [16, 25] },
+};
+
+interface Spots {
+  /** A board's face (tl, tr, br, bl) where notes are pinned. */
+  board?: Quad;
+  /** The cooler's jug, where it glugs as a cup's filled. */
+  jug?: P;
+  globe?: { at: P; r: number };
+  liftoff?: { cut: number; nozzle: P };
+  tip?: P;
+  chute?: P;
 }
 
 
@@ -799,4 +1513,39 @@ function sampleColor(sprite: Sprite, q: Quad): string {
   if (!best) return '#3a2618';
   const [r, g, b] = best.split(',').map((v) => Number(v) * 8 + 4);
   return `rgb(${r},${g},${b})`;
+}
+
+/** The opaque bounds of a drawing (canvas px). */
+function maskBox(sp: Sprite): { x0: number; y0: number; x1: number; y1: number } {
+  const w = sp.canvas.width;
+  const h = sp.canvas.height;
+  let x0 = w;
+  let y0 = h;
+  let x1 = 0;
+  let y1 = 0;
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++)
+      if (sp.mask[y * w + x]) {
+        if (x < x0) x0 = x;
+        if (x + 1 > x1) x1 = x + 1;
+        if (y < y0) y0 = y;
+        if (y + 1 > y1) y1 = y + 1;
+      }
+  return x1 > x0 ? { x0, y0, x1, y1 } : { x0: 0, y0: 0, x1: w, y1: h };
+}
+
+/** A drawing darkened, as if switched off (made once per object). */
+function darkOf(l: Live): HTMLCanvasElement {
+  if (l.dark) return l.dark;
+  const src = l.sprite.canvas;
+  const cv = document.createElement('canvas');
+  cv.width = src.width;
+  cv.height = src.height;
+  const g = cv.getContext('2d')!;
+  g.drawImage(src, 0, 0);
+  g.globalCompositeOperation = 'source-atop';
+  g.fillStyle = 'rgba(6,6,14,0.62)';
+  g.fillRect(0, 0, cv.width, cv.height);
+  l.dark = cv;
+  return cv;
 }

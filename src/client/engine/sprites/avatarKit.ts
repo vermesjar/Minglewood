@@ -103,7 +103,7 @@ function drawHair(P: Pix, F: Frame, L: FullLoadout, layer: 'behind' | 'front') {
 }
 
 /** Hats that sit over the crown: hair can't rise above them (a bun, a quiff or a mohawk goes under the hat). */
-const CROWN_HATS = new Set(['cap', 'capback', 'beanie', 'bucket', 'cowboy', 'beret']);
+const CROWN_HATS = new Set(['cap', 'capback', 'beanie', 'bucket', 'cowboy', 'beret', 'sun-hat']);
 
 /**
  * The hide rule for crown hats: in every column the hat spans, hair above the hat's top edge is not drawn.
@@ -283,6 +283,12 @@ function drawHeadBase(P: Pix, F: Frame, L: FullLoadout) {
 
 function drawFace(P: Pix, F: Frame, L: FullLoadout, expr?: Expression) {
   if (F.view !== 'front') return;
+  // the face follows the moment: a laugh screws the eyes shut into a grin, a cheer and a heart smile with
+  // happy eyes, looking at a phone lowers the lids
+  if (F.pose === 'laugh1' || F.pose === 'laugh2') L = { ...L, eyes: 'eyes.happy', mouth: 'mouth.grin' };
+  else if (F.pose === 'cheer1' || F.pose === 'cheer2') L = { ...L, eyes: 'eyes.happy', mouth: 'mouth.grin' };
+  else if (F.pose === 'heart') L = { ...L, eyes: 'eyes.happy', mouth: 'mouth.smile' };
+  else if (F.pose === 'phone') L = { ...L, eyes: 'eyes.sleepy', mouth: 'mouth.neutral' };
   if (expr === 'blink') L = { ...L, eyes: 'eyes.blink' };
   if (expr === 'talk') L = { ...L, mouth: L.mouth === 'mouth.o' ? 'mouth.neutral' : 'mouth.talk' };
   // 'blank' (internal): the bare head template the face art is generated on
@@ -512,6 +518,27 @@ function drawArm(P: Pix, F: Frame, L: FullLoadout, near: boolean) {
     paint(P, sleeve, tint ? (x, y) => tint(x, y, c) : c, { shade });
   }
   paint(P, M().ellipse(hand[0], hand[1], 2.4, 2.6), skin, { shade });
+  if (near && F.gesture) drawGesture(P, F, hand, skin);
+}
+
+/** A hand detail: a thumb up, a raised index finger, or a phone held with its screen lit. */
+function drawGesture(P: Pix, F: Frame, [x, y]: [number, number], skin: RGB) {
+  const edge = lineOf(skin);
+  if (F.gesture === 'thumb' || F.gesture === 'finger') {
+    // a thumb (out of the fist) or an index finger pointing straight up, outlined like the hand
+    const hx0 = Math.round(x);
+    const top = Math.round(y) - 7;
+    for (let yy = top + 1; yy <= Math.round(y) - 3; yy++) {
+      P.set(hx0, yy, skin);
+      P.set(hx0 - 1, yy, edge);
+      P.set(hx0 + 1, yy, edge);
+    }
+    P.set(hx0, top, edge);
+  } else if (F.gesture === 'phone' && F.view === 'front') {
+    // a dark phone in the hand, its screen glowing up at the face
+    paint(P, M().rrect(x - 2, y - 6, x + 3, y + 1, 1), [44, 42, 56], { flat: true });
+    P.stamp(Math.round(x - 1), Math.round(y - 5), ['ss', 'ss', 'sb'], { s: [150, 214, 255], b: [96, 170, 230] });
+  }
 }
 
 /**
@@ -789,7 +816,8 @@ function drawTorso(P: Pix, F: Frame, L: FullLoadout) {
   const map = (TOPS[id] ?? TOPS[TOP_ALIAS[id] ?? ''])?.[F.view];
   const dy = F.shoulderY - 58;
   if (map) {
-    const m0 = placed(map, [TORSO_ORIGIN.x, TORSO_ORIGIN.y + dy], [0, dy]);
+    const sway = F.hx - 45; // the body sways with some poses (dance, a weight shift)
+    const m0 = placed(map, [TORSO_ORIGIN.x + sway, TORSO_ORIGIN.y + dy], [sway, dy]);
     const m = F.body === 'a' ? m0 : warpToTorso(m0, frameFor(F.view, F.pose, 'a'), F);
     let t = tint;
     if (L.top === 'top.apron') {
@@ -893,7 +921,7 @@ function drawAccessory(P: Pix, F: Frame, L: FullLoadout) {
 }
 
 /** Things you carry to show (held up in front of you); balloons, umbrellas and laptops are held low. */
-const CARRIED = new Set(['held.coffee', 'held.boba', 'held.soda', 'held.popcorn', 'held.icecream', 'held.plush', 'held.book', 'held.plant']);
+const CARRIED = new Set(['held.coffee', 'held.boba', 'held.soda', 'held.popcorn', 'held.icecream', 'held.plush', 'held.book', 'held.plant', 'held.water', 'held.apple']);
 
 function drawHeld(P: Pix, F: Frame, L: FullLoadout) {
   if (L.held === 'held.none') return;
@@ -937,6 +965,19 @@ function drawHeld(P: Pix, F: Frame, L: FullLoadout) {
       paint(P, M().poly([[x - 2, y - 6], [x + 3, y - 6], [x + 2, y + 1], [x - 1, y + 1]]), c);
       paint(P, M().rrect(x - 3, y - 8, x + 4, y - 5, 1), WHITE, { flat: true });
       for (let k = 0; k < 4; k++) P.set(x + 1 + (k > 1 ? 1 : 0), y - 9 - k, k % 2 ? WHITE : [236, 72, 72]);
+      break;
+    case 'held.water':
+      // a clear cup from the cooler, the water in it catching the light
+      paint(P, M().poly([[x - 2, y - 6], [x + 3, y - 6], [x + 2, y + 1], [x - 1, y + 1]]), [226, 240, 248], { flat: true });
+      paint(P, M().poly([[x - 2, y - 3], [x + 3, y - 3], [x + 2, y + 1], [x - 1, y + 1]]), [90, 176, 240], { flat: true, edge: false });
+      P.set(x - 1, y - 2, [205, 236, 255]);
+      break;
+    case 'held.apple':
+      // a red apple: a shine, a stalk and a leaf
+      paint(P, M().ellipse(x + 0.5, y - 2, 3.4, 3.1), [214, 48, 49], { shine: true });
+      P.set(x + 1, y - 6, [96, 62, 38]);
+      P.set(x + 1, y - 7, [96, 62, 38]);
+      P.stamp(x + 2, y - 7, ['ll'], { l: [98, 176, 74] });
       break;
     case 'held.plush':
       // a little teddy prize: round ears, a muzzle, button eyes
@@ -1088,7 +1129,8 @@ export function drawAvatarV2(input: AvatarLoadout, view: View, requested: Pose, 
   on(LAYER.hairBehind);
   if (!coversHair) drawHair(P, F, L, 'behind');
   on(LAYER.armBack);
-  drawArm(P, F, L, view !== 'front');
+  // (both hands in front of the chest — a clap, hands on the heart — bring the far arm in front of the body)
+  if (!F.farArmFront) drawArm(P, F, L, view !== 'front');
   // Seen from behind, the holding hand is in front of the body: what it holds hides behind the torso
   // (a balloon or umbrella still shows above it).
   on(LAYER.held);
@@ -1115,6 +1157,7 @@ export function drawAvatarV2(input: AvatarLoadout, view: View, requested: Pose, 
   on(LAYER.accessory);
   drawAccessory(P, F, L);
   on(LAYER.armFront);
+  if (F.farArmFront) drawArm(P, F, L, false);
   drawArm(P, F, L, view === 'front');
   on(LAYER.chairFront);
   if (wheelchair) drawWheelchair(P, F, 'front');

@@ -22,7 +22,29 @@
             35
           ]
         }
-      }
+      },
+      "rotation": "mirror",
+      "name": "Air hockey table",
+      "category": "play",
+      "tags": [
+        "air",
+        "hockey",
+        "play"
+      ],
+      "rooms": [
+        "arcade"
+      ],
+      "height": 24,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object",
+      "use": {
+        "face": "any",
+        "actions": [
+          "use"
+        ]
+      },
+      "animated": true
     },
     "arcade-cabinet": {
       "footprint": [
@@ -36,21 +58,57 @@
           "anchor": [
             26,
             59
-          ]
+          ],
+          "light": {
+            "x": 26,
+            "y": 26,
+            "r": 26
+          }
         },
         "sw": {
           "file": "arcade-cabinet.sw.png",
           "anchor": [
             26,
             63
-          ]
+          ],
+          "light": {
+            "x": 26,
+            "y": 30,
+            "r": 26
+          }
         }
       },
       "light": {
         "x": 26,
         "y": 30,
         "r": 26
-      }
+      },
+      "rotation": "mirror",
+      "name": "Arcade cabinet",
+      "category": "play",
+      "tags": [
+        "arcade",
+        "cabinet",
+        "play"
+      ],
+      "rooms": [
+        "arcade"
+      ],
+      "height": 36,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object",
+      "use": {
+        "face": "front",
+        "actions": [
+          "use",
+          "artifact"
+        ]
+      },
+      "animated": true,
+      "still": [
+        "ne"
+      ]
     },
     "arcade-cabinet.cyan": {
       "footprint": [
@@ -64,21 +122,57 @@
           "anchor": [
             26,
             63
-          ]
+          ],
+          "light": {
+            "x": 26,
+            "y": 30,
+            "r": 26
+          }
         },
         "ne": {
           "file": "arcade-cabinet.cyan.ne.png",
           "anchor": [
             26,
             59
-          ]
+          ],
+          "light": {
+            "x": 26,
+            "y": 26,
+            "r": 26
+          }
         }
       },
       "light": {
         "x": 26,
         "y": 30,
         "r": 26
-      }
+      },
+      "rotation": "mirror",
+      "name": "Arcade cabinet",
+      "category": "play",
+      "tags": [
+        "arcade",
+        "cabinet",
+        "cyan",
+        "play"
+      ],
+      "rooms": [
+        "arcade"
+      ],
+      "height": 36,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object",
+      "use": {
+        "face": "front",
+        "actions": [
+          "use"
+        ]
+      },
+      "animated": true,
+      "still": [
+        "ne"
+      ]
     },
     "arcade-cabinet.gold": {
       "footprint": [
@@ -92,21 +186,58 @@
           "anchor": [
             26,
             63
-          ]
+          ],
+          "light": {
+            "x": 26,
+            "y": 30,
+            "r": 26
+          }
         },
         "ne": {
           "file": "arcade-cabinet.gold.ne.png",
           "anchor": [
             26,
             59
-          ]
+          ],
+          "light": {
+            "x": 26,
+            "y": 26,
+            "r": 26
+          }
         }
       },
       "light": {
         "x": 26,
         "y": 30,
         "r": 26
-      }
+      },
+      "rotation": "mirror",
+      "name": "Gold arcade cabinet",
+      "category": "play",
+      "tags": [
+        "arcade",
+        "cabinet",
+        "gold",
+        "play"
+      ],
+      "rooms": [
+        "arcade"
+      ],
+      "height": 36,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object",
+      "use": {
+        "face": "front",
+        "actions": [
+          "use",
+          "artifact"
+        ]
+      },
+      "animated": true,
+      "still": [
+        "ne"
+      ]
     },
     "arcade-cabinet.lime": {
       "footprint": [
@@ -120,21 +251,57 @@
           "anchor": [
             26,
             63
-          ]
+          ],
+          "light": {
+            "x": 26,
+            "y": 30,
+            "r": 26
+          }
         },
         "ne": {
           "file": "arcade-cabinet.lime.ne.png",
           "anchor": [
             26,
             59
-          ]
+          ],
+          "light": {
+            "x": 26,
+            "y": 26,
+            "r": 26
+          }
         }
       },
       "light": {
         "x": 26,
         "y": 30,
         "r": 26
-      }
+      },
+      "rotation": "mirror",
+      "name": "Lime arcade cabinet",
+      "category": "play",
+      "tags": [
+        "arcade",
+        "cabinet",
+        "lime",
+        "play"
+      ],
+      "rooms": [
+        "arcade"
+      ],
+      "height": 36,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object",
+      "use": {
+        "face": "front",
+        "actions": [
+          "use"
+        ]
+      },
+      "animated": true,
+      "still": [
+        "ne"
+      ]
     },
     "arcade-cabinet.orange": {
       "footprint": [
@@ -148,21 +315,57 @@
           "anchor": [
             26,
             63
-          ]
+          ],
+          "light": {
+            "x": 26,
+            "y": 30,
+            "r": 26
+          }
         },
         "ne": {
           "file": "arcade-cabinet.orange.ne.png",
           "anchor": [
             26,
             59
-          ]
+          ],
+          "light": {
+            "x": 26,
+            "y": 26,
+            "r": 26
+          }
         }
       },
       "light": {
         "x": 26,
         "y": 30,
         "r": 26
-      }
+      },
+      "rotation": "mirror",
+      "name": "Orange arcade cabinet",
+      "category": "play",
+      "tags": [
+        "arcade",
+        "cabinet",
+        "orange",
+        "play"
+      ],
+      "rooms": [
+        "arcade"
+      ],
+      "height": 36,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object",
+      "use": {
+        "face": "front",
+        "actions": [
+          "use"
+        ]
+      },
+      "animated": true,
+      "still": [
+        "ne"
+      ]
     },
     "arcade-cabinet.pink": {
       "footprint": [
@@ -176,21 +379,57 @@
           "anchor": [
             26,
             63
-          ]
+          ],
+          "light": {
+            "x": 26,
+            "y": 30,
+            "r": 26
+          }
         },
         "ne": {
           "file": "arcade-cabinet.pink.ne.png",
           "anchor": [
             26,
             59
-          ]
+          ],
+          "light": {
+            "x": 26,
+            "y": 26,
+            "r": 26
+          }
         }
       },
       "light": {
         "x": 26,
         "y": 30,
         "r": 26
-      }
+      },
+      "rotation": "mirror",
+      "name": "Pink arcade cabinet",
+      "category": "play",
+      "tags": [
+        "arcade",
+        "cabinet",
+        "pink",
+        "play"
+      ],
+      "rooms": [
+        "arcade"
+      ],
+      "height": 36,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object",
+      "use": {
+        "face": "front",
+        "actions": [
+          "use"
+        ]
+      },
+      "animated": true,
+      "still": [
+        "ne"
+      ]
     },
     "armchair.green": {
       "footprint": [
@@ -214,7 +453,32 @@
           ]
         }
       },
-      "seat": 12
+      "seat": 10.9,
+      "seatDepth": 0.23,
+      "sitStyle": "lounge",
+      "backrest": true,
+      "rotation": "mirror",
+      "name": "Green armchair",
+      "category": "seating",
+      "tags": [
+        "armchair",
+        "green",
+        "seating"
+      ],
+      "rooms": [
+        "lounge"
+      ],
+      "height": 28,
+      "base": "filled",
+      "walk": "seat",
+      "layer": "object",
+      "use": {
+        "face": "front",
+        "actions": [
+          "sit"
+        ]
+      },
+      "backDepth": 0.23
     },
     "armchair.mustard": {
       "footprint": [
@@ -238,7 +502,35 @@
           ]
         }
       },
-      "seat": 12
+      "seat": 13.77,
+      "seatDepth": 0.19,
+      "sitStyle": "lounge",
+      "backrest": true,
+      "rotation": "mirror",
+      "name": "Mustard armchair",
+      "category": "seating",
+      "tags": [
+        "armchair",
+        "mustard",
+        "seating"
+      ],
+      "rooms": [
+        "lobby",
+        "cafe",
+        "office",
+        "studio"
+      ],
+      "height": 25,
+      "base": "filled",
+      "walk": "seat",
+      "layer": "object",
+      "use": {
+        "face": "front",
+        "actions": [
+          "sit"
+        ]
+      },
+      "backDepth": 0.19
     },
     "armchair.rust": {
       "footprint": [
@@ -262,7 +554,32 @@
           ]
         }
       },
-      "seat": 12
+      "seat": 11.5,
+      "seatDepth": 0.28,
+      "sitStyle": "lounge",
+      "backrest": true,
+      "rotation": "mirror",
+      "name": "Rust armchair",
+      "category": "seating",
+      "tags": [
+        "armchair",
+        "rust",
+        "seating"
+      ],
+      "rooms": [
+        "lounge"
+      ],
+      "height": 29,
+      "base": "filled",
+      "walk": "seat",
+      "layer": "object",
+      "use": {
+        "face": "front",
+        "actions": [
+          "sit"
+        ]
+      },
+      "backDepth": 0.28
     },
     "backbar": {
       "footprint": [
@@ -281,7 +598,20 @@
           50
         ],
         "margin": 0.06
-      }
+      },
+      "rotation": "flat",
+      "name": "Back bar shelves",
+      "category": "wall-art",
+      "tags": [
+        "backbar",
+        "wall-art"
+      ],
+      "rooms": [
+        "cafe"
+      ],
+      "height": 22,
+      "walk": "open",
+      "layer": "wall"
     },
     "balloons": {
       "footprint": [
@@ -304,7 +634,27 @@
             64
           ]
         }
-      }
+      },
+      "rotation": "mirror",
+      "name": "Balloons",
+      "category": "decor",
+      "tags": [
+        "balloons",
+        "decor"
+      ],
+      "rooms": [
+        "outdoors",
+        "hall"
+      ],
+      "themes": [
+        "festive"
+      ],
+      "height": 38,
+      "base": "centred",
+      "sameFromBehind": true,
+      "walk": "open",
+      "layer": "object",
+      "animated": true
     },
     "balloons.b": {
       "footprint": [
@@ -327,7 +677,27 @@
             60
           ]
         }
-      }
+      },
+      "rotation": "mirror",
+      "name": "Balloons",
+      "category": "decor",
+      "tags": [
+        "balloons",
+        "decor"
+      ],
+      "rooms": [
+        "outdoors",
+        "hall"
+      ],
+      "themes": [
+        "festive"
+      ],
+      "height": 38,
+      "base": "centred",
+      "sameFromBehind": true,
+      "walk": "open",
+      "layer": "object",
+      "animated": true
     },
     "balloons.c": {
       "footprint": [
@@ -350,7 +720,27 @@
             54
           ]
         }
-      }
+      },
+      "rotation": "mirror",
+      "name": "Balloons",
+      "category": "decor",
+      "tags": [
+        "balloons",
+        "decor"
+      ],
+      "rooms": [
+        "outdoors",
+        "hall"
+      ],
+      "themes": [
+        "festive"
+      ],
+      "height": 34,
+      "base": "centred",
+      "sameFromBehind": true,
+      "walk": "open",
+      "layer": "object",
+      "animated": true
     },
     "banner": {
       "footprint": [
@@ -369,7 +759,23 @@
           54
         ],
         "margin": 0.03
-      }
+      },
+      "rotation": "flat",
+      "name": "Banner",
+      "category": "wall-art",
+      "tags": [
+        "banner",
+        "wall-art"
+      ],
+      "rooms": [
+        "hall"
+      ],
+      "themes": [
+        "festive"
+      ],
+      "height": 18,
+      "walk": "open",
+      "layer": "wall"
     },
     "bar-cart": {
       "footprint": [
@@ -382,17 +788,32 @@
           "file": "bar-cart.se.png",
           "anchor": [
             23,
-            26
+            22
           ]
         },
         "nw": {
           "file": "bar-cart.nw.png",
           "anchor": [
             23,
-            21
+            17
           ]
         }
-      }
+      },
+      "rotation": "mirror",
+      "name": "Bar cart",
+      "category": "appliance",
+      "tags": [
+        "bar",
+        "cart",
+        "appliance"
+      ],
+      "rooms": [
+        "hall"
+      ],
+      "height": 15,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object"
     },
     "beanbag.cyan": {
       "footprint": [
@@ -400,7 +821,7 @@
         1
       ],
       "fit": "anchor",
-      "seat": 8,
+      "seat": 9.5,
       "facings": {
         "se": {
           "file": "beanbag.cyan.png",
@@ -416,6 +837,45 @@
             15
           ]
         }
+      },
+      "seatDepth": 0,
+      "sitStyle": "floor",
+      "backrest": true,
+      "rotation": "mirror",
+      "name": "Cyan beanbag",
+      "category": "seating",
+      "tags": [
+        "beanbag",
+        "cyan",
+        "seating"
+      ],
+      "rooms": [
+        "office",
+        "lab",
+        "arcade"
+      ],
+      "height": 14,
+      "base": "filled",
+      "walk": "seat",
+      "layer": "object",
+      "use": {
+        "face": "front",
+        "actions": [
+          "sit"
+        ]
+      },
+      "backDepth": 0,
+      "backLine": {
+        "nw": [
+          [
+            0,
+            0
+          ],
+          [
+            999,
+            0
+          ]
+        ]
       }
     },
     "beanbag.orange": {
@@ -424,7 +884,7 @@
         1
       ],
       "fit": "anchor",
-      "seat": 8,
+      "seat": 10.15,
       "facings": {
         "se": {
           "file": "beanbag.orange.png",
@@ -440,6 +900,44 @@
             15
           ]
         }
+      },
+      "seatDepth": 0,
+      "sitStyle": "floor",
+      "backrest": true,
+      "rotation": "mirror",
+      "name": "Orange beanbag",
+      "category": "seating",
+      "tags": [
+        "beanbag",
+        "orange",
+        "seating"
+      ],
+      "rooms": [
+        "office",
+        "lab"
+      ],
+      "height": 15,
+      "base": "filled",
+      "walk": "seat",
+      "layer": "object",
+      "use": {
+        "face": "front",
+        "actions": [
+          "sit"
+        ]
+      },
+      "backDepth": 0,
+      "backLine": {
+        "nw": [
+          [
+            0,
+            0
+          ],
+          [
+            999,
+            0
+          ]
+        ]
       }
     },
     "beanbag.pink": {
@@ -448,7 +946,7 @@
         1
       ],
       "fit": "anchor",
-      "seat": 8,
+      "seat": 9.5,
       "facings": {
         "se": {
           "file": "beanbag.pink.png",
@@ -464,6 +962,43 @@
             15
           ]
         }
+      },
+      "seatDepth": 0,
+      "sitStyle": "floor",
+      "backrest": true,
+      "rotation": "mirror",
+      "name": "Pink beanbag",
+      "category": "seating",
+      "tags": [
+        "beanbag",
+        "pink",
+        "seating"
+      ],
+      "rooms": [
+        "arcade"
+      ],
+      "height": 14,
+      "base": "filled",
+      "walk": "seat",
+      "layer": "object",
+      "use": {
+        "face": "front",
+        "actions": [
+          "sit"
+        ]
+      },
+      "backDepth": 0,
+      "backLine": {
+        "nw": [
+          [
+            0,
+            0
+          ],
+          [
+            999,
+            0
+          ]
+        ]
       }
     },
     "beanbag.purple": {
@@ -472,7 +1007,7 @@
         1
       ],
       "fit": "anchor",
-      "seat": 8,
+      "seat": 9.5,
       "facings": {
         "se": {
           "file": "beanbag.purple.png",
@@ -488,6 +1023,44 @@
             15
           ]
         }
+      },
+      "seatDepth": 0,
+      "sitStyle": "floor",
+      "backrest": true,
+      "rotation": "mirror",
+      "name": "Purple beanbag",
+      "category": "seating",
+      "tags": [
+        "beanbag",
+        "purple",
+        "seating"
+      ],
+      "rooms": [
+        "office",
+        "arcade"
+      ],
+      "height": 14,
+      "base": "filled",
+      "walk": "seat",
+      "layer": "object",
+      "use": {
+        "face": "front",
+        "actions": [
+          "sit"
+        ]
+      },
+      "backDepth": 0,
+      "backLine": {
+        "nw": [
+          [
+            0,
+            0
+          ],
+          [
+            999,
+            0
+          ]
+        ]
       }
     },
     "bench": {
@@ -512,7 +1085,34 @@
           ]
         }
       },
-      "seat": 12
+      "seat": 10.5,
+      "seatDepth": 0.05,
+      "sitStyle": "chair",
+      "backrest": true,
+      "rotation": "mirror",
+      "name": "Bench",
+      "category": "seating",
+      "tags": [
+        "bench",
+        "seating"
+      ],
+      "rooms": [
+        "outdoors",
+        "lobby",
+        "lab"
+      ],
+      "height": 31,
+      "base": "filled",
+      "walk": "seat",
+      "layer": "object",
+      "use": {
+        "face": "front",
+        "actions": [
+          "sit",
+          "artifact"
+        ]
+      },
+      "backDepth": 0.05
     },
     "bench.navy": {
       "footprint": [
@@ -536,7 +1136,33 @@
           ]
         }
       },
-      "seat": 11
+      "seat": 12.1,
+      "seatDepth": 0,
+      "sitStyle": "chair",
+      "backrest": false,
+      "rotation": "mirror",
+      "name": "Navy bench",
+      "category": "seating",
+      "tags": [
+        "bench",
+        "navy",
+        "seating"
+      ],
+      "rooms": [
+        "lobby",
+        "lab"
+      ],
+      "height": 19,
+      "base": "filled",
+      "walk": "seat",
+      "layer": "object",
+      "use": {
+        "face": "front",
+        "actions": [
+          "sit"
+        ]
+      },
+      "backDepth": 0
     },
     "bike-rack": {
       "footprint": [
@@ -544,11 +1170,117 @@
         1
       ],
       "fit": "anchor",
-      "file": "bike-rack.png",
+      "rotation": "mirror",
+      "name": "Bike rack",
+      "category": "street",
+      "tags": [
+        "bike",
+        "rack",
+        "street"
+      ],
+      "rooms": [
+        "outdoors"
+      ],
+      "height": 20,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object",
+      "facings": {
+        "se": {
+          "file": "bike-rack.png",
+          "anchor": [
+            38,
+            30
+          ]
+        },
+        "nw": {
+          "file": "bike-rack.nw.png",
+          "anchor": [
+            38,
+            31
+          ]
+        }
+      }
+    },
+    "birdbath": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "birdbath.png",
       "anchor": [
-        26,
-        45
-      ]
+        23,
+        39
+      ],
+      "rotation": "radial",
+      "name": "Birdbath",
+      "category": "street",
+      "tags": [
+        "birdbath",
+        "street"
+      ],
+      "rooms": [
+        "outdoors"
+      ],
+      "height": 24,
+      "base": "centred",
+      "walk": "blocked",
+      "layer": "object"
+    },
+    "blanket.blue": {
+      "footprint": [
+        2,
+        2
+      ],
+      "fit": "anchor",
+      "file": "blanket.blue.png",
+      "anchor": [
+        64,
+        16
+      ],
+      "rotation": "radial",
+      "name": "Blue blanket",
+      "category": "rug",
+      "tags": [
+        "blanket",
+        "blue",
+        "rug"
+      ],
+      "rooms": [
+        "outdoors"
+      ],
+      "height": 16,
+      "base": "filled",
+      "walk": "open",
+      "layer": "floor"
+    },
+    "blanket.red": {
+      "footprint": [
+        2,
+        2
+      ],
+      "fit": "anchor",
+      "file": "blanket.red.png",
+      "anchor": [
+        64,
+        11
+      ],
+      "rotation": "radial",
+      "name": "Red blanket",
+      "category": "rug",
+      "tags": [
+        "blanket",
+        "red",
+        "rug"
+      ],
+      "rooms": [
+        "outdoors"
+      ],
+      "height": 14,
+      "base": "filled",
+      "walk": "open",
+      "layer": "floor"
     },
     "boat.red": {
       "footprint": [
@@ -556,11 +1288,30 @@
         2
       ],
       "fit": "anchor",
-      "file": "boat.red.png",
-      "anchor": [
-        30,
-        39
-      ]
+      "rotation": "mirror",
+      "name": "Red boat",
+      "category": "street",
+      "tags": [
+        "boat",
+        "red",
+        "street"
+      ],
+      "rooms": [
+        "outdoors"
+      ],
+      "height": 19,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object",
+      "facings": {
+        "sw": {
+          "file": "boat.red.png",
+          "anchor": [
+            56,
+            21
+          ]
+        }
+      }
     },
     "boat.yellow": {
       "footprint": [
@@ -568,11 +1319,30 @@
         2
       ],
       "fit": "anchor",
-      "file": "boat.yellow.png",
-      "anchor": [
-        26,
-        40
-      ]
+      "rotation": "mirror",
+      "name": "Yellow boat",
+      "category": "street",
+      "tags": [
+        "boat",
+        "yellow",
+        "street"
+      ],
+      "rooms": [
+        "outdoors"
+      ],
+      "height": 19,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object",
+      "facings": {
+        "sw": {
+          "file": "boat.yellow.png",
+          "anchor": [
+            56,
+            21
+          ]
+        }
+      }
     },
     "book-stack": {
       "footprint": [
@@ -595,7 +1365,23 @@
             4
           ]
         }
-      }
+      },
+      "rotation": "mirror",
+      "name": "Stack of books",
+      "category": "decor",
+      "tags": [
+        "book",
+        "stack",
+        "decor"
+      ],
+      "rooms": [
+        "lounge"
+      ],
+      "height": 10,
+      "base": "centred",
+      "sameFromBehind": true,
+      "walk": "blocked",
+      "layer": "object"
     },
     "bookshelf.a": {
       "footprint": [
@@ -618,6 +1404,26 @@
             91
           ]
         }
+      },
+      "rotation": "mirror",
+      "name": "Bookshelf",
+      "category": "storage",
+      "tags": [
+        "bookshelf",
+        "storage"
+      ],
+      "rooms": [
+        "lounge"
+      ],
+      "height": 50,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object",
+      "use": {
+        "face": "front",
+        "actions": [
+          "vend"
+        ]
       }
     },
     "bookshelf.b": {
@@ -641,6 +1447,26 @@
             86
           ]
         }
+      },
+      "rotation": "mirror",
+      "name": "Tall bookshelf",
+      "category": "storage",
+      "tags": [
+        "bookshelf",
+        "storage"
+      ],
+      "rooms": [
+        "lounge"
+      ],
+      "height": 49,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object",
+      "use": {
+        "face": "front",
+        "actions": [
+          "vend"
+        ]
       }
     },
     "bookshelf.birch": {
@@ -664,6 +1490,28 @@
             107
           ]
         }
+      },
+      "rotation": "mirror",
+      "name": "Birch bookshelf",
+      "category": "storage",
+      "tags": [
+        "bookshelf",
+        "birch",
+        "storage"
+      ],
+      "rooms": [
+        "office"
+      ],
+      "height": 58,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object",
+      "use": {
+        "face": "front",
+        "actions": [
+          "vend",
+          "info"
+        ]
       }
     },
     "bookshelf.birch2": {
@@ -687,6 +1535,27 @@
             88
           ]
         }
+      },
+      "rotation": "mirror",
+      "name": "Birch bookshelf, full",
+      "category": "storage",
+      "tags": [
+        "bookshelf",
+        "birch",
+        "storage"
+      ],
+      "rooms": [
+        "office"
+      ],
+      "height": 57,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object",
+      "use": {
+        "face": "front",
+        "actions": [
+          "vend"
+        ]
       }
     },
     "buffet": {
@@ -710,7 +1579,21 @@
             31
           ]
         }
-      }
+      },
+      "rotation": "mirror",
+      "name": "Buffet",
+      "category": "table",
+      "tags": [
+        "buffet",
+        "table"
+      ],
+      "rooms": [
+        "hall"
+      ],
+      "height": 23,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object"
     },
     "building.arcade": {
       "footprint": [
@@ -723,7 +1606,27 @@
         183,
         266
       ],
-      "glow": "building.arcade.glow.png"
+      "glow": "building.arcade.glow.png",
+      "rotation": "fixed",
+      "name": "Arcade building",
+      "category": "building",
+      "tags": [
+        "building",
+        "arcade"
+      ],
+      "rooms": [
+        "outdoors"
+      ],
+      "height": 147,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object",
+      "use": {
+        "face": "front",
+        "actions": [
+          "enter"
+        ]
+      }
     },
     "building.cafe": {
       "footprint": [
@@ -743,7 +1646,27 @@
           "x": 360,
           "y": 11
         }
-      ]
+      ],
+      "rotation": "fixed",
+      "name": "Cafe building",
+      "category": "building",
+      "tags": [
+        "building",
+        "cafe"
+      ],
+      "rooms": [
+        "outdoors"
+      ],
+      "height": 147,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object",
+      "use": {
+        "face": "front",
+        "actions": [
+          "enter"
+        ]
+      }
     },
     "building.design": {
       "footprint": [
@@ -756,7 +1679,27 @@
         203,
         412
       ],
-      "glow": "building.design.glow.png"
+      "glow": "building.design.glow.png",
+      "rotation": "fixed",
+      "name": "Design building",
+      "category": "building",
+      "tags": [
+        "building",
+        "design"
+      ],
+      "rooms": [
+        "outdoors"
+      ],
+      "height": 211,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object",
+      "use": {
+        "face": "front",
+        "actions": [
+          "enter"
+        ]
+      }
     },
     "building.eng": {
       "footprint": [
@@ -776,7 +1719,27 @@
           "x": 516,
           "y": 17
         }
-      ]
+      ],
+      "rotation": "fixed",
+      "name": "Eng building",
+      "category": "building",
+      "tags": [
+        "building",
+        "eng"
+      ],
+      "rooms": [
+        "outdoors"
+      ],
+      "height": 205,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object",
+      "use": {
+        "face": "front",
+        "actions": [
+          "enter"
+        ]
+      }
     },
     "building.events": {
       "footprint": [
@@ -789,7 +1752,27 @@
         205,
         338
       ],
-      "glow": "building.events.glow.png"
+      "glow": "building.events.glow.png",
+      "rotation": "fixed",
+      "name": "Events building",
+      "category": "building",
+      "tags": [
+        "building",
+        "events"
+      ],
+      "rooms": [
+        "outdoors"
+      ],
+      "height": 200,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object",
+      "use": {
+        "face": "front",
+        "actions": [
+          "enter"
+        ]
+      }
     },
     "building.focus": {
       "footprint": [
@@ -809,7 +1792,27 @@
           "x": 156,
           "y": 12
         }
-      ]
+      ],
+      "rotation": "fixed",
+      "name": "Focus building",
+      "category": "building",
+      "tags": [
+        "building",
+        "focus"
+      ],
+      "rooms": [
+        "outdoors"
+      ],
+      "height": 143,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object",
+      "use": {
+        "face": "front",
+        "actions": [
+          "enter"
+        ]
+      }
     },
     "building.hq": {
       "footprint": [
@@ -822,7 +1825,27 @@
         267,
         516
       ],
-      "glow": "building.hq.glow.png"
+      "glow": "building.hq.glow.png",
+      "rotation": "fixed",
+      "name": "Hq building",
+      "category": "building",
+      "tags": [
+        "building",
+        "hq"
+      ],
+      "rooms": [
+        "outdoors"
+      ],
+      "height": 294,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object",
+      "use": {
+        "face": "front",
+        "actions": [
+          "enter"
+        ]
+      }
     },
     "building.launch": {
       "footprint": [
@@ -842,7 +1865,27 @@
           "x": 285,
           "y": 13
         }
-      ]
+      ],
+      "rotation": "fixed",
+      "name": "Launch building",
+      "category": "building",
+      "tags": [
+        "building",
+        "launch"
+      ],
+      "rooms": [
+        "outdoors"
+      ],
+      "height": 203,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object",
+      "use": {
+        "face": "front",
+        "actions": [
+          "enter"
+        ]
+      }
     },
     "bulletin": {
       "footprint": [
@@ -861,6 +1904,25 @@
           46
         ],
         "margin": 0.1
+      },
+      "rotation": "flat",
+      "name": "Bulletin",
+      "category": "wall-art",
+      "tags": [
+        "bulletin",
+        "wall-art"
+      ],
+      "rooms": [
+        "lobby"
+      ],
+      "height": 28,
+      "walk": "open",
+      "layer": "wall",
+      "use": {
+        "face": "front",
+        "actions": [
+          "info"
+        ]
       }
     },
     "bush.flower": {
@@ -873,7 +1935,22 @@
       "anchor": [
         32,
         31
-      ]
+      ],
+      "rotation": "radial",
+      "name": "Flower bush",
+      "category": "nature",
+      "tags": [
+        "bush",
+        "flower",
+        "nature"
+      ],
+      "rooms": [
+        "outdoors"
+      ],
+      "height": 20,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object"
     },
     "bush.plain": {
       "footprint": [
@@ -885,7 +1962,22 @@
       "anchor": [
         30,
         28
-      ]
+      ],
+      "rotation": "radial",
+      "name": "Plain bush",
+      "category": "nature",
+      "tags": [
+        "bush",
+        "plain",
+        "nature"
+      ],
+      "rooms": [
+        "outdoors"
+      ],
+      "height": 18,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object"
     },
     "cake-stand": {
       "footprint": [
@@ -897,7 +1989,22 @@
       "anchor": [
         17,
         18
-      ]
+      ],
+      "rotation": "radial",
+      "name": "Cake stand",
+      "category": "decor",
+      "tags": [
+        "cake",
+        "stand",
+        "decor"
+      ],
+      "rooms": [
+        "cafe"
+      ],
+      "height": 16,
+      "base": "centred",
+      "walk": "blocked",
+      "layer": "surface"
     },
     "cake-table": {
       "footprint": [
@@ -920,7 +2027,76 @@
             32
           ]
         }
-      }
+      },
+      "rotation": "mirror",
+      "name": "Cake table",
+      "category": "table",
+      "tags": [
+        "cake",
+        "table"
+      ],
+      "rooms": [
+        "hall"
+      ],
+      "themes": [
+        "festive"
+      ],
+      "height": 23,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object",
+      "animated": true
+    },
+    "chair-bistro.sage": {
+      "name": "Sage bistro chair",
+      "category": "seating",
+      "tags": [
+        "bistro",
+        "bentwood",
+        "sage",
+        "wood"
+      ],
+      "rooms": [
+        "cafe",
+        "lounge"
+      ],
+      "footprint": [
+        1,
+        1
+      ],
+      "height": 30,
+      "rotation": "mirror",
+      "layer": "object",
+      "walk": "seat",
+      "seat": 13.75,
+      "sitStyle": "chair",
+      "backrest": true,
+      "use": {
+        "face": "front",
+        "actions": [
+          "sit"
+        ]
+      },
+      "base": "centred",
+      "fit": "anchor",
+      "facings": {
+        "nw": {
+          "file": "chair-bistro.sage.nw.png",
+          "anchor": [
+            22,
+            39
+          ]
+        },
+        "se": {
+          "file": "chair-bistro.sage.se.png",
+          "anchor": [
+            22,
+            45
+          ]
+        }
+      },
+      "seatDepth": 0.06,
+      "backDepth": 0.06
     },
     "chair.cafe": {
       "footprint": [
@@ -944,7 +2120,34 @@
           ]
         }
       },
-      "seat": 15
+      "seat": 16.9,
+      "seatDepth": 0.09,
+      "sitStyle": "chair",
+      "backrest": true,
+      "rotation": "mirror",
+      "name": "Café chair",
+      "category": "seating",
+      "tags": [
+        "chair",
+        "cafe",
+        "seating"
+      ],
+      "rooms": [
+        "outdoors",
+        "cafe",
+        "hall"
+      ],
+      "height": 32,
+      "base": "filled",
+      "walk": "seat",
+      "layer": "object",
+      "use": {
+        "face": "front",
+        "actions": [
+          "sit"
+        ]
+      },
+      "backDepth": 0.09
     },
     "chair.office": {
       "footprint": [
@@ -968,7 +2171,35 @@
           ]
         }
       },
-      "seat": 15
+      "seat": 12.75,
+      "seatDepth": 0.09,
+      "sitStyle": "chair",
+      "backrest": true,
+      "rotation": "mirror",
+      "name": "Office chair",
+      "category": "seating",
+      "tags": [
+        "chair",
+        "office",
+        "seating"
+      ],
+      "rooms": [
+        "lobby",
+        "office",
+        "lab",
+        "studio"
+      ],
+      "height": 30,
+      "base": "centred",
+      "walk": "seat",
+      "layer": "object",
+      "use": {
+        "face": "front",
+        "actions": [
+          "sit"
+        ]
+      },
+      "backDepth": 0.09
     },
     "chair.red": {
       "footprint": [
@@ -992,7 +2223,32 @@
           ]
         }
       },
-      "seat": 15
+      "seat": 11.3,
+      "seatDepth": 0.08,
+      "sitStyle": "chair",
+      "backrest": true,
+      "rotation": "mirror",
+      "name": "Red chair",
+      "category": "seating",
+      "tags": [
+        "chair",
+        "red",
+        "seating"
+      ],
+      "rooms": [
+        "hall"
+      ],
+      "height": 25,
+      "base": "centred",
+      "walk": "seat",
+      "layer": "object",
+      "use": {
+        "face": "front",
+        "actions": [
+          "sit"
+        ]
+      },
+      "backDepth": 0.08
     },
     "chair.wood": {
       "footprint": [
@@ -1016,7 +2272,32 @@
           ]
         }
       },
-      "seat": 15
+      "seat": 9.97,
+      "seatDepth": 0.03,
+      "sitStyle": "chair",
+      "backrest": true,
+      "rotation": "mirror",
+      "name": "Wooden chair",
+      "category": "seating",
+      "tags": [
+        "chair",
+        "wood",
+        "seating"
+      ],
+      "rooms": [
+        "lounge"
+      ],
+      "height": 25,
+      "base": "centred",
+      "walk": "seat",
+      "layer": "object",
+      "use": {
+        "face": "front",
+        "actions": [
+          "sit"
+        ]
+      },
+      "backDepth": 0.03
     },
     "claw-machine": {
       "footprint": [
@@ -1030,21 +2311,53 @@
           "anchor": [
             26,
             56
-          ]
+          ],
+          "light": {
+            "x": 26,
+            "y": 22,
+            "r": 26
+          }
         },
         "ne": {
           "file": "claw-machine.ne.png",
           "anchor": [
             26,
             59
-          ]
+          ],
+          "light": {
+            "x": 26,
+            "y": 25,
+            "r": 26
+          }
         }
       },
       "light": {
         "x": 26,
         "y": 22,
         "r": 26
-      }
+      },
+      "rotation": "mirror",
+      "name": "Claw machine",
+      "category": "play",
+      "tags": [
+        "claw",
+        "machine",
+        "play"
+      ],
+      "rooms": [
+        "arcade"
+      ],
+      "height": 34,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object",
+      "use": {
+        "face": "front",
+        "actions": [
+          "use"
+        ]
+      },
+      "animated": true
     },
     "clock-grand": {
       "footprint": [
@@ -1067,7 +2380,32 @@
             92
           ]
         }
-      }
+      },
+      "rotation": "mirror",
+      "name": "Grandfather clock",
+      "category": "appliance",
+      "tags": [
+        "clock",
+        "grand",
+        "appliance"
+      ],
+      "rooms": [
+        "lobby"
+      ],
+      "height": 53,
+      "base": "centred",
+      "walk": "blocked",
+      "layer": "object",
+      "use": {
+        "face": "front",
+        "actions": [
+          "use"
+        ]
+      },
+      "animated": true,
+      "still": [
+        "nw"
+      ]
     },
     "clock-wall": {
       "footprint": [
@@ -1086,7 +2424,21 @@
           46
         ],
         "margin": 0.16
-      }
+      },
+      "rotation": "flat",
+      "name": "Wall clock",
+      "category": "wall-art",
+      "tags": [
+        "clock",
+        "wall",
+        "wall-art"
+      ],
+      "rooms": [
+        "lab"
+      ],
+      "height": 18,
+      "walk": "open",
+      "layer": "wall"
     },
     "coat-rack": {
       "footprint": [
@@ -1109,7 +2461,23 @@
             56
           ]
         }
-      }
+      },
+      "rotation": "mirror",
+      "name": "Coat rack",
+      "category": "storage",
+      "tags": [
+        "coat",
+        "rack",
+        "storage"
+      ],
+      "rooms": [
+        "hall"
+      ],
+      "height": 35,
+      "base": "centred",
+      "sameFromBehind": true,
+      "walk": "blocked",
+      "layer": "object"
     },
     "cocktail-table": {
       "footprint": [
@@ -1132,7 +2500,22 @@
             52
           ]
         }
-      }
+      },
+      "rotation": "mirror",
+      "name": "Cocktail table",
+      "category": "table",
+      "tags": [
+        "cocktail",
+        "table"
+      ],
+      "rooms": [
+        "hall"
+      ],
+      "height": 32,
+      "base": "centred",
+      "sameFromBehind": true,
+      "walk": "blocked",
+      "layer": "object"
     },
     "couch.blue": {
       "footprint": [
@@ -1156,7 +2539,34 @@
           ]
         }
       },
-      "seat": 12
+      "seat": 8.7,
+      "seatDepth": 0.13,
+      "sitStyle": "lounge",
+      "backrest": true,
+      "rotation": "mirror",
+      "name": "Blue couch",
+      "category": "seating",
+      "tags": [
+        "couch",
+        "blue",
+        "seating"
+      ],
+      "rooms": [
+        "lobby",
+        "office",
+        "lab"
+      ],
+      "height": 22,
+      "base": "filled",
+      "walk": "seat",
+      "layer": "object",
+      "use": {
+        "face": "front",
+        "actions": [
+          "sit"
+        ]
+      },
+      "backDepth": 0.13
     },
     "couch.green": {
       "footprint": [
@@ -1180,7 +2590,34 @@
           ]
         }
       },
-      "seat": 12
+      "seat": 10.15,
+      "seatDepth": 0.2,
+      "sitStyle": "lounge",
+      "backrest": true,
+      "rotation": "mirror",
+      "name": "Green couch",
+      "category": "seating",
+      "tags": [
+        "couch",
+        "green",
+        "seating"
+      ],
+      "rooms": [
+        "cafe",
+        "office",
+        "studio"
+      ],
+      "height": 26,
+      "base": "filled",
+      "walk": "seat",
+      "layer": "object",
+      "use": {
+        "face": "front",
+        "actions": [
+          "sit"
+        ]
+      },
+      "backDepth": 0.2
     },
     "couch.purple": {
       "footprint": [
@@ -1204,7 +2641,44 @@
           ]
         }
       },
-      "seat": 12
+      "seat": 12.7,
+      "seatDepth": 0.25,
+      "sitStyle": "lounge",
+      "backrest": true,
+      "rotation": "mirror",
+      "name": "Purple couch",
+      "category": "seating",
+      "tags": [
+        "couch",
+        "purple",
+        "seating"
+      ],
+      "rooms": [
+        "arcade"
+      ],
+      "height": 26,
+      "base": "filled",
+      "walk": "seat",
+      "layer": "object",
+      "use": {
+        "face": "front",
+        "actions": [
+          "sit"
+        ]
+      },
+      "backDepth": 0.25,
+      "backLine": {
+        "ne": [
+          [
+            0,
+            0
+          ],
+          [
+            999,
+            0
+          ]
+        ]
+      }
     },
     "cups": {
       "footprint": [
@@ -1216,7 +2690,22 @@
       "anchor": [
         17,
         4
-      ]
+      ],
+      "rotation": "radial",
+      "name": "Cups",
+      "category": "decor",
+      "tags": [
+        "cups",
+        "decor"
+      ],
+      "rooms": [
+        "lobby",
+        "lounge"
+      ],
+      "height": 8,
+      "base": "centred",
+      "walk": "blocked",
+      "layer": "object"
     },
     "dashboard": {
       "footprint": [
@@ -1235,6 +2724,25 @@
           46
         ],
         "margin": 0.06
+      },
+      "rotation": "flat",
+      "name": "Build dashboard",
+      "category": "wall-art",
+      "tags": [
+        "dashboard",
+        "wall-art"
+      ],
+      "rooms": [
+        "office"
+      ],
+      "height": 24,
+      "walk": "open",
+      "layer": "wall",
+      "use": {
+        "face": "front",
+        "actions": [
+          "info"
+        ]
       }
     },
     "desk": {
@@ -1258,7 +2766,27 @@
             51
           ]
         }
-      }
+      },
+      "rotation": "mirror",
+      "name": "Desk",
+      "category": "table",
+      "tags": [
+        "desk",
+        "table"
+      ],
+      "rooms": [
+        "office",
+        "lounge",
+        "studio"
+      ],
+      "height": 33,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object",
+      "animated": true,
+      "still": [
+        "ne"
+      ]
     },
     "desk.light": {
       "footprint": [
@@ -1281,7 +2809,26 @@
             43
           ]
         }
-      }
+      },
+      "rotation": "mirror",
+      "name": "Light desk",
+      "category": "table",
+      "tags": [
+        "desk",
+        "light",
+        "table"
+      ],
+      "rooms": [
+        "studio"
+      ],
+      "height": 28,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object",
+      "animated": true,
+      "still": [
+        "ne"
+      ]
     },
     "desk.wood": {
       "footprint": [
@@ -1304,7 +2851,26 @@
             39
           ]
         }
-      }
+      },
+      "rotation": "mirror",
+      "name": "Wooden desk",
+      "category": "table",
+      "tags": [
+        "desk",
+        "wood",
+        "table"
+      ],
+      "rooms": [
+        "lounge"
+      ],
+      "height": 29,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object",
+      "animated": true,
+      "still": [
+        "ne"
+      ]
     },
     "dress-form": {
       "footprint": [
@@ -1327,7 +2893,22 @@
             53
           ]
         }
-      }
+      },
+      "rotation": "mirror",
+      "name": "Dress form",
+      "category": "decor",
+      "tags": [
+        "dress",
+        "form",
+        "decor"
+      ],
+      "rooms": [
+        "studio"
+      ],
+      "height": 34,
+      "base": "centred",
+      "walk": "blocked",
+      "layer": "object"
     },
     "easel": {
       "footprint": [
@@ -1340,17 +2921,31 @@
           "file": "easel.se.png",
           "anchor": [
             23,
-            61
+            56
           ]
         },
         "nw": {
           "file": "easel.nw.png",
           "anchor": [
             23,
-            60
+            55
           ]
         }
-      }
+      },
+      "rotation": "mirror",
+      "name": "Easel",
+      "category": "decor",
+      "tags": [
+        "easel",
+        "decor"
+      ],
+      "rooms": [
+        "studio"
+      ],
+      "height": 32,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object"
     },
     "easel.b": {
       "footprint": [
@@ -1363,17 +2958,31 @@
           "file": "easel.b.se.png",
           "anchor": [
             23,
-            58
+            53
           ]
         },
         "nw": {
           "file": "easel.b.nw.png",
           "anchor": [
             23,
-            69
+            64
           ]
         }
-      }
+      },
+      "rotation": "mirror",
+      "name": "Easel with canvas",
+      "category": "decor",
+      "tags": [
+        "easel",
+        "decor"
+      ],
+      "rooms": [
+        "studio"
+      ],
+      "height": 36,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object"
     },
     "elevator": {
       "footprint": [
@@ -1392,6 +3001,25 @@
           46
         ],
         "margin": 0.08
+      },
+      "rotation": "flat",
+      "name": "Elevator doors",
+      "category": "wall-art",
+      "tags": [
+        "elevator",
+        "wall-art"
+      ],
+      "rooms": [
+        "lobby"
+      ],
+      "height": 46,
+      "walk": "open",
+      "layer": "wall",
+      "use": {
+        "face": "front",
+        "actions": [
+          "info"
+        ]
       }
     },
     "espresso": {
@@ -1414,8 +3042,78 @@
             20,
             23
           ]
+        },
+        "se": {
+          "file": "espresso.se.png",
+          "anchor": [
+            20,
+            23
+          ]
+        },
+        "nw": {
+          "file": "espresso.nw.png",
+          "anchor": [
+            20,
+            18
+          ]
         }
-      }
+      },
+      "rotation": "full",
+      "name": "Espresso machine",
+      "category": "appliance",
+      "tags": [
+        "espresso",
+        "appliance"
+      ],
+      "rooms": [
+        "cafe",
+        "office",
+        "lab"
+      ],
+      "height": 16,
+      "base": "centred",
+      "walk": "blocked",
+      "layer": "surface",
+      "use": {
+        "face": "front",
+        "actions": [
+          "vend"
+        ]
+      },
+      "animated": true
+    },
+    "fire-ring": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "fire-ring.png",
+      "anchor": [
+        34,
+        26
+      ],
+      "rotation": "radial",
+      "light": {
+        "x": 34,
+        "y": 22,
+        "r": 44
+      },
+      "name": "Campfire ring",
+      "category": "street",
+      "tags": [
+        "fire",
+        "ring",
+        "street"
+      ],
+      "rooms": [
+        "outdoors"
+      ],
+      "height": 14,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object",
+      "animated": true
     },
     "fireplace": {
       "footprint": [
@@ -1429,21 +3127,55 @@
           "anchor": [
             32,
             58
-          ]
+          ],
+          "light": {
+            "x": 37,
+            "y": 47,
+            "r": 42
+          }
         },
         "ne": {
           "file": "fireplace.ne.png",
           "anchor": [
             32,
             68
-          ]
+          ],
+          "light": {
+            "x": 27,
+            "y": 57,
+            "r": 42
+          }
         }
       },
       "light": {
         "x": 37,
         "y": 47,
         "r": 42
-      }
+      },
+      "rotation": "mirror",
+      "name": "Fireplace",
+      "category": "appliance",
+      "tags": [
+        "fireplace",
+        "appliance"
+      ],
+      "rooms": [
+        "lounge"
+      ],
+      "height": 38,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object",
+      "use": {
+        "face": "front",
+        "actions": [
+          "toggle"
+        ]
+      },
+      "animated": true,
+      "still": [
+        "ne"
+      ]
     },
     "flower-cart": {
       "footprint": [
@@ -1451,11 +3183,51 @@
         2
       ],
       "fit": "anchor",
-      "file": "flower-cart.png",
-      "anchor": [
-        70,
-        112
-      ]
+      "rotation": "full",
+      "name": "Flower cart",
+      "category": "street",
+      "tags": [
+        "flower",
+        "cart",
+        "street"
+      ],
+      "rooms": [
+        "outdoors"
+      ],
+      "height": 47,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object",
+      "facings": {
+        "sw": {
+          "file": "flower-cart.png",
+          "anchor": [
+            62,
+            82
+          ]
+        },
+        "se": {
+          "file": "flower-cart.se.png",
+          "anchor": [
+            62,
+            65
+          ]
+        },
+        "ne": {
+          "file": "flower-cart.ne.png",
+          "anchor": [
+            62,
+            78
+          ]
+        },
+        "nw": {
+          "file": "flower-cart.nw.png",
+          "anchor": [
+            62,
+            76
+          ]
+        }
+      }
     },
     "flower-stand": {
       "footprint": [
@@ -1478,7 +3250,23 @@
             38
           ]
         }
-      }
+      },
+      "rotation": "mirror",
+      "name": "Flower stand",
+      "category": "plant",
+      "tags": [
+        "flower",
+        "stand",
+        "plant"
+      ],
+      "rooms": [
+        "hall"
+      ],
+      "height": 27,
+      "base": "centred",
+      "sameFromBehind": true,
+      "walk": "blocked",
+      "layer": "object"
     },
     "flowerbed.blue": {
       "footprint": [
@@ -1490,7 +3278,22 @@
       "anchor": [
         32,
         25
-      ]
+      ],
+      "rotation": "radial",
+      "name": "Blue flowerbed",
+      "category": "nature",
+      "tags": [
+        "flowerbed",
+        "blue",
+        "nature"
+      ],
+      "rooms": [
+        "outdoors"
+      ],
+      "height": 17,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object"
     },
     "flowerbed.pink": {
       "footprint": [
@@ -1502,7 +3305,22 @@
       "anchor": [
         32,
         24
-      ]
+      ],
+      "rotation": "radial",
+      "name": "Pink flowerbed",
+      "category": "nature",
+      "tags": [
+        "flowerbed",
+        "pink",
+        "nature"
+      ],
+      "rooms": [
+        "outdoors"
+      ],
+      "height": 16,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object"
     },
     "flowerbed.red": {
       "footprint": [
@@ -1514,7 +3332,22 @@
       "anchor": [
         32,
         22
-      ]
+      ],
+      "rotation": "radial",
+      "name": "Red flowerbed",
+      "category": "nature",
+      "tags": [
+        "flowerbed",
+        "red",
+        "nature"
+      ],
+      "rooms": [
+        "outdoors"
+      ],
+      "height": 15,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object"
     },
     "flowerbed.yellow": {
       "footprint": [
@@ -1526,7 +3359,22 @@
       "anchor": [
         32,
         24
-      ]
+      ],
+      "rotation": "radial",
+      "name": "Yellow flowerbed",
+      "category": "nature",
+      "tags": [
+        "flowerbed",
+        "yellow",
+        "nature"
+      ],
+      "rooms": [
+        "outdoors"
+      ],
+      "height": 16,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object"
     },
     "fountain": {
       "footprint": [
@@ -1536,8 +3384,8 @@
       "fit": "anchor",
       "file": "fountain.png",
       "anchor": [
-        96,
-        88
+        103,
+        91
       ],
       "emitters": [
         {
@@ -1545,7 +3393,27 @@
           "x": 96,
           "y": 34
         }
-      ]
+      ],
+      "rotation": "radial",
+      "name": "Fountain",
+      "category": "landmark",
+      "tags": [
+        "fountain",
+        "landmark"
+      ],
+      "rooms": [
+        "outdoors"
+      ],
+      "height": 57,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object",
+      "use": {
+        "face": "any",
+        "actions": [
+          "use"
+        ]
+      }
     },
     "frame.customer": {
       "footprint": [
@@ -1564,6 +3432,26 @@
           50
         ],
         "margin": 0.04
+      },
+      "rotation": "flat",
+      "name": "Framed photo: customer",
+      "category": "wall-art",
+      "tags": [
+        "frame",
+        "customer",
+        "wall-art"
+      ],
+      "rooms": [
+        "lobby"
+      ],
+      "height": 36,
+      "walk": "open",
+      "layer": "wall",
+      "use": {
+        "face": "front",
+        "actions": [
+          "artifact"
+        ]
       }
     },
     "frame.garage": {
@@ -1583,6 +3471,26 @@
           50
         ],
         "margin": 0.04
+      },
+      "rotation": "flat",
+      "name": "Framed photo: garage",
+      "category": "wall-art",
+      "tags": [
+        "frame",
+        "garage",
+        "wall-art"
+      ],
+      "rooms": [
+        "lobby"
+      ],
+      "height": 36,
+      "walk": "open",
+      "layer": "wall",
+      "use": {
+        "face": "front",
+        "actions": [
+          "artifact"
+        ]
       }
     },
     "frame.hackathon": {
@@ -1602,6 +3510,26 @@
           44
         ],
         "margin": 0.14
+      },
+      "rotation": "flat",
+      "name": "Framed photo: hackathon",
+      "category": "wall-art",
+      "tags": [
+        "frame",
+        "hackathon",
+        "wall-art"
+      ],
+      "rooms": [
+        "lab"
+      ],
+      "height": 22,
+      "walk": "open",
+      "layer": "wall",
+      "use": {
+        "face": "front",
+        "actions": [
+          "artifact"
+        ]
       }
     },
     "frame.lake": {
@@ -1621,7 +3549,21 @@
           45
         ],
         "margin": 0.14
-      }
+      },
+      "rotation": "flat",
+      "name": "Framed painting: lake",
+      "category": "wall-art",
+      "tags": [
+        "frame",
+        "lake",
+        "wall-art"
+      ],
+      "rooms": [
+        "cafe"
+      ],
+      "height": 23,
+      "walk": "open",
+      "layer": "wall"
     },
     "frame.lisbon": {
       "footprint": [
@@ -1640,6 +3582,26 @@
           50
         ],
         "margin": 0.04
+      },
+      "rotation": "flat",
+      "name": "Framed photo: Lisbon",
+      "category": "wall-art",
+      "tags": [
+        "frame",
+        "lisbon",
+        "wall-art"
+      ],
+      "rooms": [
+        "lobby"
+      ],
+      "height": 36,
+      "walk": "open",
+      "layer": "wall",
+      "use": {
+        "face": "front",
+        "actions": [
+          "artifact"
+        ]
       }
     },
     "frame.team": {
@@ -1659,6 +3621,26 @@
           50
         ],
         "margin": 0.04
+      },
+      "rotation": "flat",
+      "name": "Framed photo: team",
+      "category": "wall-art",
+      "tags": [
+        "frame",
+        "team",
+        "wall-art"
+      ],
+      "rooms": [
+        "lobby"
+      ],
+      "height": 36,
+      "walk": "open",
+      "layer": "wall",
+      "use": {
+        "face": "front",
+        "actions": [
+          "artifact"
+        ]
       }
     },
     "fridge": {
@@ -1671,18 +3653,32 @@
         "sw": {
           "file": "fridge.sw.png",
           "anchor": [
-            32,
-            65
+            25,
+            68
           ]
         },
         "ne": {
           "file": "fridge.ne.png",
           "anchor": [
-            32,
-            68
+            25,
+            71
           ]
         }
-      }
+      },
+      "rotation": "mirror",
+      "name": "Fridge",
+      "category": "appliance",
+      "tags": [
+        "fridge",
+        "appliance"
+      ],
+      "rooms": [
+        "office"
+      ],
+      "height": 40,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object"
     },
     "fruit-bowl": {
       "footprint": [
@@ -1705,7 +3701,140 @@
             -2
           ]
         }
-      }
+      },
+      "rotation": "mirror",
+      "name": "Fruit bowl",
+      "category": "decor",
+      "tags": [
+        "fruit",
+        "bowl",
+        "decor"
+      ],
+      "rooms": [
+        "office"
+      ],
+      "height": 6,
+      "base": "centred",
+      "sameFromBehind": true,
+      "walk": "blocked",
+      "layer": "surface"
+    },
+    "garden-bed.flowers": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "garden-bed.flowers.png",
+      "anchor": [
+        32,
+        28
+      ],
+      "rotation": "radial",
+      "name": "Flowers garden bed",
+      "category": "nature",
+      "tags": [
+        "garden",
+        "bed",
+        "flowers",
+        "nature"
+      ],
+      "rooms": [
+        "outdoors"
+      ],
+      "height": 18,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object"
+    },
+    "garden-bed.herbs": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "garden-bed.herbs.png",
+      "anchor": [
+        32,
+        22
+      ],
+      "rotation": "radial",
+      "name": "Herbs garden bed",
+      "category": "nature",
+      "tags": [
+        "garden",
+        "bed",
+        "herbs",
+        "nature"
+      ],
+      "rooms": [
+        "outdoors"
+      ],
+      "height": 15,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object"
+    },
+    "garden-bed.veg": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "garden-bed.veg.png",
+      "anchor": [
+        32,
+        25
+      ],
+      "rotation": "radial",
+      "name": "Veg garden bed",
+      "category": "nature",
+      "tags": [
+        "garden",
+        "bed",
+        "veg",
+        "nature"
+      ],
+      "rooms": [
+        "outdoors"
+      ],
+      "height": 17,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object"
+    },
+    "garden-lantern": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "garden-lantern.png",
+      "anchor": [
+        13,
+        46
+      ],
+      "rotation": "radial",
+      "light": {
+        "x": 13,
+        "y": 17,
+        "r": 30
+      },
+      "name": "Garden lantern",
+      "category": "lighting",
+      "tags": [
+        "garden",
+        "lantern",
+        "lighting"
+      ],
+      "rooms": [
+        "outdoors"
+      ],
+      "height": 30,
+      "base": "centred",
+      "walk": "blocked",
+      "layer": "object",
+      "animated": true
     },
     "gazebo": {
       "footprint": [
@@ -1717,7 +3846,21 @@
       "anchor": [
         96,
         190
-      ]
+      ],
+      "rotation": "radial",
+      "name": "Gazebo",
+      "category": "landmark",
+      "tags": [
+        "gazebo",
+        "landmark"
+      ],
+      "rooms": [
+        "outdoors"
+      ],
+      "height": 107,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object"
     },
     "globe-stand": {
       "footprint": [
@@ -1740,6 +3883,28 @@
             40
           ]
         }
+      },
+      "rotation": "mirror",
+      "name": "Globe on a stand",
+      "category": "decor",
+      "tags": [
+        "globe",
+        "stand",
+        "decor"
+      ],
+      "rooms": [
+        "lounge"
+      ],
+      "height": 27,
+      "base": "centred",
+      "sameFromBehind": true,
+      "walk": "blocked",
+      "layer": "object",
+      "use": {
+        "face": "any",
+        "actions": [
+          "use"
+        ]
       }
     },
     "grinder": {
@@ -1748,11 +3913,36 @@
         1
       ],
       "fit": "anchor",
-      "file": "grinder.png",
-      "anchor": [
-        10,
-        15
-      ]
+      "rotation": "mirror",
+      "name": "Coffee grinder",
+      "category": "appliance",
+      "tags": [
+        "grinder",
+        "appliance"
+      ],
+      "rooms": [
+        "cafe"
+      ],
+      "height": 14,
+      "base": "centred",
+      "walk": "blocked",
+      "layer": "surface",
+      "facings": {
+        "sw": {
+          "file": "grinder.png",
+          "anchor": [
+            10,
+            15
+          ]
+        },
+        "nw": {
+          "file": "grinder.nw.png",
+          "anchor": [
+            10,
+            16
+          ]
+        }
+      }
     },
     "heirloom-aquarium": {
       "footprint": [
@@ -1775,7 +3965,30 @@
             68
           ]
         }
-      }
+      },
+      "rotation": "mirror",
+      "name": "Koi aquarium",
+      "category": "decor",
+      "tags": [
+        "heirloom",
+        "aquarium",
+        "decor"
+      ],
+      "rooms": [
+        "lobby"
+      ],
+      "height": 40,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object",
+      "use": {
+        "face": "front",
+        "actions": [
+          "use",
+          "info"
+        ]
+      },
+      "animated": true
     },
     "heirloom-bell": {
       "footprint": [
@@ -1786,8 +3999,31 @@
       "file": "heirloom-bell.png",
       "anchor": [
         24,
-        37
-      ]
+        32
+      ],
+      "rotation": "mirror",
+      "name": "Launch bell",
+      "category": "decor",
+      "tags": [
+        "heirloom",
+        "bell",
+        "decor"
+      ],
+      "rooms": [
+        "lab"
+      ],
+      "height": 20,
+      "base": "filled",
+      "sameFromBehind": true,
+      "walk": "blocked",
+      "layer": "object",
+      "use": {
+        "face": "any",
+        "actions": [
+          "ring"
+        ]
+      },
+      "animated": true
     },
     "heirloom-dragonlamp": {
       "footprint": [
@@ -1799,23 +4035,79 @@
         "se": {
           "file": "heirloom-dragonlamp.se.png",
           "anchor": [
-            25,
+            18,
             65
-          ]
+          ],
+          "light": {
+            "x": 40,
+            "y": 27,
+            "r": 46
+          }
         },
         "nw": {
           "file": "heirloom-dragonlamp.nw.png",
           "anchor": [
-            25,
+            32,
             59
-          ]
+          ],
+          "light": {
+            "x": 10,
+            "y": 17,
+            "r": 46
+          }
+        },
+        "sw": {
+          "file": "heirloom-dragonlamp.sw.png",
+          "anchor": [
+            18,
+            62
+          ],
+          "light": {
+            "x": 17,
+            "y": 29,
+            "r": 46
+          }
+        },
+        "ne": {
+          "file": "heirloom-dragonlamp.ne.png",
+          "anchor": [
+            22,
+            62
+          ],
+          "light": {
+            "x": 29,
+            "y": 12,
+            "r": 46
+          }
         }
       },
       "light": {
         "x": 40,
         "y": 27,
         "r": 46
-      }
+      },
+      "rotation": "full",
+      "name": "Jade dragon lamp",
+      "category": "lighting",
+      "tags": [
+        "heirloom",
+        "dragonlamp",
+        "lighting"
+      ],
+      "rooms": [
+        "lounge"
+      ],
+      "height": 36,
+      "base": "centred",
+      "walk": "blocked",
+      "layer": "object",
+      "use": {
+        "face": "front",
+        "actions": [
+          "toggle"
+        ]
+      },
+      "animated": true
     },
     "heirloom-globe": {
       "footprint": [
@@ -1827,7 +4119,29 @@
       "anchor": [
         22,
         47
-      ]
+      ],
+      "rotation": "radial",
+      "name": "Crystal globe",
+      "category": "decor",
+      "tags": [
+        "heirloom",
+        "globe",
+        "decor"
+      ],
+      "rooms": [
+        "studio"
+      ],
+      "height": 31,
+      "base": "centred",
+      "walk": "blocked",
+      "layer": "object",
+      "use": {
+        "face": "any",
+        "actions": [
+          "use",
+          "info"
+        ]
+      }
     },
     "heirloom-gold": {
       "footprint": [
@@ -1838,8 +4152,29 @@
       "file": "heirloom-gold.png",
       "anchor": [
         25,
-        22
-      ]
+        16
+      ],
+      "rotation": "radial",
+      "name": "Gold reserve",
+      "category": "decor",
+      "tags": [
+        "heirloom",
+        "gold",
+        "decor"
+      ],
+      "rooms": [
+        "lobby"
+      ],
+      "height": 12,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "surface",
+      "use": {
+        "face": "any",
+        "actions": [
+          "info"
+        ]
+      }
     },
     "heirloom-piano": {
       "footprint": [
@@ -1861,7 +4196,43 @@
             64,
             72
           ]
+        },
+        "se": {
+          "file": "heirloom-piano.se.png",
+          "anchor": [
+            62,
+            79
+          ]
+        },
+        "nw": {
+          "file": "heirloom-piano.nw.png",
+          "anchor": [
+            62,
+            73
+          ]
         }
+      },
+      "rotation": "full",
+      "name": "Grand piano",
+      "category": "play",
+      "tags": [
+        "heirloom",
+        "piano",
+        "play"
+      ],
+      "rooms": [
+        "hall"
+      ],
+      "height": 48,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object",
+      "use": {
+        "face": "front",
+        "actions": [
+          "use",
+          "info"
+        ]
       }
     },
     "heirloom-throne": {
@@ -1875,18 +4246,43 @@
           "file": "heirloom-throne.se.png",
           "anchor": [
             32,
-            66
+            60
           ]
         },
         "nw": {
           "file": "heirloom-throne.nw.png",
           "anchor": [
             32,
-            53
+            47
           ]
         }
       },
-      "seat": 14
+      "seat": 8.05,
+      "seatDepth": 0.12,
+      "sitStyle": "chair",
+      "backrest": true,
+      "rotation": "mirror",
+      "name": "Founders’ throne",
+      "category": "seating",
+      "tags": [
+        "heirloom",
+        "throne",
+        "seating"
+      ],
+      "rooms": [
+        "lobby"
+      ],
+      "height": 34,
+      "base": "filled",
+      "walk": "seat",
+      "layer": "object",
+      "use": {
+        "face": "front",
+        "actions": [
+          "sit"
+        ]
+      },
+      "backDepth": 0.12
     },
     "heirloom-trophy": {
       "footprint": [
@@ -1898,7 +4294,28 @@
       "anchor": [
         21,
         46
-      ]
+      ],
+      "rotation": "radial",
+      "name": "Keystone trophy",
+      "category": "decor",
+      "tags": [
+        "heirloom",
+        "trophy",
+        "decor"
+      ],
+      "rooms": [
+        "lobby"
+      ],
+      "height": 29,
+      "base": "centred",
+      "walk": "blocked",
+      "layer": "surface",
+      "use": {
+        "face": "any",
+        "actions": [
+          "info"
+        ]
+      }
     },
     "jar": {
       "footprint": [
@@ -1910,7 +4327,21 @@
       "anchor": [
         11,
         26
-      ]
+      ],
+      "rotation": "radial",
+      "name": "Biscotti jar",
+      "category": "decor",
+      "tags": [
+        "jar",
+        "decor"
+      ],
+      "rooms": [
+        "cafe"
+      ],
+      "height": 20,
+      "base": "centred",
+      "walk": "blocked",
+      "layer": "surface"
     },
     "jukebox": {
       "footprint": [
@@ -1924,21 +4355,52 @@
           "anchor": [
             25,
             50
-          ]
+          ],
+          "light": {
+            "x": 25,
+            "y": 30,
+            "r": 30
+          }
         },
         "ne": {
           "file": "jukebox.ne.png",
           "anchor": [
             25,
             51
-          ]
+          ],
+          "light": {
+            "x": 25,
+            "y": 31,
+            "r": 30
+          }
         }
       },
       "light": {
         "x": 25,
         "y": 30,
         "r": 30
-      }
+      },
+      "rotation": "mirror",
+      "name": "Jukebox",
+      "category": "play",
+      "tags": [
+        "jukebox",
+        "play"
+      ],
+      "rooms": [
+        "arcade"
+      ],
+      "height": 30,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object",
+      "use": {
+        "face": "front",
+        "actions": [
+          "use"
+        ]
+      },
+      "animated": true
     },
     "kanban": {
       "footprint": [
@@ -1957,6 +4419,25 @@
           48
         ],
         "margin": 0.08
+      },
+      "rotation": "flat",
+      "name": "Kanban board",
+      "category": "wall-art",
+      "tags": [
+        "kanban",
+        "wall-art"
+      ],
+      "rooms": [
+        "lab"
+      ],
+      "height": 32,
+      "walk": "open",
+      "layer": "wall",
+      "use": {
+        "face": "front",
+        "actions": [
+          "info"
+        ]
       }
     },
     "lamp": {
@@ -1965,15 +4446,84 @@
         1
       ],
       "fit": "anchor",
-      "file": "lamp.png",
-      "anchor": [
-        20,
-        60
-      ],
       "light": {
         "x": 28,
         "y": 17,
         "r": 44
+      },
+      "rotation": "full",
+      "name": "Floor lamp",
+      "category": "lighting",
+      "tags": [
+        "lamp",
+        "lighting"
+      ],
+      "rooms": [
+        "lobby",
+        "cafe",
+        "office",
+        "lab",
+        "lounge"
+      ],
+      "height": 37,
+      "base": "centred",
+      "walk": "blocked",
+      "layer": "object",
+      "use": {
+        "face": "front",
+        "actions": [
+          "toggle"
+        ]
+      },
+      "facings": {
+        "se": {
+          "file": "lamp.png",
+          "anchor": [
+            20,
+            60
+          ],
+          "light": {
+            "x": 28,
+            "y": 17,
+            "r": 44
+          }
+        },
+        "sw": {
+          "file": "lamp.sw.png",
+          "anchor": [
+            18,
+            60
+          ],
+          "light": {
+            "x": 14,
+            "y": 29,
+            "r": 44
+          }
+        },
+        "nw": {
+          "file": "lamp.nw.png",
+          "anchor": [
+            22,
+            60
+          ],
+          "light": {
+            "x": 12,
+            "y": 17,
+            "r": 44
+          }
+        },
+        "ne": {
+          "file": "lamp.ne.png",
+          "anchor": [
+            18,
+            60
+          ],
+          "light": {
+            "x": 23,
+            "y": 17,
+            "r": 44
+          }
+        }
       }
     },
     "lamp-arc": {
@@ -1982,15 +4532,81 @@
         1
       ],
       "fit": "anchor",
-      "file": "lamp-arc.png",
-      "anchor": [
-        26,
-        56
-      ],
       "light": {
         "x": 40,
         "y": 12,
         "r": 44
+      },
+      "rotation": "full",
+      "name": "Arc lamp",
+      "category": "lighting",
+      "tags": [
+        "lamp",
+        "arc",
+        "lighting"
+      ],
+      "rooms": [
+        "studio"
+      ],
+      "height": 31,
+      "base": "centred",
+      "walk": "blocked",
+      "layer": "object",
+      "use": {
+        "face": "front",
+        "actions": [
+          "toggle"
+        ]
+      },
+      "facings": {
+        "se": {
+          "file": "lamp-arc.png",
+          "anchor": [
+            11,
+            55
+          ],
+          "light": {
+            "x": 40,
+            "y": 12,
+            "r": 44
+          }
+        },
+        "ne": {
+          "file": "lamp-arc.ne.png",
+          "anchor": [
+            14,
+            56
+          ],
+          "light": {
+            "x": 11,
+            "y": 12,
+            "r": 44
+          }
+        },
+        "sw": {
+          "file": "lamp-arc.sw.png",
+          "anchor": [
+            16,
+            56
+          ],
+          "light": {
+            "x": 15,
+            "y": 24,
+            "r": 44
+          }
+        },
+        "nw": {
+          "file": "lamp-arc.nw.png",
+          "anchor": [
+            39,
+            54
+          ],
+          "light": {
+            "x": 12,
+            "y": 12,
+            "r": 44
+          }
+        }
       }
     },
     "lamp-post": {
@@ -1999,17 +4615,75 @@
         1
       ],
       "fit": "anchor",
-      "file": "lamp-post.png",
-      "anchor": [
-        11,
-        78
+      "rotation": "full",
+      "name": "Street lamp",
+      "category": "lighting",
+      "tags": [
+        "lamp",
+        "post",
+        "lighting"
       ],
-      "light": {
-        "x": 25,
-        "y": 21,
-        "r": 70
-      },
-      "glow": "lamp-post.glow.png"
+      "rooms": [
+        "outdoors"
+      ],
+      "height": 46,
+      "base": "centred",
+      "walk": "blocked",
+      "layer": "object",
+      "facings": {
+        "se": {
+          "file": "lamp-post.png",
+          "anchor": [
+            11,
+            78
+          ],
+          "glow": "lamp-post.glow.png",
+          "light": {
+            "x": 26,
+            "y": 22,
+            "r": 70
+          }
+        },
+        "sw": {
+          "file": "lamp-post.sw.png",
+          "anchor": [
+            22,
+            79
+          ],
+          "glow": "lamp-post.sw.glow.png",
+          "light": {
+            "x": 15,
+            "y": 43,
+            "r": 70
+          }
+        },
+        "nw": {
+          "file": "lamp-post.nw.png",
+          "anchor": [
+            36,
+            76
+          ],
+          "glow": "lamp-post.nw.glow.png",
+          "light": {
+            "x": 15,
+            "y": 25,
+            "r": 70
+          }
+        },
+        "ne": {
+          "file": "lamp-post.ne.png",
+          "anchor": [
+            20,
+            79
+          ],
+          "glow": "lamp-post.ne.glow.png",
+          "light": {
+            "x": 27,
+            "y": 25,
+            "r": 70
+          }
+        }
+      }
     },
     "lantern-floor": {
       "footprint": [
@@ -2023,21 +4697,80 @@
           "anchor": [
             15,
             34
-          ]
+          ],
+          "light": {
+            "x": 15,
+            "y": 14,
+            "r": 42
+          }
+        },
+        "sw": {
+          "file": "lantern-floor.sw.png",
+          "anchor": [
+            12,
+            34
+          ],
+          "light": {
+            "x": 10,
+            "y": 19,
+            "r": 42
+          }
         },
         "nw": {
           "file": "lantern-floor.nw.png",
           "anchor": [
-            15,
+            16,
             34
-          ]
+          ],
+          "light": {
+            "x": 9,
+            "y": 14,
+            "r": 42
+          }
+        },
+        "ne": {
+          "file": "lantern-floor.ne.png",
+          "anchor": [
+            11,
+            34
+          ],
+          "light": {
+            "x": 12,
+            "y": 12,
+            "r": 42
+          }
         }
       },
       "light": {
         "x": 15,
         "y": 14,
         "r": 42
-      }
+      },
+      "rotation": "full",
+      "name": "Paper floor lantern",
+      "category": "lighting",
+      "tags": [
+        "lantern",
+        "floor",
+        "lighting"
+      ],
+      "rooms": [
+        "hall"
+      ],
+      "themes": [
+        "festive"
+      ],
+      "height": 25,
+      "base": "centred",
+      "walk": "blocked",
+      "layer": "object",
+      "use": {
+        "face": "front",
+        "actions": [
+          "toggle"
+        ]
+      },
+      "animated": true
     },
     "lantern-string": {
       "footprint": [
@@ -2056,7 +4789,24 @@
           56
         ],
         "margin": 0.02
-      }
+      },
+      "rotation": "flat",
+      "name": "String of lanterns",
+      "category": "wall-art",
+      "tags": [
+        "lantern",
+        "string",
+        "wall-art"
+      ],
+      "rooms": [
+        "hall"
+      ],
+      "themes": [
+        "festive"
+      ],
+      "height": 16,
+      "walk": "open",
+      "layer": "wall"
     },
     "lighthouse": {
       "footprint": [
@@ -2080,7 +4830,27 @@
           "x": 37,
           "y": 42
         }
-      ]
+      ],
+      "rotation": "radial",
+      "name": "Lighthouse",
+      "category": "landmark",
+      "tags": [
+        "lighthouse",
+        "landmark"
+      ],
+      "rooms": [
+        "outdoors"
+      ],
+      "height": 60,
+      "base": "centred",
+      "walk": "blocked",
+      "layer": "object",
+      "use": {
+        "face": "any",
+        "actions": [
+          "artifact"
+        ]
+      }
     },
     "logo-wall": {
       "footprint": [
@@ -2099,7 +4869,21 @@
           57
         ],
         "margin": 0.06
-      }
+      },
+      "rotation": "flat",
+      "name": "Logo wall",
+      "category": "wall-art",
+      "tags": [
+        "logo",
+        "wall",
+        "wall-art"
+      ],
+      "rooms": [
+        "lobby"
+      ],
+      "height": 29,
+      "walk": "open",
+      "layer": "wall"
     },
     "mailbox": {
       "footprint": [
@@ -2107,11 +4891,36 @@
         1
       ],
       "fit": "anchor",
-      "file": "mailbox.png",
-      "anchor": [
-        18,
-        54
-      ]
+      "rotation": "mirror",
+      "name": "Mailbox",
+      "category": "street",
+      "tags": [
+        "mailbox",
+        "street"
+      ],
+      "rooms": [
+        "outdoors"
+      ],
+      "height": 35,
+      "base": "centred",
+      "walk": "blocked",
+      "layer": "object",
+      "facings": {
+        "sw": {
+          "file": "mailbox.png",
+          "anchor": [
+            18,
+            54
+          ]
+        },
+        "ne": {
+          "file": "mailbox.ne.png",
+          "anchor": [
+            20,
+            56
+          ]
+        }
+      }
     },
     "materials-shelf": {
       "footprint": [
@@ -2134,7 +4943,22 @@
             81
           ]
         }
-      }
+      },
+      "rotation": "mirror",
+      "name": "Materials shelf",
+      "category": "storage",
+      "tags": [
+        "materials",
+        "shelf",
+        "storage"
+      ],
+      "rooms": [
+        "studio"
+      ],
+      "height": 45,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object"
     },
     "menu-board": {
       "footprint": [
@@ -2153,7 +4977,21 @@
           61
         ],
         "margin": 0.3
-      }
+      },
+      "rotation": "flat",
+      "name": "Menu board",
+      "category": "wall-art",
+      "tags": [
+        "menu",
+        "board",
+        "wall-art"
+      ],
+      "rooms": [
+        "cafe"
+      ],
+      "height": 23,
+      "walk": "open",
+      "layer": "wall"
     },
     "mission-patches": {
       "footprint": [
@@ -2172,7 +5010,21 @@
           50
         ],
         "margin": 0.12
-      }
+      },
+      "rotation": "flat",
+      "name": "Mission patches",
+      "category": "wall-art",
+      "tags": [
+        "mission",
+        "patches",
+        "wall-art"
+      ],
+      "rooms": [
+        "lab"
+      ],
+      "height": 24,
+      "walk": "open",
+      "layer": "wall"
     },
     "moodboard": {
       "footprint": [
@@ -2191,6 +5043,25 @@
           48
         ],
         "margin": 0.06
+      },
+      "rotation": "flat",
+      "name": "Moodboard",
+      "category": "wall-art",
+      "tags": [
+        "moodboard",
+        "wall-art"
+      ],
+      "rooms": [
+        "studio"
+      ],
+      "height": 32,
+      "walk": "open",
+      "layer": "wall",
+      "use": {
+        "face": "front",
+        "actions": [
+          "info"
+        ]
       }
     },
     "noticeboard": {
@@ -2199,11 +5070,35 @@
         1
       ],
       "fit": "anchor",
-      "file": "noticeboard.png",
-      "anchor": [
-        56,
-        86
-      ]
+      "rotation": "mirror",
+      "name": "Noticeboard",
+      "category": "street",
+      "tags": [
+        "noticeboard",
+        "street"
+      ],
+      "rooms": [
+        "outdoors"
+      ],
+      "height": 40,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object",
+      "use": {
+        "face": "front",
+        "actions": [
+          "info"
+        ]
+      },
+      "facings": {
+        "sw": {
+          "file": "noticeboard.png",
+          "anchor": [
+            35,
+            72
+          ]
+        }
+      }
     },
     "ottoman.green": {
       "footprint": [
@@ -2227,7 +5122,33 @@
           ]
         }
       },
-      "seat": 9
+      "seat": 8,
+      "seatDepth": 0,
+      "sitStyle": "chair",
+      "backrest": false,
+      "rotation": "mirror",
+      "name": "Green ottoman",
+      "category": "seating",
+      "tags": [
+        "ottoman",
+        "green",
+        "seating"
+      ],
+      "rooms": [
+        "lounge"
+      ],
+      "height": 13,
+      "base": "centred",
+      "sameFromBehind": true,
+      "walk": "seat",
+      "layer": "object",
+      "use": {
+        "face": "front",
+        "actions": [
+          "sit"
+        ]
+      },
+      "backDepth": 0
     },
     "paper-bin": {
       "footprint": [
@@ -2250,7 +5171,23 @@
             36
           ]
         }
-      }
+      },
+      "rotation": "mirror",
+      "name": "Paper roll bin",
+      "category": "decor",
+      "tags": [
+        "paper",
+        "bin",
+        "decor"
+      ],
+      "rooms": [
+        "studio"
+      ],
+      "height": 26,
+      "base": "centred",
+      "sameFromBehind": true,
+      "walk": "blocked",
+      "layer": "object"
     },
     "parts-rack": {
       "footprint": [
@@ -2273,7 +5210,22 @@
             72
           ]
         }
-      }
+      },
+      "rotation": "mirror",
+      "name": "Parts rack",
+      "category": "storage",
+      "tags": [
+        "parts",
+        "rack",
+        "storage"
+      ],
+      "rooms": [
+        "lab"
+      ],
+      "height": 40,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object"
     },
     "pastry-case": {
       "footprint": [
@@ -2296,7 +5248,22 @@
             22
           ]
         }
-      }
+      },
+      "rotation": "mirror",
+      "name": "Pastry case",
+      "category": "storage",
+      "tags": [
+        "pastry",
+        "case",
+        "storage"
+      ],
+      "rooms": [
+        "cafe"
+      ],
+      "height": 15,
+      "base": "centred",
+      "walk": "blocked",
+      "layer": "surface"
     },
     "pennant.mobile": {
       "footprint": [
@@ -2315,7 +5282,21 @@
           46
         ],
         "margin": 0.2
-      }
+      },
+      "rotation": "flat",
+      "name": "Pennant: Mobile",
+      "category": "wall-art",
+      "tags": [
+        "pennant",
+        "mobile",
+        "wall-art"
+      ],
+      "rooms": [
+        "office"
+      ],
+      "height": 18,
+      "walk": "open",
+      "layer": "wall"
     },
     "pennant.platform": {
       "footprint": [
@@ -2334,7 +5315,21 @@
           46
         ],
         "margin": 0.2
-      }
+      },
+      "rotation": "flat",
+      "name": "Pennant: Platform",
+      "category": "wall-art",
+      "tags": [
+        "pennant",
+        "platform",
+        "wall-art"
+      ],
+      "rooms": [
+        "office"
+      ],
+      "height": 18,
+      "walk": "open",
+      "layer": "wall"
     },
     "picnic": {
       "footprint": [
@@ -2344,9 +5339,24 @@
       "fit": "anchor",
       "file": "picnic.png",
       "anchor": [
-        67,
-        59
-      ]
+        62,
+        31
+      ],
+      "rotation": "mirror",
+      "name": "Picnic table",
+      "category": "table",
+      "tags": [
+        "picnic",
+        "table"
+      ],
+      "rooms": [
+        "outdoors"
+      ],
+      "height": 24,
+      "base": "filled",
+      "sameFromBehind": true,
+      "walk": "blocked",
+      "layer": "object"
     },
     "pinup": {
       "footprint": [
@@ -2365,6 +5375,25 @@
           48
         ],
         "margin": 0.05
+      },
+      "rotation": "flat",
+      "name": "Pin-up wall",
+      "category": "wall-art",
+      "tags": [
+        "pinup",
+        "wall-art"
+      ],
+      "rooms": [
+        "studio"
+      ],
+      "height": 32,
+      "walk": "open",
+      "layer": "wall",
+      "use": {
+        "face": "front",
+        "actions": [
+          "info"
+        ]
       }
     },
     "plan-chest": {
@@ -2388,7 +5417,22 @@
             34
           ]
         }
-      }
+      },
+      "rotation": "mirror",
+      "name": "Plan chest",
+      "category": "storage",
+      "tags": [
+        "plan",
+        "chest",
+        "storage"
+      ],
+      "rooms": [
+        "studio"
+      ],
+      "height": 21,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object"
     },
     "plant.a": {
       "footprint": [
@@ -2400,7 +5444,29 @@
       "anchor": [
         31,
         47
-      ]
+      ],
+      "rotation": "radial",
+      "name": "Potted plant",
+      "category": "plant",
+      "tags": [
+        "plant"
+      ],
+      "rooms": [
+        "cafe",
+        "office",
+        "lab",
+        "arcade"
+      ],
+      "height": 28,
+      "base": "centred",
+      "walk": "blocked",
+      "layer": "object",
+      "use": {
+        "face": "any",
+        "actions": [
+          "use"
+        ]
+      }
     },
     "plant.b": {
       "footprint": [
@@ -2412,7 +5478,31 @@
       "anchor": [
         27,
         76
-      ]
+      ],
+      "rotation": "radial",
+      "name": "Tall potted plant",
+      "category": "plant",
+      "tags": [
+        "plant"
+      ],
+      "rooms": [
+        "cafe",
+        "office",
+        "lab",
+        "hall",
+        "lounge",
+        "studio"
+      ],
+      "height": 42,
+      "base": "centred",
+      "walk": "blocked",
+      "layer": "object",
+      "use": {
+        "face": "any",
+        "actions": [
+          "use"
+        ]
+      }
     },
     "plant.fern": {
       "footprint": [
@@ -2435,7 +5525,22 @@
             16
           ]
         }
-      }
+      },
+      "rotation": "mirror",
+      "name": "Fern",
+      "category": "plant",
+      "tags": [
+        "plant",
+        "fern"
+      ],
+      "rooms": [
+        "lounge"
+      ],
+      "height": 15,
+      "base": "centred",
+      "sameFromBehind": true,
+      "walk": "blocked",
+      "layer": "object"
     },
     "plant.fiddle": {
       "footprint": [
@@ -2458,6 +5563,27 @@
             50
           ]
         }
+      },
+      "rotation": "mirror",
+      "name": "Fiddle-leaf fig",
+      "category": "plant",
+      "tags": [
+        "plant",
+        "fiddle"
+      ],
+      "rooms": [
+        "studio"
+      ],
+      "height": 33,
+      "base": "centred",
+      "sameFromBehind": true,
+      "walk": "blocked",
+      "layer": "object",
+      "use": {
+        "face": "any",
+        "actions": [
+          "use"
+        ]
       }
     },
     "plant.ivy": {
@@ -2481,6 +5607,27 @@
             33
           ]
         }
+      },
+      "rotation": "mirror",
+      "name": "Ivy",
+      "category": "plant",
+      "tags": [
+        "plant",
+        "ivy"
+      ],
+      "rooms": [
+        "lounge"
+      ],
+      "height": 23,
+      "base": "centred",
+      "sameFromBehind": true,
+      "walk": "blocked",
+      "layer": "object",
+      "use": {
+        "face": "any",
+        "actions": [
+          "use"
+        ]
       }
     },
     "plant.pothos": {
@@ -2493,7 +5640,27 @@
       "anchor": [
         17,
         19
-      ]
+      ],
+      "rotation": "radial",
+      "name": "Pothos",
+      "category": "plant",
+      "tags": [
+        "plant",
+        "pothos"
+      ],
+      "rooms": [
+        "studio"
+      ],
+      "height": 17,
+      "base": "centred",
+      "walk": "blocked",
+      "layer": "object",
+      "use": {
+        "face": "any",
+        "actions": [
+          "use"
+        ]
+      }
     },
     "plant.snake": {
       "footprint": [
@@ -2516,6 +5683,27 @@
             38
           ]
         }
+      },
+      "rotation": "mirror",
+      "name": "Snake plant",
+      "category": "plant",
+      "tags": [
+        "plant",
+        "snake"
+      ],
+      "rooms": [
+        "studio"
+      ],
+      "height": 27,
+      "base": "centred",
+      "sameFromBehind": true,
+      "walk": "blocked",
+      "layer": "object",
+      "use": {
+        "face": "any",
+        "actions": [
+          "use"
+        ]
       }
     },
     "planter.brass": {
@@ -2539,7 +5727,23 @@
             49
           ]
         }
-      }
+      },
+      "rotation": "mirror",
+      "name": "Brass planter",
+      "category": "plant",
+      "tags": [
+        "planter",
+        "brass",
+        "plant"
+      ],
+      "rooms": [
+        "lobby"
+      ],
+      "height": 32,
+      "base": "centred",
+      "sameFromBehind": true,
+      "walk": "blocked",
+      "layer": "object"
     },
     "plinth": {
       "footprint": [
@@ -2562,7 +5766,23 @@
             16
           ]
         }
-      }
+      },
+      "rotation": "mirror",
+      "name": "Plinth",
+      "category": "decor",
+      "tags": [
+        "plinth",
+        "decor"
+      ],
+      "rooms": [
+        "lobby"
+      ],
+      "height": 17,
+      "base": "centred",
+      "sameFromBehind": true,
+      "walk": "blocked",
+      "layer": "object",
+      "surface": 12.5
     },
     "podium": {
       "footprint": [
@@ -2585,7 +5805,21 @@
             48
           ]
         }
-      }
+      },
+      "rotation": "mirror",
+      "name": "Podium",
+      "category": "decor",
+      "tags": [
+        "podium",
+        "decor"
+      ],
+      "rooms": [
+        "hall"
+      ],
+      "height": 31,
+      "base": "centred",
+      "walk": "blocked",
+      "layer": "object"
     },
     "pool-table": {
       "footprint": [
@@ -2608,6 +5842,27 @@
             42
           ]
         }
+      },
+      "rotation": "mirror",
+      "name": "Pool table",
+      "category": "play",
+      "tags": [
+        "pool",
+        "table",
+        "play"
+      ],
+      "rooms": [
+        "arcade"
+      ],
+      "height": 31,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object",
+      "use": {
+        "face": "any",
+        "actions": [
+          "use"
+        ]
       }
     },
     "popcorn-cart": {
@@ -2622,21 +5877,53 @@
           "anchor": [
             21,
             36
-          ]
+          ],
+          "light": {
+            "x": 21,
+            "y": 20,
+            "r": 26
+          }
         },
-        "nw": {
-          "file": "popcorn-cart.nw.png",
+        "ne": {
+          "file": "popcorn-cart.ne.png",
           "anchor": [
             21,
             36
-          ]
+          ],
+          "light": {
+            "x": 22,
+            "y": 21,
+            "r": 26
+          }
         }
       },
       "light": {
         "x": 21,
         "y": 20,
         "r": 26
-      }
+      },
+      "rotation": "mirror",
+      "name": "Popcorn cart",
+      "category": "appliance",
+      "tags": [
+        "popcorn",
+        "cart",
+        "appliance"
+      ],
+      "rooms": [
+        "arcade"
+      ],
+      "height": 24,
+      "base": "centred",
+      "walk": "blocked",
+      "layer": "object",
+      "use": {
+        "face": "front",
+        "actions": [
+          "vend"
+        ]
+      },
+      "animated": true
     },
     "poster.ship": {
       "footprint": [
@@ -2655,7 +5942,21 @@
           46
         ],
         "margin": 0.14
-      }
+      },
+      "rotation": "flat",
+      "name": "Poster: Ship it",
+      "category": "wall-art",
+      "tags": [
+        "poster",
+        "ship",
+        "wall-art"
+      ],
+      "rooms": [
+        "office"
+      ],
+      "height": 26,
+      "walk": "open",
+      "layer": "wall"
     },
     "print.poster": {
       "footprint": [
@@ -2674,7 +5975,21 @@
           46
         ],
         "margin": 0.14
-      }
+      },
+      "rotation": "flat",
+      "name": "Art print",
+      "category": "wall-art",
+      "tags": [
+        "print",
+        "poster",
+        "wall-art"
+      ],
+      "rooms": [
+        "studio"
+      ],
+      "height": 26,
+      "walk": "open",
+      "layer": "wall"
     },
     "prize-counter": {
       "footprint": [
@@ -2688,20 +6003,50 @@
           "anchor": [
             32,
             42
-          ]
+          ],
+          "light": {
+            "x": 48,
+            "y": 30,
+            "r": 34
+          }
         },
         "ne": {
           "file": "prize-counter.ne.png",
           "anchor": [
             32,
             35
-          ]
+          ],
+          "light": {
+            "x": 48,
+            "y": 23,
+            "r": 34
+          }
         }
       },
       "light": {
         "x": 48,
         "y": 30,
         "r": 34
+      },
+      "rotation": "mirror",
+      "name": "Prize counter",
+      "category": "counter",
+      "tags": [
+        "prize",
+        "counter"
+      ],
+      "rooms": [
+        "arcade"
+      ],
+      "height": 27,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object",
+      "use": {
+        "face": "front",
+        "actions": [
+          "vend"
+        ]
       }
     },
     "reception": {
@@ -2725,7 +6070,21 @@
             47
           ]
         }
-      }
+      },
+      "rotation": "mirror",
+      "name": "Reception desk",
+      "category": "counter",
+      "tags": [
+        "reception",
+        "counter"
+      ],
+      "rooms": [
+        "lobby"
+      ],
+      "height": 38,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object"
     },
     "reeds": {
       "footprint": [
@@ -2737,7 +6096,21 @@
       "anchor": [
         28,
         38
-      ]
+      ],
+      "rotation": "radial",
+      "name": "Reeds",
+      "category": "nature",
+      "tags": [
+        "reeds",
+        "nature"
+      ],
+      "rooms": [
+        "outdoors"
+      ],
+      "height": 23,
+      "base": "centred",
+      "walk": "open",
+      "layer": "object"
     },
     "register": {
       "footprint": [
@@ -2759,8 +6132,36 @@
             18,
             19
           ]
+        },
+        "se": {
+          "file": "register.se.png",
+          "anchor": [
+            16,
+            14
+          ]
+        },
+        "nw": {
+          "file": "register.nw.png",
+          "anchor": [
+            16,
+            14
+          ]
         }
-      }
+      },
+      "rotation": "full",
+      "name": "Cash register",
+      "category": "appliance",
+      "tags": [
+        "register",
+        "appliance"
+      ],
+      "rooms": [
+        "cafe"
+      ],
+      "height": 13,
+      "base": "centred",
+      "walk": "blocked",
+      "layer": "surface"
     },
     "rocket-model": {
       "footprint": [
@@ -2783,6 +6184,28 @@
             80
           ]
         }
+      },
+      "rotation": "mirror",
+      "name": "Rocket model",
+      "category": "decor",
+      "tags": [
+        "rocket",
+        "model",
+        "decor"
+      ],
+      "rooms": [
+        "lab"
+      ],
+      "height": 48,
+      "base": "centred",
+      "walk": "blocked",
+      "layer": "object",
+      "use": {
+        "face": "any",
+        "actions": [
+          "use",
+          "artifact"
+        ]
       }
     },
     "rocket-statue": {
@@ -2795,7 +6218,65 @@
       "anchor": [
         36,
         67
-      ]
+      ],
+      "rotation": "radial",
+      "name": "Rocket statue",
+      "category": "landmark",
+      "tags": [
+        "rocket",
+        "statue",
+        "landmark"
+      ],
+      "rooms": [
+        "outdoors"
+      ],
+      "height": 38,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object",
+      "use": {
+        "face": "any",
+        "actions": [
+          "artifact"
+        ]
+      }
+    },
+    "scarecrow": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "facings": {
+        "se": {
+          "file": "scarecrow.se.png",
+          "anchor": [
+            28,
+            49
+          ]
+        },
+        "nw": {
+          "file": "scarecrow.nw.png",
+          "anchor": [
+            28,
+            47
+          ]
+        }
+      },
+      "rotation": "mirror",
+      "name": "Scarecrow",
+      "category": "street",
+      "tags": [
+        "scarecrow",
+        "street"
+      ],
+      "rooms": [
+        "outdoors"
+      ],
+      "height": 29,
+      "base": "centred",
+      "walk": "blocked",
+      "layer": "object"
     },
     "screen.countdown": {
       "footprint": [
@@ -2814,7 +6295,75 @@
           44
         ],
         "margin": 0.06
-      }
+      },
+      "rotation": "flat",
+      "name": "Countdown screen",
+      "category": "wall-art",
+      "tags": [
+        "screen",
+        "countdown",
+        "wall-art"
+      ],
+      "rooms": [
+        "lab"
+      ],
+      "height": 16,
+      "walk": "open",
+      "layer": "wall"
+    },
+    "sculpture.cairn": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "sculpture.cairn.png",
+      "anchor": [
+        25,
+        68
+      ],
+      "rotation": "radial",
+      "name": "Stone cairn",
+      "category": "decor",
+      "tags": [
+        "sculpture",
+        "cairn",
+        "decor"
+      ],
+      "rooms": [
+        "outdoors"
+      ],
+      "height": 38,
+      "base": "centred",
+      "walk": "blocked",
+      "layer": "object"
+    },
+    "sculpture.sphere": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "sculpture.sphere.png",
+      "anchor": [
+        29,
+        87
+      ],
+      "rotation": "radial",
+      "name": "Armillary sphere",
+      "category": "decor",
+      "tags": [
+        "sculpture",
+        "sphere",
+        "decor"
+      ],
+      "rooms": [
+        "outdoors"
+      ],
+      "height": 48,
+      "base": "centred",
+      "walk": "blocked",
+      "layer": "object"
     },
     "server-rack": {
       "footprint": [
@@ -2837,7 +6386,29 @@
             82
           ]
         }
-      }
+      },
+      "rotation": "mirror",
+      "name": "Server rack",
+      "category": "appliance",
+      "tags": [
+        "server",
+        "rack",
+        "appliance"
+      ],
+      "rooms": [
+        "office"
+      ],
+      "height": 45,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object",
+      "use": {
+        "face": "front",
+        "actions": [
+          "use"
+        ]
+      },
+      "animated": true
     },
     "side-table.walnut": {
       "footprint": [
@@ -2851,20 +6422,52 @@
           "anchor": [
             17,
             35
-          ]
+          ],
+          "light": {
+            "x": 18,
+            "y": 8,
+            "r": 34
+          }
         },
         "nw": {
           "file": "side-table.walnut.nw.png",
           "anchor": [
             17,
             35
-          ]
+          ],
+          "light": {
+            "x": 16,
+            "y": 8,
+            "r": 34
+          }
         }
       },
       "light": {
         "x": 18,
         "y": 8,
         "r": 34
+      },
+      "rotation": "mirror",
+      "name": "Walnut side table",
+      "category": "table",
+      "tags": [
+        "side",
+        "table",
+        "walnut"
+      ],
+      "rooms": [
+        "lounge"
+      ],
+      "height": 25,
+      "base": "centred",
+      "sameFromBehind": true,
+      "walk": "blocked",
+      "layer": "object",
+      "use": {
+        "face": "front",
+        "actions": [
+          "toggle"
+        ]
       }
     },
     "sign-quiet": {
@@ -2884,6 +6487,26 @@
           40
         ],
         "margin": 0.18
+      },
+      "rotation": "flat",
+      "name": "Quiet sign",
+      "category": "wall-art",
+      "tags": [
+        "sign",
+        "quiet",
+        "wall-art"
+      ],
+      "rooms": [
+        "lounge"
+      ],
+      "height": 14,
+      "walk": "open",
+      "layer": "wall",
+      "use": {
+        "face": "front",
+        "actions": [
+          "info"
+        ]
       }
     },
     "signpost": {
@@ -2892,11 +6515,56 @@
         1
       ],
       "fit": "anchor",
-      "file": "signpost.png",
-      "anchor": [
-        30,
-        90
-      ]
+      "rotation": "full",
+      "name": "Signpost",
+      "category": "street",
+      "tags": [
+        "signpost",
+        "street"
+      ],
+      "rooms": [
+        "outdoors"
+      ],
+      "height": 44,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object",
+      "use": {
+        "face": "front",
+        "actions": [
+          "info"
+        ]
+      },
+      "facings": {
+        "se": {
+          "file": "signpost.png",
+          "anchor": [
+            33,
+            79
+          ]
+        },
+        "sw": {
+          "file": "signpost.sw.png",
+          "anchor": [
+            36,
+            77
+          ]
+        },
+        "nw": {
+          "file": "signpost.nw.png",
+          "anchor": [
+            35,
+            77
+          ]
+        },
+        "ne": {
+          "file": "signpost.ne.png",
+          "anchor": [
+            30,
+            80
+          ]
+        }
+      }
     },
     "speaker": {
       "footprint": [
@@ -2919,7 +6587,21 @@
             60
           ]
         }
-      }
+      },
+      "rotation": "mirror",
+      "name": "Speaker",
+      "category": "appliance",
+      "tags": [
+        "speaker",
+        "appliance"
+      ],
+      "rooms": [
+        "hall"
+      ],
+      "height": 37,
+      "base": "centred",
+      "walk": "blocked",
+      "layer": "object"
     },
     "stanchion": {
       "footprint": [
@@ -2935,14 +6617,43 @@
             22
           ]
         },
-        "nw": {
-          "file": "stanchion.nw.png",
+        "sw": {
+          "file": "stanchion.sw.png",
           "anchor": [
             13,
             22
           ]
+        },
+        "nw": {
+          "file": "stanchion.nw.png",
+          "anchor": [
+            16,
+            22
+          ]
+        },
+        "ne": {
+          "file": "stanchion.ne.png",
+          "anchor": [
+            10,
+            22
+          ]
         }
-      }
+      },
+      "rotation": "full",
+      "name": "Stanchion",
+      "category": "decor",
+      "tags": [
+        "stanchion",
+        "decor"
+      ],
+      "rooms": [
+        "lobby",
+        "lab"
+      ],
+      "height": 19,
+      "base": "centred",
+      "walk": "blocked",
+      "layer": "object"
     },
     "star-map": {
       "footprint": [
@@ -2961,6 +6672,106 @@
           48
         ],
         "margin": 0.06
+      },
+      "rotation": "flat",
+      "name": "Star map",
+      "category": "wall-art",
+      "tags": [
+        "star",
+        "map",
+        "wall-art"
+      ],
+      "rooms": [
+        "lab"
+      ],
+      "height": 32,
+      "walk": "open",
+      "layer": "wall"
+    },
+    "steampunk-coffee-machine": {
+      "name": "Steampunk espresso machine",
+      "category": "appliance",
+      "tags": [
+        "steampunk",
+        "coffee",
+        "machine",
+        "appliance"
+      ],
+      "rooms": [
+        "lounge",
+        "lobby",
+        "cafe",
+        "lab"
+      ],
+      "footprint": [
+        1,
+        1
+      ],
+      "height": 40,
+      "rotation": "full",
+      "themes": [
+        "warm"
+      ],
+      "layer": "object",
+      "walk": "blocked",
+      "use": {
+        "face": "front",
+        "actions": [
+          "vend",
+          "toggle"
+        ]
+      },
+      "base": "filled",
+      "fit": "anchor",
+      "facings": {
+        "ne": {
+          "file": "steampunk-coffee-machine.ne.png",
+          "anchor": [
+            32,
+            62
+          ],
+          "light": {
+            "x": 32,
+            "y": 28,
+            "r": 40
+          }
+        },
+        "nw": {
+          "file": "steampunk-coffee-machine.nw.png",
+          "anchor": [
+            32,
+            62
+          ],
+          "light": {
+            "x": 32,
+            "y": 28,
+            "r": 40
+          }
+        },
+        "se": {
+          "file": "steampunk-coffee-machine.se.png",
+          "anchor": [
+            32,
+            71
+          ],
+          "light": {
+            "x": 32,
+            "y": 31,
+            "r": 40
+          }
+        },
+        "sw": {
+          "file": "steampunk-coffee-machine.sw.png",
+          "anchor": [
+            32,
+            68
+          ],
+          "light": {
+            "x": 32,
+            "y": 30,
+            "r": 40
+          }
+        }
       }
     },
     "stool": {
@@ -2974,7 +6785,34 @@
         18,
         38
       ],
-      "seat": 17
+      "seat": 21.9,
+      "seatDepth": 0,
+      "sitStyle": "stool",
+      "backrest": false,
+      "rotation": "radial",
+      "name": "Stool",
+      "category": "seating",
+      "tags": [
+        "stool",
+        "seating"
+      ],
+      "rooms": [
+        "cafe",
+        "lab",
+        "arcade",
+        "studio"
+      ],
+      "height": 25,
+      "base": "centred",
+      "walk": "seat",
+      "layer": "object",
+      "use": {
+        "face": "front",
+        "actions": [
+          "sit"
+        ]
+      },
+      "backDepth": 0
     },
     "stool.drafting": {
       "footprint": [
@@ -2998,7 +6836,33 @@
           ]
         }
       },
-      "seat": 17
+      "seat": 16.7,
+      "seatDepth": 0,
+      "sitStyle": "stool",
+      "backrest": false,
+      "rotation": "mirror",
+      "name": "Drafting stool",
+      "category": "seating",
+      "tags": [
+        "stool",
+        "drafting",
+        "seating"
+      ],
+      "rooms": [
+        "studio"
+      ],
+      "height": 20,
+      "base": "centred",
+      "sameFromBehind": true,
+      "walk": "seat",
+      "layer": "object",
+      "use": {
+        "face": "front",
+        "actions": [
+          "sit"
+        ]
+      },
+      "backDepth": 0
     },
     "stool.neon": {
       "footprint": [
@@ -3011,7 +6875,61 @@
         15,
         31
       ],
-      "seat": 17
+      "seat": 19.7,
+      "seatDepth": 0,
+      "sitStyle": "stool",
+      "backrest": false,
+      "rotation": "radial",
+      "name": "Neon stool",
+      "category": "seating",
+      "tags": [
+        "stool",
+        "neon",
+        "seating"
+      ],
+      "rooms": [
+        "arcade"
+      ],
+      "themes": [
+        "neon"
+      ],
+      "height": 23,
+      "base": "centred",
+      "walk": "seat",
+      "layer": "object",
+      "use": {
+        "face": "front",
+        "actions": [
+          "sit"
+        ]
+      },
+      "backDepth": 0
+    },
+    "stump": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "stump.png",
+      "anchor": [
+        23,
+        14
+      ],
+      "rotation": "radial",
+      "name": "Stump",
+      "category": "nature",
+      "tags": [
+        "stump",
+        "nature"
+      ],
+      "rooms": [
+        "outdoors"
+      ],
+      "height": 11,
+      "base": "centred",
+      "walk": "blocked",
+      "layer": "object"
     },
     "swatches": {
       "footprint": [
@@ -3030,7 +6948,20 @@
           46
         ],
         "margin": 0.08
-      }
+      },
+      "rotation": "flat",
+      "name": "Colour swatches",
+      "category": "wall-art",
+      "tags": [
+        "swatches",
+        "wall-art"
+      ],
+      "rooms": [
+        "studio"
+      ],
+      "height": 26,
+      "walk": "open",
+      "layer": "wall"
     },
     "table-high.neon": {
       "footprint": [
@@ -3053,7 +6984,26 @@
             37
           ]
         }
-      }
+      },
+      "rotation": "mirror",
+      "name": "Neon high table",
+      "category": "table",
+      "tags": [
+        "table",
+        "high",
+        "neon"
+      ],
+      "rooms": [
+        "arcade"
+      ],
+      "themes": [
+        "neon"
+      ],
+      "height": 26,
+      "base": "centred",
+      "sameFromBehind": true,
+      "walk": "blocked",
+      "layer": "object"
     },
     "table-long": {
       "footprint": [
@@ -3076,7 +7026,22 @@
             45
           ]
         }
-      }
+      },
+      "rotation": "mirror",
+      "name": "Long table",
+      "category": "table",
+      "tags": [
+        "table",
+        "long"
+      ],
+      "rooms": [
+        "lab",
+        "studio"
+      ],
+      "height": 35,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object"
     },
     "table-long.light": {
       "footprint": [
@@ -3099,7 +7064,22 @@
             53
           ]
         }
-      }
+      },
+      "rotation": "mirror",
+      "name": "Light long table",
+      "category": "table",
+      "tags": [
+        "table",
+        "long",
+        "light"
+      ],
+      "rooms": [
+        "studio"
+      ],
+      "height": 37,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object"
     },
     "table-low": {
       "footprint": [
@@ -3111,7 +7091,27 @@
       "anchor": [
         32,
         19
-      ]
+      ],
+      "rotation": "mirror",
+      "name": "Coffee table",
+      "category": "table",
+      "tags": [
+        "table",
+        "low"
+      ],
+      "rooms": [
+        "lobby",
+        "cafe",
+        "office",
+        "lab",
+        "arcade",
+        "studio"
+      ],
+      "height": 16,
+      "base": "filled",
+      "sameFromBehind": true,
+      "walk": "blocked",
+      "layer": "object"
     },
     "table-low.side": {
       "footprint": [
@@ -3123,7 +7123,24 @@
       "anchor": [
         21,
         27
-      ]
+      ],
+      "rotation": "radial",
+      "name": "Low side table",
+      "category": "table",
+      "tags": [
+        "table",
+        "low",
+        "side"
+      ],
+      "rooms": [
+        "office",
+        "lab",
+        "arcade"
+      ],
+      "height": 20,
+      "base": "centred",
+      "walk": "blocked",
+      "layer": "object"
     },
     "table-round": {
       "footprint": [
@@ -3135,7 +7152,24 @@
       "anchor": [
         30,
         45
-      ]
+      ],
+      "rotation": "radial",
+      "name": "Round table",
+      "category": "table",
+      "tags": [
+        "table",
+        "round"
+      ],
+      "rooms": [
+        "cafe",
+        "hall",
+        "lounge",
+        "studio"
+      ],
+      "height": 27,
+      "base": "centred",
+      "walk": "blocked",
+      "layer": "object"
     },
     "table-side.brass": {
       "footprint": [
@@ -3158,7 +7192,23 @@
             34
           ]
         }
-      }
+      },
+      "rotation": "mirror",
+      "name": "Brass side table",
+      "category": "table",
+      "tags": [
+        "table",
+        "side",
+        "brass"
+      ],
+      "rooms": [
+        "lobby"
+      ],
+      "height": 24,
+      "base": "centred",
+      "sameFromBehind": true,
+      "walk": "blocked",
+      "layer": "object"
     },
     "time-capsule": {
       "footprint": [
@@ -3166,11 +7216,97 @@
         1
       ],
       "fit": "anchor",
-      "file": "time-capsule.png",
+      "rotation": "mirror",
+      "name": "Time capsule",
+      "category": "decor",
+      "tags": [
+        "time",
+        "capsule",
+        "decor"
+      ],
+      "rooms": [
+        "lobby"
+      ],
+      "height": 32,
+      "base": "centred",
+      "walk": "blocked",
+      "layer": "object",
+      "use": {
+        "face": "any",
+        "actions": [
+          "artifact"
+        ]
+      },
+      "facings": {
+        "sw": {
+          "file": "time-capsule.png",
+          "anchor": [
+            22,
+            57
+          ]
+        },
+        "ne": {
+          "file": "time-capsule.ne.png",
+          "anchor": [
+            22,
+            53
+          ]
+        }
+      }
+    },
+    "tree/apple.a": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "tree/apple.a.png",
       "anchor": [
-        22,
-        57
-      ]
+        58,
+        107
+      ],
+      "rotation": "radial",
+      "name": "Tree apple",
+      "category": "nature",
+      "tags": [
+        "tree",
+        "apple",
+        "nature"
+      ],
+      "rooms": [
+        "outdoors"
+      ],
+      "height": 58,
+      "base": "centred",
+      "walk": "blocked",
+      "layer": "object"
+    },
+    "tree/apple.b": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "tree/apple.b.png",
+      "anchor": [
+        55,
+        103
+      ],
+      "rotation": "radial",
+      "name": "Tree apple",
+      "category": "nature",
+      "tags": [
+        "tree",
+        "apple",
+        "nature"
+      ],
+      "rooms": [
+        "outdoors"
+      ],
+      "height": 56,
+      "base": "centred",
+      "walk": "blocked",
+      "layer": "object"
     },
     "tree/birch.a": {
       "footprint": [
@@ -3182,7 +7318,22 @@
       "anchor": [
         40,
         121
-      ]
+      ],
+      "rotation": "radial",
+      "name": "Tree birch",
+      "category": "nature",
+      "tags": [
+        "tree",
+        "birch",
+        "nature"
+      ],
+      "rooms": [
+        "outdoors"
+      ],
+      "height": 65,
+      "base": "centred",
+      "walk": "blocked",
+      "layer": "object"
     },
     "tree/birch.b": {
       "footprint": [
@@ -3194,7 +7345,22 @@
       "anchor": [
         43,
         104
-      ]
+      ],
+      "rotation": "radial",
+      "name": "Tree birch",
+      "category": "nature",
+      "tags": [
+        "tree",
+        "birch",
+        "nature"
+      ],
+      "rooms": [
+        "outdoors"
+      ],
+      "height": 56,
+      "base": "centred",
+      "walk": "blocked",
+      "layer": "object"
     },
     "tree/oak-big": {
       "footprint": [
@@ -3206,7 +7372,29 @@
       "anchor": [
         102,
         115
-      ]
+      ],
+      "rotation": "radial",
+      "name": "Tree oak big",
+      "category": "nature",
+      "tags": [
+        "tree",
+        "oak",
+        "big",
+        "nature"
+      ],
+      "rooms": [
+        "outdoors"
+      ],
+      "height": 70,
+      "base": "centred",
+      "walk": "blocked",
+      "layer": "object",
+      "use": {
+        "face": "any",
+        "actions": [
+          "artifact"
+        ]
+      }
     },
     "tree/pine.a": {
       "footprint": [
@@ -3218,7 +7406,22 @@
       "anchor": [
         46,
         146
-      ]
+      ],
+      "rotation": "radial",
+      "name": "Tree pine",
+      "category": "nature",
+      "tags": [
+        "tree",
+        "pine",
+        "nature"
+      ],
+      "rooms": [
+        "outdoors"
+      ],
+      "height": 77,
+      "base": "centred",
+      "walk": "blocked",
+      "layer": "object"
     },
     "tree/pine.b": {
       "footprint": [
@@ -3230,7 +7433,22 @@
       "anchor": [
         48,
         118
-      ]
+      ],
+      "rotation": "radial",
+      "name": "Tree pine",
+      "category": "nature",
+      "tags": [
+        "tree",
+        "pine",
+        "nature"
+      ],
+      "rooms": [
+        "outdoors"
+      ],
+      "height": 63,
+      "base": "centred",
+      "walk": "blocked",
+      "layer": "object"
     },
     "tree/round.a": {
       "footprint": [
@@ -3242,7 +7460,22 @@
       "anchor": [
         62,
         120
-      ]
+      ],
+      "rotation": "radial",
+      "name": "Tree round",
+      "category": "nature",
+      "tags": [
+        "tree",
+        "round",
+        "nature"
+      ],
+      "rooms": [
+        "outdoors"
+      ],
+      "height": 64,
+      "base": "centred",
+      "walk": "blocked",
+      "layer": "object"
     },
     "tree/round.b": {
       "footprint": [
@@ -3254,7 +7487,22 @@
       "anchor": [
         74,
         117
-      ]
+      ],
+      "rotation": "radial",
+      "name": "Tree round",
+      "category": "nature",
+      "tags": [
+        "tree",
+        "round",
+        "nature"
+      ],
+      "rooms": [
+        "outdoors"
+      ],
+      "height": 63,
+      "base": "centred",
+      "walk": "blocked",
+      "layer": "object"
     },
     "trophy-case": {
       "footprint": [
@@ -3277,6 +7525,27 @@
             77
           ]
         }
+      },
+      "rotation": "mirror",
+      "name": "Trophy case",
+      "category": "storage",
+      "tags": [
+        "trophy",
+        "case",
+        "storage"
+      ],
+      "rooms": [
+        "lobby"
+      ],
+      "height": 47,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object",
+      "use": {
+        "face": "front",
+        "actions": [
+          "artifact"
+        ]
       }
     },
     "umbrella-table.red": {
@@ -3289,7 +7558,22 @@
       "anchor": [
         56,
         131
-      ]
+      ],
+      "rotation": "radial",
+      "name": "Red umbrella table",
+      "category": "table",
+      "tags": [
+        "umbrella",
+        "table",
+        "red"
+      ],
+      "rooms": [
+        "outdoors"
+      ],
+      "height": 70,
+      "base": "centred",
+      "walk": "blocked",
+      "layer": "object"
     },
     "umbrella-table.teal": {
       "footprint": [
@@ -3301,7 +7585,22 @@
       "anchor": [
         55,
         131
-      ]
+      ],
+      "rotation": "radial",
+      "name": "Teal umbrella table",
+      "category": "table",
+      "tags": [
+        "umbrella",
+        "table",
+        "teal"
+      ],
+      "rooms": [
+        "outdoors"
+      ],
+      "height": 70,
+      "base": "centred",
+      "walk": "blocked",
+      "layer": "object"
     },
     "vending-machine": {
       "footprint": [
@@ -3313,23 +7612,83 @@
         "sw": {
           "file": "vending-machine.sw.png",
           "anchor": [
-            32,
-            62
-          ]
+            25,
+            65
+          ],
+          "light": {
+            "x": 22,
+            "y": 30,
+            "r": 30
+          }
         },
         "ne": {
           "file": "vending-machine.ne.png",
           "anchor": [
-            32,
-            68
-          ]
+            25,
+            71
+          ],
+          "light": {
+            "x": 28,
+            "y": 36,
+            "r": 30
+          }
+        },
+        "se": {
+          "file": "vending-machine.se.png",
+          "anchor": [
+            25,
+            67
+          ],
+          "light": {
+            "x": 28,
+            "y": 32,
+            "r": 30
+          }
+        },
+        "nw": {
+          "file": "vending-machine.nw.png",
+          "anchor": [
+            25,
+            58
+          ],
+          "light": {
+            "x": 28,
+            "y": 23,
+            "r": 30
+          }
         }
       },
       "light": {
         "x": 22,
         "y": 30,
         "r": 30
-      }
+      },
+      "rotation": "full",
+      "name": "Vending machine",
+      "category": "appliance",
+      "tags": [
+        "vending",
+        "machine",
+        "appliance"
+      ],
+      "rooms": [
+        "arcade"
+      ],
+      "height": 33,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object",
+      "use": {
+        "face": "front",
+        "actions": [
+          "vend"
+        ]
+      },
+      "animated": true,
+      "still": [
+        "ne",
+        "nw"
+      ]
     },
     "water-cooler": {
       "footprint": [
@@ -3338,21 +7697,50 @@
       ],
       "fit": "anchor",
       "facings": {
-        "se": {
-          "file": "water-cooler.se.png",
+        "sw": {
+          "file": "water-cooler.sw.png",
           "anchor": [
             15,
             54
           ]
         },
+        "se": {
+          "file": "water-cooler.se.png",
+          "anchor": [
+            16,
+            52
+          ]
+        },
         "nw": {
           "file": "water-cooler.nw.png",
           "anchor": [
-            15,
-            54
+            16,
+            52
+          ]
+        },
+        "ne": {
+          "file": "water-cooler.ne.png",
+          "anchor": [
+            16,
+            52
           ]
         }
-      }
+      },
+      "rotation": "full",
+      "name": "Water cooler",
+      "category": "appliance",
+      "tags": [
+        "water",
+        "cooler",
+        "appliance"
+      ],
+      "rooms": [
+        "office"
+      ],
+      "height": 33,
+      "base": "centred",
+      "walk": "blocked",
+      "layer": "object"
     },
     "whiteboard": {
       "footprint": [
@@ -3371,6 +7759,25 @@
           48
         ],
         "margin": 0.08
+      },
+      "rotation": "flat",
+      "name": "Whiteboard",
+      "category": "wall-art",
+      "tags": [
+        "whiteboard",
+        "wall-art"
+      ],
+      "rooms": [
+        "office"
+      ],
+      "height": 32,
+      "walk": "open",
+      "layer": "wall",
+      "use": {
+        "face": "front",
+        "actions": [
+          "info"
+        ]
       }
     },
     "whiteboard-stand": {
@@ -3384,17 +7791,84 @@
           "file": "whiteboard-stand.sw.png",
           "anchor": [
             25,
-            40
+            35
           ]
         },
         "ne": {
           "file": "whiteboard-stand.ne.png",
           "anchor": [
             25,
-            44
+            39
           ]
         }
-      }
+      },
+      "rotation": "mirror",
+      "name": "Whiteboard on a stand",
+      "category": "decor",
+      "tags": [
+        "whiteboard",
+        "stand",
+        "decor"
+      ],
+      "rooms": [
+        "office"
+      ],
+      "height": 24,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object"
+    },
+    "wildflowers.a": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "wildflowers.a.png",
+      "anchor": [
+        35,
+        60
+      ],
+      "rotation": "radial",
+      "name": "Wildflowers",
+      "category": "nature",
+      "tags": [
+        "wildflowers",
+        "nature"
+      ],
+      "rooms": [
+        "outdoors"
+      ],
+      "height": 34,
+      "base": "centred",
+      "walk": "open",
+      "layer": "object"
+    },
+    "wildflowers.b": {
+      "footprint": [
+        1,
+        1
+      ],
+      "fit": "anchor",
+      "file": "wildflowers.b.png",
+      "anchor": [
+        33,
+        63
+      ],
+      "rotation": "radial",
+      "name": "Wildflowers",
+      "category": "nature",
+      "tags": [
+        "wildflowers",
+        "nature"
+      ],
+      "rooms": [
+        "outdoors"
+      ],
+      "height": 36,
+      "base": "centred",
+      "walk": "open",
+      "layer": "object"
     },
     "workbench": {
       "footprint": [
@@ -3417,7 +7891,21 @@
             32
           ]
         }
-      }
+      },
+      "rotation": "mirror",
+      "name": "Workbench",
+      "category": "table",
+      "tags": [
+        "workbench",
+        "table"
+      ],
+      "rooms": [
+        "lab"
+      ],
+      "height": 30,
+      "base": "filled",
+      "walk": "blocked",
+      "layer": "object"
     }
   }
 }

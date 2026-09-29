@@ -5,7 +5,7 @@
 import { useSyncExternalStore } from 'react';
 import type { Bootstrap, PublicConfig, PublicMember } from '@shared/api';
 import type { OrgEvent } from '@shared/domain/types';
-import type { DirectoryEntry, KnockKind, Occupant } from '@shared/protocol';
+import type { BoardNote, DirectoryEntry, KnockKind, Occupant } from '@shared/protocol';
 
 export interface Toast {
   id: number;
@@ -45,6 +45,8 @@ export interface State {
   connection: 'connecting' | 'online' | 'reconnecting';
   sceneId: string | null;
   occupants: Record<string, Occupant>;
+  /** Notes left on the boards of the room you're in. */
+  notes: BoardNote[];
   directory: Record<string, DirectoryEntry>;
   events: OrgEvent[];
   selection: Selection | null;
@@ -89,6 +91,7 @@ let state: State = {
   connection: 'connecting',
   sceneId: null,
   occupants: {},
+  notes: [],
   directory: {},
   events: [],
   selection: null,

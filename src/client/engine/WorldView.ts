@@ -7,17 +7,20 @@ import type { Occupant } from '@shared/protocol';
 import { EMOTES, STATUS_META, type EmoteId } from '@shared/presence';
 import { isoToScreen, screenToIso } from '@shared/iso';
 import type { Facing, NpcDef, SceneDef, SceneObject } from '@shared/world/scene';
-import type { NpcState } from '@shared/protocol';
+import type { BoardNote, MomentKind, NpcState } from '@shared/protocol';
 import { carryMeta } from '@shared/carry';
-import { footprint } from '@shared/world/scene';
-import { positionAlong, type Tile } from '@shared/world/pathfinding';
+import { footprint, isSeat } from '@shared/world/scene';
+import { BACK_COVER_UP, SIT_DROP, SIT_POSE_OF, seatFacing, seatSpots, seenFromBehind, sitterLift, sitterPoint, type SeatProfile, type SeatSpot } from '@shared/world/seats';
+import { pathLength, positionAlong, WALK_SPEED, type Tile } from '@shared/world/pathfinding';
 import { Camera } from './camera';
 import { behind, rectsOverlap, topoSort, type Box, type ScreenRect } from './depth';
 import { Effects } from './effects';
 import { renderOutdoorGround, type GroundLayer } from './ground';
 import { renderInteriorShell, type InteriorLayer } from './interior';
 import { skyAt, windowView, type Sky } from './weather';
-import { artLight, artSeat } from './sprites/art';
+import { drawSurroundings, skyColor } from './surroundings';
+import { artLight, artSeatProfile } from './sprites/art';
+import { backrestMask, mirrorLine } from './sprites/seatFit';
 import { ObjectAnimations } from './animations';
 import { INK_CSS, PAPER, UI_FONT, drawBubble, layoutBubbles, pill, roundRect, type BubbleSpec, type Rect } from './overlays';
 import { AVATAR_CROPS, avatarSprite, usesWheelchair, type Expression, type Pose } from './sprites/avatar';
@@ -63,8 +66,32 @@ interface ActorView {
   bubble?: { text: string; start: number; until: number };
   emotes: Array<{ emoji: string; start: number }>;
   waveUntil: number;
+  /** Briefly working something they used (the jukebox, the cue, the watering can). */
+  workUntil?: number;
   /** Set for a room NPC (a barista): who they are, what they're doing and what's in their hands. */
   npc?: { def: NpcDef; doing?: NpcState['doing']; holding?: string };
+  /** Character life: an emote gesture playing, a quiet idle moment, and when the next one may come. */
+  act?: { kind: ActKind; start: number; until: number };
+  idle?: { kind: 'shift' | 'glance' | 'phone'; start: number; until: number; facing?: Facing };
+  nextIdleAt: number;
+  /** Per-person dance timing (a phase and a tempo), so a room never dances in unison. */
+  groove: { phase: number; tempo: number; dances: boolean };
+  /**
+   * Into or out of a seat (the seat standard): which seat and cushion, and how far in — 0 standing … 1 seated —
+   * easing from `from` to `to` since `start`. Set on arriving at a cushion (before the server confirms),
+   * cleared once they've stood up.
+   */
+  seat?: {
+    objId: string;
+    spot: { x: number; y: number; facing: Facing };
+    from: number;
+    to: number;
+    start: number;
+  };
+  /** After standing up: the step from the seat's tile onto the floor where the server put them. */
+  stepOff?: { x: number; y: number; start: number; objId: string };
+  /** Moved along a seat without a walk (the server shifted them a cushion over): the slide from where they were. */
+  glide?: { x: number; y: number; start: number; ms: number };
   /** Next idle blink (performance.now ms) and when the current one ends. */
   blinkAt: number;
   blinkUntil: number;
@@ -73,44 +100,94 @@ interface ActorView {
   sy: number;
 }
 
+type ActKind = 'clap' | 'cheer' | 'laugh' | 'thumbs' | 'heart' | 'idea' | 'dance';
+
+/** Which emotes the body acts out, and for how long (ms). */
+const EMOTE_ACT: Partial<Record<EmoteId, { kind: ActKind; ms: number }>> = {
+  clap: { kind: 'clap', ms: 1500 },
+  celebrate: { kind: 'cheer', ms: 1500 },
+  laugh: { kind: 'laugh', ms: 1300 },
+  thumbs: { kind: 'thumbs', ms: 1300 },
+  heart: { kind: 'heart', ms: 1500 },
+  idea: { kind: 'idea', ms: 1300 },
+  dance: { kind: 'dance', ms: 8000 },
+};
+
+/** A person's own groove, stable per member: most dance at a party, each at their own phase and tempo. */
+function grooveOf(memberId: string) {
+  let h = 2166136261;
+  for (let i = 0; i < memberId.length; i++) h = Math.imul(h ^ memberId.charCodeAt(i), 16777619);
+  const u = (k: number) => ((h >>> k) & 255) / 255;
+  return { phase: u(0) * 4, tempo: 3.2 + u(8) * 1.4, dances: u(16) < 0.75 };
+}
+
 const facingFrom = (dx: number, dy: number, prev: Facing): Facing => {
   if (Math.abs(dx) < 1e-6 && Math.abs(dy) < 1e-6) return prev;
   if (Math.abs(dx) >= Math.abs(dy)) return dx > 0 ? 'se' : 'nw';
   return dy > 0 ? 'sw' : 'ne';
 };
 
-const SEAT_LIFT: Record<string, number> = { chair: 5, bench: 5, stool: 7, couch: 4, armchair: 4, beanbag: 1 };
 /**
- * How each kind of seat is sat in. `back`: it has a backrest, which hides a sitter who faces away (a stool or
- * beanbag never covers its sitter). `fwd`: where the cushion is, in tiles forward of the tile centre along
- * the way the seat faces — a thick backrest (a throne) pushes the sitter forward onto the cushion.
+ * Getting into and out of a seat (the seat standard, src/shared/world/seats.ts): turn to the seat's facing,
+ * crouch, then into the seat, settling the last couple of px; standing up is the reverse, then a step off onto
+ * the floor. Milliseconds; the crouch holds the first part of the way in (the last part of the way out).
  */
-const SEAT_STYLE: Record<string, { back: boolean; fwd: number }> = {
-  chair: { back: true, fwd: 0 },
-  armchair: { back: true, fwd: 0.04 },
-  couch: { back: true, fwd: 0.04 },
-  'heirloom-throne': { back: true, fwd: 0.16 },
-  stool: { back: false, fwd: 0 },
-  beanbag: { back: false, fwd: 0 },
-  bench: { back: false, fwd: 0 },
-};
-const seatStyle = (sprite: string) => SEAT_STYLE[sprite] ?? { back: true, fwd: 0 };
-/** The haze around the town, by phase. */
-const OUTDOOR_BG: Record<Sky['phase'], [string, string]> = {
-  day: ['#bfe7ef', '#f7ecd9'],
-  dawn: ['#f3cdbd', '#fbe6cc'],
-  dusk: ['#7d6a9a', '#e9ae90'],
-  night: ['#161c36', '#262c4c'],
-};
+const SIT_DOWN_MS = 180;
+const STAND_UP_MS = 150;
+const STEP_OFF_MS = 260;
+const CROUCH_UNTIL = 0.4;
+/** How far above the cushion (world px) a sitter is as they start to settle into it. */
+const SETTLE = 2;
+/** A sit the server hasn't confirmed by now didn't happen (someone else took the cushion). */
+const SIT_UNCONFIRMED_MS = 1500;
+
 /**
- * The town's light by phase (multiplied over it, lamp pools cut out). Deeper than indoors: outside at night
- * the street lamps and lit windows should carry the picture.
+ * Seen from behind, the part of a seat's drawing that covers its sitter — all of it but the cushion behind
+ * them (seatFit.backrestMask) — worked out once per drawing.
  */
-const OUTDOOR_MOOD: Record<string, [string, number] | undefined> = {
-  night: ['#3f4a8c', 0.84],
-  dusk: ['#e79c7c', 0.48],
-  dawn: ['#ffcdb8', 0.28],
+const backrests = new WeakMap<Sprite, HTMLCanvasElement | null>();
+function backrestOverlay(sp: Sprite, o: SceneObject, facing: Facing, profile: SeatProfile): HTMLCanvasElement | null {
+  if (backrests.has(sp)) return backrests.get(sp)!;
+  let out: HTMLCanvasElement | null = null;
+  // the seat maths works in the art's own px (2× density); a classic sprite just keeps its sitter in front
+  if ((sp.scale ?? 1) === 2) {
+    const W = sp.canvas.width;
+    const H = sp.canvas.height;
+    const src = sp.canvas.getContext('2d')!.getImageData(0, 0, W, H);
+    // a backrest line is traced on the drawn back view; this drawing may be its mirror
+    const partner = facing === 'ne' ? 'nw' : 'ne';
+    const drawn = sp.mirrored ? profile.backLine?.[partner] : profile.backLine?.[facing as 'ne' | 'nw'];
+    const line = drawn && sp.mirrored ? mirrorLine(drawn, W) : drawn;
+    const mask = backrestMask({ px: { w: W, h: H, d: src.data }, ax: sp.ax, ay: sp.ay }, o.w ?? 1, o.d ?? 1, profile, facing as 'ne' | 'nw', line);
+    const img = new ImageData(W, H);
+    for (let i = 0; i < mask.length; i++) if (mask[i]) img.data.set(src.data.subarray(i * 4, i * 4 + 4), i * 4);
+    out = document.createElement('canvas');
+    out.width = W;
+    out.height = H;
+    out.getContext('2d')!.putImageData(img, 0, 0);
+  }
+  backrests.set(sp, out);
+  return out;
+}
+/**
+ * The light by time of day and weather, indoors and out alike. The scene is multiplied by `mul` — nearly
+ * neutral, so colours keep their hue and saturation and only their value drops — then the air's own colour,
+ * `amb` (the blue-purple of a night sky, the rose of dusk), is screened over it, lifting the shadows toward it.
+ * Lamps cut warm pools out of the dimming. Indoors the same light falls, less deep (INDOOR_DEPTH): the rooms
+ * have their lamps on; outside at night the street lamps and lit windows carry the picture.
+ */
+interface Mood {
+  mul: [number, number, number];
+  amb?: [number, number, number];
+}
+const MOODS: Record<string, Mood | undefined> = {
+  night: { mul: [0.4, 0.41, 0.5], amb: [18, 13, 42] },
+  dusk: { mul: [0.9, 0.77, 0.72], amb: [22, 8, 30] },
+  dawn: { mul: [1, 0.93, 0.9], amb: [8, 4, 12] },
+  rain: { mul: [0.86, 0.88, 0.93] },
+  clouds: { mul: [0.96, 0.96, 0.98] },
 };
+const INDOOR_DEPTH = 0.62;
 /** How dark it is outside, by phase (effects: beacons, the lighthouse beam). */
 const NIGHTNESS: Record<Sky['phase'], number> = { night: 1, dusk: 0.6, dawn: 0.3, day: 0 };
 /** How strongly lit windows show outdoors, by phase. */
@@ -142,10 +219,7 @@ function drawSwaying(c: CanvasRenderingContext2D, sp: Sprite, x: number, y: numb
 }
 
 /** Lights that are flames, not bulbs: they flicker on their own. */
-const FIRE_LIGHTS = new Set(['fireplace', 'heirloom-dragonlamp']);
-const FACE_VEC: Record<Facing, [number, number]> = { se: [1, 0], sw: [0, 1], ne: [0, -1], nw: [-1, 0] };
-/** In the sitting pose, the underside of an avatar's thighs is this many art px above its anchor. */
-const SIT_THIGH = 6.5;
+const FIRE_LIGHTS = new Set(['fireplace', 'heirloom-dragonlamp', 'fire-ring', 'garden-lantern']);
 
 export class WorldView {
   readonly camera = new Camera();
@@ -189,6 +263,8 @@ export class WorldView {
   private badgeRects: Array<{ r: { x: number; y: number; w: number; h: number }; obj: SceneObject }> = [];
   private festiveRooms = new Set<string>();
   private stageBoxes: Box[] = [];
+  /** A party is on in this room: people standing about dance. */
+  private party = false;
   private raf = 0;
   private last = performance.now();
   private pointer = { down: false, x: 0, y: 0, sx: 0, sy: 0, moved: false, id: -1 };
@@ -259,6 +335,7 @@ export class WorldView {
     this.scene = scene;
     this.meId = opts.meId;
     this.festiveRooms = opts.festiveRooms;
+    this.party = opts.party;
     this.hover = null;
     this.selectedActor = null;
     this.dest = null;
@@ -275,7 +352,8 @@ export class WorldView {
       }
       if (o.wall) continue;
       if (o.eventDecor && !opts.activeDecor.has(o.eventDecor)) continue;
-      const sprite = spriteFor(o);
+      // a seat without a facing of its own is drawn the way it's sat in (toward its table, else the room)
+      const sprite = spriteFor(isSeat(o) && !o.facing ? { ...o, facing: seatFacing(o, scene) } : o);
       if (!sprite) continue;
       const p = isoToScreen(o.x, o.y, o.z ?? 0);
       const size = spriteSize(sprite);
@@ -385,12 +463,14 @@ export class WorldView {
   upsert(o: Occupant) {
     const existing = this.actors.get(o.memberId);
     if (existing) {
+      const was = { on: existing.occ.sittingOn, x: existing.x, y: existing.y };
       existing.occ = { ...existing.occ, ...o };
       if (!o.path) {
         existing.x = o.x;
         existing.y = o.y;
       }
       if (o.facing) existing.facing = o.facing;
+      this.seatChanged(existing, was);
       return;
     }
     this.actors.set(o.memberId, {
@@ -404,10 +484,15 @@ export class WorldView {
       waveUntil: 0,
       blinkAt: performance.now() + 1000 + Math.random() * 5000,
       blinkUntil: 0,
+      nextIdleAt: performance.now() + 5000 + Math.random() * 12000,
+      groove: grooveOf(o.memberId),
       rect: { l: 0, t: 0, r: 0, b: 0 },
       sx: 0,
       sy: 0,
     });
+    // already seated when we arrive: seated, no motion
+    const spot = o.sittingOn && !o.path ? this.cushion(o.sittingOn, o.x, o.y) : null;
+    if (spot) this.actors.get(o.memberId)!.seat = { objId: o.sittingOn!, spot, from: 1, to: 1, start: 0 };
   }
 
   remove(memberId: string) {
@@ -419,6 +504,7 @@ export class WorldView {
     const a = this.actors.get(memberId);
     if (!a) return;
     const hasPath = 'path' in patch;
+    const was = { on: a.occ.sittingOn, x: a.x, y: a.y };
     a.occ = { ...a.occ, ...patch };
     if (hasPath && !patch.path) {
       a.occ.path = undefined;
@@ -436,12 +522,212 @@ export class WorldView {
       a.y = patch.y;
     }
     if (patch.facing) a.facing = patch.facing;
+    this.seatChanged(a, was);
   }
 
   move(memberId: string, path: Tile[], startedAt: number) {
     const a = this.actors.get(memberId);
     if (!a) return;
+    const was = { on: a.occ.sittingOn, x: a.x, y: a.y };
     a.occ = { ...a.occ, path, pathStartedAt: startedAt, sittingOn: undefined };
+    this.seatChanged(a, was);
+  }
+
+  /* ------------------------------------------------------------------ seats */
+
+  private objIndex: { of: SceneObject[]; byId: Map<string, SceneObject> } | null = null;
+  private objById(id: string): SceneObject | undefined {
+    const list = this.scene?.objects;
+    if (!list) return undefined;
+    if (this.objIndex?.of !== list) this.objIndex = { of: list, byId: new Map(list.map((o) => [o.id, o])) };
+    return this.objIndex.byId.get(id);
+  }
+
+  /** Every cushion in the scene by its tile (a couch has one per tile). */
+  private spotIndex: { of: SceneObject[]; at: Map<string, { seat: SceneObject; spot: SeatSpot }> } | null = null;
+  private seatSpotAt(x: number, y: number): { seat: SceneObject; spot: SeatSpot } | null {
+    const scene = this.scene;
+    if (!scene) return null;
+    if (this.spotIndex?.of !== scene.objects) {
+      const at = new Map<string, { seat: SceneObject; spot: SeatSpot }>();
+      for (const o of scene.objects) for (const spot of seatSpots(o, scene)) at.set(`${spot.x},${spot.y}`, { seat: o, spot });
+      this.spotIndex = { of: scene.objects, at };
+    }
+    return this.spotIndex.at.get(`${x},${y}`) ?? null;
+  }
+
+  /** The cushion of a seat object at a tile, facing the seat's way. */
+  private cushion(objId: string, x: number, y: number): { x: number; y: number; facing: Facing } | null {
+    const at = this.seatSpotAt(Math.round(x), Math.round(y));
+    return at && at.seat.id === objId ? { x: at.spot.x, y: at.spot.y, facing: at.spot.facing } : null;
+  }
+
+  /**
+   * The seat someone is in, or whose cushion their feet are on (stepping onto it, getting up, stepping
+   * off): from the moment they're on its tile until they've left it, they're drawn as its sitter.
+   */
+  private seatOf(a: ActorView, foot = this.footPoint(a)): { obj: SceneObject; facing: Facing } | null {
+    const sat = this.seated(a);
+    if (sat?.ownSeat) return { obj: sat.obj, facing: sat.facing };
+    if (usesWheelchair(a.occ.avatar)) return null;
+    const at = this.seatSpotAt(Math.floor(foot.x), Math.floor(foot.y));
+    return at ? { obj: at.seat, facing: at.spot.facing } : null;
+  }
+
+  /**
+   * Someone's seat changed — the server's word, or a walk they started: sit down or stand up, the same for
+   * everyone watching. `was`: what they sat on and where they were before the change.
+   */
+  private seatChanged(a: ActorView, was: { on?: string; x: number; y: number }) {
+    const now = performance.now();
+    const on = a.occ.sittingOn;
+    if (on && !a.occ.path) {
+      const spot = this.cushion(on, a.x, a.y);
+      if (!spot) return;
+      a.facing = spot.facing;
+      a.stepOff = undefined;
+      const s = a.seat;
+      // already settling onto this cushion (they arrived on it): carry on
+      if (s && s.objId === on && s.spot.x === spot.x && s.spot.y === spot.y && s.to === 1) return;
+      // put on another cushion of the seat they're in, without a walk: slide over, still seated
+      if (s && s.objId === on && s.to === 1 && (was.x !== a.x || was.y !== a.y))
+        a.glide = { x: was.x, y: was.y, start: now, ms: (Math.hypot(a.x - was.x, a.y - was.y) / WALK_SPEED) * 1000 };
+      a.seat = { objId: on, spot, from: this.seatK(a, now), to: 1, start: now };
+      return;
+    }
+    if (!on && a.seat && a.seat.to === 1 && (was.on !== undefined || a.occ.path)) {
+      a.seat = { ...a.seat, from: this.seatK(a, now), to: 0, start: now };
+      // put on the floor beside the seat: up first, then the step off (a walk away starts from the seat itself)
+      if (!a.occ.path && (a.x !== was.x || a.y !== was.y)) a.stepOff = { x: was.x, y: was.y, start: now + STAND_UP_MS, objId: a.seat.objId };
+    }
+  }
+
+  /**
+   * On the last step of a walk onto a cushion: turn the way the seat faces and sit down into it as the step
+   * finishes (the server confirms once they're there) — never walking into the furniture and turning inside
+   * it. A step along a couch to the next cushion slides over without getting up.
+   */
+  private approachSeat(a: ActorView, path: Tile[], elapsedMs: number) {
+    if (!this.scene || path.length < 2 || usesWheelchair(a.occ.avatar)) return;
+    const [lx, ly] = path[path.length - 1];
+    if (a.seat?.to === 1 && a.seat.spot.x === lx && a.seat.spot.y === ly) return;
+    const [px, py] = path[path.length - 2];
+    const last = Math.hypot(lx - px, ly - py);
+    if ((elapsedMs / 1000) * WALK_SPEED < pathLength(path) - last) return;
+    const at = this.seatSpotAt(lx, ly);
+    if (!at) return;
+    const spot = { x: at.spot.x, y: at.spot.y, facing: at.spot.facing };
+    a.stepOff = undefined;
+    a.seat = { objId: at.seat.id, spot, from: this.seatK(a), to: 1, start: performance.now() };
+  }
+
+  /** A walk ended on a cushion: sitting down, if the last step didn't already start it. */
+  private arrive(a: ActorView) {
+    if (!this.scene || a.occ.sittingOn || usesWheelchair(a.occ.avatar)) return;
+    const at = this.seatSpotAt(Math.round(a.x), Math.round(a.y));
+    if (!at) return;
+    a.facing = at.spot.facing;
+    a.stepOff = undefined;
+    if (a.seat?.to === 1 && a.seat.spot.x === at.spot.x && a.seat.spot.y === at.spot.y) return;
+    a.seat = { objId: at.seat.id, spot: { x: at.spot.x, y: at.spot.y, facing: at.spot.facing }, from: this.seatK(a), to: 1, start: performance.now() };
+  }
+
+  private tickSeat(a: ActorView, now: number) {
+    const s = a.seat;
+    if (s && s.to === 1 && !a.occ.sittingOn && !a.occ.path && now - s.start > SIT_UNCONFIRMED_MS) a.seat = { ...s, from: this.seatK(a, now), to: 0, start: now };
+    else if (s && s.to === 0 && this.seatK(a, now) <= 0) a.seat = undefined;
+    if (a.stepOff && now > a.stepOff.start + STEP_OFF_MS) a.stepOff = undefined;
+    if (a.glide && now > a.glide.start + a.glide.ms) a.glide = undefined;
+  }
+
+  /** How far into their seat someone is: 0 standing … 1 seated. */
+  private seatK(a: ActorView, now = performance.now()): number {
+    const s = a.seat;
+    if (!s) return 0;
+    const ms = (s.to > s.from ? SIT_DOWN_MS : STAND_UP_MS) * Math.abs(s.to - s.from);
+    const u = ms > 0 ? Math.min(1, Math.max(0, (now - s.start) / ms)) : 1;
+    return s.from + (s.to - s.from) * u;
+  }
+
+  /** Where someone stands or walks, mid-step off a seat or sliding along one (tile coordinates of their feet). */
+  private footPoint(a: ActorView, now = performance.now()): { x: number; y: number; stepping: boolean } {
+    const g = a.stepOff ? { ...a.stepOff, ms: STEP_OFF_MS } : a.glide;
+    if (g) {
+      const u = Math.min(1, Math.max(0, (now - g.start) / g.ms));
+      const e = u * u * (3 - 2 * u);
+      return { x: g.x + (a.x - g.x) * e + 0.5, y: g.y + (a.y - g.y) * e + 0.5, stepping: !!a.stepOff && u > 0 && u < 1 };
+    }
+    return { x: a.x + 0.5, y: a.y + 0.5, stepping: false };
+  }
+
+  /**
+   * Someone in a seat, or on their way into or out of one: where their figure stands (the seat standard's
+   * hip point, lifted so the thighs rest on the cushion) and in what pose — a crouch with the feet on the
+   * floor, then the seat's sitting style.
+   */
+  private seated(a: ActorView, now = performance.now()) {
+    const s = a.seat;
+    if (!s || usesWheelchair(a.occ.avatar)) return null;
+    const k = this.seatK(a, now);
+    if (k <= 0) return null;
+    const obj = this.objById(s.objId);
+    if (!obj) return null;
+    const profile = artSeatProfile(obj);
+    // (getting up to step off, the feet stay on the seat's tile until the step starts)
+    const foot = this.footPoint(a, now);
+    // the hip point of the cushion under their feet: sliding along a couch, it slides with them
+    const hip = sitterPoint({ x: foot.x - 0.5, y: foot.y - 0.5, facing: s.spot.facing }, profile);
+    const inSeat = k >= CROUCH_UNTIL;
+    const u = inSeat ? (k - CROUCH_UNTIL) / (1 - CROUCH_UNTIL) : 0;
+    return {
+      obj,
+      profile,
+      facing: s.spot.facing,
+      // sorted as its sitter from the moment their feet are on the seat's tile (past the middle of the step
+      // onto it) or they're down in it: drawn after it, a backrest seen from behind drawn back over them
+      ownSeat: inSeat || (Math.floor(foot.x) === s.spot.x && Math.floor(foot.y) === s.spot.y),
+      x: foot.x + (hip.x - foot.x) * k,
+      y: foot.y + (hip.y - foot.y) * k,
+      lift: inSeat ? sitterLift(profile, s.spot.facing) + SETTLE * (1 - u * (2 - u)) : 0,
+      pose: (inSeat ? SIT_POSE_OF[profile.sitStyle] : 'crouch') as Pose,
+    };
+  }
+
+  /** The pose for getting into, sitting in or stepping off a seat; null when none of that is happening. */
+  private seatPose(a: ActorView): Pose | null {
+    const sat = this.seated(a);
+    if (sat) return sat.pose;
+    if (usesWheelchair(a.occ.avatar) && a.occ.sittingOn && !a.moving) return 'sit';
+    if (a.stepOff && this.footPoint(a).stepping) return Math.floor(performance.now() / 125) % 2 ? 'walk1' : 'walk2';
+    return null;
+  }
+
+  /**
+   * Seen from behind, the seat is drawn back over its sitter — all of it but the cushion behind them: the
+   * backrest, and the cushion's near lip their hips sink behind — from the moment their feet are on its
+   * tile until they've left it, up to a little above their hips (their head, shoulders and upper back show).
+   */
+  private drawBackrest(a: ActorView) {
+    const on = this.seatOf(a);
+    if (!on || !seenFromBehind(on.facing)) return;
+    const st = this.statics.find((x) => x.obj.id === on.obj.id);
+    if (!st) return;
+    const profile = artSeatProfile(on.obj);
+    const over = backrestOverlay(st.sprite, st.obj, on.facing, profile);
+    if (!over) return;
+    const pose = this.pose(a);
+    const drop = pose === 'crouch' ? 3 : pose.startsWith('sit') ? SIT_DROP[profile.sitStyle] : 0;
+    const cut = a.sy - (104 - (82 + drop)) / 2 - BACK_COVER_UP;
+    const c = this.ctx;
+    c.save();
+    c.beginPath();
+    c.rect(-1e5, -1e5, 2e5, 2e5);
+    c.rect(a.rect.l, cut - 200, a.rect.r - a.rect.l, 200);
+    c.clip('evenodd');
+    const k = st.sprite.scale ?? 1;
+    const [nx, ny] = this.anims.offset(st.obj.id, this.reducedMotion);
+    blit(c, st.sprite, st.dx + st.sprite.ax / k + nx, st.dy + st.sprite.ay / k + ny, over);
+    c.restore();
   }
 
   hasActor(id: string) {
@@ -497,6 +783,10 @@ export class WorldView {
     const now = performance.now();
     a.emotes.push({ emoji: EMOTES[emote].emoji, start: now });
     if (emote === 'wave') a.waveUntil = now + 1400;
+    // the body acts it out (standing, hands free); the emoji still floats up
+    const act = EMOTE_ACT[emote];
+    if (act && !a.occ.sittingOn && !a.occ.carrying) a.act = { kind: act.kind, start: now, until: now + act.ms };
+    a.idle = undefined;
     const p = isoToScreen(a.x + 0.5, a.y + 0.5, 30);
     if (emote === 'celebrate') this.effects.burst(p.x, p.y, 'confetti', 30);
     if (emote === 'heart') this.effects.burst(p.x, p.y, 'hearts', 8);
@@ -537,19 +827,42 @@ export class WorldView {
     };
     this.upsert(occ);
     const a = this.actors.get(id)!;
+    const was = { on: a.occ.sittingOn, x: a.x, y: a.y };
     if (!st.path) {
       a.occ = { ...a.occ, path: undefined, pathStartedAt: undefined, sittingOn: st.sittingOn };
       a.x = st.x;
       a.y = st.y;
     } else a.occ = { ...a.occ, sittingOn: undefined };
     a.facing = st.facing;
+    this.seatChanged(a, was);
     a.npc = { def, doing: st.doing, holding: st.holding };
     if (st.say) this.say(id, st.say);
   }
 
   /** A one-off moment on a piece of furniture: an espresso machine pulling a shot, the bell being rung. */
-  playObject(objectId: string, what: 'brew' | 'ring') {
-    this.anims.trigger(objectId, what);
+  playObject(objectId: string, what: MomentKind, by?: string, detail?: string) {
+    this.anims.trigger(objectId, what, detail);
+    const a = by ? this.actors.get(by) : undefined;
+    if (what === 'toast') {
+      // a toast: glasses up round the room — whoever's standing nearby cheers, a beat apart
+      const o = this.scene?.objects.find((x) => x.id === objectId);
+      const now = performance.now();
+      for (const [id, p] of this.actors) {
+        if (p.npc || p.occ.sittingOn || p.occ.carrying || (o && Math.hypot(p.x - o.x, p.y - o.y) > 9)) continue;
+        const start = now + (id === by ? 0 : 250 + Math.random() * 600);
+        p.act = { kind: 'cheer', start, until: start + 1500 };
+        p.emotes.push({ emoji: '🥂', start });
+        p.idle = undefined;
+      }
+      return;
+    }
+    // whoever used it works it for a moment (hands on the machine, the cue, the keys)
+    if (a && !a.occ.sittingOn && what !== 'brew' && what !== 'ring') a.workUntil = performance.now() + 900;
+  }
+
+  /** The notes pinned on the room's boards; `pop` when one was just pinned (it pops on). */
+  setNotes(notes: BoardNote[], pop = false) {
+    this.anims.setNotes(notes, pop);
   }
 
   /** Turn someone standing still toward an object's footprint (you face what you use). */
@@ -637,17 +950,23 @@ export class WorldView {
         a.y = p.y;
         a.facing = facingFrom(p.dir[0], p.dir[1], a.facing);
         a.moving = !p.done;
+        if (!p.done) this.approachSeat(a, path, now - a.occ.pathStartedAt);
+        // on the way into a seat they've turned the way it faces, their back to it
+        if (a.seat?.to === 1) a.facing = a.seat.spot.facing;
         if (p.done) {
           a.occ.path = undefined;
           a.occ.pathStartedAt = undefined;
           a.occ.x = p.x;
           a.occ.y = p.y;
+          this.arrive(a);
         }
       } else {
         a.moving = false;
         if (a.occ.sittingOn) a.facing = a.occ.facing;
       }
       a.walkClock = a.moving ? a.walkClock + dt : 0;
+      this.tickSeat(a, performance.now());
+      this.tickLife(a, performance.now());
       a.emotes = a.emotes.filter((e) => performance.now() - e.start < 1800);
       if (a.bubble && performance.now() > a.bubble.until) a.bubble = undefined;
     }
@@ -671,13 +990,8 @@ export class WorldView {
 
   private actorLift(a: ActorView): number {
     if (usesWheelchair(a.occ.avatar)) return 0;
-    if (a.occ.sittingOn && this.scene) {
-      const o = this.scene.objects.find((x) => x.id === a.occ.sittingOn);
-      if (o) {
-        const seat = artSeat(o);
-        return seat !== null ? seat - SIT_THIGH : (SEAT_LIFT[o.sprite] ?? 4);
-      }
-    }
+    const sat = this.seated(a);
+    if (sat) return sat.lift;
     for (const b of this.stageBoxes) {
       if (a.x + 0.5 >= b.x0 && a.x + 0.5 < b.x1 && a.y + 0.5 >= b.y0 && a.y + 0.5 < b.y1) return 6;
     }
@@ -687,14 +1001,81 @@ export class WorldView {
   private pose(a: ActorView): Pose {
     const doing = a.moving ? undefined : a.npc?.doing;
     if ((doing === 'serve' || doing === 'greet') && !a.occ.sittingOn) return 'wave';
-    if (a.occ.sittingOn && !a.moving) return 'sit';
+    const seatPose = this.seatPose(a);
+    if (seatPose) return seatPose;
     if (doing === 'brew' || doing === 'work') return 'work';
     if (performance.now() < a.waveUntil) return 'wave';
+    if (!a.moving && !a.occ.sittingOn && a.workUntil && performance.now() < a.workUntil) return 'work';
     if (a.moving) {
+      // contact, passing, contact, passing: arms swing through, the body bobs on each stride
       const f = Math.floor(a.walkClock * 8) % 4;
-      return f === 0 ? 'walk1' : f === 2 ? 'walk2' : 'stand';
+      return (['walk1', 'pass1', 'walk2', 'pass2'] as const)[f];
     }
-    return 'stand';
+    return this.lifePose(a) ?? 'stand';
+  }
+
+  /**
+   * Standing still: an emote gesture while it plays, a dance at a party (or after the dance emote), else now
+   * and then a quiet idle moment. Never while carrying something or mid-sentence.
+   */
+  private lifePose(a: ActorView): Pose | null {
+    const now = performance.now();
+    if (a.act && now < a.act.until) {
+      const t = (now - a.act.start) / 1000;
+      const alt = (x: Pose, y: Pose, fps: number): Pose => (Math.floor(t * fps) % 2 ? y : x);
+      switch (a.act.kind) {
+        case 'clap':
+          return alt('clap1', 'clap2', 6);
+        case 'cheer':
+          return alt('cheer1', 'cheer2', 4);
+        case 'laugh':
+          return alt('laugh1', 'laugh2', 7);
+        case 'thumbs':
+          return 'thumbs';
+        case 'heart':
+          return 'heart';
+        case 'idea':
+          return 'idea';
+        case 'dance':
+          return this.dancePose(a, now);
+      }
+    }
+    if (this.reducedMotion || a.npc) return null;
+    if (this.party && a.groove.dances && !a.occ.carrying && !a.bubble) return this.dancePose(a, now);
+    if (a.idle && now < a.idle.until && a.idle.kind !== 'glance') return a.idle.kind;
+    return null;
+  }
+
+  private dancePose(a: ActorView, now: number): Pose {
+    const f = Math.floor((now / 1000) * a.groove.tempo + a.groove.phase) % 4;
+    return (['dance1', 'dance2', 'dance3', 'dance4'] as const)[f];
+  }
+
+  /** Idle moments come and go on each person's own clock; anything that needs them cancels one. */
+  private tickLife(a: ActorView, now: number) {
+    const busy = a.moving || !!a.occ.sittingOn || !!a.occ.carrying || !!a.bubble || !!a.npc || (!!a.act && now < a.act.until);
+    if (busy || this.reducedMotion) {
+      a.idle = undefined;
+      if (now >= a.nextIdleAt) a.nextIdleAt = now + 4000 + Math.random() * 8000;
+      return;
+    }
+    if (a.idle && now >= a.idle.until) a.idle = undefined;
+    if (a.idle || now < a.nextIdleAt) return;
+    const r = Math.random();
+    if (r < 0.45) a.idle = { kind: 'shift', start: now, until: now + 2500 + Math.random() * 2500 };
+    else if (r < 0.8) {
+      // a glance to one side: the next facing round, for a moment
+      const order: Facing[] = ['se', 'sw', 'nw', 'ne'];
+      const i = order.indexOf(a.facing);
+      const facing = order[(i + (Math.random() < 0.5 ? 1 : 3)) % 4];
+      a.idle = { kind: 'glance', start: now, until: now + 1100 + Math.random() * 900, facing };
+    } else a.idle = { kind: 'phone', start: now, until: now + 3000 + Math.random() * 2500 };
+    a.nextIdleAt = a.idle.until + 7000 + Math.random() * 14000;
+  }
+
+  /** The facing to draw: the way they face, or the way they glanced for a moment. */
+  private viewFacing(a: ActorView): Facing {
+    return a.idle?.kind === 'glance' && performance.now() < a.idle.until && a.idle.facing ? a.idle.facing : a.facing;
   }
 
   private draw() {
@@ -704,16 +1085,10 @@ export class WorldView {
     c.imageSmoothingEnabled = false;
     const outdoor = this.scene?.kind === 'outdoor';
     const bg = c.createLinearGradient(0, 0, 0, this.canvas.height);
-    if (outdoor) {
-      // the haze around the town follows the time of day
-      const [top, bottom] = OUTDOOR_BG[skyAt().phase];
-      bg.addColorStop(0, top);
-      bg.addColorStop(1, bottom);
-    } else {
-      bg.addColorStop(0, '#2d2538');
-      bg.addColorStop(1, '#1b1623');
-    }
-    c.fillStyle = bg;
+    bg.addColorStop(0, '#2d2538');
+    bg.addColorStop(1, '#1b1623');
+    // outdoors: the sky (the sea, the horizon and the hills are drawn in the world, below)
+    c.fillStyle = outdoor ? skyColor(skyAt()) : bg;
     c.fillRect(0, 0, this.canvas.width, this.canvas.height);
     if (!this.scene || !this.ground) return;
 
@@ -726,6 +1101,7 @@ export class WorldView {
     const sky = skyAt();
     const shell = 'windows' in this.ground ? this.ground : null;
     if (shell) this.drawWindowViews(c, shell, sky);
+    if (outdoor) drawSurroundings(c, this.scene.width, this.scene.height, sky, this.visibleArt(), performance.now() / 1000, this.reducedMotion);
     const gk = this.ground.scale ?? 1;
     c.drawImage(this.ground.canvas, this.ground.minX, this.ground.minY, this.ground.canvas.width / gk, this.ground.canvas.height / gk);
     if ('water' in this.ground && this.ground.water) this.drawWaterMotion(c, this.ground.water);
@@ -758,7 +1134,9 @@ export class WorldView {
     // actor shadows, selection and speaking rings
     const t = performance.now() / 1000;
     for (const a of this.actors.values()) {
-      const p = isoToScreen(a.x + 0.5, a.y + 0.5, this.actorLift(a));
+      const sat = this.seated(a);
+      const foot = this.footPoint(a);
+      const p = sat ? isoToScreen(sat.x, sat.y, sat.lift) : isoToScreen(foot.x, foot.y, this.actorLift(a));
       c.fillStyle = 'rgba(40,30,50,0.25)';
       c.beginPath();
       c.ellipse(p.x, p.y, 8, 4, 0, 0, Math.PI * 2);
@@ -781,6 +1159,7 @@ export class WorldView {
     }
 
     this.effects.night = NIGHTNESS[sky.phase];
+    this.effects.people = outdoor ? [...this.actors.values()].map((a) => ({ x: a.x, y: a.y })) : [];
     // Lit windows and lanterns (outdoors, dusk to dawn): collected in depth order on their own layer — each
     // thing drawn in front erases what it covers — and added over the dimmed town at the end.
     const glowAlpha = outdoor ? GLOW_ALPHA[sky.phase] : 0;
@@ -816,7 +1195,7 @@ export class WorldView {
         this.drawActor(d);
         if (gl) {
           gl.globalCompositeOperation = 'destination-out';
-          blit(gl, avatarSprite(this.look(d), d.facing, this.pose(d)), Math.round(d.sx), Math.round(d.sy));
+          blit(gl, avatarSprite(this.look(d), this.viewFacing(d), this.pose(d)), Math.round(d.sx), Math.round(d.sy));
         }
       }
     }
@@ -834,6 +1213,7 @@ export class WorldView {
     this.drawGlints(c);
     this.effects.drawOver(c);
     this.drawAmbience(c, sky, s, Math.round(tx), Math.round(ty));
+    this.effects.drawLights(c);
     if (gl && this.glow) {
       // lit glass over the dimmed town: warm, a touch of flicker per window row
       c.save();
@@ -849,7 +1229,7 @@ export class WorldView {
     const me = outdoor ? order.find((d): d is ActorView => !('obj' in d) && d.occ.memberId === this.meId) : undefined;
     if (me) {
       c.globalAlpha = 0.45;
-      blit(c, avatarSprite(this.look(me), me.facing, this.pose(me)), Math.round(me.sx), Math.round(me.sy));
+      blit(c, avatarSprite(this.look(me), this.viewFacing(me), this.pose(me)), Math.round(me.sx), Math.round(me.sy));
       c.globalAlpha = 1;
     }
 
@@ -883,23 +1263,28 @@ export class WorldView {
     const statics = this.statics;
     const slots: Array<ActorView[]> = Array.from({ length: statics.length + 1 }, () => []);
     for (const a of this.actors.values()) {
-      const lift = this.actorLift(a);
-      // a sitter sits on the seat's cushion, which a thick backrest pushes forward of the tile centre
-      const seatObj = a.occ.sittingOn && !a.moving ? this.scene?.objects.find((o) => o.id === a.occ.sittingOn) : undefined;
-      const fwd = seatObj ? seatStyle(seatObj.sprite).fwd : 0;
-      const [fx, fy] = FACE_VEC[a.facing];
-      const p = isoToScreen(a.x + 0.5 + fx * fwd, a.y + 0.5 + fy * fwd, lift);
+      // a sitter's figure stands on the seat standard's hip point, lifted onto the cushion
+      const sat = this.seated(a);
+      const foot = this.footPoint(a);
+      const p = sat ? isoToScreen(sat.x, sat.y, sat.lift) : isoToScreen(foot.x, foot.y, this.actorLift(a));
       a.sx = p.x;
       a.sy = p.y;
       a.rect = { l: p.x - 12, t: p.y - 42, r: p.x + 12, b: p.y + 2 };
-      const box: Box = { x0: a.x, y0: a.y, x1: a.x + 1, y1: a.y + 1 };
+      // the seat they're in, or whose tile their feet are on: drawn after it (and seen from behind, its back
+      // drawn over them); otherwise sorted by the tile they're on — walking, the one they're leaving until
+      // they're past the middle of a step
+      const on = this.seatOf(a, foot);
+      const own = on?.obj.id ?? a.occ.sittingOn;
+      const tile = sat?.ownSeat ? { x: a.seat!.spot.x, y: a.seat!.spot.y } : { x: Math.floor(foot.x), y: Math.floor(foot.y) };
+      const box: Box = { x0: tile.x, y0: tile.y, x1: tile.x + 1, y1: tile.y + 1 };
       let slot = 0;
       for (let i = 0; i < statics.length; i++) {
         const s = statics[i];
         if (!rectsOverlap(s.rect, a.rect)) continue;
         let isBehind: boolean;
-        // Your own seat: you sit in front of it, unless its backrest is between you and us.
-        if (a.occ.sittingOn === s.obj.id) isBehind = !(seatStyle(s.obj.sprite).back && (a.facing === 'ne' || a.facing === 'nw'));
+        // Your own seat: you're drawn after it, and a backrest between you and us is drawn back over you
+        // (drawBackrest)
+        if (own === s.obj.id) isBehind = true;
         else isBehind = behind(s.box, box);
         if (isBehind) slot = i + 1;
       }
@@ -943,7 +1328,7 @@ export class WorldView {
 
   private drawActor(a: ActorView) {
     const c = this.ctx;
-    const sprite = avatarSprite(this.look(a), a.facing, this.pose(a), this.reducedMotion ? undefined : this.expression(a));
+    const sprite = avatarSprite(this.look(a), this.viewFacing(a), this.pose(a), this.reducedMotion ? undefined : this.expression(a));
     const hovered = this.hover?.kind === 'actor' && this.hover.id === a.occ.memberId;
     const x = Math.round(a.sx);
     const y = Math.round(a.sy);
@@ -951,6 +1336,7 @@ export class WorldView {
     if (hovered) blit(c, sprite, x, y, highlightOf(sprite), 2);
     else blit(c, sprite, x, y);
     c.globalAlpha = 1;
+    this.drawBackrest(a);
   }
 
   private headScreen(a: ActorView): [number, number] {
@@ -1044,6 +1430,7 @@ export class WorldView {
     for (const { a, x, top } of emotes)
       for (const e of a.emotes) {
         const k = (now - e.start) / 1800;
+        if (k < 0) continue; // not yet (a toast's glasses go up a beat apart)
         const rise = (this.reducedMotion ? 0.3 : k) * 34;
         const pop = k < 0.12 ? 0.6 + (k / 0.12) * 0.6 : 1.2 - Math.min(0.2, (k - 0.12) * 0.4);
         c.globalAlpha = Math.max(0, 1 - Math.max(0, k - 0.6) / 0.4);
@@ -1141,14 +1528,13 @@ export class WorldView {
    * out of that dimness (so it visibly lights the floor, furniture and people near it), then glows.
    */
   private drawAmbience(c: CanvasRenderingContext2D, sky: Sky, s: number, tx: number, ty: number) {
-    const tint: Record<string, [string, number] | undefined> = {
-      night: ['#6f79bd', 0.7],
-      dusk: ['#f2b89a', 0.45],
-      dawn: ['#ffd2bf', 0.25],
+    const outdoor = this.scene?.kind === 'outdoor';
+    const base = MOODS[sky.phase] ?? (sky.weather === 'rain' ? MOODS.rain : sky.weather === 'clouds' || sky.weather === 'snow' ? MOODS.clouds : undefined);
+    const k = outdoor ? 1 : INDOOR_DEPTH;
+    const mood = base && {
+      mul: base.mul.map((v) => Math.round((1 - (1 - v) * k) * 255)),
+      amb: base.amb?.map((v) => Math.round(v * k)),
     };
-    let mood = this.scene?.kind === 'outdoor' ? OUTDOOR_MOOD[sky.phase] : tint[sky.phase];
-    if (!mood && sky.weather === 'rain') mood = ['#b9c0d6', 0.4];
-    else if (!mood && (sky.weather === 'clouds' || sky.weather === 'snow')) mood = ['#dfe2ec', 0.22];
     const now = performance.now();
     const flicker = 0.95 + 0.05 * Math.sin(now / 170) * Math.sin(now / 530);
     // indoors lamps glow whenever they're on; street lamps only once the light goes
@@ -1177,7 +1563,7 @@ export class WorldView {
       l.setTransform(1, 0, 0, 1, 0, 0);
       l.globalCompositeOperation = 'source-over';
       l.clearRect(0, 0, W, H);
-      l.fillStyle = mood[0];
+      l.fillStyle = `rgb(${mood.mul.join(',')})`;
       l.fillRect(0, 0, W, H);
       l.globalCompositeOperation = 'destination-out';
       l.setTransform(s, 0, 0, s, tx, ty);
@@ -1194,8 +1580,12 @@ export class WorldView {
       c.save();
       c.setTransform(1, 0, 0, 1, 0, 0);
       c.globalCompositeOperation = 'multiply';
-      c.globalAlpha = mood[1];
       c.drawImage(this.shade, 0, 0);
+      if (mood.amb) {
+        c.globalCompositeOperation = 'screen';
+        c.fillStyle = `rgb(${mood.amb.join(',')})`;
+        c.fillRect(0, 0, W, H);
+      }
       c.restore();
     }
     // Warm light: a broad spill over everything nearby, and a bright core at the shade.

@@ -511,6 +511,12 @@ def cmd_hair(a):
     raw_path = OUT / f"{job}.raw.png"
     if a.regen or not raw_path.exists():
         files = [("image[]", (ref_path.name, ref_path.read_bytes(), "image/png")), ("mask", (mask_path.name, mask_path.read_bytes(), "image/png"))]
+        # extra reference images (the Design Lab's uploads): the mask applies to the first image only
+        for r_ in getattr(a, "ref", None) or []:
+            rp = HERE / r_
+            files.insert(1, ("image[]", (rp.name, rp.read_bytes(), "image/png")))
+        if getattr(a, "ref", None):
+            prompt += " The other images are references for the part's look only; draw it on the figure."
         data = {"model": studio.MODEL, "prompt": prompt, "size": f"{CANVAS[0]}x{CANVAS[1]}", "quality": a.quality,
                 "background": "transparent", "n": "1", "output_format": "png"}
         t = time.time()
@@ -634,6 +640,7 @@ def main():
     h.add_argument("--quality", default="high")
     h.add_argument("--regen", action="store_true")
     h.add_argument("--no-publish", action="store_true")
+    h.add_argument("--ref", action="append", help="extra reference image (path relative to art/)")
     h.set_defaults(fn=cmd_hair, kind="hair")
     for kind in ("hat", "top", "pet"):
         k = sub.add_parser(kind)
@@ -645,6 +652,7 @@ def main():
         k.add_argument("--quality", default="high")
         k.add_argument("--regen", action="store_true")
         k.add_argument("--no-publish", action="store_true")
+        k.add_argument("--ref", action="append", help="extra reference image (path relative to art/)")
         k.set_defaults(fn=cmd_hair, kind=kind)
     e = sub.add_parser("extract")
     e.add_argument("only", nargs="*")

@@ -27,6 +27,8 @@ export interface Sprite {
   glow?: HTMLCanvasElement;
   /** Points (canvas px) that give off smoke, spray, a blinking beacon or a lighthouse beam. */
   emitters?: Array<{ kind: 'smoke' | 'spray' | 'blink' | 'beam'; x: number; y: number }>;
+  /** Where a lamp in this drawing glows from (canvas px, already mirrored with the drawing). */
+  light?: { x: number; y: number; r: number };
 }
 
 /** Draws a sprite with its anchor at art-space (x, y), at its own pixel density. */

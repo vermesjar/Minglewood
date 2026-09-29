@@ -1,6 +1,7 @@
 import type { SceneDef, SceneObject } from './scene';
 import { buildTown, TOWN_ID } from './northstarTown';
 import { buildInteriors } from './interiors';
+import { giveUses } from './uses';
 
 export { TOWN_ID };
 
@@ -12,6 +13,8 @@ export function allScenes(): Map<string, SceneDef> {
     cache = new Map();
     cache.set(TOWN_ID, buildTown());
     for (const s of buildInteriors()) cache.set(s.id, s);
+    // what clicking each thing does comes from what it is (uses.ts), the same everywhere
+    for (const s of cache.values()) giveUses(s);
   }
   return cache;
 }

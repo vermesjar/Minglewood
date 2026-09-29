@@ -9,7 +9,87 @@
  * The two authored views face screen-right: "front" (3/4 front, facing se) and "back" (3/4 back, facing
  * ne); sw/nw are mirrors.
  */
-export type Pose = 'stand' | 'walk1' | 'walk2' | 'sit' | 'wave' | 'work';
+import { SIT_DROP, type SitStyle } from '@shared/world/seats';
+
+export type { SitStyle } from '@shared/world/seats';
+export type Pose =
+  | 'stand'
+  | 'walk1'
+  | 'walk2'
+  | 'sit'
+  | 'sit-stool'
+  | 'sit-lounge'
+  | 'sit-floor'
+  | 'crouch'
+  | 'wave'
+  | 'work'
+  | LifePose;
+
+/**
+ * Character life (see WorldView): the passing frames between walk strides, emote gestures (each 1–2 frames),
+ * a four-frame dance, and quiet idle moments.
+ */
+export type LifePose =
+  | 'pass1'
+  | 'pass2'
+  | 'clap1'
+  | 'clap2'
+  | 'cheer1'
+  | 'cheer2'
+  | 'thumbs'
+  | 'laugh1'
+  | 'laugh2'
+  | 'heart'
+  | 'idea'
+  | 'dance1'
+  | 'dance2'
+  | 'dance3'
+  | 'dance4'
+  | 'shift'
+  | 'phone';
+
+export const LIFE_POSES: LifePose[] = [
+  'pass1',
+  'pass2',
+  'clap1',
+  'clap2',
+  'cheer1',
+  'cheer2',
+  'thumbs',
+  'laugh1',
+  'laugh2',
+  'heart',
+  'idea',
+  'dance1',
+  'dance2',
+  'dance3',
+  'dance4',
+  'shift',
+  'phone',
+];
+
+/** Body bob (+ down) and sway (+ toward screen right) per pose, in frame px. */
+const LIFE_DY: Partial<Record<Pose, number>> = { walk1: 1, walk2: 1, cheer2: -2, laugh1: 1, dance2: 1, dance4: 1 };
+const LIFE_DX: Partial<Record<Pose, number>> = { dance1: -1, dance3: 1, shift: 1 };
+
+/**
+ * How a seat is sat in (the seat standard, see src/shared/world/seats.ts): each is its own sitting pose.
+ *   chair  — upright, thighs level, shins hanging down past the seat's front edge ('sit')
+ *   stool  — tall and shallow: thighs slope down, shins hang straight to a rung ('sit-stool')
+ *   lounge — sofas and armchairs: sunk a pixel deeper, knees up, feet forward ('sit-lounge')
+ *   floor  — beanbags: low, legs stretched out forward ('sit-floor')
+ */
+export const SIT_POSE: Record<SitStyle, Pose> = { chair: 'sit', stool: 'sit-stool', lounge: 'sit-lounge', floor: 'sit-floor' };
+export const isSitPose = (p: Pose) => p === 'sit' || p === 'sit-stool' || p === 'sit-lounge' || p === 'sit-floor';
+
+/** How far the upper body drops for each sitting pose (the seat standard's values), and for the crouch. */
+const DROP: Partial<Record<Pose, number>> = {
+  sit: SIT_DROP.chair,
+  'sit-stool': SIT_DROP.stool,
+  'sit-lounge': SIT_DROP.lounge,
+  'sit-floor': SIT_DROP.floor,
+  crouch: 3,
+};
 /**
  * Body bases: 'a' straight (squarer shoulders), 'b' softer (narrower shoulders, a defined waist). The same
  * head, face anchors and legs; parts conform to whichever torso the frame gives them.
@@ -67,12 +147,17 @@ export interface Frame {
   /** Where a carried thing is held, and whether it's in front of the body in this view. */
   hold: Pt;
   holdInFront: boolean;
+  /** Both hands in front of the chest (a clap, hands on the heart): the far arm is drawn in front of the body. */
+  farArmFront?: boolean;
+  /** A hand detail on the near hand: a thumb up, a finger raised, a phone. */
+  gesture?: 'thumb' | 'finger' | 'phone';
 }
 
 const CX = 45;
 
-/** Upper body, identical across poses except for a vertical shift. */
-function upper(view: View, dy: number, body: Body) {
+/** Upper body, identical across poses except for a bob (dy) and a sway (dx). */
+function upper(view: View, dy: number, body: Body, dx = 0) {
+  const CX = 45 + dx;
   const x0 = CX - 11;
   const y0 = 36 + dy;
   const head: [number, number, number, number] = [x0, y0, x0 + 22, y0 + 22];
@@ -128,9 +213,10 @@ function upper(view: View, dy: number, body: Body) {
  * front of the chest (seen from the front) or held out at the side (seen from behind), and doesn't swing.
  */
 export function frameFor(view: View, pose: Pose, body: Body = 'a', carry = false): Frame {
-  const sitting = pose === 'sit';
-  const dy = sitting ? 6 : pose === 'walk1' || pose === 'walk2' ? 1 : 0;
-  const U = upper(view, dy, body);
+  const sitting = isSitPose(pose);
+  const dy = DROP[pose] ?? LIFE_DY[pose] ?? 0;
+  const dx = LIFE_DX[pose] ?? 0;
+  const U = upper(view, dy, body, dx);
   const s = U.shoulderY;
   // Arms hang straight with hands at the hips; they swing opposite the legs when walking.
   let armNear: Limb = { a: [CX - 9, s + 3], m: [CX - 10, s + 10], b: [CX - 10, s + 17] };
@@ -151,8 +237,88 @@ export function frameFor(view: View, pose: Pose, body: Body = 'a', carry = false
   } else if (sitting) {
     armNear = { a: [CX - 9, s + 3], m: [CX - 9, s + 11], b: [CX - 3, s + 16] };
     armFar = { a: [CX + 10, s + 3], m: [CX + 11, s + 10], b: [CX + 10, s + 15] };
+  } else if (pose === 'crouch') {
+    // lowering into a seat (or getting up): hands reaching back toward the seat
+    armNear = { a: [CX - 9, s + 3], m: [CX - 11, s + 10], b: [CX - 10, s + 16] };
+    armFar = { a: [CX + 10, s + 3], m: [CX + 12, s + 10], b: [CX + 11, s + 15] };
   }
-  const carrying = carry && (pose === 'stand' || pose === 'walk1' || pose === 'walk2');
+  // ---- character life: gestures, dance and idle moments (the body sways by dx, so limbs start from cx)
+  const cx = CX + dx;
+  const front = view === 'front';
+  let farArmFront = false;
+  let gesture: Frame['gesture'];
+  const arms = (n: [Pt, Pt, Pt], f: [Pt, Pt, Pt]) => {
+    armNear = { a: n[0], m: n[1], b: n[2] };
+    armFar = { a: f[0], m: f[1], b: f[2] };
+  };
+  const hangNear: [Pt, Pt, Pt] = [[cx - 9, s + 3], [cx - 10, s + 10], [cx - 10, s + 17]];
+  const hangFar: [Pt, Pt, Pt] = [[cx + 10, s + 3], [cx + 11, s + 10], [cx + 11, s + 16]];
+  switch (pose) {
+    case 'pass1': // between strides: arms at half swing, coming back
+      arms([[cx - 9, s + 3], [cx - 11, s + 10], [cx - 11, s + 16]], [[cx + 10, s + 3], [cx + 11, s + 10], [cx + 12, s + 16]]);
+      break;
+    case 'pass2':
+      arms([[cx - 9, s + 3], [cx - 9, s + 10], [cx - 8, s + 16]], [[cx + 10, s + 3], [cx + 10, s + 10], [cx + 10, s + 16]]);
+      break;
+    case 'clap1': // hands apart in front of the chest, about to meet
+    case 'clap2': {
+      const gap = pose === 'clap1' ? 5 : 0;
+      if (front) {
+        farArmFront = true;
+        arms([[cx - 9, s + 3], [cx - 11, s + 10], [cx - 2 - gap, s + 8]], [[cx + 10, s + 3], [cx + 13, s + 9], [cx + 3 + gap, s + 8]]);
+      } else arms([[cx - 9, s + 3], [cx - 12, s + 9], [cx - 9 + gap / 5, s + 9]], [[cx + 10, s + 3], [cx + 13, s + 9], [cx + 10 - gap / 5, s + 9]]);
+      break;
+    }
+    case 'cheer1': // both arms thrown up
+      arms([[cx - 9, s + 2], [cx - 14, s - 4], [cx - 16, s - 12]], [[cx + 10, s + 2], [cx + 15, s - 4], [cx + 17, s - 12]]);
+      break;
+    case 'cheer2': // …and a hop
+      arms([[cx - 9, s + 2], [cx - 13, s - 5], [cx - 15, s - 14]], [[cx + 10, s + 2], [cx + 14, s - 5], [cx + 16, s - 14]]);
+      break;
+    case 'thumbs': // forearm up in front, thumb raised
+      arms([[cx - 9, s + 3], [cx - 14, s + 8], [cx - 14, s + 1]], hangFar);
+      gesture = 'thumb';
+      break;
+    case 'laugh1': // hands on the belly, shoulders shaking
+    case 'laugh2': {
+      const k = pose === 'laugh1' ? 0 : 1;
+      if (front) {
+        farArmFront = true;
+        arms([[cx - 9, s + 3], [cx - 12 + k, s + 9], [cx - 5, s + 14 - k]], [[cx + 10, s + 3], [cx + 13 - k, s + 9], [cx + 6, s + 14 - k]]);
+      } else arms([[cx - 9, s + 3], [cx - 12 + k, s + 9], [cx - 9, s + 14 - k]], [[cx + 10, s + 3], [cx + 13 - k, s + 9], [cx + 10, s + 14 - k]]);
+      break;
+    }
+    case 'heart': // both hands over the heart
+      if (front) {
+        farArmFront = true;
+        arms([[cx - 9, s + 3], [cx - 11, s + 10], [cx - 2, s + 7]], [[cx + 10, s + 3], [cx + 13, s + 10], [cx + 3, s + 7]]);
+      } else arms([[cx - 9, s + 3], [cx - 12, s + 10], [cx - 9, s + 9]], [[cx + 10, s + 3], [cx + 13, s + 10], [cx + 10, s + 9]]);
+      break;
+    case 'idea': // one finger up beside the head
+      arms([[cx - 9, s + 2], [cx - 15, s - 2], [cx - 16, s - 13]], hangFar);
+      gesture = 'finger';
+      break;
+    case 'dance1': // sway left: near arm up, far arm swung out low
+      arms([[cx - 9, s + 2], [cx - 15, s - 5], [cx - 17, s - 16]], [[cx + 10, s + 3], [cx + 14, s + 8], [cx + 16, s + 12]]);
+      break;
+    case 'dance2': // bounce: elbows out, hands up in front
+      arms([[cx - 9, s + 3], [cx - 14, s + 8], [cx - 8, s + 4]], [[cx + 10, s + 3], [cx + 15, s + 7], [cx + 10, s + 3]]);
+      break;
+    case 'dance3': // sway right: far arm up, near arm swung out low
+      arms([[cx - 9, s + 3], [cx - 13, s + 8], [cx - 15, s + 12]], [[cx + 10, s + 2], [cx + 16, s - 5], [cx + 18, s - 16]]);
+      break;
+    case 'dance4': // bounce: arms swinging down and out
+      arms([[cx - 9, s + 3], [cx - 13, s + 10], [cx - 14, s + 15]], [[cx + 10, s + 3], [cx + 14, s + 10], [cx + 15, s + 14]]);
+      break;
+    case 'shift': // weight on one leg, arms loose
+      arms(hangNear, hangFar);
+      break;
+    case 'phone': // looking at a phone held at the chest
+      arms([[cx - 9, s + 3], [cx - 9, s + 11], [cx - 3, s + 8]], hangFar);
+      gesture = 'phone';
+      break;
+  }
+  const carrying = carry && (pose === 'stand' || pose === 'walk1' || pose === 'walk2' || pose === 'pass1' || pose === 'pass2');
   if (carrying && view === 'front') {
     // the near arm: elbow at the waist, forearm forward, hand up in front of the chest
     armNear = { a: [CX - 9, s + 3], m: [CX - 9, s + 11], b: [CX - 3, s + 9] };
@@ -183,12 +349,58 @@ export function frameFor(view: View, pose: Pose, body: Body = 'a', carry = false
     heelNear = true;
   } else if (sitting && view === 'back') {
     // seen from behind the thighs run away from us, staying inside the torso's silhouette (a low backrest
-    // must hide them), with just the shins and feet showing below
+    // must hide them); the kit leaves legs out of the back view altogether
     legNear = { a: [CX - 4, h], m: [CX + 3, h + 1], b: [CX + 5, h + 6] };
     legFar = { a: [CX + 4, h], m: [CX + 9, h], b: [CX + 10, h + 5] };
+  } else if (pose === 'sit-stool') {
+    // tall and shallow: thighs slope down off the seat, shins hang straight down to the rung
+    legNear = { a: [CX - 4, h], m: [CX + 4, h + 4], b: [CX + 4, h + 12] };
+    legFar = { a: [CX + 4, h - 1], m: [CX + 10, h + 3], b: [CX + 10, h + 11] };
+  } else if (pose === 'sit-lounge') {
+    // sunk into a sofa: knees up level with the hips, shins angled forward, feet out in front
+    legNear = { a: [CX - 4, h], m: [CX + 8, h + 1], b: [CX + 10, h + 9] };
+    legFar = { a: [CX + 4, h - 1], m: [CX + 14, h], b: [CX + 16, h + 8] };
+  } else if (pose === 'sit-floor') {
+    // low in a beanbag: legs stretched out forward, feet resting on the floor ahead
+    legNear = { a: [CX - 4, h], m: [CX + 6, h + 2], b: [CX + 13, h + 4] };
+    legFar = { a: [CX + 4, h - 1], m: [CX + 12, h + 1], b: [CX + 18, h + 3] };
   } else if (sitting) {
-    legNear = { a: [CX - 4, h], m: [CX + 7, h + 3], b: [CX + 8, 98] };
-    legFar = { a: [CX + 4, h - 1], m: [CX + 13, h + 2], b: [CX + 14, 97] };
+    // a chair: thighs level to the seat's front edge, shins hanging down past it
+    legNear = { a: [CX - 4, h], m: [CX + 7, h + 2], b: [CX + 8, h + 10] };
+    legFar = { a: [CX + 4, h - 1], m: [CX + 13, h + 1], b: [CX + 14, h + 9] };
+  } else if (pose === 'crouch') {
+    // halfway down: knees bent forward over the feet
+    legNear = { a: [CX - 4, h], m: [CX + 1, h + 7], b: [CX - 2, 99] };
+    legFar = { a: [CX + 4, h], m: [CX + 8, h + 6], b: [CX + 5, 99] };
+  } else if (pose === 'pass1') {
+    // passing: feet close together, the trailing foot just lifting
+    legNear = { a: [CX - 4, h], m: [CX - 3, h + 9], b: [CX - 2, 99] };
+    legFar = { a: [CX + 4, h], m: [CX + 3, h + 9], b: [CX + 2, 98] };
+    heelFar = true;
+  } else if (pose === 'pass2') {
+    legNear = { a: [CX - 4, h], m: [CX - 5, h + 9], b: [CX - 5, 98] };
+    legFar = { a: [CX + 4, h], m: [CX + 5, h + 9], b: [CX + 5, 99] };
+    heelNear = true;
+  } else if (pose === 'cheer2') {
+    // off the ground: knees soft, both feet up
+    legNear = { a: [cx - 4, h], m: [cx - 3, h + 8], b: [cx - 4, 97] };
+    legFar = { a: [cx + 4, h], m: [cx + 5, h + 8], b: [cx + 4, 96] };
+  } else if (pose === 'dance1' || pose === 'shift') {
+    // hips over to one side: the near leg carries the weight, the far knee bends
+    legNear = { a: [cx - 4, h], m: [CX - 4, h + 9], b: [CX - 4, 99] };
+    legFar = { a: [cx + 4, h], m: [CX + 6, h + 8], b: [CX + 4, 98] };
+    heelFar = true;
+  } else if (pose === 'dance3') {
+    legNear = { a: [cx - 4, h], m: [CX - 6, h + 8], b: [CX - 4, 98] };
+    legFar = { a: [cx + 4, h], m: [CX + 4, h + 9], b: [CX + 4, 99] };
+    heelNear = true;
+  } else if (pose === 'dance2' || pose === 'dance4' || pose === 'laugh1') {
+    // a little bounce: knees give
+    legNear = { a: [cx - 4, h], m: [CX - 5, h + 8], b: [CX - 4, 99] };
+    legFar = { a: [cx + 4, h], m: [CX + 5, h + 8], b: [CX + 4, 99] };
+  } else if (dx) {
+    legNear = { a: [cx - 4, h], m: [cx - 4, h + 9], b: [CX - 4, 99] };
+    legFar = { a: [cx + 4, h], m: [cx + 4, h + 9], b: [CX + 4, 99] };
   }
   const holdLimb = carrying ? (view === 'front' ? armNear : armFar) : pose === 'wave' ? armFar : armNear;
   return {
@@ -207,5 +419,7 @@ export function frameFor(view: View, pose: Pose, body: Body = 'a', carry = false
     heelNear,
     heelFar,
     sitting,
+    farArmFront: farArmFront || undefined,
+    gesture,
   };
 }

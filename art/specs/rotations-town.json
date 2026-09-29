@@ -1,0 +1,359 @@
+{
+  "name": "rotations-town",
+  "note": "The four-rotation standard: the missing views of the town props.",
+  "mood": "A cosy seaside town in the Minglewood house style.",
+  "colors": 28,
+  "quality": "high",
+  "sheets": [
+    {
+      "name": "boat-red",
+      "grid": "2x1",
+      "size": "1536x1024",
+      "tile": 240,
+      "refs": [
+        "out/town-props/leisure/boat.red.raw.png"
+      ],
+      "items": [
+        {
+          "facing": "sw",
+          "w": 2,
+          "d": 2,
+          "h": 16,
+          "fill": 0.6,
+          "prompt": "The red wooden rowboat exactly as in the reference: its pointed bow toward the LOWER LEFT, its square stern toward the upper right, oars resting inside.",
+          "width": 112
+        },
+        {
+          "facing": "ne",
+          "w": 2,
+          "d": 2,
+          "h": 16,
+          "fill": 0.6,
+          "prompt": "The SAME red wooden rowboat turned half round: its pointed bow now toward the UPPER RIGHT, away from us, its square stern toward the lower left, nearest us; the oars resting inside.",
+          "width": 112,
+          "key": "boat.red"
+        }
+      ],
+      "note": "The extra reference images are finished drawings of this exact piece. EVERY cell shows the SAME piece, same size, materials and colours, seen from a different side as each cell says. Reference: the rowboat with its pointed bow toward the lower left.",
+      "model": {
+        "rooms": [
+          "outdoors"
+        ]
+      }
+    },
+    {
+      "name": "boat-yellow",
+      "grid": "2x1",
+      "size": "1536x1024",
+      "tile": 240,
+      "refs": [
+        "out/town-props/leisure/boat.yellow.raw.png"
+      ],
+      "items": [
+        {
+          "facing": "sw",
+          "w": 2,
+          "d": 2,
+          "h": 16,
+          "fill": 0.6,
+          "prompt": "The yellow wooden rowboat exactly as in the reference: its pointed bow toward the LOWER LEFT, its square stern toward the upper right, oars resting inside.",
+          "width": 112
+        },
+        {
+          "facing": "ne",
+          "w": 2,
+          "d": 2,
+          "h": 16,
+          "fill": 0.6,
+          "prompt": "The SAME yellow wooden rowboat turned half round: its pointed bow now toward the UPPER RIGHT, away from us, its square stern toward the lower left, nearest us; the oars resting inside.",
+          "width": 112,
+          "key": "boat.yellow"
+        }
+      ],
+      "note": "The extra reference images are finished drawings of this exact piece. EVERY cell shows the SAME piece, same size, materials and colours, seen from a different side as each cell says. Reference: the rowboat with its pointed bow toward the lower left.",
+      "model": {
+        "rooms": [
+          "outdoors"
+        ]
+      }
+    },
+    {
+      "name": "mailbox",
+      "grid": "2x1",
+      "size": "1536x1024",
+      "tile": 280,
+      "refs": [
+        "out/town-props/street/mailbox.raw.png"
+      ],
+      "items": [
+        {
+          "facing": "sw",
+          "w": 1,
+          "d": 1,
+          "h": 34,
+          "fill": 0.3,
+          "prompt": "The blue street mailbox exactly as in the reference. Its front faces the LOWER LEFT.",
+          "height_px": 77
+        },
+        {
+          "facing": "ne",
+          "w": 1,
+          "d": 1,
+          "h": 34,
+          "fill": 0.3,
+          "prompt": "The SAME blue mailbox seen from BEHIND. Seen from BEHIND: its front faces away from us, to the UPPER RIGHT. Its plain rounded blue back faces us, with a small hinged collection door and a brass lock; no slot and no star visible.",
+          "height_px": 77,
+          "key": "mailbox"
+        }
+      ],
+      "note": "The extra reference images are finished drawings of this exact piece. EVERY cell shows the SAME piece, same size, materials and colours, seen from a different side as each cell says. Reference: the mailbox from the front (its slot and star face the lower left).",
+      "model": {
+        "rooms": [
+          "outdoors"
+        ]
+      }
+    },
+    {
+      "name": "noticeboard",
+      "grid": "2x1",
+      "size": "1536x1024",
+      "tile": 280,
+      "refs": [
+        "out/town-props/park/noticeboard.raw.png"
+      ],
+      "items": [
+        {
+          "facing": "sw",
+          "w": 1,
+          "d": 1,
+          "h": 48,
+          "fill": 0.3,
+          "prompt": "The wooden town notice board exactly as in the reference. Its front faces the LOWER LEFT.",
+          "height_px": 106
+        },
+        {
+          "facing": "ne",
+          "w": 1,
+          "d": 1,
+          "h": 48,
+          "fill": 0.3,
+          "prompt": "The SAME notice board seen from BEHIND. Seen from BEHIND: its front faces away from us, to the UPPER RIGHT. The plain planked back of the board between its two posts faces us, ivy climbing the posts, the mossy shingle roof on top; no notices visible.",
+          "height_px": 106,
+          "key": "noticeboard"
+        }
+      ],
+      "note": "The extra reference images are finished drawings of this exact piece. EVERY cell shows the SAME piece, same size, materials and colours, seen from a different side as each cell says. Reference: the notice board from the front (its pinned notices face the lower left).",
+      "model": {
+        "rooms": [
+          "outdoors"
+        ]
+      }
+    },
+    {
+      "name": "bike-rack",
+      "grid": "2x1",
+      "size": "1536x1024",
+      "tile": 280,
+      "refs": [
+        "out/town-props/street/bike-rack.raw.png"
+      ],
+      "items": [
+        {
+          "facing": "se",
+          "w": 1,
+          "d": 1,
+          "h": 24,
+          "fill": 0.5,
+          "prompt": "The black steel hoop bike rack with the mint bicycle exactly as in the reference.",
+          "width": 76
+        },
+        {
+          "facing": "nw",
+          "w": 1,
+          "d": 1,
+          "h": 24,
+          "fill": 0.5,
+          "prompt": "The SAME bike rack and bicycle seen from the other side, from BEHIND the rack: the hoops and the parked bicycle's other side, its basket now at the other end.",
+          "width": 76,
+          "key": "bike-rack"
+        }
+      ],
+      "note": "The extra reference images are finished drawings of this exact piece. EVERY cell shows the SAME piece, same size, materials and colours, seen from a different side as each cell says. Reference: the bike rack with a bicycle parked in it.",
+      "model": {
+        "rooms": [
+          "outdoors"
+        ]
+      }
+    },
+    {
+      "name": "flower-cart",
+      "grid": "2x2",
+      "size": "1536x1024",
+      "tile": 240,
+      "refs": [
+        "out/town-props/park/flower-cart.raw.png"
+      ],
+      "items": [
+        {
+          "facing": "sw",
+          "w": 2,
+          "d": 2,
+          "h": 64,
+          "fill": 0.4,
+          "prompt": "The flower cart exactly as in the reference. Its front faces the LOWER LEFT.",
+          "width": 124
+        },
+        {
+          "facing": "se",
+          "w": 2,
+          "d": 2,
+          "h": 64,
+          "fill": 0.4,
+          "prompt": "The SAME flower cart turned a quarter-turn: its flower display now faces the LOWER RIGHT. As in the reference seen from the display side, the big spoked wheel is at the LEFT end and the handles at the RIGHT end; the striped awning on top.",
+          "width": 124,
+          "key": "flower-cart"
+        },
+        {
+          "facing": "ne",
+          "w": 2,
+          "d": 2,
+          "h": 64,
+          "fill": 0.4,
+          "prompt": "The SAME flower cart seen from BEHIND: its display faces away to the UPPER RIGHT. We see the cart's plain wooden back; the big spoked wheel is now at the RIGHT end and the handles at the LEFT end; flowers peeking over the top; the striped awning.",
+          "width": 124,
+          "key": "flower-cart"
+        },
+        {
+          "facing": "nw",
+          "w": 2,
+          "d": 2,
+          "h": 64,
+          "fill": 0.4,
+          "prompt": "The SAME flower cart seen from BEHIND: its display faces away to the UPPER LEFT. We see the cart's plain wooden back; the big spoked wheel is at the RIGHT end and the handles at the LEFT end; flowers peeking over the top; the striped awning.",
+          "width": 124,
+          "key": "flower-cart"
+        }
+      ],
+      "note": "The extra reference images are finished drawings of this exact piece. EVERY cell shows the SAME piece, same size, materials and colours, seen from a different side as each cell says. Reference: the flower cart with its flower display facing the lower left, its big spoked wheel at the LEFT end and its handles at the RIGHT end. The wheel and handles turn with the cart.",
+      "model": {
+        "rooms": [
+          "outdoors"
+        ]
+      }
+    },
+    {
+      "name": "lamp-post",
+      "grid": "2x2",
+      "size": "1536x1024",
+      "tile": 280,
+      "refs": [
+        "out/town-props/street/lamp-post.raw.png"
+      ],
+      "items": [
+        {
+          "facing": "se",
+          "w": 1,
+          "d": 1,
+          "h": 56,
+          "fill": 0.3,
+          "prompt": "The black iron street lamp on its round foot exactly as in the reference: its curled arm holding the lantern out to the RIGHT.",
+          "height_px": 100
+        },
+        {
+          "facing": "sw",
+          "w": 1,
+          "d": 1,
+          "h": 56,
+          "fill": 0.3,
+          "prompt": "The SAME piece turned: The black iron street lamp on its round foot; its curled arm holding the lantern now reaches out TOWARD US, in front of the post (lower on the page, overlapping the post).",
+          "height_px": 100,
+          "key": "lamp-post"
+        },
+        {
+          "facing": "nw",
+          "w": 1,
+          "d": 1,
+          "h": 56,
+          "fill": 0.3,
+          "prompt": "The SAME piece turned: The black iron street lamp on its round foot; its curled arm holding the lantern now reaches out to the LEFT of the post (like a mirror image of the reference).",
+          "height_px": 100,
+          "key": "lamp-post"
+        },
+        {
+          "facing": "ne",
+          "w": 1,
+          "d": 1,
+          "h": 56,
+          "fill": 0.3,
+          "prompt": "The SAME piece turned: The black iron street lamp on its round foot; its curled arm holding the lantern now reaches out AWAY from us, BEHIND the post (higher on the page, partly hidden behind the post).",
+          "height_px": 100,
+          "key": "lamp-post"
+        }
+      ],
+      "note": "The extra reference images are finished drawings of this exact piece. EVERY cell shows the SAME piece, same size, materials and colours, seen from a different side as each cell says. Reference: the piece with its curled arm holding the lantern out to the RIGHT. That part swings round with the piece as it turns; the post stays on the same spot.",
+      "model": {
+        "rooms": [
+          "outdoors"
+        ],
+        "base": "centred"
+      }
+    },
+    {
+      "name": "signpost",
+      "grid": "2x2",
+      "size": "1536x1024",
+      "tile": 280,
+      "refs": [
+        "out/town-props/street/signpost.raw.png"
+      ],
+      "items": [
+        {
+          "facing": "se",
+          "w": 1,
+          "d": 1,
+          "h": 56,
+          "fill": 0.3,
+          "prompt": "The wooden town signpost in its flower planter exactly as in the reference: its three painted arrow signs (cream, teal and red, no text) out to the RIGHT.",
+          "height_px": 112
+        },
+        {
+          "facing": "sw",
+          "w": 1,
+          "d": 1,
+          "h": 56,
+          "fill": 0.3,
+          "prompt": "The SAME piece turned: The wooden town signpost in its flower planter; its three painted arrow signs (cream, teal and red, no text) now reaches out TOWARD US, in front of the post (lower on the page, overlapping the post).",
+          "height_px": 112,
+          "key": "signpost"
+        },
+        {
+          "facing": "nw",
+          "w": 1,
+          "d": 1,
+          "h": 56,
+          "fill": 0.3,
+          "prompt": "The SAME piece turned: The wooden town signpost in its flower planter; its three painted arrow signs (cream, teal and red, no text) now reaches out to the LEFT of the post (like a mirror image of the reference).",
+          "height_px": 112,
+          "key": "signpost"
+        },
+        {
+          "facing": "ne",
+          "w": 1,
+          "d": 1,
+          "h": 56,
+          "fill": 0.3,
+          "prompt": "The SAME piece turned: The wooden town signpost in its flower planter; its three painted arrow signs (cream, teal and red, no text) now reaches out AWAY from us, BEHIND the post (higher on the page, partly hidden behind the post).",
+          "height_px": 112,
+          "key": "signpost"
+        }
+      ],
+      "note": "The extra reference images are finished drawings of this exact piece. EVERY cell shows the SAME piece, same size, materials and colours, seen from a different side as each cell says. Reference: the piece with its three painted arrow signs (cream, teal and red, no text) out to the RIGHT. That part swings round with the piece as it turns; the post stays on the same spot.",
+      "model": {
+        "rooms": [
+          "outdoors"
+        ],
+        "base": "filled"
+      }
+    }
+  ]
+}

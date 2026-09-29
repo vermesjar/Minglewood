@@ -1,7 +1,7 @@
 import type { Server } from 'node:http';
 import { randomUUID } from 'node:crypto';
 import { WebSocketServer, type WebSocket } from 'ws';
-import { clientMsgSchema, type ServerMsg } from '@shared/protocol';
+import { clientMsgSchema, toWirePatch, type ServerMsg } from '@shared/protocol';
 import { getScene } from '@shared/world';
 import { sessionFromRequest, verifyToken } from '../auth/session';
 import { config } from '../config';
@@ -14,6 +14,11 @@ import { TokenBucket } from './rateLimit';
  * Activity iframe), then validates every message against the protocol schema before it
  * reaches the hub. The hub never sees unauthenticated or malformed input.
  */
+/** A message as it goes out: patches carry their cleared fields as null (see WirePatch). */
+export function encodeServerMsg(msg: ServerMsg): string {
+  return JSON.stringify(msg.t === 'updated' ? { ...msg, patch: toWirePatch(msg.patch) } : msg);
+}
+
 export function attachSockets(server: Server, store: Store, hubs: Map<string, OrgHub>) {
   const wss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024 });
 
@@ -52,7 +57,7 @@ export function attachSockets(server: Server, store: Store, hubs: Map<string, Or
       memberId,
       sceneId: null,
       send(msg: ServerMsg) {
-        if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(msg));
+        if (ws.readyState === ws.OPEN) ws.send(encodeServerMsg(msg));
       },
     };
     const bucket = new TokenBucket(40, 20);
@@ -94,7 +99,7 @@ export function attachSockets(server: Server, store: Store, hubs: Map<string, Or
           }
           break;
         case 'sit':
-          hub.sit(memberId, msg.objectId);
+          hub.sit(memberId, msg.objectId, msg.at);
           break;
         case 'stand':
           hub.stand(memberId);
@@ -104,6 +109,15 @@ export function attachSockets(server: Server, store: Store, hubs: Map<string, Or
           break;
         case 'toggle':
           hub.toggle(memberId, msg.objectId);
+          break;
+        case 'use':
+          hub.use(memberId, msg.objectId);
+          break;
+        case 'note':
+          hub.note(memberId, msg.objectId, msg.text);
+          break;
+        case 'unnote':
+          hub.unnote(memberId, msg.noteId);
           break;
         case 'ring':
           hub.ring(memberId, msg.objectId);

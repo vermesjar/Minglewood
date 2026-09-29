@@ -10,6 +10,7 @@ export const TERRAIN = {
   h: 'grass-dark',
   m: 'meadow',
   p: 'path',
+  t: 'trail',
   P: 'plaza',
   s: 'sand',
   w: 'water',
@@ -39,7 +40,15 @@ export type ObjectAction =
   /** Switches something on or off for everyone in the room (lamps). `on` is its starting state. */
   | { kind: 'toggle'; label: string; on?: boolean }
   /** Walk up and ring it (the launch bell): a little celebration everyone in the room sees. */
-  | { kind: 'ring'; label: string };
+  | { kind: 'ring'; label: string }
+  /** Walk up and use it (play the jukebox, feed the fish, water a plant): a moment everyone in the room sees. */
+  | { kind: 'use'; use: UseKind; label: string }
+  /** A board people leave short notes on for the room to read (a whiteboard). */
+  | { kind: 'note'; label: string };
+
+/** What using a thing does (see src/shared/world/uses.ts for which things do what). */
+export const USE_KINDS = ['song', 'arcade', 'pool', 'hockey', 'claw', 'piano', 'feed', 'spin', 'water', 'wish', 'chime', 'reboot', 'rocket', 'toast'] as const;
+export type UseKind = (typeof USE_KINDS)[number];
 
 /** Height of a counter's top surface in art px — things stacked on a counter rest at this z. */
 export const COUNTER_TOP = 20.5;

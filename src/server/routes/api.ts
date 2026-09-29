@@ -6,7 +6,7 @@ import { loadoutSchema, outfitsSchema } from '@shared/protocol';
 import { sanitizeLoadout } from '@shared/avatar';
 import { DECOR_BY_ID, MAX_DECOR_PER_ROOM, placementProblem } from '@shared/world/decor';
 import { randomUUID } from 'node:crypto';
-import { config, discordConfigured } from '../config';
+import { config, discordConfigured, slackConfigured } from '../config';
 import { requireMember, type AppContext, authed } from '../context';
 import type { BindingView, PublicMember } from '@shared/api';
 
@@ -18,7 +18,7 @@ export function toPublic(m: Member): PublicMember {
 }
 
 export function bindingView(ctx: AppContext, b: RoomBinding): BindingView {
-  const provider = b.provider === 'discord' ? ctx.discord : ctx.demo;
+  const provider = b.provider === 'discord' ? ctx.discord : b.provider === 'slack' ? ctx.slack.provider : ctx.demo;
   return { ...b, join: provider.joinInstruction(b) };
 }
 
@@ -51,6 +51,7 @@ export function apiRoutes(ctx: AppContext): Router {
       brand: BRAND,
       demoMode: config.demoMode,
       discord: { enabled: discordConfigured(), clientId: config.discord.clientId || null },
+      slack: { enabled: slackConfigured() },
       installUrl: config.installUrl || null,
     });
   });
@@ -72,9 +73,11 @@ export function apiRoutes(ctx: AppContext): Router {
       me: member,
       capabilities: {
         discord: discordConfigured() ? ctx.discord.capabilities : null,
+        slack: slackConfigured() || config.slack.mock ? ctx.slack.provider.capabilities : null,
         demo: ctx.demo.capabilities,
       },
       discordConnected: d.connections.some((c) => c.provider === 'discord' && c.status === 'active'),
+      slackConnected: !!ctx.slack.connection(orgId),
     });
   });
 

@@ -260,19 +260,32 @@ function wallTexture(scene: SceneDef, face: 'left' | 'right', rc: InteriorRender
     const span = face === 'right' ? (o.w ?? 1) : (o.d ?? o.w ?? 1);
     let range: [number, number];
     const art = wallArt(o);
+    // The left wall's texture runs right-to-left on screen (u grows toward the viewer's left), so anything
+    // hung there is drawn mirrored about its own span: pictures, signs and text read the right way round on
+    // both walls, from one drawing.
+    const readable = (draw: () => [number, number]): [number, number] => {
+      if (face !== 'left') return draw();
+      c.save();
+      c.transform(-1, 0, 0, 1, 2 * u0 + span, 0);
+      const r = draw();
+      c.restore();
+      return r;
+    };
     if (o.sprite === 'window') range = drawWindow(c, u0, span, theme, windows, face);
     else if (o.sprite === 'door') range = drawDoor(c, u0, theme);
     else if (art) {
       const [v0, v1] = art.v;
       const m = art.margin ?? 0.08;
-      c.save();
-      c.translate(u0 + m, v1);
-      c.scale((span - 2 * m) / art.img.width, -(v1 - v0) / art.img.height);
-      c.imageSmoothingEnabled = false;
-      c.drawImage(art.img, 0, 0);
-      c.restore();
-      range = [v0, v1];
-    } else range = drawWallItem(c, o, u0, span, rc);
+      range = readable(() => {
+        c.save();
+        c.translate(u0 + m, v1);
+        c.scale((span - 2 * m) / art.img.width, -(v1 - v0) / art.img.height);
+        c.imageSmoothingEnabled = false;
+        c.drawImage(art.img, 0, 0);
+        c.restore();
+        return [v0, v1];
+      });
+    } else range = readable(() => drawWallItem(c, o, u0, span, rc));
     if (o.actions?.length && range[1] > range[0]) {
       const pt = (u: number, v: number): [number, number] => (face === 'right' ? [u * 16, u * 8 - v] : [-u * 16, u * 8 - v]);
       hits.push({ obj: o, poly: [pt(u0, range[0]), pt(u0 + span, range[0]), pt(u0 + span, range[1]), pt(u0, range[1])] });

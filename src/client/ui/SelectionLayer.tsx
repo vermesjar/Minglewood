@@ -4,6 +4,7 @@ import { carryMeta } from '@shared/carry';
 import { game } from '../app/game';
 import { setState, useStore } from '../app/store';
 import { AvatarCanvas, Popover, StatusDot, formatDate, formatTime, localTime, tenureLabel, timeAgo } from './common';
+import { NotesBoard } from './NotesBoard';
 
 const ARTIFACT_KIND: Record<string, string> = {
   launch: '🚀 Launch',
@@ -263,6 +264,9 @@ function ObjectCard({ sceneId, objectId, x, y }: { sceneId: string; objectId: st
       </Popover>
     );
   }
+
+  // a board people leave notes on
+  if (o.actions?.some((a) => a.kind === 'note')) return <NotesBoard o={o} x={x} y={y} />;
 
   const info = o.actions?.find((a) => a.kind === 'info' || a.kind === 'activity' || a.kind === 'link');
   if (info && (info.kind === 'info' || info.kind === 'activity' || info.kind === 'link')) {

@@ -13,13 +13,16 @@
  *     cut straight by the slicer)
  *   - every rotation exists: a front and a back drawing (the other two are mirrors), unless it's round
  *   - seats say how high their seat is (manifest `seat`)
+ *   - THE FILL RULE (footing.ts fillProblems), in every facing, mirrors included: a large piece whose `base` is
+ *     'filled' fills its footprint diamond (or is inset evenly) and ends on its front corner; a 'centred' one
+ *     stands its narrow base on the footprint's centre
  *
  * Output (art/review/furniture/): <key>.png (se, sw, ne, nw at 3× with the footprint in cyan, its centre as a
  * cyan dot and the base centre as a red dot), index.png (everything, se), report.md.
  */
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { deflateSync, inflateSync } from 'node:zlib';
-import { baseCentre as footingCentre, isSmall, silhouette } from '../src/client/engine/sprites/footing';
+import { baseCentre as footingCentre, fillProblems, isSmall, silhouette } from '../src/client/engine/sprites/footing';
 import { allScenes } from '@shared/world';
 
 type Facing = 'se' | 'sw' | 'ne' | 'nw';
@@ -145,6 +148,8 @@ interface Entry {
   wall?: unknown;
   seat?: number;
   pad?: number;
+  /** The model spec's base contact (src/shared/models.ts). */
+  base?: 'filled' | 'centred';
 }
 export interface Placed {
   img: Img;
@@ -194,10 +199,17 @@ export const footCentre = (p: Placed): [number, number] => [p.ax + 16 * (p.w - p
  * counter, lamps, ornaments) must have its base centred on the footprint. A LARGE piece fills its footprint:
  * it must not spill past the footprint's left, right or front vertex.
  */
-export function placement(p: Placed, town = false, key = ''): { kind: 'small'; dx: number; dy: number } | { kind: 'large'; spill: string[] } {
+export function placement(
+  p: Placed,
+  town = false,
+  key = '',
+  base?: 'filled' | 'centred',
+): { kind: 'small'; dx: number; dy: number } | { kind: 'large'; spill: string[] } {
   const fc = footCentre(p);
   const bc = footingCentre(p.img);
   if (bc && isSmall(p.img, p.w, p.d)) return { kind: 'small', dx: bc[0] - fc[0], dy: bc[1] - fc[1] };
+  // the fill rule, for a piece whose model spec says how it meets the floor
+  if (base && !key.startsWith('building.')) return { kind: 'large', spill: fillProblems(p.img, p.ax, p.ay, p.w, p.d, base) };
   // A large piece stands on its footprint: its BASE (the lower part of the drawing, where it meets the
   // ground) must not spill past the footprint's corners. Canopies, eaves and roofs above may overhang.
   const e = silhouette(p.img)!;
@@ -345,9 +357,8 @@ export function reviewEntry(key: string, e: Entry, sprites: string) {
   const offsets: Array<{ facing: Facing; dx: number; dy: number }> = [];
   for (const { facing, p } of cells) {
     if (!p) continue;
-    // town pieces stand as authored (se): only that orientation is theirs to answer for
-    if (!ROOM_KEYS.has(key) && facing !== 'se') continue;
-    const fit = placement(p, !ROOM_KEYS.has(key), key);
+    // every piece turns four ways (docs/furniture.md), town pieces too: each facing answers for itself
+    const fit = placement(p, !ROOM_KEYS.has(key), key, e.base);
     if (fit.kind === 'small') {
       // small pieces are centred on their footprint at runtime (art.ts + footing.ts); record how far off the
       // drawing's own anchor was

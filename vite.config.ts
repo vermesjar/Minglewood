@@ -16,6 +16,8 @@ export default defineConfig({
     // Discord Activities are served through a tunnel (e.g. cloudflared); allow any host in dev.
     allowedHosts: true,
     proxy: {
+      // dev tools keep the browser's Host so the Design Lab can refuse anything that isn't localhost
+      '/api/dev': { target: `http://localhost:${serverPort}`, changeOrigin: false },
       '/api': `http://localhost:${serverPort}`,
       '/ws': { target: `ws://localhost:${serverPort}`, ws: true },
     },

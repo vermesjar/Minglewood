@@ -1,3 +1,4 @@
+import { resolve } from 'node:path';
 import { BRAND } from '@shared/brand';
 import { cloudConfigured, config } from './config';
 import { ControlPlane } from './cloud/controlPlane';
@@ -14,11 +15,12 @@ async function main() {
     serveClient: true,
     demo: config.demoMode,
     cloud,
+    slackTokenFile: resolve(config.dataDir, 'slack-tokens.json'),
   });
   app.server.listen(config.port, () => {
     console.log(`\n  ${BRAND.name} server on http://localhost:${config.port}`);
     console.log(
-      `  demo mode: ${config.demoMode ? 'on' : 'off'} · simulated coworkers: ${config.simulateCoworkers ? 'on' : 'off'} · discord: ${config.discord.clientId ? 'configured' : 'not configured'} · cloud: ${cloud ? 'connected' : 'off (single-org)'}\n`,
+      `  demo mode: ${config.demoMode ? 'on' : 'off'} · simulated coworkers: ${config.simulateCoworkers ? 'on' : 'off'} · discord: ${config.discord.clientId ? 'configured' : 'not configured'} · slack: ${config.slack.clientId ? 'configured' : config.slack.mock ? 'mock' : 'not configured'} · cloud: ${cloud ? 'connected' : 'off (single-org)'}\n`,
     );
   });
   const shutdown = async () => {

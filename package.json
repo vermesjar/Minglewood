@@ -22,7 +22,9 @@
     "reset-data": "tsx src/server/scripts/resetData.ts",
     "avatars:review": "tsx --tsconfig tsconfig.json scripts/avatar-review.ts",
     "avatars:sweep": "tsx --tsconfig tsconfig.json scripts/avatar-sweep.ts",
-    "furniture:review": "tsx --tsconfig tsconfig.json scripts/furniture-review.ts"
+    "furniture:review": "tsx --tsconfig tsconfig.json scripts/furniture-review.ts",
+    "slack:sim": "tsx --tsconfig tsconfig.json scripts/slack-simulate.ts",
+    "playtest": "playwright test"
   },
   "dependencies": {
     "@discord/embedded-app-sdk": "^2.5.0",
@@ -34,6 +36,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
+    "@playwright/test": "^1.63.0",
     "@types/express": "^4.17.25",
     "@types/node": "^20.19.43",
     "@types/react": "^18.3.31",

@@ -25,6 +25,16 @@ services:
         sync: false
       - key: DISCORD_BOT_TOKEN
         sync: false
+      - key: SLACK_CLIENT_ID
+        sync: false # see docs/slack.md
+      - key: SLACK_CLIENT_SECRET
+        sync: false
+      - key: SLACK_SIGNING_SECRET
+        sync: false
+      - key: SLACK_BOT_TOKEN
+        sync: false
+      - key: SLACK_TEAM_ID
+        sync: false
       - key: CONTROL_PLANE_URL
         sync: false # e.g. https://minglewood-cloud.lovable.app/api/public
       - key: MINGLEWOOD_SERVER_KEY

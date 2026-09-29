@@ -151,3 +151,36 @@ All of P1–P3 is live (WorldView.ts, effects.ts, art.ts, animations.ts). How to
    (`vend: plush`, served by Pip: he steps to the counter, works, hands it over), the popcorn cart (`popcorn`) and
    the vending machine (`soda`) are self-serve (a 0.7 s moment at the machine — the cart throws up a flurry of
    kernels — then it's yours). The kit draws `held.plush`, `held.popcorn`, `held.soda`.
+
+## Design Lab requests (from the Design Lab, `docs/design-lab.md`)
+
+The lab publishes furniture only through studio.py's JSON commands (`lab-generate`, `check`, `lab-publish`) and
+character parts through `charkit.py`. These would make it complete:
+
+1. **studio.py `lab-generate`: turn the footprint per facing.** It draws every view on `spec.footprint` as given.
+   A long piece (width ≠ depth) covers `[depth, width]` facing se/nw (models.ts `footprintFacing`), so its se and
+   nw guides are the wrong way round. For now the lab works around it: it passes a long mirror piece's footprint
+   turned (both of its views are se/nw), and it draws a long `full` piece's four sides one call at a time, which
+   costs four calls and gives less consistent sides. Asked for: per view, `w, d = footprintFacing(spec, facing)`,
+   so every view is drawn on one sheet.
+2. **studio.py `lab-generate`: return the take's raw sheet path** (`sheet.png`, `prompt.txt`), so the lab can
+   show the model's raw output next to the pixelized view.
+3. **Light points per drawing.** When a lamp is drawn, the lab puts its light a third of the way down each
+   drawing's silhouette. A `light` hint from the construction guide (where the shade is), returned per view by
+   `lab-generate`, would be exact.
+4. **charkit.py: a JSON entry point** like studio's (`part-generate --out DIR`, `part-extract`). Today the lab
+   runs `charkit.py <kind> <name> --no-publish --regen` and then reads `out/charkit/<job>.json`. It also renames
+   the raw and meta files to publish under the final name before running `extract`.
+5. **Wardrobe entries for new parts** (owner of `src/shared/avatar.ts`). A published part lands in
+   `<kind>Lib.json`, but it only appears in the wardrobe once `AVATAR_ITEMS` lists it. The lab shows the line to
+   paste. Ideally `AVATAR_ITEMS` would pick up library entries that have a `label` automatically, or read a
+   small `parts.json` the lab can write.
+6. **Seat profiles for lab seats.** A new seat publishes `seat`, `sitStyle` and `backrest` from the form.
+   `scripts/seat-fit.ts --fit <key>`, run on the staged drawing, would measure `seatDepth` and `backDepth`
+   the way it does for catalog seats. The lab would call it before publishing.
+
+**Done (1–3, the rotation/model-spec pass):** `lab-generate` draws each view on `footprintFacing(spec, facing)`
+(all views on one sheet), returns `raw: {sheet, prompt, guide}` and each view's `raw`, and gives a lamp
+(category `lighting`, or a spec with a `light`) a `light` per drawing where that drawing glows (its lit shade or
+lantern), on the entry's `facings`. `studio.publish_sprite` also records a long piece's footprint as
+`[width, depth]` whichever facing it was drawn from.

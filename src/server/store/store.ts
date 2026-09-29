@@ -23,6 +23,7 @@ import type {
   World,
 } from '@shared/domain/types';
 import type { Decoration } from '@shared/world/decor';
+import type { BoardNote } from '@shared/protocol';
 import { tenantOrgId, tenantTemplate, type TenantInfo } from '@shared/seed/tenant';
 import {
   buildSeed,
@@ -48,6 +49,8 @@ export interface OrgData {
   events: OrgEvent[];
   artifacts: HistoricalArtifact[];
   decorations: Decoration[];
+  /** Notes left on boards (whiteboards) around the world. */
+  notes: BoardNote[];
   audit: AuditEntry[];
   sim: Record<string, SimProfile>;
   /** Event/artifact ids generated from a template (demo seed or tenant starter) — never persisted. */
@@ -66,6 +69,7 @@ export interface PersistedOrg {
   customEvents: OrgEvent[];
   customArtifacts?: HistoricalArtifact[];
   decorations?: Decoration[];
+  notes?: BoardNote[];
   audit: AuditEntry[];
   tenant?: TenantInfo;
 }
@@ -105,6 +109,7 @@ export class Store {
         events: [...seed.events, ...(saved?.customEvents ?? [])],
         artifacts: [...seed.artifacts, ...(saved?.customArtifacts ?? [])],
         decorations: saved?.decorations ?? [],
+        notes: saved?.notes ?? [],
         audit: saved?.audit ?? [],
         sim: seed.sim,
         templateIds: new Set([...seed.events.map((e) => e.id), ...seed.artifacts.map((a) => a.id)]),
@@ -151,6 +156,7 @@ export class Store {
       events: [...tpl.events, ...(saved?.customEvents ?? [])],
       artifacts: [...tpl.artifacts, ...(saved?.customArtifacts ?? [])],
       decorations: saved?.decorations ?? [],
+      notes: saved?.notes ?? [],
       audit: saved?.audit ?? [],
       sim: {},
       templateIds: new Set([...tpl.events.map((e) => e.id), ...tpl.artifacts.map((a) => a.id)]),
@@ -290,6 +296,19 @@ export class Store {
     return found;
   }
 
+  addNote(orgId: string, n: BoardNote): void {
+    this.get(orgId).notes.push(n);
+    this.scheduleSave();
+  }
+
+  removeNote(orgId: string, id: string): BoardNote | undefined {
+    const data = this.get(orgId);
+    const found = data.notes.find((n) => n.id === id);
+    data.notes = data.notes.filter((n) => n.id !== id);
+    this.scheduleSave();
+    return found;
+  }
+
   addArtifact(orgId: string, a: HistoricalArtifact): void {
     this.get(orgId).artifacts.push(a);
     this.scheduleSave();
@@ -323,6 +342,7 @@ export class Store {
         customEvents: d.events.filter((e) => !d.templateIds.has(e.id)),
         customArtifacts: d.artifacts.filter((a) => !d.templateIds.has(a.id)),
         decorations: d.decorations,
+        notes: d.notes,
         audit: d.audit,
         tenant: d.tenant,
       };

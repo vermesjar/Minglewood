@@ -23,6 +23,8 @@ const env: Record<string, string | undefined> = Object.fromEntries(
   Object.entries(process.env).map(([key, value]) => [key, value?.trim()]),
 );
 const isProd = env.NODE_ENV === 'production';
+/** Slack without a workspace (docs/slack.md): outgoing calls are recorded, never sent. Never in production. */
+const slackMock = !isProd && (env.SLACK_MOCK === 'true' || env.SLACK_MOCK === '1');
 
 let sessionSecret = env.SESSION_SECRET ?? '';
 if (!sessionSecret) {
@@ -62,9 +64,27 @@ export const config = {
     redirectUri: env.DISCORD_REDIRECT_URI ?? `${env.PUBLIC_URL ?? 'http://localhost:5173'}/api/auth/discord/callback`,
     adminUserIds: (env.DISCORD_ADMIN_USER_IDS ?? '').split(',').map((s) => s.trim()).filter(Boolean),
   },
+  slack: {
+    clientId: env.SLACK_CLIENT_ID ?? '',
+    clientSecret: env.SLACK_CLIENT_SECRET ?? '',
+    /** Verifies every request Slack sends us (Basic Information → Signing Secret). */
+    signingSecret: env.SLACK_SIGNING_SECRET || (slackMock ? 'mock-signing-secret' : ''),
+    /** Optional single-workspace bot token (xoxb-…). Without it, the token from the in-app install is used. */
+    botToken: env.SLACK_BOT_TOKEN ?? '',
+    /** Optional: pre-bind the demo org to this workspace (team id T…) at boot. Admins can also install in the UI. */
+    teamId: env.SLACK_TEAM_ID || (slackMock ? 'T0MOCK' : ''),
+    signInRedirectUri: env.SLACK_REDIRECT_URI ?? `${env.PUBLIC_URL ?? 'http://localhost:5173'}/api/slack/auth/callback`,
+    installRedirectUri: env.SLACK_INSTALL_REDIRECT_URI ?? `${env.PUBLIC_URL ?? 'http://localhost:5173'}/api/slack/install/callback`,
+    adminUserIds: (env.SLACK_ADMIN_USER_IDS ?? '').split(',').map((s) => s.trim()).filter(Boolean),
+    /** Local development without a workspace: outgoing Slack calls are recorded instead of sent. */
+    mock: slackMock,
+  },
 };
 
 export const discordConfigured = () => !!(config.discord.clientId && config.discord.clientSecret);
 export const discordBotConfigured = () => !!config.discord.botToken;
+export const slackConfigured = () => !!(config.slack.clientId && config.slack.clientSecret && config.slack.signingSecret);
+/** Requests from Slack can be verified (events, slash commands) — true in mock mode with a dev signing secret too. */
+export const slackSigningConfigured = () => !!config.slack.signingSecret;
 
 export const cloudConfigured = () => !!(config.controlPlaneUrl && config.serverKey);

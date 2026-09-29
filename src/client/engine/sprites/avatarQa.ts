@@ -18,11 +18,11 @@ import type { AvatarLoadout } from '@shared/domain/types';
 import type { Facing } from '@shared/world/scene';
 import { ITEM_BY_ID, normalizeLoadout } from '@shared/avatar';
 import { LAYER, bodyOf, drawAvatarV2, headMaskOf } from './avatarKit';
-import { frameFor, type Frame, type Pose } from './avatarFrame';
+import { LIFE_POSES, frameFor, type Frame, type Pose } from './avatarFrame';
 import { H, M, W, type Mask } from './pixkit';
 
 export const FACINGS: Facing[] = ['se', 'sw', 'ne', 'nw'];
-export const POSES: Pose[] = ['stand', 'walk1', 'walk2', 'sit', 'wave', 'work'];
+export const POSES: Pose[] = ['stand', 'walk1', 'walk2', 'sit', 'sit-stool', 'sit-lounge', 'sit-floor', 'crouch', 'wave', 'work', ...LIFE_POSES];
 
 export interface Rendered {
   /** RGBA, W × H, exactly what the game blits. */

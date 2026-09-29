@@ -70,6 +70,8 @@ export interface MemberSettings {
   /** Allow knocks while Focused. Default false: focus means focus. */
   knocksWhileFocused: boolean;
   reducedMotion?: boolean;
+  /** When I'm not in the world, deliver knocks as a Slack DM from the Minglewood bot. Opt-in. */
+  slackKnockDms?: boolean;
 }
 
 export interface ExternalIdentity {
@@ -77,6 +79,8 @@ export interface ExternalIdentity {
   externalId: string;
   memberId: Id;
   username?: string;
+  /** Verified email from the provider (Slack), used to recognise the same person across sign-in methods. */
+  email?: string;
   linkedAt: string;
 }
 
@@ -202,17 +206,26 @@ export interface RoomBinding {
   label: string;
 }
 
-export type ProviderKind = 'discord' | 'demo';
+export type ProviderKind = 'discord' | 'slack' | 'demo';
 
 export interface ProviderConnection {
   id: Id;
   orgId: Id;
   provider: ProviderKind;
-  externalWorkspaceId: string; // Discord guild id
+  externalWorkspaceId: string; // Discord guild id / Slack team id
   displayName: string;
   connectedAt: string;
   connectedBy: Id;
   status: 'active' | 'error' | 'disconnected';
+  /** Provider-specific options an admin sets (never secrets — tokens live server-side only). */
+  settings?: ConnectionSettings;
+}
+
+export interface ConnectionSettings {
+  /** Slack: post a short "who's around" note to this channel once a day. */
+  dailyChannelId?: string;
+  /** Hour of day (0–23, in the org's timezone) for the daily note. */
+  dailyHour?: number;
 }
 
 /* ---------------------------------------------------------------- events & memory */

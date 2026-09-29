@@ -142,6 +142,14 @@ textarea {
 .btn.discord:hover {
   background: #6a76f5;
 }
+.btn.slack {
+  background: #4a154b;
+  color: white;
+  margin-bottom: 10px;
+}
+.btn.slack:hover {
+  background: #611f69;
+}
 .ghost-btn {
   background: transparent;
   box-shadow: none;
@@ -1184,9 +1192,71 @@ code {
 }
 .artifact h3,
 .building-card h3,
-.info-card h3 {
+.info-card h3,
+.notes-board h3 {
   margin: 2px 0 6px;
   font-size: 18px;
+}
+/* a board's notes: sticky notes in the colour they are on the board */
+.notes-board {
+  width: min(320px, 78vw);
+}
+.notes-board .notes {
+  list-style: none;
+  margin: 8px 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+.notes-board .note {
+  border: 1.5px solid var(--ink);
+  border-radius: 4px;
+  padding: 7px 9px 5px;
+  box-shadow: 0 2px 0 rgba(42, 31, 45, 0.35);
+  transform: rotate(-0.6deg);
+}
+.notes-board .note:nth-child(even) {
+  transform: rotate(0.7deg);
+}
+.notes-board .note-text {
+  margin: 0 0 4px;
+  font-size: 14.5px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.notes-board .note-by {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.notes-board .note-down {
+  margin-left: auto;
+  background: none;
+  border: none;
+  padding: 2px 0;
+  font: inherit;
+  color: var(--ink-2);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.notes-board .note-form {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+.notes-board .note-form input {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 9px;
+  border: var(--border);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  background: var(--white);
 }
 .story {
   line-height: 1.5;
@@ -1907,6 +1977,30 @@ body.rm *::after {
   font-weight: 700;
   color: #6b6875;
   margin-left: 8px;
+}
+.aurls {
+  margin: 0;
+}
+.aurls dt {
+  font-size: 12px;
+  font-weight: 700;
+  margin-top: 10px;
+}
+.aurls dd {
+  margin: 4px 0 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.aurls code {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  background: #f5f3ef;
+  border-radius: 6px;
+  padding: 5px 8px;
 }
 .agrid2 {
   display: grid;

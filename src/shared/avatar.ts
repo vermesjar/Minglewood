@@ -197,6 +197,7 @@ export const AVATAR_ITEMS: AvatarItem[] = [
   I('headwear', 'flowers', 'Flower crown'),
   I('headwear', 'headphones', 'Headphones'),
   I('headwear', 'cowboy', 'Cowboy hat'),
+  I('headwear', 'sun-hat', 'Sun hat'),
   I('headwear', 'crown', 'Crown'),
   I('headwear', 'hijab', 'Hijab', { coversHair: true }),
   I('headwear', 'turban', 'Turban', { coversHair: true }),

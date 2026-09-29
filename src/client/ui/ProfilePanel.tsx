@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { MemberSettings } from '@shared/domain/types';
+import { api } from '../app/api';
 import { game } from '../app/game';
 import { setState, toast, useStore } from '../app/store';
 import { Modal } from './common';
@@ -13,6 +14,8 @@ const list = (s: string) =>
 export function ProfilePanel() {
   const me = useStore((s) => s.boot?.me);
   const prefs = useStore((s) => s.prefs);
+  const slackConnected = useStore((s) => s.boot?.slackConnected);
+  const [knockDms, setKnockDms] = useState(me?.settings.slackKnockDms ?? false);
   const [f, setF] = useState(() => ({
     displayName: me?.displayName ?? '',
     title: me?.title ?? '',
@@ -102,6 +105,20 @@ export function ProfilePanel() {
               <input type="checkbox" checked={f.knocksWhileFocused} onChange={(e) => setF({ ...f, knocksWhileFocused: e.target.checked })} />
               <span>Let knocks through even when I’m focused</span>
             </label>
+            {slackConnected && (
+              <label className="check">
+                <input
+                  type="checkbox"
+                  checked={knockDms}
+                  onChange={(e) => {
+                    const enabled = e.target.checked;
+                    setKnockDms(enabled);
+                    api('/slack/me/knock-dms', { method: 'PUT', json: { enabled } }).catch((x) => (setKnockDms(!enabled), toast(`Couldn’t save: ${(x as Error).message}`)));
+                  }}
+                />
+                <span>When I’m not here, send knocks to me as a Slack DM (needs Sign in with Slack once)</span>
+              </label>
+            )}
             <div className="promise-box">
               <strong>What Minglewood never does</strong>
               <ul>

@@ -5,12 +5,15 @@ import type { Store } from './store/store';
 import type { OrgHub } from './realtime/orgHub';
 import type { DiscordProvider } from './providers/discord/provider';
 import type { DemoProvider } from './providers/demo';
+import type { SlackService } from './slack/service';
 
 export interface AppContext {
   store: Store;
   hubs: Map<string, OrgHub>;
   discord: DiscordProvider;
   demo: DemoProvider;
+  /** Slack: provider (sign-in, install, channels, links) and the per-company presence/commands service. */
+  slack: SlackService;
   /** Which org a Discord server belongs to (installed tenants, or the legacy single-guild setup). */
   resolveGuild(guildId: string): Promise<string | undefined>;
 }

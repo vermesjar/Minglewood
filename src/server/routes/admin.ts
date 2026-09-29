@@ -6,6 +6,7 @@ import { requireAdmin, requireMember, type AppContext, authed } from '../context
 import { bindingView } from './api';
 import { DiscordApiError } from '../providers/discord/api';
 import { nextFreeSlot } from '@shared/world/memory';
+import { slackAdminStatus } from '../slack/routes';
 
 /**
  * Admin console API. Every mutation is org-scoped by the session and recorded in the audit log.
@@ -36,6 +37,7 @@ export function adminRoutes(ctx: AppContext, onDiscordConnected: (orgId: string)
         installUrl: discordConfigured() ? ctx.discord.botInstallUrl() : null,
         capabilities: ctx.discord.capabilities,
       },
+      slack: slackAdminStatus(ctx, orgId),
     });
   });
 
@@ -67,7 +69,7 @@ export function adminRoutes(ctx: AppContext, onDiscordConnected: (orgId: string)
   const bindingSchema = z.union([
     z.object({ remove: z.literal(true) }),
     z.object({
-      provider: z.enum(['discord', 'demo']),
+      provider: z.enum(['discord', 'slack', 'demo']),
       kind: z.enum(['voice', 'text', 'stage', 'activity']),
       externalChannelId: z.string().trim().min(1).max(40),
       label: z.string().trim().min(1).max(60),
@@ -88,12 +90,14 @@ export function adminRoutes(ctx: AppContext, onDiscordConnected: (orgId: string)
     }
     const guild = d.connections.find((c) => c.provider === 'discord' && c.status === 'active');
     if (body.data.provider === 'discord' && !guild) return res.status(400).json({ error: 'connect a Discord server first' });
+    const slackTeam = ctx.slack.teamFor(orgId);
+    if (body.data.provider === 'slack' && !slackTeam) return res.status(400).json({ error: 'connect a Slack workspace first' });
     const binding = {
       id: randomUUID(),
       orgId,
       roomId,
       ...body.data,
-      externalGuildId: body.data.provider === 'discord' ? guild!.externalWorkspaceId : undefined,
+      externalGuildId: body.data.provider === 'discord' ? guild!.externalWorkspaceId : body.data.provider === 'slack' ? slackTeam : undefined,
     };
     ctx.store.setBinding(orgId, binding, roomId);
     ctx.store.audit(orgId, member.id, 'binding.set', roomId, `${binding.provider}:${binding.externalChannelId}`);
@@ -102,8 +106,13 @@ export function adminRoutes(ctx: AppContext, onDiscordConnected: (orgId: string)
 
   r.get('/channels', async (req, res) => {
     const { orgId } = authed(req);
-    const provider = req.query.provider === 'discord' ? 'discord' : 'demo';
+    const provider = req.query.provider === 'discord' ? 'discord' : req.query.provider === 'slack' ? 'slack' : 'demo';
     if (provider === 'demo') return res.json({ channels: await ctx.demo.listChannels() });
+    if (provider === 'slack') {
+      const team = ctx.slack.teamFor(orgId);
+      if (!team) return res.json({ channels: [] });
+      return res.json({ channels: await ctx.slack.provider.listChannels(team).catch(() => []) });
+    }
     const conn = ctx.store.get(orgId).connections.find((c) => c.provider === 'discord' && c.status === 'active');
     if (!conn) return res.json({ channels: [] });
     try {

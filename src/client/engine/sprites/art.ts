@@ -6,35 +6,13 @@
 import type { Facing, SceneObject } from '@shared/world/scene';
 import { makeCanvas, type Sprite } from './painter';
 import { centredAnchor } from './footing';
+import { seatProfile, type SeatProfile } from '@shared/world/seats';
+import type { Drawing, ModelSpec, Rotation } from '@shared/models';
 
-interface ArtFile {
-  file: string;
-  /** Image pixel of the footprint's back corner (tile x0,y0 at floor level). */
-  anchor?: [number, number];
-}
-
-interface ArtEntry {
-  file?: string;
-  anchor?: [number, number];
-  /** Per-facing art; a missing facing is the mirror of its partner (se↔sw, ne↔nw). */
-  facings?: Partial<Record<Facing, ArtFile>>;
-  footprint: [number, number];
-  /** anchor: exact anchors from the construction guide (the default for generated art).
-   *  diamond: art fills the footprint (left edge = left corner, bottom = front corner).
-   *  stand: the art's bottom-centre stands on the footprint's centre. */
-  fit?: 'anchor' | 'diamond' | 'stand';
-  pad?: number;
-  /** Wall-mounted flat art: painted into the wall texture between v0..v1 art px above the floor. */
-  wall?: { v: [number, number]; margin?: number };
-  /** A light source in the sprite (image px): lamps glow here. */
-  light?: { x: number; y: number; r?: number };
-  /** Seat surface height above the floor, in art px (chairs, sofas, stools). */
-  seat?: number;
-  /** A mask of what lights up at night (lit windows, lanterns, bulbs), same size and anchor as the drawing. */
-  glow?: string;
-  /** Points in the drawing (image px) that give off something: chimney smoke, fountain spray, beacons. */
-  emitters?: Array<{ kind: 'smoke' | 'spray' | 'blink' | 'beam'; x: number; y: number }>;
-}
+/** A drawing of a model and a manifest entry: THE MODEL SPEC (src/shared/models.ts). */
+type ArtFile = Drawing;
+type ArtEntry = ModelSpec;
+export type { Rotation };
 
 interface Manifest {
   scale: number;
@@ -65,7 +43,10 @@ export async function loadArt(base = ''): Promise<void> {
     for (const e of Object.values(m.sprites)) {
       if (e.file) files.add(e.file);
       if (e.glow) files.add(e.glow);
-      for (const f of Object.values(e.facings ?? {})) if (f) files.add(f.file);
+      for (const f of Object.values(e.facings ?? {})) {
+        if (f) files.add(f.file);
+        if (f?.glow) files.add(f.glow);
+      }
     }
     const bust = `?v=${Date.now().toString(36)}`;
     await Promise.all(
@@ -76,6 +57,7 @@ export async function loadArt(base = ''): Promise<void> {
     );
     manifest = m;
     lightCache.clear();
+    seatProfiles.clear();
   } catch {
     manifest = null;
   }
@@ -88,13 +70,14 @@ function entryFor(o: SceneObject): ArtEntry | null {
 
 /** Flat wall art for a wall-mounted object, if it has been drawn. */
 /** Every piece of finished art: key → footprint, the facings it was drawn in, and whether it hangs on a wall. */
-export function artCatalog(): Array<{ key: string; footprint: [number, number]; facings: Facing[]; wall: boolean }> {
+export function artCatalog(): Array<{ key: string; footprint: [number, number]; facings: Facing[]; wall: boolean; rotation?: Rotation }> {
   if (!manifest) return [];
   return Object.entries(manifest.sprites).map(([key, e]) => ({
     key,
     footprint: e.footprint,
     facings: Object.keys(e.facings ?? {}) as Facing[],
     wall: !!e.wall,
+    rotation: e.rotation,
   }));
 }
 
@@ -117,6 +100,28 @@ export function artSeat(o: SceneObject): number | null {
   return sibling?.[1].seat ?? null;
 }
 
+/**
+ * How a seat is sat in (the seat standard): its art's profile over its family's defaults. A variant drawn
+ * without its own profile borrows its sibling's (a blue couch sits like the green one).
+ */
+const seatProfiles = new Map<string, SeatProfile>();
+export function artSeatProfile(o: SceneObject): SeatProfile {
+  const key = `${o.sprite}.${o.variant ?? ''}`;
+  let p = seatProfiles.get(key);
+  if (!p) seatProfiles.set(key, (p = seatProfileOf(o)));
+  return p;
+}
+
+function seatProfileOf(o: SceneObject): SeatProfile {
+  const own = entryFor(o);
+  const sibling =
+    own?.seat === undefined && manifest
+      ? Object.entries(manifest.sprites).find(([k, e]) => (k === o.sprite || k.startsWith(`${o.sprite}.`)) && e.seat !== undefined)?.[1]
+      : undefined;
+  const e = own?.seat !== undefined ? own : (sibling ?? own);
+  return seatProfile(o.sprite, { seat: e?.seat, seatDepth: e?.seatDepth, backDepth: e?.backDepth, sitStyle: e?.sitStyle, backrest: e?.backrest, backLine: e?.backLine });
+}
+
 /** Where a lamp's light comes from, relative to the sprite's anchor, in art px (follows mirroring). */
 const lightCache = new Map<string, { dx: number; dy: number; r: number } | null>();
 
@@ -129,17 +134,11 @@ export function artLight(o: SceneObject): { dx: number; dy: number; r: number } 
 }
 
 function computeLight(o: SceneObject): { dx: number; dy: number; r: number } | null {
-  const e = entryFor(o);
-  if (!e?.light || !manifest) return null;
+  if (!manifest) return null;
   const s = artSprite(o);
-  if (!s) return null;
+  if (!s?.light) return null;
   const S = manifest.scale;
-  const [primary] = e.file ? [{ file: e.file, anchor: e.anchor }] : Object.values(e.facings ?? {});
-  const img = primary ? images.get(primary.file) : undefined;
-  if (!img) return null;
-  // The light is authored on the primary drawing; mirrored rotations reflect it.
-  const lx = s.mirrored ? img.width - e.light.x : e.light.x;
-  return { dx: (lx - s.ax) / S, dy: (e.light.y - s.ay) / S, r: (e.light.r ?? 40) / S };
+  return { dx: (s.light.x - s.ax) / S, dy: (s.light.y - s.ay) / S, r: s.light.r / S };
 }
 
 /** The finished art for a scene object, or null to fall back to procedural drawing. */
@@ -190,8 +189,14 @@ export function artSprite(o: SceneObject): Sprite | null {
     ax = e.fit === 'stand' ? img.width / 2 - (w - d) * 8 * S : d * 16 * S;
     ay = e.fit === 'stand' ? bottom - (w + d) * 4 * S : bottom - (w + d) * 8 * S;
   }
-  // the night-glow mask and emitters follow the drawing (mirrored with it)
-  const glowImg = e.glow ? images.get(e.glow) : undefined;
+  // the lamp, night-glow mask and emitters follow the drawing (mirrored with it): the drawing's own if it has
+  // them, else the entry's (authored on its first drawing, so only valid for that drawing and its mirror)
+  const first = e.file ? e.file : Object.values(e.facings ?? {})[0]?.file;
+  const ownOrFirst = <T,>(own: T | undefined, shared: T | undefined): T | undefined => own ?? (rec.file === first ? shared : undefined);
+  const lightAt = ownOrFirst(rec.light, e.light);
+  const light = lightAt ? { x: mirror ? img.width - lightAt.x : lightAt.x, y: lightAt.y, r: lightAt.r ?? 40 } : undefined;
+  const glowFile = ownOrFirst(rec.glow, e.glow);
+  const glowImg = glowFile ? images.get(glowFile) : undefined;
   let glow: HTMLCanvasElement | undefined;
   if (glowImg) {
     glow = makeCanvas(img.width, img.height);
@@ -202,6 +207,6 @@ export function artSprite(o: SceneObject): Sprite | null {
     }
     g.drawImage(glowImg, 0, 0);
   }
-  const emitters = e.emitters?.map((m) => ({ kind: m.kind, x: mirror ? img.width - m.x : m.x, y: m.y }));
-  return { canvas, ax, ay, mask, scale: S, mirrored: mirror, file: rec.file, glow, emitters };
+  const emitters = ownOrFirst(rec.emitters, e.emitters)?.map((m) => ({ kind: m.kind, x: mirror ? img.width - m.x : m.x, y: m.y }));
+  return { canvas, ax, ay, mask, scale: S, mirrored: mirror, file: rec.file, glow, emitters, light };
 }

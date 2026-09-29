@@ -7,9 +7,34 @@ Run from art/:  uv run studio.py <command> ...
   slice     cut a grid sheet (e.g. 3x2) into one trimmed PNG per cell
   pixelize  raw render -> finished pixel sprite at exact size (quantized, hard alpha, optional sel-out)
   publish   copy a finished sprite into public/art/sprites and register it in public/art/manifest.json
+  build     a spec of sheets -> every view of every piece, checked and published together
   usage     image-API spend so far vs the cap in budget.json
 
 Every API call is logged to out/usage.jsonl with the API's own token counts. The key is never printed.
+
+THE MODEL SPEC. Every manifest entry is a model (src/shared/models.ts, docs/furniture.md). Nothing is published
+unless the model check passes (scripts/model-check.ts, run on the staged entry and images before anything is
+written): every drawing its rotation needs, facing the right way, standing on its footprint (the fill rule), and a
+complete declaration. studio completes what it can know (name, tags, height, base, walk, layer, a seat's use);
+what it can't must be given in a `"model"` block on the spec, the sheet or the item (merged in that order):
+at least {"category": "...", "rooms": ["..."]}.
+
+JSON commands (stable, for tools such as the Design Lab; each prints ONE JSON object on stdout's last line and
+exits 0 on success, 1 when the model check refuses, 2 on bad input):
+
+  lab-generate --spec model.json [--ref img.png ...] --out DIR [--view se] [--quality medium]
+      draw every view a model spec needs (or one --view), into DIR/sprites/<key>[.<facing>].png, and check it.
+      model.json: a ModelSpec (key, name, category, tags, rooms, footprint, height, rotation, …) plus how to draw
+      it: prompt, prompts {facing: extra}, width, fill, fit, colors, quality. Each view is drawn on the tiles it
+      covers facing that way (footprintFacing); a lamp's views each get a light where the drawing glows.
+      -> {"ok", "key", "usd", "views": {facing|"one": {"file", "anchor", "raw", "light"?}}, "entry", "sprites",
+          "raw": {"sheet", "prompt", "guide"}, "problems"}
+  check [KEY ...] [--entries entries.json --sprites DIR]
+      the model check, on the catalog or on staged entries ({key: ModelSpec}, drawings in DIR first).
+      -> {"ok", "checked", "problems": {key: [...]}}
+  lab-publish --entries entries.json --sprites DIR [--overwrite]
+      publish staged entries (with their drawings from DIR) under the manifest lock, if the model check passes.
+      -> {"ok", "published": [keys], "problems"}
 """
 from __future__ import annotations
 
@@ -17,6 +42,8 @@ import argparse
 import base64
 import json
 import os
+import shutil
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -448,18 +475,45 @@ def load_manifest() -> dict:
     return json.loads(mpath.read_text(encoding="utf-8")) if mpath.exists() else {"scale": 2, "sprites": {}}
 
 
+def write_atomic(path: Path, text: str):
+    """Write a file so anything reading it alongside (the lab server, another tool, the game) sees the old
+    contents or the new, never a half-written file: to a temp file beside it, then swapped in."""
+    tmp = path.with_name(f"{path.name}.{os.getpid()}.tmp")
+    tmp.write_text(text, encoding="utf-8", newline="\n")
+    for _ in range(40):
+        try:
+            os.replace(tmp, path)
+            return
+        except PermissionError:  # Windows refuses while another process has it open: a moment
+            time.sleep(0.025)
+    os.replace(tmp, path)
+
+
 def save_manifest(m: dict):
     PUBLIC.mkdir(parents=True, exist_ok=True)
     m["sprites"] = dict(sorted(m["sprites"].items()))
-    (PUBLIC / "manifest.json").write_text(json.dumps(m, indent=2) + "\n", encoding="utf-8", newline="\n")
+    write_atomic(PUBLIC / "manifest.json", json.dumps(m, indent=2) + "\n")
 
 
-def publish_sprite(m: dict, key: str, facing: str | None, img: Image.Image, anchor, footprint, extra: dict):
+# Drawings staged by publish_sprite in this process and not yet written (enforce_rotation checks them).
+STAGED: dict = {}
+
+
+def publish_sprite(m: dict, key: str, facing: str | None, img: Image.Image, anchor, footprint, extra: dict,
+                   stage: list | None = None):
+    """Record a drawing in the manifest (in memory). The image is written now, or staged in `stage` to be written
+    only once the whole build passes the four-rotation standard (see write_staged)."""
     (PUBLIC / "sprites").mkdir(parents=True, exist_ok=True)
     fname = f"{key}{'.' + facing if facing else ''}.png"
-    img.save(PUBLIC / "sprites" / fname, optimize=True)
+    if stage is None:
+        img.save(PUBLIC / "sprites" / fname, optimize=True)
+    else:
+        stage.append((PUBLIC / "sprites" / fname, img))
+        STAGED[PUBLIC / "sprites" / fname] = img
     e = m["sprites"].get(key, {})
-    e["footprint"] = footprint
+    # the model spec's footprint is [width, depth] as the piece faces sw or ne (models.ts footprintFacing): a view
+    # facing se or nw covers it turned
+    e["footprint"] = list(footprint) if facing not in ("se", "nw") else [footprint[1], footprint[0]]
     e["fit"] = "anchor"
     rec = {"file": fname, "anchor": [int(anchor[0]), int(anchor[1])]}
     if facing:
@@ -563,11 +617,14 @@ def run_sheet(spec: dict, sheet: dict, a) -> list[dict]:
             prev.alpha_composite(px.resize((px.width * 4, px.height * 4), Image.NEAREST))
             prev.convert("RGB").save(job / f"{stem}.x4.png")
             results.append({"key": stem, "facing": None, "img": px, "anchor": (0, 0), "footprint": [span, 1],
-                            "extra": {"wall": it["wall"], **it.get("extra", {})}, "stem": stem})
+                            "extra": {"wall": it["wall"], **it.get("extra", {})}, "stem": stem, "rotation": "flat",
+                            "model": {**spec.get("model", {}), **sheet.get("model", {}), **it.get("model", {})}})
             print(f"  {stem} (wall): {px.size}")
             continue
-        tw = int(it.get("width") or (w_ + d_) * 32)
-        px = pixelize(obj, tw, None, it.get("colors", spec.get("colors", 28)), it.get("outline", "none"),
+        # size: `width` (sprite px, 2x), or `height_px` for a turnaround whose views differ in width (a lamp's arm
+        # reaching toward us or out to the side), or the full footprint width
+        tw = None if it.get("height_px") else int(it.get("width") or (w_ + d_) * 32)
+        px = pixelize(obj, tw, it.get("height_px"), it.get("colors", spec.get("colors", 28)), it.get("outline", "none"),
                       no_trim=True, sharpen=it.get("sharpen", 0.0))
         if it.get("flip"):
             px = px.transpose(Image.FLIP_LEFT_RIGHT)  # the model drew it along the other diagonal
@@ -581,6 +638,12 @@ def run_sheet(spec: dict, sheet: dict, a) -> list[dict]:
             # bottom-centre stands `fill` of the way from the footprint centre to its front corner
             fill = it.get("fill", 0.7)
             anchor = (round(Wp / 2 - (w_ - d_) * 16) + nx, round(Hp - fill * (w_ + d_) * 8 - (w_ + d_) * 8) + ny)
+        # a large piece stands on its footprint by THE FILL RULE (footing.ts): its anchor is worked out from the
+        # drawing, not from `fill` (the model's base: 'filled' unless its "model" block says 'centred')
+        if not is_small(px, w_, d_):
+            base = {**spec.get("model", {}), **sheet.get("model", {}), **it.get("model", {})}.get("base", "filled")
+            anchor = fill_anchor(px, (anchor[0] - nx, anchor[1] - ny), w_, d_, base)
+            anchor = (anchor[0] + nx, anchor[1] + ny)
         stem = f"{it['key']}{'.' + it['facing'] if it.get('facing') else ''}"
         px.save(job / f"{stem}.png")
         prev = checker(px.width * 4, px.height * 4)
@@ -591,7 +654,9 @@ def run_sheet(spec: dict, sheet: dict, a) -> list[dict]:
         prev.convert("RGB").save(job / f"{stem}.x4.png")
         results.append({"key": it["key"], "facing": it.get("facing"), "img": px, "anchor": anchor,
                         "footprint": [it.get("w", 1), it.get("d", 1)], "extra": it.get("extra", {}), "stem": stem,
-                        "also": it.get("also", []), "also_facings": it.get("also_facings", [])})
+                        "also": it.get("also", []), "also_facings": it.get("also_facings", []),
+                        "rotation": it.get("rotation"),
+                        "model": {**spec.get("model", {}), **sheet.get("model", {}), **it.get("model", {})}})
         print(f"  {stem}: {px.size} anchor {anchor}")
     return results
 
@@ -637,9 +702,274 @@ def orient_backs(results: list[dict], m: dict) -> None:
             print(f"  ! {r['key']}.{r['facing']}: back view leaned like its front; flipped (lean {front:+.2f} / {back:+.2f})")
 
 
+VIEW_SETS = {"mirror": ["se", "nw"], "full": ["se", "sw", "ne", "nw"]}
+
+
+def expand_views(spec: dict) -> None:
+    """An item with `views` ('mirror' or 'full') and no `facing` is drawn from every side it needs, in one sheet:
+    front and back for 'mirror', all four for 'full'. `prompts` may give per-facing descriptions (a handed piece
+    needs its details placed side by side); `rotation` defaults to the views."""
+    for sh in spec.get("sheets", []):
+        items = []
+        for it in sh["items"]:
+            views = it.get("views")
+            if not views or it.get("facing"):
+                items.append(it)
+                continue
+            for f in VIEW_SETS[views]:
+                cell = {k: v for k, v in it.items() if k not in ("views", "prompts")}
+                cell["facing"] = f
+                cell["rotation"] = it.get("rotation", views)
+                cell["prompt"] = it.get("prompts", {}).get(f, it["prompt"])
+                items.append(cell)
+        sh["items"] = items
+        n = len(items)
+        cols, rows = (int(v) for v in sh.get("grid", "3x2").split("x"))
+        if cols * rows < n:
+            cols = 2 if n <= 4 else 3 if n <= 6 else 4
+            rows = (n + cols - 1) // cols
+            sh["grid"] = f"{cols}x{rows}"
+
+
+def enforce_rotation(m: dict, keys: set, rotations: dict, stage: list | None = None) -> list:
+    """The four-rotation standard and the model spec (models.ts, docs/furniture.md) for every piece a publish
+    touched, checked on its staged drawings (`stage`, from publish_sprite) before anything is written."""
+    sys.path.insert(0, str(HERE))
+    import rotation as rot  # noqa: PLC0415
+    for key in sorted(keys):
+        e = m["sprites"].get(key)
+        if not e:
+            continue
+        e["rotation"] = rotations.get(key) or e.get("rotation") or rot.declared(key, e)
+    # the model check covers the rotation's drawings too, on the staged images (the ones this process staged
+    # with publish_sprite when the caller doesn't pass them)
+    return enforce_model(m, keys, stage if stage is not None else list(STAGED.items()))
+
+
+def write_staged(stage: list) -> None:
+    for path, img in stage:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        img.save(path, optimize=True)
+        STAGED.pop(path, None)
+
+
+# ───────────────────────────── the model spec ─────────────────────────────
+
+TSX = [str(REPO / "node_modules" / "tsx" / "dist" / "cli.mjs"), "--tsconfig", str(REPO / "tsconfig.json")]
+
+
+def _alpha_cols_rows(img: Image.Image):
+    al = np.array(img.convert("RGBA"))[..., 3] > 0
+    return al, np.where(al.any(axis=0))[0], np.where(al.any(axis=1))[0]
+
+
+def is_small(img: Image.Image, w: int, d: int) -> bool:
+    """footing.ts isSmall: well narrower than its footprint, so it's centred on it at runtime."""
+    _, xs, _ = _alpha_cols_rows(img)
+    return len(xs) > 0 and int(xs.max() - xs.min()) < (w + d) * 32 * 0.7
+
+
+def measured_height(img: Image.Image, anchor, w: int, d: int) -> int:
+    """model-check.ts measuredHeight: floor to top in art px (drawings are 2x)."""
+    al, xs, ys = _alpha_cols_rows(img)
+    if not len(ys):
+        return 0
+    t, b = int(ys.min()), int(ys.max())
+    if is_small(img, w, d):
+        band = al[round(b - (b - t) * 0.3): b + 1]
+        bx = np.where(band.any(axis=0))[0]
+        floor = b - (bx.max() - bx.min()) / 4
+    else:
+        floor = anchor[1] + 4 * (w + d)
+    return max(1, round((floor - t) / 2))
+
+
+def fill_anchor(img: Image.Image, anchor, w: int, d: int, base: str):
+    """footing.ts fillAnchor: the anchor that makes a large piece meet the fill rule ('filled': fills its footprint
+    diamond or is inset evenly and ends on its front corner; 'centred': its narrow base on the footprint centre).
+    Unchanged if moving can't fix it (the model check then refuses it)."""
+    al, xs, ys = _alpha_cols_rows(img)
+    if not len(xs):
+        return anchor
+    l, r, b = int(xs.min()), int(xs.max()), int(ys.max())
+    ax, ay = anchor
+    dl, dr, db = ax - 32 * d - l, r - (ax + 32 * w), b - (ay + 16 * (w + d))
+    if base == "filled":
+        k = round((dr - dl) / 2)
+        dl2, dr2 = dl + k, dr - k
+        if dl2 > 6 or dr2 > 6:
+            return anchor
+        return (ax + k, ay + round(db - (dl2 + dr2) / 4))
+    bx = np.where(al[max(0, b - 5): b + 1].any(axis=0))[0]
+    bl, br = int(bx.min()), int(bx.max())
+    cx, cy = ax + 16 * (w - d), ay + 8 * (w + d)
+    dx = round((bl + br) / 2 - cx)
+    if br - bl < (w + d) * 16:
+        return (ax + dx, ay + round(b - (br - bl) / 4 - cy))
+    return (ax + dx, ay + max(0, db - 4))
+
+
+def base_centre(img: Image.Image):
+    """footing.ts baseCentre: the centre of the base, read from the lower 30% of the silhouette."""
+    al, xs, ys = _alpha_cols_rows(img)
+    if not len(ys):
+        return None
+    t, b = int(ys.min()), int(ys.max())
+    bx = np.where(al[round(b - (b - t) * 0.3): b + 1].any(axis=0))[0]
+    return ((bx.min() + bx.max()) / 2, b - (bx.max() - bx.min()) / 4)
+
+
+def footing_centre(img: Image.Image, anchor, w: int, d: int):
+    """Where the footprint's centre falls in a drawing at runtime (art.ts): a small piece's base centre (it's
+    centred there), else from its anchor."""
+    if is_small(img, w, d):
+        return base_centre(img)
+    return (anchor[0] + 16 * (w - d), anchor[1] + 8 * (w + d))
+
+
+def carry_lights(e: dict, images: dict) -> None:
+    """A lamp drawn from more than one side needs its light in each drawing: carry the first drawing's to the
+    others on the footprint's vertical axis (height kept, mirrored about the centre). `images`: file -> image."""
+    f = e.get("facings") or {}
+    if not e.get("light") or len({r["file"] for r in f.values()}) < 2:
+        return
+    # carried from a drawing that has its own light, else from the first (the one art.ts gives the entry's light)
+    order = list(f)
+    src = next((x for x in order if f[x].get("light")), order[0])
+    light = f[src].get("light") or e["light"]
+
+    def img(file):
+        return images.get(file) or Image.open(PUBLIC / "sprites" / file)
+
+    def wd(x):
+        return e["footprint"] if x in ("sw", "ne") else e["footprint"][::-1]
+    c0 = footing_centre(img(f[src]["file"]), f[src]["anchor"], *wd(src))
+    dx, dy = light["x"] - c0[0], light["y"] - c0[1]
+    for x in order:
+        rec = f[x]
+        if rec.get("light") or rec["file"] == f[src]["file"]:
+            continue
+        c = footing_centre(img(rec["file"]), rec["anchor"], *wd(x))
+        rec["light"] = {"x": round(c[0] - dx), "y": round(c[1] + dy), **({"r": light["r"]} if "r" in light else {})}
+
+
+def light_hint(img: Image.Image, top: float = 0.7):
+    """Where a lamp's drawing glows: the centre of its brightest warm pixels (a lit shade, a lantern) in the upper
+    part of the drawing (drawing px), or None."""
+    a = np.array(img.convert("RGBA")).astype(float)
+    m = (a[..., 3] > 0) & (a[..., 0] > 200) & (a[..., 1] > 150) & (a[..., 0] >= a[..., 2] + 30)
+    m[int(a.shape[0] * top):] = False
+    if m.sum() < 4:
+        return None
+    lum = 0.3 * a[..., 0] + 0.59 * a[..., 1] + 0.11 * a[..., 2]
+    ys, xs = np.where(m & (lum >= np.percentile(lum[m], 82)))
+    return (round(float(xs.mean())), round(float(ys.mean())))
+
+
+def humanize(key: str) -> str:
+    base, *variant = key.replace("tree/", "tree-").split(".")
+    words = base.replace("heirloom-", "").split("-")
+    v = " ".join(x for x in variant if x not in ("a", "b", "c"))
+    name = (v + " " if v else "") + " ".join(words)
+    return name[:1].upper() + name[1:]
+
+
+def model_tags(key: str, category: str | None) -> list[str]:
+    import re  # noqa: PLC0415
+    out = []
+    for w in re.split(r"[./-]", key.replace("tree/", "tree.")):
+        w = re.sub(r"\d+$", "", w)
+        if len(w) > 1 and w not in ("the",) and w not in out:
+            out.append(w)
+    if key.startswith("heirloom-") and "heirloom" not in out:
+        out.append("heirloom")
+    if category and category not in out:
+        out.append(category)
+    return out
+
+
+def complete_model(e: dict, key: str, given: dict, img: Image.Image | None = None, anchor=None) -> None:
+    """Complete a manifest entry's model spec (src/shared/models.ts) from what the pipeline knows. `given` (a
+    spec's "model" blocks) wins; what can't be known (category, rooms) must be given or already on the entry."""
+    for k, v in (given or {}).items():
+        if v is not None:
+            e[k] = v
+    wall = bool(e.get("wall"))
+    if wall:
+        e.setdefault("category", "wall-art")
+        e.setdefault("layer", "wall")
+        e.setdefault("walk", "open")
+        e.setdefault("height", int(e["wall"]["v"][1] - e["wall"]["v"][0]))
+    cat = e.get("category")
+    e.setdefault("name", humanize(key))
+    e.setdefault("tags", model_tags(key, cat))
+    if not wall:
+        w, d = e["footprint"]
+        if img is not None:
+            e.setdefault("base", "centred" if is_small(img, w, d) else "filled")
+            if anchor is not None and "height" not in (given or {}):
+                e["height"] = max(e.get("_h", 0), measured_height(img, anchor, w, d))
+                e["_h"] = e["height"]
+        e.setdefault("walk", "seat" if cat == "seating" else "open" if cat == "rug" else "blocked")
+        e.setdefault("layer", "floor" if cat == "rug" else "object")
+        if cat == "seating":
+            e.setdefault("use", {"face": "front", "actions": ["sit"]})
+
+
+def model_check(entries: dict | None = None, stage: list | None = None, sprites: Path | None = None,
+                keys: list | None = None, declared_only: bool = False) -> dict:
+    """Run scripts/model-check.ts: on `entries` ({key: entry}) with their staged images (`stage` from
+    publish_sprite, or a `sprites` dir), or on the catalog. Returns its JSON result."""
+    job = OUT / "stage" / f"{os.getpid()}-{time.time_ns()}"
+    args = ["--json"]
+    try:
+        if entries is not None:
+            job.mkdir(parents=True, exist_ok=True)
+            clean = {k: {f: v for f, v in e.items() if not f.startswith("_")} for k, e in entries.items()}
+            (job / "entries.json").write_text(json.dumps(clean), encoding="utf-8")
+            args += ["--entries", str(job / "entries.json")]
+            if stage:
+                for path, img in stage:
+                    dst = job / "sprites" / Path(path).relative_to(PUBLIC / "sprites")
+                    dst.parent.mkdir(parents=True, exist_ok=True)
+                    img.save(dst)
+                sprites = job / "sprites"
+            if sprites:
+                args += ["--sprites", str(sprites)]
+        if declared_only:
+            args.append("--declared-only")
+        r = subprocess.run(["node", *TSX, str(REPO / "scripts" / "model-check.ts"), *args, *(keys or [])],
+                           cwd=REPO, capture_output=True, text=True, encoding="utf-8")
+        lines = [ln for ln in r.stdout.splitlines() if ln.startswith("{")]
+        if not lines:
+            raise SystemExit(f"model check failed to run: {r.stderr.strip()[-800:]}")
+        return json.loads(lines[-1])
+    finally:
+        shutil.rmtree(job, ignore_errors=True)
+
+
+def enforce_model(m: dict, keys: set, stage: list | None = None) -> list:
+    """The model spec (models.ts) for every piece a publish touches, on its staged drawings. Without `stage` the
+    drawings are looked up in the catalog."""
+    entries = {k: m["sprites"][k] for k in sorted(keys) if k in m["sprites"]}
+    if not entries:
+        return []
+    staged_imgs = {str(Path(path).relative_to(PUBLIC / "sprites")).replace("\\", "/"): img for path, img in (stage or [])}
+    for e in entries.values():
+        carry_lights(e, staged_imgs)
+    res = model_check(entries=entries, stage=stage or [])
+    problems = [f"{k}: {p_}" for k, ps in res.get("problems", {}).items() for p_ in ps]
+    # a new drawing of an animated piece gets its animation points after it exists (animations.ts): the gate
+    # fails it until then, but it may be published
+    for p_ in [p_ for p_ in problems if "animation" in p_]:
+        print("  ~", p_, "(add its animation points to src/client/engine/animations.ts)")
+    return [p_ for p_ in problems if "animation" not in p_]
+
+
 def cmd_build(a):
     import concurrent.futures as cf  # noqa: PLC0415
     spec = json.loads(Path(a.spec).read_text(encoding="utf-8"))
+    expand_views(spec)
     only = set(a.only.split(",")) if a.only else None
     sheets = [s for s in spec["sheets"] if not only or s["name"] in only]
     # Sheets whose references are another sheet's output (a back view drawn from its front) run second.
@@ -651,6 +981,9 @@ def cmd_build(a):
             done += list(ex.map(lambda sh: (sh, run_sheet(spec, sh, a)), phase))
     previews = []
     skip = set((a.skip or "").split(","))
+    stage: list = []
+    touched: set = set()
+    rotations: dict = {}
     with ManifestLock():
         m = load_manifest()
         orient_backs([r for _, res in done for r in res], m)
@@ -659,13 +992,33 @@ def cmd_build(a):
                 if not a.no_publish and r["key"] not in skip:
                     # `also`: the same drawing published under more keys (one back view shared by colour variants)
                     for key in [r["key"], *r.get("also", [])]:
-                        publish_sprite(m, key, r["facing"], r["img"], r["anchor"], r["footprint"], r["extra"])
+                        publish_sprite(m, key, r["facing"], r["img"], r["anchor"], r["footprint"], r["extra"], stage)
                         # `also_facings`: a piece that looks the same from behind (round or symmetric) uses its one
                         # drawing for the back view too, so all four rotations exist
                         for f in r.get("also_facings", []):
-                            publish_sprite(m, key, f, r["img"], r["anchor"], r["footprint"], r["extra"])
+                            publish_sprite(m, key, f, r["img"], r["anchor"], r["footprint"], r["extra"], stage)
+                        touched.add(key)
+                        if r.get("rotation"):
+                            rotations[key] = r["rotation"]
+                        complete_model(m["sprites"][key], key, r.get("model", {}), r["img"],
+                                       None if m["sprites"][key].get("wall") else r["anchor"])
                 previews.append(OUT / spec["name"] / sh["name"] / f"{r['stem']}.x4.png")
         if not a.no_publish:
+            # Every piece this build touched must have every drawing its rotation needs, or nothing is published:
+            # a piece's views are generated together (docs/furniture.md).
+            for key in touched:
+                m["sprites"][key].pop("_h", None)
+            problems = enforce_rotation(m, touched, rotations, stage)
+            if problems and a.partial:
+                # a turnaround split over builds: only its missing views may be missing
+                problems = [p_ for p_ in problems if "needs" not in p_ and "missing" not in p_]
+            if problems:
+                for p_ in problems:
+                    print("  !", p_)
+                raise SystemExit("refusing to publish: the pieces above break the model spec (docs/furniture.md): "
+                                 "add their missing views, fix their placement, or give their \"model\" "
+                                 "(category, rooms); --partial publishes one side of a turnaround at a time")
+            write_staged(stage)
             save_manifest(m)
     if previews:
         sa = argparse.Namespace(images=[str(p) for p in previews], out=str(OUT / spec["name"] / "review.jpg"),
@@ -681,7 +1034,6 @@ def cmd_publish(a):
     (PUBLIC / "sprites").mkdir(exist_ok=True)
     fname = f"{a.key}{'.' + a.facing if a.facing else ''}.png"
     im = Image.open(a.image).convert("RGBA")
-    im.save(PUBLIC / "sprites" / fname, optimize=True)
     # Several agents publish at once: read, change and write the manifest only while holding the lock.
     with ManifestLock():
         manifest = load_manifest()
@@ -700,9 +1052,152 @@ def cmd_publish(a):
             e["file"] = fname
         if a.note:
             e["note"] = a.note
+        if a.rotation:
+            e["rotation"] = a.rotation
         manifest["sprites"][a.key] = e
+        w_, d_ = e["footprint"]
+        bottom = im.height - (a.pad or 0)
+        anchor = (w_ * 0 + d_ * 32, bottom - (w_ + d_) * 16) if a.fit == "diamond" else \
+            (im.width / 2 - (w_ - d_) * 16, bottom - (w_ + d_) * 8)
+        complete_model(e, a.key, json.loads(a.model) if a.model else {}, im, None if e.get("wall") else anchor)
+        e.pop("_h", None)
+        # the model spec: a piece is published with every drawing its rotation needs, standing right, declared
+        stage = [(PUBLIC / "sprites" / fname, im)]
+        problems = enforce_rotation(manifest, {a.key}, {a.key: a.rotation} if a.rotation else {}, stage)
+        if problems and a.partial:
+            problems = [p_ for p_ in problems if "needs" not in p_ and "missing" not in p_]
+        if problems:
+            for p_ in problems:
+                print("  !", p_)
+            raise SystemExit("refusing to publish (see docs/furniture.md); --partial to publish one side of a turnaround")
+        write_staged(stage)
         save_manifest(manifest)
     print(f"published {a.key}{' (' + a.facing + ')' if a.facing else ''} -> sprites/{fname} {im.size}")
+
+
+# ───────────────────────────── JSON commands (the Design Lab) ─────────────────────────────
+
+def emit(obj: dict, code: int = 0):
+    print(json.dumps(obj))
+    sys.exit(code)
+
+
+VIEWS = {"radial": [None], "flat": [None], "fixed": [None], "mirror": ["se", "nw"], "full": ["se", "sw", "ne", "nw"]}
+DRAW_FIELDS = ("key", "prompt", "prompts", "width", "fill", "fit", "colors", "quality", "nudge")
+
+
+def cmd_lab_generate(a):
+    try:
+        spec = json.loads(Path(a.spec).read_text(encoding="utf-8"))
+        key, rot = spec["key"], spec["rotation"]
+        w_, d_ = spec["footprint"]
+        views = VIEWS[rot]
+    except (OSError, KeyError, ValueError, TypeError) as ex:
+        emit({"ok": False, "error": f"bad spec: {ex}"}, 2)
+    if a.view:
+        if a.view not in [v or "one" for v in views]:
+            emit({"ok": False, "error": f"{a.view} isn't a view of a '{rot}' model"}, 2)
+        views = [None if a.view == "one" else a.view]
+    out = Path(a.out).resolve()
+    items = []
+    for f in views:
+        # each view is drawn on the tiles it covers facing that way (models.ts footprintFacing)
+        vw, vd = (d_, w_) if f in ("se", "nw") else (w_, d_)
+        it = {"key": key, "w": vw, "d": vd, "h": spec.get("height", 40), "fit": spec.get("fit", "stand"),
+              "fill": spec.get("fill", 0.7), "colors": spec.get("colors", 28),
+              "prompt": " ".join(x for x in [spec.get("prompt", ""), (spec.get("prompts") or {}).get(f or "", "")] if x)}
+        if spec.get("width"):
+            it["width"] = spec["width"]
+        if f:
+            it["facing"] = f
+        if rot == "flat":
+            it["wall"] = spec["wall"]
+            it["span"] = w_
+        items.append(it)
+    cols = 1 if len(items) == 1 else 2
+    sheet = {"name": time.strftime("take-%Y%m%d-%H%M%S"), "grid": f"{cols}x{(len(items) + cols - 1) // cols}",
+             "items": items, "refs": [str(Path(r).resolve()) for r in a.ref or []]}
+    if rot == "flat":
+        sheet["kind"] = "wall"
+    if len(items) > 1 or a.ref:
+        sheet["note"] = ("Every cell is the SAME piece seen from a different side (see each cell's facing)."
+                         + (" The extra reference images show the piece or its style: match them." if a.ref else ""))
+    run = {"name": f"lab/{key.replace('/', '__')}", "quality": a.quality or spec.get("quality", "medium"), "sheets": [sheet]}
+    job = OUT / run["name"] / sheet["name"]
+    before = spent()
+    results = run_sheet(run, sheet, argparse.Namespace(regen=True, quality=run["quality"]))
+    if not results:
+        emit({"ok": False, "error": "the model returned no usable drawing"}, 1)
+    orient_backs(results, load_manifest())
+    sprites = out / "sprites"
+    lamp = spec.get("category") == "lighting" or spec.get("light") is not None
+    entry = {k: v for k, v in spec.items() if k not in DRAW_FIELDS}
+    entry.pop("file", None)
+    entry.pop("facings", None)
+    entry["fit"] = "anchor"
+    views_out = {}
+    for r in results:
+        fname = f"{key}{'.' + r['facing'] if r['facing'] else ''}.png"
+        dst = sprites / fname
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        r["img"].save(dst)
+        anchor = [int(r["anchor"][0]), int(r["anchor"][1])]
+        views_out[r["facing"] or "one"] = {"file": str(dst), "anchor": anchor, "raw": str(job / f"{r['stem']}.raw.png")}
+        rec = {"file": fname, "anchor": anchor}
+        hint = light_hint(r["img"]) if lamp else None
+        if hint:
+            # where the drawing glows (its shade or lantern): each drawing carries its own light
+            rec["light"] = {"x": hint[0], "y": hint[1], "r": (spec.get("light") or {}).get("r", 40)}
+            views_out[r["facing"] or "one"]["light"] = rec["light"]
+        if r["facing"]:
+            entry.setdefault("facings", {})[r["facing"]] = rec
+        else:
+            entry["file"], entry["anchor"] = fname, anchor
+            if hint:
+                entry["light"] = rec["light"]
+        complete_model(entry, key, {}, r["img"], None if rot == "flat" else anchor)
+    entry.pop("_h", None)
+    if rot == "flat":
+        entry.pop("anchor", None)
+    if lamp and entry.get("facings") and "light" in entry:
+        del entry["light"]  # one per drawing instead
+    res = model_check(entries={key: entry}, sprites=sprites)
+    emit({"ok": res["ok"], "key": key, "usd": round(spent() - before, 4), "views": views_out, "entry": entry,
+          "sprites": str(sprites), "raw": {"sheet": str(job / "sheet.png"), "prompt": str(job / "prompt.txt"),
+                                           "guide": str(job / "guide.png")},
+          "problems": res.get("problems", {}).get(key, [])})
+
+
+def cmd_check(a):
+    if a.entries:
+        entries = json.loads(Path(a.entries).read_text(encoding="utf-8"))
+        res = model_check(entries=entries, sprites=Path(a.sprites) if a.sprites else None)
+    else:
+        res = model_check(keys=a.keys)
+    emit(res, 0 if res["ok"] else 1)
+
+
+def cmd_lab_publish(a):
+    entries = json.loads(Path(a.entries).read_text(encoding="utf-8"))
+    sprites = Path(a.sprites)
+    with ManifestLock():
+        m = load_manifest()
+        taken = [k for k in entries if k in m["sprites"] and not a.overwrite]
+        if taken:
+            emit({"ok": False, "error": f"already in the catalog: {', '.join(taken)} (--overwrite to replace)"}, 2)
+        res = model_check(entries=entries, sprites=sprites)
+        if not res["ok"]:
+            emit({"ok": False, "published": [], "problems": res["problems"]}, 1)
+        for key, e in entries.items():
+            for rec in [e, *(e.get("facings") or {}).values()]:
+                for f in (rec.get("file"), rec.get("glow")):
+                    if f:
+                        dst = PUBLIC / "sprites" / f
+                        dst.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.copyfile(sprites / f, dst)
+            m["sprites"][key] = e
+        save_manifest(m)
+    emit({"ok": True, "published": sorted(entries), "problems": {}})
 
 
 def cmd_usage(_a):
@@ -769,7 +1264,28 @@ def main():
     pb.add_argument("--pad", type=int)
     pb.add_argument("--lift", type=int)
     pb.add_argument("--note")
+    pb.add_argument("--rotation", choices=["radial", "mirror", "full", "flat", "fixed"],
+                    help="how the piece turns (docs/furniture.md); required for a new piece")
+    pb.add_argument("--partial", action="store_true", help="allow a piece that doesn't yet have every view")
+    pb.add_argument("--model", help='its model spec as JSON, e.g. \'{"category": "decor", "rooms": ["lounge"]}\'')
     pb.set_defaults(fn=cmd_publish)
+    lg = sub.add_parser("lab-generate", help="draw a model spec's views (JSON out)")
+    lg.add_argument("--spec", required=True)
+    lg.add_argument("--ref", action="append")
+    lg.add_argument("--out", required=True)
+    lg.add_argument("--view", choices=["se", "sw", "ne", "nw", "one"])
+    lg.add_argument("--quality", choices=["low", "medium", "high"])
+    lg.set_defaults(fn=cmd_lab_generate)
+    ck = sub.add_parser("check", help="the model check (JSON out)")
+    ck.add_argument("keys", nargs="*")
+    ck.add_argument("--entries")
+    ck.add_argument("--sprites")
+    ck.set_defaults(fn=cmd_check)
+    lp = sub.add_parser("lab-publish", help="publish staged model entries (JSON out)")
+    lp.add_argument("--entries", required=True)
+    lp.add_argument("--sprites", required=True)
+    lp.add_argument("--overwrite", action="store_true")
+    lp.set_defaults(fn=cmd_lab_publish)
     b = sub.add_parser("build")
     b.add_argument("spec")
     b.add_argument("--only", help="comma-separated sheet names")
@@ -777,6 +1293,7 @@ def main():
     b.add_argument("--quality")
     b.add_argument("--no-publish", action="store_true")
     b.add_argument("--skip", help="comma-separated keys not to publish")
+    b.add_argument("--partial", action="store_true", help="publish pieces still missing views (the gate fails them)")
     b.add_argument("--cell", type=int, default=300)
     b.add_argument("--cols", type=int, default=6)
     b.set_defaults(fn=cmd_build)

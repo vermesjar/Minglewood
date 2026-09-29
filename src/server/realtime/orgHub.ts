@@ -11,15 +11,16 @@
 import { EventEmitter } from 'node:events';
 import { randomUUID } from 'node:crypto';
 import type { Member, OrgEvent, PresenceState, PresenceStatus } from '@shared/domain/types';
-import { CARRYABLE, type DirectoryEntry, type KnockKind, type KnockReply, type Occupant, type ServerMsg } from '@shared/protocol';
+import { CARRYABLE, NOTES_PER_BOARD, type BoardNote, type DirectoryEntry, type KnockKind, type KnockReply, type Occupant, type ServerMsg } from '@shared/protocol';
 import type { EmoteId } from '@shared/presence';
 import { STATUS_META } from '@shared/presence';
 import { allScenes, buildingForRoom, getScene, TOWN_ID } from '@shared/world';
 import { livedScene } from '@shared/world/lived';
-import type { Facing, SceneDef } from '@shared/world/scene';
-import { footprint, isSeat } from '@shared/world/scene';
+import type { Facing, SceneDef, SceneObject } from '@shared/world/scene';
+import { footprint, isSeat, terrainAt } from '@shared/world/scene';
 import { seatSpotAt, seatSpots, stepOffTiles } from '@shared/world/seats';
 import { NpcDirector } from './npcs';
+import { CLAW_DROP_MS, NOTE_GAP_MS, USE_COOLDOWN_MS, USE_PERSON_GAP_MS, cleanNote, outcomeOf } from './uses';
 import { WalkGrid } from '@shared/world/walkGrid';
 import { findPath, isValidPath, pathLength, positionAlong, WALK_SPEED, type Tile } from '@shared/world/pathfinding';
 import { sanitizeLoadout } from '@shared/avatar';
@@ -30,6 +31,8 @@ export const SELF_SERVE_MS = 700;
 
 /** How far back a client may date a path it is extending (a little more than one diagonal step plus latency). */
 const MAX_PATH_BACKDATE_MS = 1500;
+/** The ground a stroll keeps to: streets, the plaza, the pier and the footpaths. */
+const STROLL_WAYS = new Set(['p', 'P', 'd', 't']);
 
 export interface HubClient {
   id: string;
@@ -64,6 +67,8 @@ export type HubEvents = {
   emote: [memberId: string, emote: EmoteId, sceneId: string, targetId?: string];
   said: [memberId: string, text: string, sceneId: string];
   knock: [knock: Knock];
+  /** A knock for someone who isn't in the world (providers may deliver it elsewhere, e.g. a Slack DM). */
+  missedKnock: [knock: Knock];
 };
 
 const facingFromDir = (dx: number, dy: number, prev: Facing): Facing => {
@@ -300,6 +305,7 @@ export class OrgHub extends EventEmitter<HubEvents> {
           occupants: this.actorsIn(sceneId).map((x) => this.occupant(x)),
           states: this.statesIn(sceneId),
           npcs: this.npcs.statesIn(sceneId),
+          notes: this.data.notes.filter((n) => n.sceneId === sceneId),
         });
       }
     }
@@ -385,13 +391,19 @@ export class OrgHub extends EventEmitter<HubEvents> {
   }
 
   /** Server-computed path (for simulated coworkers). */
-  walkTo(memberId: string, goal: Tile): boolean {
+  /**
+   * Walk someone to a tile. `stroll`: the way a person out for a walk goes — by the streets and footpaths
+   * where they lead the right way, cutting across the grass only when that's much shorter (the sims do).
+   */
+  walkTo(memberId: string, goal: Tile, opts: { stroll?: boolean } = {}): boolean {
     const a = this.actors.get(memberId);
     if (!a) return false;
     const grid = this.grids.get(a.sceneId)!;
     const pos = this.position(a);
     const start: Tile = [Math.round(pos.x), Math.round(pos.y)];
-    const path = findPath(grid, start, goal, { allowGoal: !!this.seatAt(a.sceneId, goal[0], goal[1]) });
+    const scene = opts.stroll ? this.scene(a.sceneId) : undefined;
+    const cost = scene?.kind === 'outdoor' ? (x: number, y: number) => (STROLL_WAYS.has(terrainAt(scene, x, y)) ? 1 : 1.45) : undefined;
+    const path = findPath(grid, start, goal, { allowGoal: !!this.seatAt(a.sceneId, goal[0], goal[1]), cost });
     if (!path || path.length < 2) return false;
     this.startPath(a, path);
     return true;
@@ -429,15 +441,26 @@ export class OrgHub extends EventEmitter<HubEvents> {
    * Sit on the nearest free spot of a seat. You must be at it: standing next to it, or arriving on it as the
    * last step of a walk.
    */
-  sit(memberId: string, objectId: string): boolean {
+  sit(memberId: string, objectId: string, at?: Tile): boolean {
     const a = this.actors.get(memberId);
     if (!a) return false;
     const seat = this.scene(a.sceneId)?.objects.find((o) => o.id === objectId && isSeat(o));
     if (!seat) return false;
+    // already on this cushion: nothing to do (re-clicking your own seat never moves you)
+    if (a.sittingOn === seat.id && (!at || (a.x === at[0] && a.y === at[1]))) return true;
     const pos = this.position(a);
-    const spot = this.freeSpots(a.sceneId, objectId, memberId)
-      .map((s) => ({ s, d: Math.hypot(pos.x - s.x, pos.y - s.y) }))
-      .sort((p, q) => p.d - q.d)[0];
+    const free = this.freeSpots(a.sceneId, objectId, memberId);
+    // The cushion you walked to is yours if it's free and you're at it, or your walk ends on it (the client
+    // sends this as it arrives, a moment before the server's own clock gets there).
+    const last = a.path?.[a.path.length - 1];
+    const asked = at ? free.find((s) => s.x === at[0] && s.y === at[1]) : undefined;
+    const arriving = !!asked && !!last && last[0] === asked.x && last[1] === asked.y;
+    // on this couch already: any free cushion of it is a slide along the seat, however long the couch
+    const sliding = !!asked && a.sittingOn === seat.id;
+    const spot =
+      asked && (arriving || sliding || Math.hypot(pos.x - asked.x, pos.y - asked.y) <= 1.6)
+        ? { s: asked, d: 0 }
+        : free.map((s) => ({ s, d: Math.hypot(pos.x - s.x, pos.y - s.y) })).sort((p, q) => p.d - q.d)[0];
     if (!spot || spot.d > 1.6) return false;
     a.path = undefined;
     a.pathStartedAt = undefined;
@@ -556,6 +579,113 @@ export class OrgHub extends EventEmitter<HubEvents> {
     return true;
   }
 
+  /**
+   * Use a thing you're standing at (play the jukebox, feed the fish, water a plant — see uses.ts): the server
+   * decides the outcome and everyone in the room sees the moment. Rate-limited per person and per thing.
+   */
+  use(memberId: string, objectId: string): boolean {
+    const a = this.actors.get(memberId);
+    if (!a) return false;
+    const o = this.scene(a.sceneId)?.objects.find((x) => x.id === objectId);
+    const act = o?.actions?.find((k) => k.kind === 'use');
+    if (!o || !act || act.kind !== 'use' || !this.standingAt(a, o)) return false;
+    const now = Date.now();
+    const key = `${a.sceneId}:${o.id}`;
+    if (now - (this.lastUse.get(memberId) ?? -Infinity) < USE_PERSON_GAP_MS || now < (this.useCooldown.get(key) ?? 0)) return false;
+    this.lastUse.set(memberId, now);
+    this.useCooldown.set(key, now + USE_COOLDOWN_MS[act.use]);
+    this.faceToward(a, o);
+    this.toScene(a.sceneId, { t: 'updated', memberId, patch: { x: a.x, y: a.y, facing: a.facing, path: undefined } });
+    const out = outcomeOf(act.use, { rand: Math.random, best: this.highScores.get(key), org: this.data.org.name });
+    if (act.use === 'arcade' && out.detail) {
+      const score = Number(out.detail.replace(/,/g, ''));
+      const best = this.highScores.get(key);
+      if (!best || score > best.score) this.highScores.set(key, { score, name: this.member(memberId)?.displayName.split(' ')[0] ?? 'Someone' });
+    }
+    this.toScene(a.sceneId, { t: 'moment', sceneId: a.sceneId, objectId: o.id, what: act.use, by: memberId, detail: out.detail });
+    // a quiet room keeps quiet: the moment plays, nobody announces it
+    const quiet = !!this.data.rooms.find((r) => r.id === a.sceneId)?.quiet;
+    if (out.line && !quiet) this.toScene(a.sceneId, { t: 'said', memberId, text: out.line });
+    if (act.use === 'claw') {
+      // the claw drops, closes, rises: then you learn whether it grabbed anything
+      const t = setTimeout(() => {
+        this.selfServe.delete(t);
+        const still = this.actors.get(memberId);
+        if (!still || still.sceneId !== a.sceneId) return;
+        if (out.win && !this.carrying.has(memberId)) {
+          this.carrying.set(memberId, 'plush');
+          this.toScene(still.sceneId, { t: 'updated', memberId, patch: { carrying: 'plush' } });
+          if (!quiet) this.toScene(still.sceneId, { t: 'said', memberId, text: '🧸 Got one!' });
+        } else if (!quiet) this.toScene(still.sceneId, { t: 'said', memberId, text: out.win ? '🧸 Got one — but my hands are full' : '🦾 So close…' });
+      }, CLAW_DROP_MS);
+      this.selfServe.add(t);
+    }
+    return true;
+  }
+
+  /** Whether someone is standing at a thing (on a tile touching it), where they can use it. */
+  private standingAt(a: Actor, o: SceneObject): boolean {
+    const pos = this.position(a);
+    const f = footprint(o);
+    const dx = Math.max(f.x0 - pos.x, 0, pos.x - (f.x1 - 1));
+    const dy = Math.max(f.y0 - pos.y, 0, pos.y - (f.y1 - 1));
+    return Math.hypot(dx, dy) <= 1.6;
+  }
+
+  /**
+   * Leave a note on a board you're standing at, for the room to read. Short, one every NOTE_GAP_MS per person;
+   * a board holds NOTES_PER_BOARD and the oldest comes down to make room.
+   */
+  note(memberId: string, objectId: string, text: string): boolean {
+    const a = this.actors.get(memberId);
+    if (!a) return false;
+    const o = this.scene(a.sceneId)?.objects.find((x) => x.id === objectId);
+    if (!o?.actions?.some((k) => k.kind === 'note')) return false;
+    if (!this.standingAt(a, o)) {
+      this.toMember(memberId, { t: 'toast', text: 'Walk up to the board to leave a note.' });
+      return false;
+    }
+    const clean = cleanNote(text);
+    if (!clean) return false;
+    const now = Date.now();
+    if (now - (this.lastNote.get(memberId) ?? -Infinity) < NOTE_GAP_MS) {
+      this.toMember(memberId, { t: 'toast', text: 'One note at a time — give the board a minute.' });
+      return false;
+    }
+    this.lastNote.set(memberId, now);
+    const n: BoardNote = { id: randomUUID(), sceneId: a.sceneId, objectId: o.id, by: memberId, text: clean, at: new Date(now).toISOString() };
+    this.store.addNote(this.orgId, n);
+    const on = this.notesOn(a.sceneId, o.id);
+    for (const old of on.slice(0, Math.max(0, on.length - NOTES_PER_BOARD))) this.store.removeNote(this.orgId, old.id);
+    this.faceToward(a, o);
+    this.toScene(a.sceneId, { t: 'updated', memberId, patch: { x: a.x, y: a.y, facing: a.facing, path: undefined } });
+    this.toScene(a.sceneId, { t: 'notes', sceneId: a.sceneId, objectId: o.id, notes: this.notesOn(a.sceneId, o.id) });
+    return true;
+  }
+
+  /** Take a note down: your own, or anyone's if you're an admin. */
+  unnote(memberId: string, noteId: string): boolean {
+    const n = this.data.notes.find((x) => x.id === noteId);
+    const m = this.member(memberId);
+    if (!n || !m || (n.by !== memberId && m.role !== 'admin' && m.role !== 'owner')) return false;
+    this.store.removeNote(this.orgId, n.id);
+    this.toScene(n.sceneId, { t: 'notes', sceneId: n.sceneId, objectId: n.objectId, notes: this.notesOn(n.sceneId, n.objectId) });
+    return true;
+  }
+
+  private notesOn(sceneId: string, objectId: string): BoardNote[] {
+    return this.data.notes.filter((n) => n.sceneId === sceneId && n.objectId === objectId);
+  }
+
+  /** When each person last left a note. */
+  private lastNote = new Map<string, number>();
+
+  /** When each person last used something, and when each thing can be used again (per scene). */
+  private lastUse = new Map<string, number>();
+  private useCooldown = new Map<string, number>();
+  /** Best arcade scores, per cabinet. */
+  private highScores = new Map<string, { score: number; name: string }>();
+
   /** Stand up and step off the seat onto the floor in front of it (never left standing in furniture). */
   stand(memberId: string) {
     const a = this.actors.get(memberId);
@@ -603,6 +733,11 @@ export class OrgHub extends EventEmitter<HubEvents> {
     const a = this.actors.get(memberId);
     if (a) this.toScene(a.sceneId, { t: 'updated', memberId, patch: { voice } });
     this.directoryDirty = true;
+  }
+
+  /** A short social note to someone in the world (a wave from Slack). */
+  notify(memberId: string, text: string) {
+    this.toMember(memberId, { t: 'toast', text, tone: 'social' });
   }
 
   emote(memberId: string, emote: EmoteId, targetId?: string) {
@@ -666,6 +801,7 @@ export class OrgHub extends EventEmitter<HubEvents> {
     const first = target.displayName.split(' ')[0];
     if (!reachable || tp.status === 'offline') {
       this.toMember(fromId, { t: 'toast', text: `${first} isn’t around right now.` });
+      this.emit('missedKnock', k);
       return;
     }
     if (target.simulated) {

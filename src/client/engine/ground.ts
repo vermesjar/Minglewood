@@ -12,7 +12,12 @@ import { makeCanvas } from './sprites/painter';
 import { rugTexture } from './sprites/furniture';
 
 export const WALL_H = 62;
-const CLIFF = 18;
+/**
+ * The town stands on an island: a thick skirt of earth and rock under its front edges, going down into the sea
+ * (WorldView draws the sea, the mist and the far hills around it at this depth below the ground).
+ */
+export const SEA_DROP = 46;
+const CLIFF = SEA_DROP + 3;
 const WATER_DROP = 3;
 
 export interface WallHit {
@@ -57,12 +62,21 @@ const PAL = {
   grassLight: C('#8fd07a'),
   meadow: C('#86c872'),
   path: C('#d8c6a6'),
+  trail: C('#cfb07c'),
+  trailDark: C('#ad8f5f'),
+  trailLight: C('#e2cb98'),
   pathDark: C('#bca885'),
   pathLight: C('#e8dcc2'),
   curb: C('#a8977a'),
+  pathJoint: C('#9f8a67'),
   plaza: C('#e6d3b3'),
-  plaza2: C('#d9c29d'),
-  plazaRing: C('#c9ae86'),
+  plaza2: C('#dfc9a5'),
+  plazaJoint: C('#b7a07b'),
+  plazaRing: C('#cdb28a'),
+  coping: C('#e4ddcd'),
+  quay: C('#a39a8b'),
+  quayDark: C('#7d7568'),
+  quayWet: C('#5b6664'),
   sand: C('#efd9a4'),
   wetSand: C('#d9bd86'),
   foam: C('#e9f7fb'),
@@ -172,39 +186,58 @@ function pathColor(s: Sample, T: (x: number, y: number) => string): RGB {
   const grassAt = (dx: number, dy: number) => !isPaved(T(s.tx + dx, s.ty + dy)) && isLand(T(s.tx + dx, s.ty + dy));
   if ((fx < edge && grassAt(-1, 0)) || (fx > 1 - edge && grassAt(1, 0)) || (fy < edge && grassAt(0, -1)) || (fy > 1 - edge && grassAt(0, 1)))
     return PAL.curb;
-  // rounded cobbles, three to a tile, in a running bond
-  const row = Math.floor(fy * 3);
-  const cx = fx * 3 + (row % 2) * 0.5;
-  const u = frac(cx);
-  const v = frac(fy * 3);
-  const mortar = u < 0.1 || v < 0.12;
-  if (mortar) return PAL.pathDark;
-  const k = 0.94 + hash2(s.tx * 3 + Math.floor(cx), s.ty * 3 + row, 5) * 0.1;
-  const lit = v < 0.3 && u > 0.2 && u < 0.7; // a highlight on the upper edge of each stone
-  return shade(lit ? PAL.pathLight : PAL.path, k);
+  // Square setts, four to a tile, exactly on the tile grid: a strong joint along every tile edge (drawn on
+  // each tile's two upper edges, so every edge gets one), a finer one between the setts inside it.
+  if (fx < 0.045 || fy < 0.045) return PAL.pathJoint;
+  const u = frac(fx * 2);
+  const v = frac(fy * 2);
+  if ((u < 0.055 && fx > 0.25) || (v < 0.055 && fy > 0.25)) return PAL.pathDark;
+  const k = 0.94 + hash2(s.tx * 2 + Math.floor(fx * 2), s.ty * 2 + Math.floor(fy * 2), 5) * 0.1;
+  // each sett is lit along its upper edges and shaded along its lower ones
+  if (u > 0.9 || v > 0.9) return shade(PAL.path, 0.93 * k);
+  if ((u > 0.055 && u < 0.17) || (v > 0.055 && v < 0.17)) return shade(PAL.pathLight, k);
+  return shade(PAL.path, k);
 }
 
-function plazaColor(s: Sample, fountain: { x: number; y: number } | null): RGB {
-  // rings of darker setts radiating from the fountain, big flagstones elsewhere
-  if (fountain) {
-    const r = Math.hypot(s.gx - fountain.x, s.gy - fountain.y);
-    if ((r > 3.0 && r < 3.3) || (r > 5.1 && r < 5.35)) return PAL.plazaRing;
-    if (r < 3.0) {
-      const a = Math.atan2(s.gy - fountain.y, s.gx - fountain.x);
-      const seg = Math.floor(((a + Math.PI) / (Math.PI * 2)) * 24);
-      const ring = Math.floor(r * 3);
-      if (frac(r * 3) < 0.12) return shade(PAL.plaza2, 0.9);
-      return (seg + ring) % 2 ? PAL.plaza : PAL.plaza2;
-    }
-  }
-  const fx = frac(s.gx * 2);
-  const fy = frac(s.gy * 2);
-  if (fx < 0.06 || fy < 0.06) return shade(PAL.plaza2, 0.9);
-  const k = 0.97 + hash2(Math.floor(s.gx * 2), Math.floor(s.gy * 2), 6) * 0.06;
-  return shade((Math.floor(s.gx * 2) + Math.floor(s.gy * 2)) % 2 ? PAL.plaza : PAL.plaza2, k);
+/**
+ * A garden trail: packed earth and fine gravel, lighter where feet wear it down the middle, with scattered
+ * pebbles; `v` is the trail's coverage here (its edge is ~0.4), so the margins darken into the grass.
+ */
+function trailColor(s: Sample, v: number): RGB {
+  const n = vnoise(s.gx, s.gy, 0.9, 41) + (dither(s.sx, s.sy) - 0.5) * 0.12;
+  let base = v < 0.47 ? PAL.trailDark : v > 0.62 && n > 0.45 ? PAL.trailLight : PAL.trail;
+  const h = hash2(s.px, s.py, 43);
+  if (h > 0.985) base = shade(PAL.trailLight, 1.06); // a pale pebble…
+  else if (h < 0.02 || hash2(s.px, s.py - 1, 43) > 0.985) base = shade(base, 0.82); // …and its shadow
+  return base;
 }
 
-function landColor(c: string, s: Sample, T: (x: number, y: number) => string, fountain: { x: number; y: number } | null): RGB {
+interface Box {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+
+/**
+ * Plaza paving: one flagstone per tile, as a Habbo floor is laid: a dark joint on every tile edge, each slab
+ * lit along its upper edges and shaded along its lower ones, alternate slabs a shade apart, so the ground
+ * shows the grid people and furniture stand on. The slabs round the fountain are a darker stone.
+ */
+function plazaColor(s: Sample, fountain: Box | null): RGB {
+  const fx = frac(s.gx);
+  const fy = frac(s.gy);
+  if (fx < 0.045 || fy < 0.045) return PAL.plazaJoint;
+  const ring = !!fountain && s.tx >= fountain.x0 - 1 && s.tx < fountain.x1 + 1 && s.ty >= fountain.y0 - 1 && s.ty < fountain.y1 + 1;
+  const base = ring ? PAL.plazaRing : (s.tx + s.ty) % 2 ? PAL.plaza : PAL.plaza2;
+  const k = 0.975 + hash2(s.tx, s.ty, 6) * 0.05;
+  if (fx < 0.11 || fy < 0.11) return shade(base, 1.06 * k);
+  if (fx > 0.94 || fy > 0.94) return shade(base, 0.9 * k);
+  const g = hash2(s.px, s.py, 7);
+  return shade(base, k * (g > 0.975 ? 0.95 : g < 0.015 ? 1.04 : 1));
+}
+
+function landColor(c: string, s: Sample, T: (x: number, y: number) => string, fountain: Box | null): RGB {
   switch (c) {
     case 'g':
     case 'h':
@@ -219,15 +252,70 @@ function landColor(c: string, s: Sample, T: (x: number, y: number) => string, fo
       return t > 0.93 ? shade(PAL.sand, 0.9) : t < 0.04 ? shade(PAL.sand, 1.05) : PAL.sand;
     }
     case 'd': {
+      // decking on the tile grid: four planks to a tile, every plank butted on the tile edge (a joist under
+      // each), so the pier shows its tiles like the streets do
       const fx = frac(s.gx);
       const fy = frac(s.gy);
-      const seam = frac(fy * 5) < 0.14;
-      const end = frac(fx * 1.5 + (Math.floor(fy * 5) % 2) * 0.5) < 0.04;
-      return seam || end ? PAL.dirtDark : shade(PAL.dock, 0.95 + hash2(s.tx, Math.floor(fy * 5) + s.ty * 5, 1) * 0.1);
+      if (fx < 0.045 || fy < 0.045) return shade(PAL.dirtDark, 0.85);
+      if (frac(fy * 4) < 0.1) return PAL.dirtDark;
+      const plank = Math.floor(fy * 4);
+      const nail = fx > 0.07 && fx < 0.1 && frac(fy * 4) > 0.4 && frac(fy * 4) < 0.6;
+      return nail ? PAL.dirtDark : shade(PAL.dock, 0.95 + hash2(s.tx, plank + s.ty * 4, 1) * 0.1);
     }
     default:
       return PAL.grass;
   }
+}
+
+/** Sedimentary bands in the island's skirt, top to bottom (they repeat). */
+const STRATA = [C('#a87a4d'), C('#8d5f3b'), C('#c39668'), C('#7a5134'), C('#b3875a'), C('#94663f')];
+const SOIL = C('#6a452c');
+const ROOT = C('#4a2f1c');
+const ROCK = C('#8b8276');
+const ROCK_DARK = C('#6d665d');
+const ROCK_WET = C('#546360');
+const FOAM = C('#f2fbfd');
+
+/**
+ * The island's skirt, `k` art px below its edge (`along`: tiles along that edge; `right`: the right-hand face,
+ * turned from the light): a grass lip with tufts hanging over, dark topsoil threaded with roots, wavy bands of
+ * sediment, then bedrock that darkens and goes green where the sea wets it, and a broken line of foam at the
+ * waterline.
+ */
+function skirtColor(k: number, along: number, right: boolean, px: number, py: number): RGB | null {
+  if (k > SEA_DROP + 1) return null;
+  const col = Math.floor(along * 16); // one art px column along the face
+  const lit = right ? 0.8 : 1;
+  if (k >= SEA_DROP) return hash2(col >> 1, k, 61) > 0.3 ? FOAM : shade(ROCK_WET, 0.9);
+  // the grass lip, with tufts hanging over the soil
+  const tuft = hash2(col, 0, 53) > 0.72 ? 1 + Math.floor(hash2(col, 1, 53) * 3) : 0;
+  if (k <= 2 + tuft) return shade(k === 1 ? PAL.grass : PAL.grassDark, lit * (k > 2 ? 0.85 : 1));
+  // roots: a few strands hanging down through the topsoil
+  const rootLen = hash2(col >> 1, 2, 54) > 0.86 ? 5 + Math.floor(hash2(col >> 1, 3, 54) * 12) : 0;
+  const wobble = Math.round(Math.sin(k * 0.7 + col) * 0.6);
+  if (rootLen && k < 3 + rootLen && ((col + wobble) & 1) === 0) return shade(ROOT, lit);
+  const wav = Math.sin(along * 1.3) * 1.6 + (vnoise(along * 4, 0.5, 1.7, 55) - 0.5) * 5;
+  const d = k + wav;
+  if (d < 12) {
+    const pebble = hash2(px, py, 56) > 0.965;
+    return shade(pebble ? PAL.dirt : SOIL, lit * (0.96 + hash2(col, k, 57) * 0.06));
+  }
+  if (d < 34) {
+    const band = Math.floor((d - 12) / 5.4);
+    const into = (d - 12) / 5.4 - band;
+    const base = STRATA[band % STRATA.length];
+    // each band's top is lit, its bottom in shadow; the odd stone embedded in it
+    const k2 = into < 0.18 ? 1.08 : into > 0.85 ? 0.88 : 1;
+    const stone = hash2(px >> 1, py >> 1, 58) > 0.975;
+    return shade(stone ? ROCK : base, lit * k2);
+  }
+  // bedrock: blocky, cracked, wetter toward the sea
+  const row = Math.floor((d - 34) / 5);
+  const cell = Math.floor(along * 3 + hash2(row, 0, 59) * 0.9);
+  const crack = frac(along * 3 + hash2(row, 0, 59) * 0.9) < 0.07 || frac((d - 34) / 5) < 0.12;
+  const wet = k > SEA_DROP - 7;
+  const base = wet ? ROCK_WET : hash2(cell, row, 60) > 0.5 ? ROCK : shade(ROCK, 0.93);
+  return shade(crack ? ROCK_DARK : base, lit * (wet ? 0.9 : 1) * (1 - Math.max(0, k - 34) * 0.006));
 }
 
 function waterColor(depth: number, s: Sample): RGB {
@@ -351,7 +439,7 @@ function rasterizeOutdoor(scene: SceneDef, scale: number, flatCoat: boolean) {
   const T = (x: number, y: number) => (x < 0 || y < 0 || x >= W || y >= H ? ' ' : flatTiles[y * W + x]);
   // Natural edges (water, sand, grass) are drawn from a smoothed field, not tile by tile, so shores curve;
   // streets, the plaza and the pier keep their crisp tile edges. Only tiles near water pay for it.
-  const natural = (c: string) => c === 'w' || c === 'W' || c === 's' || c === 'g' || c === 'h' || c === 'm';
+  const natural = (c: string) => c === 'w' || c === 'W' || c === 's' || c === 'g' || c === 'h' || c === 'm' || c === 't';
   const wet = new Uint8Array(W * H);
   for (let y = 0; y < H; y++)
     for (let x = 0; x < W; x++)
@@ -376,6 +464,24 @@ function rasterizeOutdoor(scene: SceneDef, scale: number, flatCoat: boolean) {
       sandF[y * W + x] = isWater(c) || c === 's' ? 1 : 0;
     }
   const waterB = blur(waterF);
+  // Garden trails: a lightly blurred coverage field whose ~0.4 contour wanders, so trails have soft, organic
+  // edges instead of tile steps. `trailish`: tiles on or beside one (only they pay for it).
+  const trailF = new Float32Array(W * H);
+  const trailish = new Uint8Array(W * H);
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++)
+      if (T(x, y) === 't') {
+        trailF[y * W + x] = 1;
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (x + dx >= 0 && y + dy >= 0 && x + dx < W && y + dy < H) trailish[(y + dy) * W + x + dx] = 1;
+      }
+  const trailB = (() => {
+    const tmp = new Float32Array(W * H);
+    const out = new Float32Array(W * H);
+    const at = (a: Float32Array, x: number, y: number) => a[Math.min(H - 1, Math.max(0, y)) * W + Math.min(W - 1, Math.max(0, x))];
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) tmp[y * W + x] = (at(trailF, x - 1, y) + 2 * at(trailF, x, y) + at(trailF, x + 1, y)) / 4;
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) out[y * W + x] = (at(tmp, x, y - 1) + 2 * at(tmp, x, y) + at(tmp, x, y + 1)) / 4;
+    return out;
+  })();
   const sandB = blur(sandF);
   const sampleF = (f: Float32Array, gx: number, gy: number) => {
     const cx = gx - 0.5;
@@ -387,10 +493,15 @@ function rasterizeOutdoor(scene: SceneDef, scale: number, flatCoat: boolean) {
     const v = (x: number, y: number) => f[Math.min(H - 1, Math.max(0, y)) * W + Math.min(W - 1, Math.max(0, x))];
     return (v(x0, y0) * (1 - fx) + v(x0 + 1, y0) * fx) * (1 - fy) + (v(x0, y0 + 1) * (1 - fx) + v(x0 + 1, y0 + 1) * fx) * fy;
   };
+  const trailAt = (gx: number, gy: number) => sampleF(trailB, gx, gy) + (vnoise(gx, gy, 0.9, 37) - 0.5) * 0.2;
   const classAt = (gx: number, gy: number): string => {
     const tx = Math.floor(gx);
     const ty = Math.floor(gy);
     const own = T(tx, ty);
+    if (own !== ' ' && trailish[ty * W + tx] && (own === 't' || own === 'g' || own === 'h' || own === 'm')) {
+      if (trailAt(gx, gy) > 0.4) return 't';
+      if (own === 't') return 'g';
+    }
     if (!natural(own) || !wet[ty * W + tx]) return own;
     // next to a street or the pier: keep the authored, crisp edge
     for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (!natural(T(tx + dx, ty + dy)) && T(tx + dx, ty + dy) !== ' ') return own;
@@ -400,7 +511,7 @@ function rasterizeOutdoor(scene: SceneDef, scale: number, flatCoat: boolean) {
     return own === 's' || own === 'w' || own === 'W' ? 'g' : own;
   };
   const f = scene.objects.find((o) => o.sprite === 'fountain');
-  const fountain = f ? { x: f.x + (f.w ?? 1) / 2, y: f.y + (f.d ?? 1) / 2 } : null;
+  const fountain = f ? footprint(f) : null;
   // distance to shore for water tiles (in tiles), for depth tones and lily pads
   const shore = new Float32Array(W * H).fill(99);
   for (let y = 0; y < H; y++)
@@ -476,7 +587,20 @@ function rasterizeOutdoor(scene: SceneDef, scale: number, flatCoat: boolean) {
       smp.sx = sx;
       smp.sy = sy;
       if (isLand(c)) {
-        rgb = landColor(c, smp, T, fountain);
+        rgb = c === 't' ? trailColor(smp, trailAt(gx0, gy0)) : landColor(c, smp, T, fountain);
+        // a quay: pale coping stones along paving that meets the water, a joint every half tile
+        if (c === 'p' || c === 'P') {
+          const ex = frac(gx0);
+          const ey = frac(gy0);
+          const cope = 0.13;
+          const along = ex > 1 - cope && isWater(T(tx + 1, ty)) ? gy0 : ey > 1 - cope && isWater(T(tx, ty + 1)) ? gx0 : ex < cope && isWater(T(tx - 1, ty)) ? gy0 : ey < cope && isWater(T(tx, ty - 1)) ? gx0 : -1;
+          if (along >= 0) {
+            const inner = ex > 1 - cope ? ex < 1 - cope + 0.03 : ey > 1 - cope ? ey < 1 - cope + 0.03 : ex < cope ? ex > cope - 0.03 : ey > cope - 0.03;
+            rgb = frac(along * 2) < 0.05 || inner ? shade(PAL.coping, 0.84) : shade(PAL.coping, 0.97 + hash2(Math.floor(along * 2), tx + ty, 12) * 0.06);
+          }
+        }
+        // grass trodden flat along a trail's margins
+        if ((c === 'g' || c === 'h' || c === 'm') && trailish[ty * W + tx] && trailAt(gx0, gy0) > 0.3) rgb = shade(rgb, 0.93);
         if (c === 's' && wet[ty * W + tx]) {
           // the wet band just above the waterline
           const w2 = classAt(gx0 + 0.22, gy0 + 0.22);
@@ -493,7 +617,15 @@ function rasterizeOutdoor(scene: SceneDef, scale: number, flatCoat: boolean) {
         // Bank below a land tile edge?
         for (let k = 1; k <= WATER_DROP + 1 && !rgb; k++) {
           const u = toIso(ax, ay - k);
-          if (Math.floor(u.x) < W && Math.floor(u.y) < H && isLand(classAt(u.x, u.y))) rgb = k <= 1 ? PAL.dirt : PAL.dirtDark;
+          if (Math.floor(u.x) < W && Math.floor(u.y) < H && isLand(classAt(u.x, u.y))) {
+            const above = T(Math.floor(u.x), Math.floor(u.y));
+            if (above === 'p' || above === 'P') {
+              // the quay's dressed-stone face: blocks half a tile long, a wet dark line at the water
+              const along = frac(u.x) > frac(u.y) ? u.y : u.x;
+              const joint = frac(along * 2 + (k % 2) * 0.5) < 0.07;
+              rgb = k > WATER_DROP ? PAL.quayWet : joint ? PAL.quayDark : shade(PAL.quay, (frac(u.x) > frac(u.y) ? 0.86 : 1) * (0.96 + hash2(Math.floor(along * 2), k, 13) * 0.08));
+            } else rgb = k <= 1 ? PAL.dirt : PAL.dirtDark;
+          }
         }
         if (!rgb) {
           const wv0 = toIso(ax, ay - WATER_DROP);
@@ -539,12 +671,9 @@ function rasterizeOutdoor(scene: SceneDef, scale: number, flatCoat: boolean) {
           if (!onMap) continue;
           const onFront = ux === W - 1 || uy === H - 1;
           if (!onFront) continue;
-          const tc = T(ux, uy);
           const rightFace = frac(u.x) > frac(u.y);
-          const fc = rightFace ? 0.82 : 1;
-          if (isWater(tc)) rgb = shade(k < 6 ? PAL.water : k < 12 ? PAL.dirt : PAL.stone, fc * (k < 6 ? 0.85 : 1));
-          else rgb = shade(k < 3 ? PAL.grassDark : k < 12 ? PAL.dirt : PAL.stone, fc);
-          if (k > 12 && hash2(px, py, 6) > 0.8) rgb = shade(rgb, 0.85);
+          rgb = skirtColor(k, rightFace ? u.y : u.x, rightFace, px, py);
+          break;
         }
       }
       if (!rgb) continue;
@@ -592,7 +721,7 @@ function rasterizeOutdoor(scene: SceneDef, scale: number, flatCoat: boolean) {
     ctx.save();
     ctx.scale(S, S);
     ctx.translate(-minX, -minY);
-    const flat: Record<string, RGB> = { g: PAL.grass, h: PAL.grass2, m: PAL.meadow, p: PAL.path, P: PAL.plaza, s: PAL.sand, w: PAL.water, W: PAL.deep, d: PAL.dock };
+    const flat: Record<string, RGB> = { g: PAL.grass, h: PAL.grass2, m: PAL.meadow, p: PAL.path, t: PAL.trail, P: PAL.plaza, s: PAL.sand, w: PAL.water, W: PAL.deep, d: PAL.dock };
     for (let y = 0; y < H; y++)
       for (let x = 0; x < W; x++) {
         const col = flat[T(x, y)] ?? PAL.grass;

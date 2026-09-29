@@ -35,6 +35,33 @@ export class TileCanvas {
     for (let x = ax; x !== bx + sx; x += sx) for (let k = 0; k < width; k++) this.pave(x, ay + k, c);
     for (let y = ay; y !== by + sy; y += sy) for (let k = 0; k < width; k++) this.pave(bx + k, y, c);
   }
+  /**
+   * A winding footpath through `pts` (a smooth Catmull-Rom curve, not an L): every tile whose centre lies
+   * within `width / 2` of the curve. Never paves water, the pier or a street (a trail runs up to them).
+   */
+  trail(pts: Array<[number, number]>, c = 't', width = 1.6): void {
+    const at = (i: number) => pts[Math.max(0, Math.min(pts.length - 1, i))];
+    const r = width / 2;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const [p0, p1, p2, p3] = [at(i - 1), at(i), at(i + 1), at(i + 2)];
+      const steps = Math.ceil(Math.hypot(p2[0] - p1[0], p2[1] - p1[1]) * 6);
+      for (let s = 0; s <= steps; s++) {
+        const u = s / steps;
+        const u2 = u * u;
+        const u3 = u2 * u;
+        const cr = (a: number, b: number, c2: number, d: number) =>
+          0.5 * (2 * b + (-a + c2) * u + (2 * a - 5 * b + 4 * c2 - d) * u2 + (-a + 3 * b - 3 * c2 + d) * u3);
+        const x = cr(p0[0], p1[0], p2[0], p3[0]);
+        const y = cr(p0[1], p1[1], p2[1], p3[1]);
+        for (let ty = Math.floor(y - r); ty <= Math.ceil(y + r); ty++)
+          for (let tx = Math.floor(x - r); tx <= Math.ceil(x + r); tx++) {
+            if (Math.hypot(tx + 0.5 - x, ty + 0.5 - y) > r) continue;
+            if (this.get(tx, ty) === 'p') continue;
+            this.pave(tx, ty, c);
+          }
+      }
+    }
+  }
   private pave(x: number, y: number, c: string) {
     const cur = this.get(x, y);
     if (cur === 'w' || cur === 'W' || cur === 'd' || cur === 'P') return;

@@ -10,6 +10,7 @@ import { presenceFromCalendar, type CalendarProvider } from '@shared/calendar';
 import { STATUS_META } from '@shared/presence';
 import { buildingForRoom, getScene, TOWN_ID } from '@shared/world';
 import { isSeat, terrainAt } from '@shared/world/scene';
+import { TOWN_SPOTS } from '@shared/world/northstarTown';
 import type { Tile } from '@shared/world/pathfinding';
 import { daysSince } from '@shared/serendipity';
 import type { SimProfile } from '@shared/seed/northstar';
@@ -20,7 +21,7 @@ import { CHATTER, GREETINGS, WAVE_BACKS } from './chatter';
 type Step =
   | { kind: 'walk'; to: Tile }
   | { kind: 'enter'; sceneId: string }
-  | { kind: 'sit' }
+  | { kind: 'sit'; near?: Tile }
   | { kind: 'wait'; ms: number }
   | { kind: 'do'; fn: () => void };
 
@@ -98,11 +99,16 @@ export class LifeSim {
     this.hub.enter(npc.id, sceneId, 'sim', this.randomSpot(sceneId));
   }
 
-  private freeSeat(sceneId: string) {
+  /** A free seat in the scene (`near`: within a few tiles of there). */
+  private freeSeat(sceneId: string, near?: Tile) {
     const scene = this.hub.scene(sceneId);
     if (!scene) return undefined;
     const seats = scene.objects.filter(
-      (o) => isSeat(o) && !this.hub.seatTaken(sceneId, o.id) && !this.reserved.has(`${sceneId}:${o.id}`),
+      (o) =>
+        isSeat(o) &&
+        !this.hub.seatTaken(sceneId, o.id) &&
+        !this.reserved.has(`${sceneId}:${o.id}`) &&
+        (!near || Math.hypot(o.x - near[0], o.y - near[1]) < 5),
     );
     return seats.length ? pick(seats) : undefined;
   }
@@ -117,7 +123,7 @@ export class LifeSim {
       if (!grid.walkable(x, y)) continue;
       if (scene.kind === 'outdoor') {
         const t = terrainAt(scene, x, y);
-        if (!['p', 'P', 'd', 's'].includes(t) && Math.random() < 0.8) continue;
+        if (!['p', 'P', 'd', 's', 't'].includes(t) && Math.random() < 0.8) continue;
       }
       return [x, y];
     }
@@ -167,6 +173,14 @@ export class LifeSim {
       if (scene.kind === 'interior') {
         if (!a.sittingOn || Math.random() < 0.4) npc.plan.push({ kind: 'sit' });
         else if (Math.random() < 0.3) this.hub.emote(npc.id, pick(['laugh', 'idea', 'thumbs', 'clap'] as const));
+      } else if (a.sceneId === TOWN_ID && Math.random() < 0.55) {
+        // out for a stroll: to one of the town's places (the garden, the pier, the campfire…), by the paths;
+        // a while there, and sometimes a sit on a bench nearby
+        const place = pick(TOWN_SPOTS);
+        const spot = this.randomSpotNear(a.sceneId, place.x, place.y, 2);
+        if (!spot) return;
+        npc.plan.push({ kind: 'walk', to: spot }, { kind: 'wait', ms: rand(6_000, 18_000) });
+        if (Math.random() < 0.4) npc.plan.push({ kind: 'sit', near: [place.x, place.y] });
       } else {
         const spot = this.randomSpotNear(a.sceneId, a.x, a.y, 9);
         if (spot) npc.plan.push({ kind: 'walk', to: spot });
@@ -177,7 +191,7 @@ export class LifeSim {
   private runStep(npc: NpcState, step: Step, now: number) {
     switch (step.kind) {
       case 'walk':
-        this.hub.walkTo(npc.id, step.to);
+        this.hub.walkTo(npc.id, step.to, { stroll: true });
         break;
       case 'enter': {
         this.hub.enter(npc.id, step.sceneId, 'sim');
@@ -185,7 +199,8 @@ export class LifeSim {
       }
       case 'sit': {
         const a = this.hub.actor(npc.id)!;
-        const seat = this.freeSeat(a.sceneId);
+        const seat = this.freeSeat(a.sceneId, step.near);
+        if (!seat && step.near) break; // no bench free there: stroll on
         if (!seat) {
           const spot = this.randomSpot(a.sceneId);
           if (spot) this.hub.walkTo(npc.id, spot);
@@ -193,7 +208,7 @@ export class LifeSim {
         }
         const key = `${a.sceneId}:${seat.id}`;
         this.reserved.add(key);
-        if (!this.hub.walkTo(npc.id, [seat.x, seat.y]) && Math.hypot(a.x - seat.x, a.y - seat.y) > 1.6) {
+        if (!this.hub.walkTo(npc.id, [seat.x, seat.y], { stroll: true }) && Math.hypot(a.x - seat.x, a.y - seat.y) > 1.6) {
           this.reserved.delete(key);
           break;
         }
@@ -244,7 +259,7 @@ export class LifeSim {
       const ny = Math.round(y + rand(-r, r));
       if (!grid.walkable(nx, ny)) continue;
       const t = terrainAt(scene, nx, ny);
-      if (scene.kind === 'outdoor' && !['p', 'P', 'd', 's', 'm'].includes(t) && Math.random() < 0.7) continue;
+      if (scene.kind === 'outdoor' && !['p', 'P', 'd', 's', 'm', 't'].includes(t) && Math.random() < 0.7) continue;
       return [nx, ny];
     }
     return undefined;
