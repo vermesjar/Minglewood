@@ -39,6 +39,8 @@ export const QUESTS: Array<{ id: string; label: string; hint: string }> = [
 
 
 /** How long you may stand on a seat's tile unseated (a sit on its way) before you're walked off it (WorldView stands you up then too). */
+/** How long after shifting along a couch a click on it still means "the cushion I'm moving to". */
+const SHIFT_SETTLE_MS = 900;
 const SIT_CONFIRM_MS = 1500;
 
 class Game {
@@ -780,8 +782,11 @@ class Game {
         // Already sitting here: clicking your own cushion does nothing (stand up with the Stand up button or by
         // walking off); clicking another free cushion of the same seat shifts you over. "Your cushion" is the
         // one you're in or still sliding into (the store only learns it when the server confirms the shift).
-        const cur = this.world?.cushionOf(this.meId) ?? occ;
-        const mine = !target || (target.x === cur.x && target.y === cur.y);
+        // (just shifted — the server hasn't answered, or you're still sliding — any click on this seat is you
+        // settling in: it keeps the cushion you're moving to)
+        const shifting = this.shift && this.shift.seat === o.id && Date.now() - this.shift.at < SHIFT_SETTLE_MS;
+        const cur = shifting ? this.shift!.to : (this.world?.cushionOf(this.meId) ?? occ);
+        const mine = !target || shifting || (target.x === cur.x && target.y === cur.y);
         if (!mine) this.sitOn(o, [target.x, target.y]);
         return;
       }
@@ -840,11 +845,15 @@ class Game {
     // already on this couch or bench: slide over to the cushion (the seat's tiles aren't walked on; the server
     // moves you along the seat and every screen glides you there)
     if (getState().occupants[this.meId]?.sittingOn === o.id) {
+      this.shift = { seat: o.id, to: { x: spot.x, y: spot.y }, at: Date.now() };
       sit();
       return;
     }
     this.walkTo([spot.x, spot.y], sit);
   }
+
+  /** The last shift along a couch or bench: which seat, to which cushion, when. */
+  private shift: { seat: string; to: { x: number; y: number }; at: number } | null = null;
 
   /** Since when we've stood on a seat's tile without sitting (0: we haven't). */
   private onSeatSince = 0;

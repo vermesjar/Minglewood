@@ -602,9 +602,9 @@ export function buildInteriors(): SceneDef[] {
       { id: 'launch-bench-table', sprite: 'table-low', x: 5, y: 9, w: 1, d: 1, variant: 'side' },
       // The break corner for the long nights before a launch.
       { id: 'launch-lounge-rug', sprite: 'rug', x: 6, y: 7, w: 5, d: 3, flat: true, variant: 'cream' },
-      { id: 'launch-lamp', sprite: 'lamp', x: 6, y: 7, actions: [{ kind: 'toggle', label: 'Switch the lamp' }] },
+      { id: 'launch-lamp', sprite: 'lamp', x: 9, y: 7, actions: [{ kind: 'toggle', label: 'Switch the lamp' }] },
       { id: 'launch-couch', sprite: 'couch', variant: 'blue', x: 7, y: 7, w: 2, d: 1, facing: 'sw', actions: sit },
-      { id: 'launch-side-table', sprite: 'table-low', x: 9, y: 7, w: 1, d: 1, variant: 'side' },
+      { id: 'launch-side-table', sprite: 'table-low', x: 6, y: 7, w: 1, d: 1, variant: 'side' },
       { id: 'launch-coffee-table', sprite: 'table-low', x: 7, y: 8, w: 2, d: 1 },
       { id: 'launch-beanbag-2', sprite: 'beanbag', x: 7, y: 9, variant: 'cyan', actions: sit },
       { sprite: 'beanbag', x: 8, y: 9, variant: 'orange', actions: sit },
