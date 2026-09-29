@@ -11,6 +11,15 @@ facing ne; sw/nw are mirrors) and pose (`stand`, `walk1`, `walk2`, `sit`, `wave`
 box, the face anchors (eyes, brows, nose, mouth — mid-head, close-set, turned toward the facing), collar,
 shoulders, waist, hips, and the arm and leg limbs. Canvas 88×112 art px; feet at (45, 104).
 
+### Body bases
+
+`body: 'body.a' | 'body.b'` picks the frame's torso: **a** straight (squarer shoulders), **b** soft (narrower
+shoulders, a defined waist; the arms hang closer). The head, face anchors and legs are shared. Generated tops
+are drawn once, on base A, and **mesh-warped** onto other bases (`warpToTorso` in avatarKit.ts): each row of
+the garment is remapped from A's torso outline to the target's, so pockets, plackets and prints stay put.
+Limbs, legs, shoes and lower garments hang off the frame, so they follow automatically. A new base is a new
+torso outline (and arm offsets) in `avatarFrame.ts` plus a catalogue entry; the gate covers it.
+
 ## The standard
 
 `src/client/engine/sprites/avatarQa.ts` — zones every part is checked against, per view and pose:
@@ -63,7 +72,8 @@ better at 1:1). Templates for generation: `npx tsx scripts/export-refs.ts`.
 ```
 npm run avatars:review   # every character (roster + saved members + 200 random looks) × 4 facings × 6 poses,
                          # plus per-asset galleries in art/review/assets/ and art/review/characters/report.md
-npm run avatars:sweep    # pairwise: every value of each colliding slot pair, every facing and pose (~29k frames)
+npm run avatars:sweep    # pairwise: every value of each colliding slot pair (incl. × body), every facing and pose (~31k frames)
+sh scripts/gate.sh       # all of the above plus typecheck and lint, stopping at the first failure
 npm test                 # includes the roster + random gate and proofs that each rule fires
 ```
 
