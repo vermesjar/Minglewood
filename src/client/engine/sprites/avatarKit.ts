@@ -15,6 +15,7 @@ import HAT_LIB from './hatLib.json';
 import { HAIR, HAIR_ORIGIN } from './avatarHair';
 import HAIR_LIB from './hairLib.json';
 import FACE_LIB from './faceLib.json';
+import PET_LIB from './petLib.json';
 
 /**
  * Paint a hand-drawn tone map at (x0, y0): '#' base, 'h' light, 's' shade, 'd' deep, '.' empty, tinted from
@@ -387,6 +388,7 @@ function drawFacialHair(P: Pix, F: Frame, L: FullLoadout) {
 /* ------------------------------------------------------------------ clothes & body on the frame */
 
 const TOPS = TOP_LIB as unknown as Lib;
+const PETS = PET_LIB as unknown as Lib;
 const HATS = HAT_LIB as unknown as Lib;
 /** Where generated torso garments sit: the torso zone's corner (stand pose), shifted with the frame. */
 const TORSO_ORIGIN = { x: 34, y: 57 };
@@ -790,6 +792,13 @@ function drawPet(P: Pix, L: FullLoadout, pose: Pose) {
   if (kind === 'none') return;
   const c = hx(L.petColor);
   const hop = pose === 'walk1' ? -2 : 0;
+  // generated buddies (art/charkit.py pet), conformed to the pet anchor beside the feet
+  const gen = PETS[kind]?.front;
+  if (gen) {
+    const m = placed(gen, [0, 0], [0, hop]);
+    paintMap(P, m.x, m.y, m.rows, c);
+    return;
+  }
   const x = 14;
   const y = 99 + hop;
   const eye: RGB = LINE;

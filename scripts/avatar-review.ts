@@ -390,3 +390,28 @@ console.log(`${people.length} characters, ${total} issue(s) → ${OUT}/`);
   rows.forEach(([, look], i) => sheet.paste(renderAvatarLayers(look, 'se', 'stand').px, (i % cols) * cw + 3, Math.floor(i / cols) * ch + 3, z, [c.x, c.y, c.w, c.h]));
   sheet.save('art/review/assets/wardrobe-face-tiles.png');
 }
+
+/* ------------------------------------------------------------------ pets close-up */
+{
+  const pets = [...ITEM_BY_ID.values()].filter((i) => i.slot === 'pet' && !i.id.endsWith('.none')).map((i) => i.id);
+  const z = 6;
+  const PC = [0, 78, 40, 30];
+  const frames = [
+    ['se', 'stand'],
+    ['se', 'walk1'],
+    ['ne', 'stand'],
+    ['sw', 'stand'],
+  ] as const;
+  const cw = PC[2] * z + 6;
+  const ch = PC[3] * z + 6;
+  const sheet = new Sheet(cw * frames.length, ch * pets.length, BG);
+  pets.forEach((pet, row) =>
+    frames.forEach(([f, p], col) => {
+      const px = renderAvatarLayers({ pet, petColor: ['#e8a15a', '#c98f4a', '#f4efe6', '#d9c7b8', '#7cc576'][row % 5] } as AvatarLoadout, f, p).px;
+      // pets stand on the figure's left (mirrored for sw/nw): crop that side
+      const x0 = f === 'sw' || f === 'nw' ? W - PC[0] - PC[2] : PC[0];
+      sheet.paste(px, col * cw + 3, row * ch + 3, z, [x0, PC[1], PC[2], PC[3]]);
+    }),
+  );
+  sheet.save('art/review/assets/pets.png');
+}

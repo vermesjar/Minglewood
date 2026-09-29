@@ -1,0 +1,47 @@
+{
+ "cat": {
+  "front": {
+   "x": 8,
+   "y": 91,
+   "rows": [
+    ".....l...l",
+    "....lhslshl",
+    "....lhh###l",
+    "....#h####d",
+    "...l#######l",
+    "...l#######l",
+    "....l#####s",
+    "...l#ll#ll",
+    ".l####hhhl",
+    "lss###shhl",
+    "l#ls##shll",
+    "l##ss##lss",
+    ".l###l#l#s",
+    "..lsslsl#l"
+   ]
+  }
+ },
+ "dog": {
+  "front": {
+   "x": 7,
+   "y": 90,
+   "rows": [
+    ".....ll###ll",
+    "....l#######l",
+    "...l########sl",
+    "...###l####lssl",
+    "..l###l#l##lssl",
+    "..lsssl#hhllhsl",
+    "...sssl#hhhhll",
+    "...lllsshhh#l",
+    "...lss#sslll",
+    "l#.#####hhl",
+    "l#l#s###hh#l",
+    "ll###l##ls#l",
+    "..###ll#ll#l",
+    "..s###l##lh#",
+    "..llllllllll"
+   ]
+  }
+ }
+}

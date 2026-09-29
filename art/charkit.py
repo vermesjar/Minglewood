@@ -77,12 +77,17 @@ def hair_mask(view: str, long: bool, drape: bool = False) -> Image.Image:
 TORSO = (34, 57, 58, 78)  # torso zone on the frame (stand pose): x0, y0, x1, y1
 
 
+PET_ZONE = (1, 78, 31, 106)  # beside the figure's feet, where the kit draws the buddy: x0, y0, x1, y1
+PET_ANCHOR = (14, 104)  # the pet's bottom-centre on the frame (src/client/engine/sprites/avatarKit.ts drawPet)
+PET_H = 15  # pets stand about shin high
+
+
 def zone_mask(kind: str, view: str, long: bool, drape: bool = False) -> Image.Image:
     if kind in ("hair", "hat"):
         return hair_mask(view, long, drape)
     m = Image.new("RGBA", CANVAS, (0, 0, 0, 255))
     a = np.array(m)
-    x0, y0, x1, y1 = TORSO
+    x0, y0, x1, y1 = PET_ZONE if kind == "pet" else TORSO
     a[OFFSET[1] + y0 * S: OFFSET[1] + y1 * S, OFFSET[0] + x0 * S: OFFSET[0] + x1 * S, 3] = 0
     return Image.fromarray(a)
 
@@ -150,6 +155,8 @@ def keep_zone(kind: str, view: str, long: bool) -> np.ndarray:
     if kind == "top":
         rows(20, 55)  # the head
         rows(80, 112)  # the legs
+    elif kind == "pet":
+        rows(20, 112)  # the whole figure (the empty pet zone has no pixels to match)
     else:
         rows(80 if long else 60, 112)
     return k
@@ -211,6 +218,9 @@ def extract_zone(kind: str, view: str, long: bool, drape: bool) -> np.ndarray:
     if kind == "top":
         tx0, ty0, tx1, ty1 = TORSO
         z[ty0:ty1, tx0:tx1] = True
+        return z
+    if kind == "pet":
+        z[60:112, :] = True  # wherever the model put it (the pet is the only key colour down there)
         return z
     bottom = y0 + (46 if long else 32 if drape else 22 if view == "front" else 24)
     z[max(0, y0 - 28):bottom, max(0, x0 - 22):min(88, x0 + 44)] = True
@@ -446,7 +456,7 @@ def preview(rows: list[str], path: Path, color=(90, 58, 37)):
     img.save(path)
 
 
-LIBS = {k: HERE.parent / "src" / "client" / "engine" / "sprites" / f"{k}Lib.json" for k in ("hair", "hat", "top")}
+LIBS = {k: HERE.parent / "src" / "client" / "engine" / "sprites" / f"{k}Lib.json" for k in ("hair", "hat", "top", "pet")}
 LIB = LIBS["hair"]
 
 
@@ -471,6 +481,10 @@ PART_TEXT = {
            "the same body shape: the garment fills the torso from the shoulders to the waist, with a neckline at the "
            "top, three tones (light toward the upper left, base, shade toward the lower right), fabric folds as "
            "single shade pixels, and a dark 1-pixel outline. Do NOT draw arms or sleeves.",
+    "pet": "Draw ONLY a small pet animal in the masked area, standing on the same ground line as the character's "
+           "feet, on exactly the same 8×8 pixel grid, in the same crisp pixel-art style: cute and clearly readable at "
+           "1:1, three tones (light toward the upper left, base, shade toward the lower right), a dark 1-pixel "
+           "outline, small dark eyes. About as tall as the character's shins. Do not touch the character.",
 }
 
 
@@ -549,7 +563,7 @@ def extract(job: str, publish: bool = True):
     zone = extract_zone(kind, view, long, drape)
     covers = kind == "hair" or (kind == "hat" and (drape or meta["name"] in COVERS_HAIR))
     min_frac = 0.25 if kind == "hat" else 0.03  # a hat is one piece; hair can be several
-    key = ("gold" if meta["name"] == "crown" else "teal") if kind == "hat" else None
+    key = ("gold" if meta["name"] == "crown" else "teal") if kind in ("hat", "pet") else None
     placed = to_tone_map(grid, base, zone, capture_all=kind == "top", min_frac=min_frac, key=key)
     front_json = OUT / f"{kind}-{meta['name']}-front.json"
     fitted = None
@@ -571,6 +585,20 @@ def extract(job: str, publish: bool = True):
     if covers and placed["rows"]:
         # anything the fit could not reach is still covered (tones carried in from the drawing)
         placed = to_tone_map(*refill(placed, view, base), min_frac=min_frac)
+    if kind == "pet" and placed["rows"]:
+        # conform: pets are small (about shin height); shrink the drawing about its feet, re-pixelate, then put
+        # its feet on the kit's pet anchor, beside the figure (bottom-centre)
+        h = len(placed["rows"])
+        if h > PET_H:
+            part = rows_mask(placed)
+            w0 = max(len(r) for r in placed["rows"])
+            pivot = (placed["x"] + w0 / 2, placed["y"] + h - 1)
+            moved = apply_fit(aligned, part, {"s": PET_H / h, "dx": 0.0, "dy": 0.0, "pivot": pivot})
+            moved.save(OUT / f"{job}.fitted.png")
+            placed = to_tone_map(snap_grid(moved), base, zone, min_frac=0.25, key=key)
+        w = max(len(r) for r in placed["rows"])
+        placed["x"] = PET_ANCHOR[0] - w // 2
+        placed["y"] = PET_ANCHOR[1] - len(placed["rows"]) + 1
     behind = None
     if kind == "hair" and view == "front" and long:
         placed, behind = split_behind(placed, view)
@@ -607,7 +635,7 @@ def main():
     h.add_argument("--regen", action="store_true")
     h.add_argument("--no-publish", action="store_true")
     h.set_defaults(fn=cmd_hair, kind="hair")
-    for kind in ("hat", "top"):
+    for kind in ("hat", "top", "pet"):
         k = sub.add_parser(kind)
         k.add_argument("name")
         k.add_argument("--prompt", required=True)

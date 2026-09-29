@@ -49,6 +49,13 @@ JOBS: dict[str, tuple[str, list[str]]] = {
                        "spiral stripes and a pom-pom on the tip. All in solid medium teal with lighter teal stripes.", []),
     "hat-beanie-front": ("The head wears a slouchy ribbed knit beanie with a folded cuff and a round pom-pom on top; "
                          "the beanie AND the pom-pom are both solid medium teal.", []),
+    "pet-cat-front": ("A cute cat sitting on the ground in 3/4 view facing the viewer's lower right: upright "
+                      "pointed ears, a round head, a sitting body with its front paws together and a curled tail "
+                      "wrapped round the paws. Solid medium teal fur with lighter teal on the chest; small dark eyes.", []),
+    "pet-dog-front": ("A cute chunky puppy SITTING on the ground in 3/4 view facing the viewer's lower right, compact "
+                      "like a sitting cat: a big round head with two floppy ears hanging down, a short snout with a "
+                      "dark nose, straight front legs, a little tail. Solid medium teal fur with lighter teal on the "
+                      "chest and muzzle; small dark eyes.", []),
     "top-hoodie-back": ("Seen from BEHIND: the back of a pullover hoodie: the empty hood lies flat between the "
                         "shoulder blades, a plain back, a ribbed hem. No pocket and no drawstrings on the back.", []),
     "top-shirt-back": ("Seen from BEHIND: the back of a button-up shirt: the collar folded round the back of the neck, "
