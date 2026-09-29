@@ -22,7 +22,8 @@
             40
           ]
         }
-      }
+      },
+      "seat": 12
     },
     "cake-stand": {
       "footprint": [
@@ -57,7 +58,8 @@
             48
           ]
         }
-      }
+      },
+      "seat": 15
     },
     "couch.green": {
       "footprint": [
@@ -80,7 +82,8 @@
             40
           ]
         }
-      }
+      },
+      "seat": 12
     },
     "cups": {
       "footprint": [
@@ -264,7 +267,8 @@
       "anchor": [
         18,
         38
-      ]
+      ],
+      "seat": 17
     },
     "table-low": {
       "footprint": [

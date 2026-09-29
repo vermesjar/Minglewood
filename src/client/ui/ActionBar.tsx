@@ -3,6 +3,8 @@ import { EMOTES, EMOTE_IDS } from '@shared/presence';
 import { game } from '../app/game';
 import { useStore } from '../app/store';
 
+const CARRY_EMOJI: Record<string, string> = { coffee: '☕', boba: '🧋', icecream: '🍦' };
+
 export function ActionBar() {
   const [text, setText] = useState('');
   const sceneId = useStore((s) => s.sceneId);
@@ -10,6 +12,7 @@ export function ActionBar() {
   const selection = useStore((s) => s.selection);
   const meId = useStore((s) => s.boot?.me.id);
   const sitting = useStore((s) => (meId ? s.occupants[meId]?.sittingOn : undefined));
+  const carrying = useStore((s) => (meId ? s.occupants[meId]?.carrying : undefined));
   const quiet = rooms?.find((r) => r.id === sceneId)?.quiet;
   const target = selection?.kind === 'member' ? selection.id : undefined;
 
@@ -41,6 +44,11 @@ export function ActionBar() {
           aria-label="Say something to people in this room"
         />
       </form>
+      {carrying && (
+        <button className="btn small" onClick={() => game.putDown()} title="Put it down">
+          {CARRY_EMOJI[carrying] ?? '✋'} Put down
+        </button>
+      )}
       {sitting && (
         <button className="btn small" onClick={() => game.rt?.send({ t: 'stand' })}>
           Stand up

@@ -15,7 +15,7 @@ import { Effects } from './effects';
 import { renderOutdoorGround, type GroundLayer } from './ground';
 import { renderInteriorShell, type InteriorLayer } from './interior';
 import { skyAt, windowView, type Sky } from './weather';
-import { artLight } from './sprites/art';
+import { artLight, artSeat } from './sprites/art';
 import { INK_CSS, PAPER, UI_FONT, pill, roundRect, speechBubble } from './overlays';
 import { AVATAR_CROPS, avatarSprite, usesWheelchair, type Pose } from './sprites/avatar';
 import { festiveFor, spriteFor } from './sprites/registry';
@@ -72,6 +72,8 @@ const facingFrom = (dx: number, dy: number, prev: Facing): Facing => {
 };
 
 const SEAT_LIFT: Record<string, number> = { chair: 5, bench: 5, stool: 7, couch: 4, armchair: 4, beanbag: 1 };
+/** In the sitting pose, the underside of an avatar's thighs is this many art px above its anchor. */
+const SIT_THIGH = 7.5;
 
 export class WorldView {
   readonly camera = new Camera();
@@ -121,6 +123,8 @@ export class WorldView {
     canvas.addEventListener('pointerleave', this.onLeave);
     canvas.addEventListener('dblclick', this.onDbl);
     canvas.addEventListener('wheel', this.onWheel, { passive: false });
+    // The world isn't an image to save: no browser context menu over it.
+    canvas.addEventListener('contextmenu', (e) => e.preventDefault());
     this.raf = requestAnimationFrame(this.frame);
   }
 
@@ -213,9 +217,10 @@ export class WorldView {
     } else {
       this.camera.minZoom = 1;
       this.camera.maxZoom = 4;
+      this.camera.pixelStep = 1 / this.dpr;
       const me = this.actors.get(this.meId);
       const c = me ? isoToScreen(me.x + 0.5, me.y + 0.5) : isoToScreen(scene.spawn.x, scene.spawn.y);
-      const z = this.vw < 700 ? 1.5 : 2;
+      const z = this.camera.snap(this.vw < 700 ? 1.5 : 2);
       const [sx, sy] = this.insetShift(z);
       this.camera.jump(c.x + sx, c.y - 20 + sy, z);
     }
@@ -245,9 +250,14 @@ export class WorldView {
     const zx = availW / (right - left);
     const zy = availH / (bottom - top);
     const fit = Math.max(1, Math.min(4, Math.min(zx, zy)));
-    const z = Math.floor(fit * 4) / 4 || fit;
-    this.camera.minZoom = Math.max(1, z * 0.75);
-    this.camera.maxZoom = 5;
+    // Rooms are 64-px-per-tile art: pick a zoom where each art pixel is a whole number of device pixels,
+    // falling back to half steps only when the crisp choice would leave the room far too small.
+    const crisp = 2 / this.dpr;
+    const half = 1 / this.dpr;
+    this.camera.pixelStep = Math.floor(fit / crisp) * crisp >= fit * 0.72 ? crisp : half;
+    const z = this.camera.snap(fit);
+    this.camera.minZoom = this.camera.pixelStep;
+    this.camera.maxZoom = Math.max(z, 5);
     const [sx, sy] = this.insetShift(z);
     const cx = (left + right) / 2 + sx;
     const cy = (top + bottom) / 2 + sy;
@@ -491,7 +501,10 @@ export class WorldView {
     if (usesWheelchair(a.occ.avatar)) return 0;
     if (a.occ.sittingOn && this.scene) {
       const o = this.scene.objects.find((x) => x.id === a.occ.sittingOn);
-      if (o) return SEAT_LIFT[o.sprite] ?? 4;
+      if (o) {
+        const seat = artSeat(o);
+        return seat !== null ? seat - SIT_THIGH : (SEAT_LIFT[o.sprite] ?? 4);
+      }
     }
     for (const b of this.stageBoxes) {
       if (a.x + 0.5 >= b.x0 && a.x + 0.5 < b.x1 && a.y + 0.5 >= b.y0 && a.y + 0.5 < b.y1) return 6;
@@ -612,14 +625,14 @@ export class WorldView {
     this.effects.drawOver(c);
     if (shell) this.drawAmbience(c, sky, s, Math.round(tx), Math.round(ty));
 
-    // X-ray: faint silhouettes where buildings hide people, so nobody gets lost behind a roof.
-    for (const d of order) {
-      if ('obj' in d) continue;
-      const sprite = avatarSprite(d.occ.avatar, d.facing, this.pose(d));
-      c.globalAlpha = d.occ.memberId === this.meId ? 0.5 : 0.28;
-      blit(c, sprite, Math.round(d.sx), Math.round(d.sy));
+    // People can tuck themselves behind furniture — no see-through silhouettes. The one exception: in
+    // town a whole building can swallow you, so your own avatar keeps a faint outline there.
+    const me = outdoor ? order.find((d): d is ActorView => !('obj' in d) && d.occ.memberId === this.meId) : undefined;
+    if (me) {
+      c.globalAlpha = 0.45;
+      blit(c, avatarSprite(this.look(me), me.facing, this.pose(me)), Math.round(me.sx), Math.round(me.sy));
+      c.globalAlpha = 1;
     }
-    c.globalAlpha = 1;
 
     // screen-space overlays
     c.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -678,9 +691,14 @@ export class WorldView {
     return out;
   }
 
+  /** The look to draw: whatever someone picked up in the world goes in their hand. */
+  private look(a: ActorView): AvatarLoadout {
+    return a.occ.carrying ? { ...a.occ.avatar, held: a.occ.carrying } : a.occ.avatar;
+  }
+
   private drawActor(a: ActorView) {
     const c = this.ctx;
-    const sprite = avatarSprite(a.occ.avatar, a.facing, this.pose(a));
+    const sprite = avatarSprite(this.look(a), a.facing, this.pose(a));
     const hovered = this.hover?.kind === 'actor' && this.hover.id === a.occ.memberId;
     const x = Math.round(a.sx);
     const y = Math.round(a.sy);
@@ -1037,11 +1055,20 @@ export class WorldView {
     if (hit?.kind === 'object') this.cb.onObjectActivate(hit.obj);
   };
 
+  private wheelAcc = 0;
+
   private onWheel = (ev: WheelEvent) => {
     ev.preventDefault();
     const { sx, sy } = this.toArt(ev);
-    const f = Math.exp(-ev.deltaY * 0.0015);
-    this.camera.zoomAt(f, sx, sy, this.vw, this.vh);
+    if (!this.camera.pixelStep) {
+      this.camera.zoomAt(Math.exp(-ev.deltaY * 0.0015), sx, sy, this.vw, this.vh);
+      return;
+    }
+    // Pixel-perfect zoom moves in whole steps: collect wheel motion until it amounts to one.
+    this.wheelAcc += ev.deltaY;
+    if (Math.abs(this.wheelAcc) < 90) return;
+    this.camera.zoomAt(this.wheelAcc < 0 ? 2 : 0.5, sx, sy, this.vw, this.vh);
+    this.wheelAcc = 0;
   };
 }
 

@@ -229,6 +229,8 @@ class Game {
         w?.move(m.memberId, m.path, m.startedAt);
         break;
       case 'updated':
+        if (m.memberId === this.meId && m.patch.carrying && m.patch.carrying !== getState().occupants[this.meId]?.carrying)
+          toast(m.patch.carrying === 'coffee' ? '☕ Freshly pulled — enjoy your coffee.' : 'Enjoy!', 'social', undefined, 3000);
         w?.patch(m.memberId, m.patch);
         setState((s) => {
           const cur = s.occupants[m.memberId];
@@ -600,6 +602,11 @@ class Game {
     }
     const kinds = new Set(o.actions?.map((a) => a.kind));
     if (kinds.has('exit')) return this.exitToTown();
+    if (kinds.has('vend')) {
+      // Like the real thing: walk up to the machine, then it's yours to carry around.
+      this.walkTo([o.x, o.y], () => this.rt?.send({ t: 'carry', objectId: o.id }));
+      return;
+    }
     if (kinds.has('sit')) {
       const occ = getState().occupants[this.meId];
       if (occ?.sittingOn === o.id) {
@@ -621,6 +628,11 @@ class Game {
   }
 
   /* ------------------------------------------------------------------ social actions */
+
+  /** Put down whatever you picked up. */
+  putDown() {
+    this.rt?.send({ t: 'carry', objectId: null });
+  }
 
   emote(emote: EmoteId, targetId?: string) {
     const occ = getState().occupants;

@@ -190,13 +190,23 @@ async function sprites(o: { scenes?: string[]; name?: string } = {}) {
 }
 
 /** Avatars: every facing × pose for a few looks, at 3× so faces can be judged. */
-async function avatars(o: { looks?: AvatarLoadout[]; name?: string; zoom?: number } = {}) {
-  const looks = o.looks ?? seed.members.slice(0, 6).map((m) => m.avatar);
-  const facings: Facing[] = ['se', 'sw', 'ne', 'nw'];
-  const poses: Pose[] = ['stand', 'walk1', 'walk2', 'sit', 'wave'];
+interface AvatarOpts {
+  looks?: AvatarLoadout[];
+  name?: string;
+  zoom?: number;
+  from?: number;
+  count?: number;
+  facings?: Facing[];
+  poses?: Pose[];
+}
+
+async function avatars(o: AvatarOpts = {}) {
+  const looks = o.looks ?? seed.members.slice(o.from ?? 0, (o.from ?? 0) + (o.count ?? 6)).map((m) => m.avatar);
+  const facings: Facing[] = o.facings ?? ['se', 'sw', 'ne', 'nw'];
+  const poses: Pose[] = o.poses ?? ['stand', 'walk1', 'walk2', 'sit', 'wave'];
   const Z = o.zoom ?? 3;
-  const cw = 34 * Z;
-  const ch = 56 * Z;
+  const cw = 46 * Z;
+  const ch = 58 * Z;
   const cols = facings.length * poses.length;
   const canvas = freshCanvas(cols * cw, looks.length * ch);
   canvas.width = cols * cw;
@@ -209,7 +219,7 @@ async function avatars(o: { looks?: AvatarLoadout[]; name?: string; zoom?: numbe
     facings.forEach((f, fi) =>
       poses.forEach((p, pi) => {
         const col = fi * poses.length + pi;
-        c.setTransform(Z, 0, 0, Z, col * cw + cw / 2, r * ch + ch - 8 * Z);
+        c.setTransform(Z, 0, 0, Z, col * cw + cw / 2, r * ch + ch - 4 * Z);
         c.fillStyle = 'rgba(40,30,50,0.25)';
         c.beginPath();
         c.ellipse(0, 0, 8, 4, 0, 0, Math.PI * 2);
@@ -233,7 +243,7 @@ const lab = {
     await ready;
     return sprites(o);
   },
-  avatars: async (o?: { looks?: AvatarLoadout[]; name?: string; zoom?: number }) => {
+  avatars: async (o?: AvatarOpts) => {
     await ready;
     return avatars(o);
   },

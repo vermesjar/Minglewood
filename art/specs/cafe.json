@@ -17,7 +17,10 @@
           "h": 32,
           "prompt": "A classic bentwood caf\u00e9 chair in warm honey oak: a curved hoop backrest with a second inner hoop, a round woven cane seat, four slightly splayed legs joined by a bentwood ring.",
           "width": 48,
-          "fill": 0.55
+          "fill": 0.55,
+          "extra": {
+            "seat": 15
+          }
         },
         {
           "key": null,
@@ -44,7 +47,10 @@
           "h": 28,
           "prompt": "A plush mustard-yellow velvet club armchair with rolled arms, deep button tufting on the curved back, a thick seat cushion with piping, short turned walnut legs.",
           "width": 66,
-          "fill": 0.85
+          "fill": 0.85,
+          "extra": {
+            "seat": 12
+          }
         },
         {
           "key": "armchair.mustard",
@@ -54,7 +60,10 @@
           "h": 28,
           "prompt": "The SAME mustard-yellow velvet club armchair (rolled arms, curved tufted back, piping, turned walnut legs).",
           "width": 66,
-          "fill": 0.85
+          "fill": 0.85,
+          "extra": {
+            "seat": 12
+          }
         },
         {
           "key": "lamp",
@@ -92,7 +101,10 @@
           "h": 32,
           "width": 48,
           "fill": 0.55,
-          "prompt": "The bentwood caf\u00e9 chair from the reference, in warm honey oak, seen from behind."
+          "prompt": "The bentwood caf\u00e9 chair from the reference, in warm honey oak, seen from behind.",
+          "extra": {
+            "seat": 15
+          }
         }
       ]
     },
@@ -109,7 +121,10 @@
           "prompt": "A deep sage-green velvet Chesterfield sofa for two: rolled arms, button-tufted back, two plump seat cushions with piping, short turned walnut legs.",
           "width": 100,
           "fill": 0.9,
-          "fit": "diamond"
+          "fit": "diamond",
+          "extra": {
+            "seat": 12
+          }
         },
         {
           "key": "couch.green",
@@ -120,7 +135,10 @@
           "prompt": "The SAME sage-green velvet Chesterfield two-seater sofa (rolled arms, tufted back, turned walnut legs).",
           "width": 100,
           "fill": 0.9,
-          "fit": "diamond"
+          "fit": "diamond",
+          "extra": {
+            "seat": 12
+          }
         },
         {
           "key": "table-low",
@@ -157,7 +175,10 @@
           "h": 26,
           "prompt": "A round bar stool: oak seat with a brass footring and three slim black-iron legs.",
           "width": 36,
-          "fill": 0.4
+          "fill": 0.4,
+          "extra": {
+            "seat": 17
+          }
         }
       ]
     },

@@ -28,7 +28,12 @@ export interface Occupant {
   via: 'live' | 'sim' | 'provider';
   voice?: PresenceState['voice'];
   speaking?: boolean;
+  /** Something picked up in the world (a coffee from the espresso machine). Held in the hand, never saved. */
+  carrying?: string | null;
 }
+
+/** What the world can hand you; each must also be a `held` item the avatar renderer can draw. */
+export const CARRYABLE = ['coffee', 'boba', 'icecream'] as const;
 
 export type DirectoryEntry = Pick<PresenceState, 'memberId' | 'status' | 'note' | 'sceneId' | 'voice' | 'until'> & {
   online: boolean;
@@ -103,6 +108,7 @@ export const clientMsgSchema = z.discriminatedUnion('t', [
   z.object({ t: z.literal('move'), path: z.array(tile).min(1).max(400), startedAt: z.number().finite().optional() }),
   z.object({ t: z.literal('sit'), objectId: idStr }),
   z.object({ t: z.literal('stand') }),
+  z.object({ t: z.literal('carry'), objectId: idStr.nullable() }),
   z.object({
     t: z.literal('status'),
     status: z.enum(['available', 'open', 'focused', 'meeting', 'away']),

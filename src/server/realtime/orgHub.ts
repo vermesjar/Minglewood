@@ -11,13 +11,13 @@
 import { EventEmitter } from 'node:events';
 import { randomUUID } from 'node:crypto';
 import type { Member, OrgEvent, PresenceState, PresenceStatus } from '@shared/domain/types';
-import type { DirectoryEntry, KnockKind, KnockReply, Occupant, ServerMsg } from '@shared/protocol';
+import { CARRYABLE, type DirectoryEntry, type KnockKind, type KnockReply, type Occupant, type ServerMsg } from '@shared/protocol';
 import type { EmoteId } from '@shared/presence';
 import { STATUS_META } from '@shared/presence';
 import { allScenes, buildingForRoom, getScene, TOWN_ID } from '@shared/world';
 import { livedScene } from '@shared/world/lived';
 import type { Facing, SceneDef } from '@shared/world/scene';
-import { isSeat } from '@shared/world/scene';
+import { footprint, isSeat } from '@shared/world/scene';
 import { WalkGrid } from '@shared/world/walkGrid';
 import { findPath, isValidPath, positionAlong, type Tile } from '@shared/world/pathfinding';
 import { sanitizeLoadout } from '@shared/avatar';
@@ -70,6 +70,8 @@ const facingFromDir = (dx: number, dy: number, prev: Facing): Facing => {
 export class OrgHub extends EventEmitter<HubEvents> {
   private clients = new Map<string, HubClient>();
   private actors = new Map<string, Actor>();
+  /** What people are carrying (memberId → held item); live state, cleared when they leave. */
+  private carrying = new Map<string, string>();
   private presence = new Map<string, PresenceState>();
   private grids = new Map<string, WalkGrid>();
   private knocks = new Map<string, Knock>();
@@ -179,6 +181,7 @@ export class OrgHub extends EventEmitter<HubEvents> {
       path: a.path,
       pathStartedAt: a.pathStartedAt,
       sittingOn: a.sittingOn,
+      carrying: this.carrying.get(a.memberId),
       status: p.status,
       note: p.note,
       avatar: m!.avatar,
@@ -222,6 +225,7 @@ export class OrgHub extends EventEmitter<HubEvents> {
   disconnect(client: HubClient) {
     this.clients.delete(client.id);
     if (this.isLive(client.memberId)) return;
+    this.carrying.delete(client.memberId);
     const a = this.actors.get(client.memberId);
     if (a && a.via === 'live') this.removeActor(client.memberId);
     const p = this.presenceOf(client.memberId);
@@ -398,6 +402,31 @@ export class OrgHub extends EventEmitter<HubEvents> {
       memberId,
       patch: { x: a.x, y: a.y, sittingOn: seat.id, facing: a.facing, path: undefined },
     });
+    return true;
+  }
+
+  /**
+   * Pick something up from an object that hands things out (you must be standing at it), or put down
+   * what you're carrying (objectId null). Carrying follows you between rooms until you put it down.
+   */
+  carry(memberId: string, objectId: string | null): boolean {
+    const a = this.actors.get(memberId);
+    if (!a) return false;
+    let item: string | undefined;
+    if (objectId) {
+      const o = this.scene(a.sceneId)?.objects.find((x) => x.id === objectId);
+      const vend = o?.actions?.find((x) => x.kind === 'vend');
+      if (!o || !vend || vend.kind !== 'vend' || !(CARRYABLE as readonly string[]).includes(vend.item)) return false;
+      const pos = this.position(a);
+      const f = footprint(o);
+      const dx = Math.max(f.x0 - pos.x, 0, pos.x - (f.x1 - 1));
+      const dy = Math.max(f.y0 - pos.y, 0, pos.y - (f.y1 - 1));
+      if (Math.hypot(dx, dy) > 1.6) return false;
+      item = vend.item;
+    }
+    if (item) this.carrying.set(memberId, item);
+    else this.carrying.delete(memberId);
+    this.toScene(a.sceneId, { t: 'updated', memberId, patch: { carrying: item ?? null } });
     return true;
   }
 

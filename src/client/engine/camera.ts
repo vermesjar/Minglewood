@@ -10,6 +10,17 @@ export class Camera {
   maxZoom = 4;
   bounds = { l: -1000, t: -1000, r: 1000, b: 1000 };
   lastManual = 0;
+  /**
+   * Zoom levels at which art pixels land on whole device pixels (e.g. 2/dpr for 64-px-per-tile art).
+   * When set, zooming steps between these levels so pixel art never scales unevenly.
+   */
+  pixelStep = 0;
+
+  /** The pixel-perfect zoom nearest to z (rounded down), never below one step. */
+  snap(z: number): number {
+    if (!this.pixelStep) return z;
+    return Math.max(this.pixelStep, Math.floor(z / this.pixelStep + 1e-6) * this.pixelStep);
+  }
 
   toScreen(ax: number, ay: number, vw: number, vh: number): [number, number] {
     return [(ax - this.x) * this.zoom + vw / 2, (ay - this.y) * this.zoom + vh / 2];
@@ -41,7 +52,12 @@ export class Camera {
   }
 
   zoomAt(factor: number, sx: number, sy: number, vw: number, vh: number) {
-    const nz = Math.max(this.minZoom, Math.min(this.maxZoom, this.tzoom * factor));
+    let nz = Math.max(this.minZoom, Math.min(this.maxZoom, this.tzoom * factor));
+    if (this.pixelStep) {
+      const k = this.tzoom / this.pixelStep;
+      nz = (factor > 1 ? Math.floor(k + 1e-6) + 1 : Math.ceil(k - 1e-6) - 1) * this.pixelStep;
+      nz = Math.max(this.snap(this.minZoom) || this.pixelStep, Math.min(this.snap(this.maxZoom), nz));
+    }
     const [wx, wy] = this.toWorld(sx, sy, vw, vh);
     this.tzoom = nz;
     // keep the point under the cursor fixed once zoom settles
@@ -53,6 +69,8 @@ export class Camera {
   update(dt: number, reducedMotion: boolean) {
     const k = reducedMotion ? 1 : 1 - Math.pow(0.0008, dt);
     this.zoom += (this.tzoom - this.zoom) * k;
+    // Land exactly on the target so pixel art settles on whole pixels.
+    if (Math.abs(this.tzoom - this.zoom) < 0.003) this.zoom = this.tzoom;
     this.x += (this.tx - this.x) * k;
     this.y += (this.ty - this.y) * k;
     this.clamp();

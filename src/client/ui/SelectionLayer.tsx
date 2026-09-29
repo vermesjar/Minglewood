@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { STATUS_META } from '@shared/presence';
 import { game } from '../app/game';
 import { setState, useStore } from '../app/store';
@@ -17,11 +18,17 @@ function close() {
   game.world?.setSelected(null);
 }
 
-function ProfileCard({ id, x, y }: { id: string; x: number; y: number }) {
+/**
+ * The person you clicked, docked bottom-right like an info stand: who they are and what you can do at a
+ * glance, with the fuller profile one click away. It stays out of the way of the world.
+ */
+function ProfileCard({ id }: { id: string; x: number; y: number }) {
   const m = useStore((s) => s.membersById.get(id));
   const boot = useStore((s) => s.boot);
   const entry = useStore((s) => s.directory[id]);
   const occ = useStore((s) => s.occupants[id]);
+  const interior = useStore((s) => !!s.boot?.rooms.some((r) => r.id === s.sceneId));
+  const [more, setMore] = useState(false);
   if (!m || !boot) return null;
   const me = boot.me;
   const isMe = id === me.id;
@@ -35,19 +42,22 @@ function ProfileCard({ id, x, y }: { id: string; x: number; y: number }) {
   const sameRoom = !!occ;
   const first = m.displayName.split(' ')[0];
   const reachable = status !== 'offline';
+  const where = room ? `${room.emoji} ${room.name}` : entry?.sceneId === 'town' ? 'Out in town' : null;
 
   return (
-    <Popover x={x} y={y} onClose={close} label={`${m.displayName} profile`}>
+    <aside className={`infostand card ${interior ? 'beside-panel' : ''}`} role="dialog" aria-label={`${m.displayName} profile`}>
+      <button className="close-x" onClick={close} aria-label="Close">
+        ×
+      </button>
       <div className="profile">
-        <div className="profile-head">
-          <div className="profile-avatar" style={{ background: `${dept?.color ?? '#ccc'}33` }}>
+        <div className="infostand-head">
+          <div className="infostand-avatar" style={{ background: `${dept?.color ?? '#ccc'}33` }}>
             <AvatarCanvas loadout={m.avatar} scale={2} />
           </div>
-          <div>
+          <div className="infostand-who">
             <h3>
               {m.displayName} {isMe && <span className="tag">you</span>}
             </h3>
-            {m.pronouns && <p className="muted small">{m.pronouns}</p>}
             <p className="title">{m.title}</p>
             <p className="team-line">
               <span className="dept-chip" style={{ background: dept?.color }}>
@@ -66,72 +76,79 @@ function ProfileCard({ id, x, y }: { id: string; x: number; y: number }) {
           {note && <span className="muted"> — “{note}”</span>}
           {entry?.until && <span className="muted"> · until {formatTime(entry.until)}</span>}
         </p>
-        <ul className="facts">
-          {room ? (
-            <li>
-              📍 In {room.emoji} {room.name}
-            </li>
-          ) : entry?.sceneId === 'town' ? (
-            <li>📍 Out in town</li>
-          ) : null}
-          <li>
-            🕒 {localTime(m.timezone)} for {first} · {m.location}
-          </li>
-          <li>🌱 {tenureLabel(m.startDate)}</li>
-          {manager && <li>🤝 Works with {manager.displayName.split(' ')[0]}</li>}
-        </ul>
-        {m.bio && <p className="bio">{m.bio}</p>}
-        {m.askMeAbout.length > 0 && (
-          <div className="chip-group">
-            <span className="chip-label">Ask me about</span>
-            <div className="chips tight">
-              {m.askMeAbout.map((a) => (
-                <span key={a} className="chip static">
-                  {a}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-        {m.interests.length > 0 && (
-          <div className="chip-group">
-            <span className="chip-label">Into</span>
-            <div className="chips tight">
-              {m.interests.map((a) => (
-                <span key={a} className={`chip static ${shared.includes(a) && !isMe ? 'shared' : ''}`}>
-                  {a}
-                  {shared.includes(a) && !isMe && ' ✨'}
-                </span>
-              ))}
-            </div>
-          </div>
+        <p className="infostand-meta muted small">
+          {where && <span>📍 {where}</span>}
+          <span>
+            🕒 {localTime(m.timezone)} · {m.location}
+          </span>
+        </p>
+        {!isMe && shared.length > 0 && <p className="shared-line">✨ You’re both into {shared.join(', ')}</p>}
+        {more && (
+          <>
+            {m.pronouns && <p className="muted small">{m.pronouns}</p>}
+            <ul className="facts">
+              <li>🌱 {tenureLabel(m.startDate)}</li>
+              {manager && <li>🤝 Works with {manager.displayName.split(' ')[0]}</li>}
+            </ul>
+            {m.bio && <p className="bio">{m.bio}</p>}
+            {m.askMeAbout.length > 0 && (
+              <div className="chip-group">
+                <span className="chip-label">Ask me about</span>
+                <div className="chips tight">
+                  {m.askMeAbout.map((a) => (
+                    <span key={a} className="chip static">
+                      {a}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {m.interests.length > 0 && (
+              <div className="chip-group">
+                <span className="chip-label">Into</span>
+                <div className="chips tight">
+                  {m.interests.map((a) => (
+                    <span key={a} className={`chip static ${shared.includes(a) && !isMe ? 'shared' : ''}`}>
+                      {a}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
         )}
         {!isMe ? (
-          <div className="profile-actions">
+          <div className="profile-actions compact">
             {sameRoom && (
-              <button className="btn" onClick={() => game.emote('wave', id)}>
+              <button className="btn small" onClick={() => game.emote('wave', id)}>
                 👋 Wave
               </button>
             )}
-            <button className="btn primary" disabled={!reachable} onClick={() => game.knock(id, 'chat')} title={STATUS_META[status].interruptible ? 'Ask if they have a minute' : 'They’ll see it when they’re free'}>
+            <button className="btn small primary" disabled={!reachable} onClick={() => game.knock(id, 'chat')} title={STATUS_META[status].interruptible ? 'Ask if they have a minute' : 'They’ll see it when they’re free'}>
               🚪 Knock
             </button>
-            <button className="btn" disabled={!reachable} onClick={() => game.knock(id, 'coffee')}>
+            <button className="btn small" disabled={!reachable} onClick={() => game.knock(id, 'coffee')}>
               ☕ Coffee?
             </button>
             {!sameRoom && entry?.sceneId && (
-              <button className="btn" onClick={() => game.goToMember(id)}>
+              <button className="btn small" onClick={() => game.goToMember(id)}>
                 📍 Go to {first}
               </button>
             )}
+            <button className="btn small ghost" onClick={() => setMore((v) => !v)} aria-expanded={more}>
+              {more ? 'Less' : 'More'}
+            </button>
           </div>
         ) : (
-          <div className="profile-actions">
-            <button className="btn" onClick={() => setState({ panel: 'avatar', selection: null })}>
+          <div className="profile-actions compact">
+            <button className="btn small" onClick={() => setState({ panel: 'avatar', selection: null })}>
               👕 Wardrobe
             </button>
-            <button className="btn" onClick={() => setState({ panel: 'profile', selection: null })}>
-              📝 Edit profile
+            <button className="btn small" onClick={() => setState({ panel: 'profile', selection: null })}>
+              📝 Profile
+            </button>
+            <button className="btn small ghost" onClick={() => setMore((v) => !v)} aria-expanded={more}>
+              {more ? 'Less' : 'More'}
             </button>
           </div>
         )}
@@ -139,7 +156,7 @@ function ProfileCard({ id, x, y }: { id: string; x: number; y: number }) {
           <p className="fineprint">{first} is {STATUS_META[status].label.toLowerCase()} — knocks are held until they’re free.</p>
         )}
       </div>
-    </Popover>
+    </aside>
   );
 }
 

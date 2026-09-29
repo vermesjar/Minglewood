@@ -27,6 +27,8 @@ interface ArtEntry {
   wall?: { v: [number, number]; margin?: number };
   /** A light source in the sprite (image px): lamps glow here. */
   light?: { x: number; y: number; r?: number };
+  /** Seat surface height above the floor, in art px (chairs, sofas, stools). */
+  seat?: number;
 }
 
 interface Manifest {
@@ -83,6 +85,11 @@ export function wallArt(o: SceneObject): { img: HTMLImageElement; v: [number, nu
   if (!e?.wall || !e.file) return null;
   const img = images.get(e.file);
   return img ? { img, v: e.wall.v, margin: e.wall.margin } : null;
+}
+
+/** How high this seat's surface is, in art px, if its art says so. */
+export function artSeat(o: SceneObject): number | null {
+  return entryFor(o)?.seat ?? null;
 }
 
 /** Where a lamp's light comes from, relative to the sprite's anchor, in art px. */

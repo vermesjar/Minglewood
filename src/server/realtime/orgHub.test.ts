@@ -97,6 +97,24 @@ describe('OrgHub', () => {
     expect(hub.move(a.id, line(3), Date.now() - 900)).toBe(false);
   });
 
+  it('hands out a coffee only at the machine, and everyone sees it until it is put down', () => {
+    const a = newMember(store, 'Ada');
+    const b = newMember(store, 'Bo');
+    const cb = client(b.id);
+    hub.connect(client(a.id));
+    hub.connect(cb);
+    const machine = getScene('cafe')!.objects.find((o) => o.sprite === 'espresso')!;
+    hub.enter(a.id, 'cafe', 'live', [9, 8]);
+    hub.enter(b.id, 'cafe', 'live');
+    expect(hub.carry(a.id, machine.id)).toBe(false); // across the room
+    hub.enter(a.id, 'cafe', 'live', [machine.x, machine.y + 1]);
+    expect(hub.carry(a.id, machine.id)).toBe(true);
+    expect(cb.msgs.some((m) => m.t === 'updated' && m.memberId === a.id && m.patch.carrying === 'coffee')).toBe(true);
+    expect(hub.carry(a.id, null)).toBe(true);
+    const last = cb.msgs.filter((m) => m.t === 'updated' && m.memberId === a.id).pop();
+    expect(last && last.t === 'updated' && last.patch.carrying).toBeNull();
+  });
+
   it('holds knocks for focused people and delivers them when they are free', () => {
     const a = newMember(store, 'Ada');
     const b = newMember(store, 'Bo');
