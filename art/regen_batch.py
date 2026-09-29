@@ -9,7 +9,7 @@ import concurrent.futures as cf
 import subprocess
 import sys
 
-COLOR = {"hair": "in a warm medium chestnut brown", "top": "in a solid medium teal colour"}
+COLOR = {"hair": "in a warm medium chestnut brown", "top": "in a solid medium teal colour"}  # hats say their own colour
 
 # job → (prompt, extra flags). Back views describe what is actually visible from behind, because the model
 # otherwise copies front details (buttons, pockets, lapels) onto the back.
@@ -38,6 +38,17 @@ JOBS: dict[str, tuple[str, list[str]]] = {
                         "little taller than it; the hair frames the face and ends at the jaw.", []),
     "hair-afro-back": ("Seen from BEHIND: a rounded afro, soft and textured, about one and a half times as wide as the "
                        "head, covering the whole back of the head down to the nape.", []),
+    "top-apron-front": ("A café barista's bib apron over a plain tee: the apron covers the chest from just below the "
+                        "neckline down to the waist, with a neck strap, a front pocket with a pen, and ties at the "
+                        "sides; the tee's short sleeves and neckline show around it. The tee is plain light cream.", []),
+    "top-apron-back": ("Seen from BEHIND: a plain light-cream tee with a café apron's straps crossing over the back "
+                       "and the apron ties knotted in a small bow at the waist.", []),
+    "hat-cowboy-front": ("The head wears a cowboy hat: a pinched crown with a band and a wide brim curling up at the "
+                         "sides, sitting level on the head; the brim is clearly wider than the head. Solid medium teal.", []),
+    "hat-party-back": ("Seen from BEHIND: a cone party hat on top of the head, the cone pointing straight up, with "
+                       "spiral stripes and a pom-pom on the tip. All in solid medium teal with lighter teal stripes.", []),
+    "hat-beanie-front": ("The head wears a slouchy ribbed knit beanie with a folded cuff and a round pom-pom on top; "
+                         "the beanie AND the pom-pom are both solid medium teal.", []),
     "top-hoodie-back": ("Seen from BEHIND: the back of a pullover hoodie: the empty hood lies flat between the "
                         "shoulder blades, a plain back, a ribbed hem. No pocket and no drawstrings on the back.", []),
     "top-shirt-back": ("Seen from BEHIND: the back of a button-up shirt: the collar folded round the back of the neck, "
@@ -63,7 +74,8 @@ def split(job: str) -> tuple[str, str, str]:
 def run(job: str) -> str:
     kind, name, view = split(job)
     prompt, flags = JOBS[job]
-    prompt = f"{prompt} The {'hair' if kind == 'hair' else 'garment'} is {COLOR[kind]}."
+    if kind in COLOR:
+        prompt = f"{prompt} The {'hair' if kind == 'hair' else 'garment'} is {COLOR[kind]}."
     cmd = [sys.executable, "charkit.py", kind, name, "--view", view, "--prompt", prompt, "--regen", "--no-publish", *flags]
     r = subprocess.run(cmd, capture_output=True, text=True)
     return f"{job}: {'ok' if r.returncode == 0 else 'FAILED ' + r.stderr.strip()[-200:]}"

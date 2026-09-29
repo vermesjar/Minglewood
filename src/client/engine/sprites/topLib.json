@@ -1,4 +1,60 @@
 {
+ "apron": {
+  "front": {
+   "x": 34,
+   "y": 57,
+   "rows": [
+    "..ll#l#lhll#####llsll",
+    "ll###l#lh##lllll#ll##ll",
+    "lh#h#l#lhhh#ll#l#llhh#ll",
+    "lhhhhl#lhhhhhh#h#ll#hhll",
+    "lhhhhl#llllllllllll##hll",
+    "hhhh#dls#########ssl#hhl",
+    "hhhh#dd########l#ssl#hhl",
+    "hhhhlds#######dhd#sl###l",
+    "##h#lds#sd####l#ls#l#h#l",
+    "lll#lls#lllllll#lssl#lll",
+    "lll#ll##ll####lllssl#lll",
+    "l##ll###ll######lssdlll",
+    "l##ls###ll######lsssl#l",
+    "l##ls###ll######lsssl#l",
+    "l##l####ls#####slsssl#l",
+    "l##ls####lllllll#sssl#l",
+    "lllsss#########ss#sslll",
+    "l##ls#########ss#sssl#l",
+    "l#sl#########ss##sssl#l",
+    "l#ll########ss###sssls#",
+    "lllllllllllllllllllllll"
+   ]
+  },
+  "back": {
+   "x": 34,
+   "y": 57,
+   "rows": [
+    "...ldllllllllllllddd",
+    "lllddl#l#l######ldddlll",
+    "h#ddd############ddd##ll",
+    "hhhdddd########hddddh##l",
+    "hhh#ddddh##h###ddddhhh#l",
+    "hhhhdddd####h#dddd#hhh#l",
+    "#hh##ddddhh#h#dddd##h#hl",
+    "####h#ddd#h##dddd##h##hl",
+    "####hhdddd##dddd#h#h###l",
+    "####hh##ddddddd##hhh###l",
+    "####hhhh#dddddh##hh####l",
+    "###h##hh#dddd##h##h####l",
+    "#####h##dddddddh###h###l",
+    "####hh#ddddddddhh#hh###l",
+    "####h#ldddd#dddd#hh####l",
+    "dddddddddddddddddddddddl",
+    "dddddddddddddddddddddddl",
+    "dddddddddddddddddddddddl",
+    "dddddddddddddddddddddddl",
+    "#####h#ddddddddd####h##l",
+    "slllllldddddddddllllllll"
+   ]
+  }
+ },
  "blazer": {
   "front": {
    "x": 34,

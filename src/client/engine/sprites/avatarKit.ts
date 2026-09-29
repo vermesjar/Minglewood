@@ -9,7 +9,7 @@
 import type { AvatarLoadout } from '@shared/domain/types';
 import { ITEM_BY_ID, normalizeLoadout, type FullLoadout } from '@shared/avatar';
 import { frameFor, type Frame, type Pose, type View } from './avatarFrame';
-import { GOLD, H, LINE, M, PINK, Pix, W, WHITE, hx, lightOf, lineOf, lum, mix, outline, paint, shadowOf, type RGB } from './pixkit';
+import { GOLD, H, LINE, M, PINK, PLUM, Pix, W, WHITE, hx, lightOf, lineOf, lum, mix, outline, paint, shadowOf, type RGB } from './pixkit';
 import TOP_LIB from './topLib.json';
 import HAT_LIB from './hatLib.json';
 import { HAIR, HAIR_ORIGIN } from './avatarHair';
@@ -447,7 +447,7 @@ function drawLegs(P: Pix, F: Frame, L: FullLoadout) {
   const skin = hx(L.skin);
   const pants = hx(L.bottomColor);
   const b = L.bottom.replace('bottom.', '');
-  const skirt = b === 'skirt' || b === 'longskirt' || !!ITEM_BY_ID.get(L.top)?.fullLength;
+  const skirt = b === 'skirt' || b === 'longskirt' || L.top === 'top.dress';
   const r = b === 'leggings' ? 2.6 : b === 'cargo' || b === 'joggers' ? 3.4 : 3.1;
   for (const [leg, far] of [
     [F.legFar, true],
@@ -460,9 +460,50 @@ function drawLegs(P: Pix, F: Frame, L: FullLoadout) {
     if (b === 'shorts') pm.band(0, Math.round(leg.a[1] + (leg.m[1] - leg.a[1]) * 0.8));
     else pm.capsule(leg.m[0], leg.m[1], leg.b[0], leg.b[1] - (b === 'joggers' ? 1 : 0), r - 0.3);
     paint(P, pm, pants, { shade });
+    // each style's signature, readable at 1:1
+    const inside = (x: number, y: number) => pm.has(x, y) && pm.has(x - 1, y) && pm.has(x + 1, y) && pm.has(x, y - 1) && pm.has(x, y + 1);
+    const base = far ? mix(pants, PLUM, 0.35 * 0.3) : pants;
+    const along = (fn: (x: number, y: number, t: number) => void) => {
+      // walk the leg from hip to ankle, t = 0..1
+      const [ax, ay] = leg.a;
+      const [mx, my] = leg.m;
+      const [bx, by] = leg.b;
+      for (let y = Math.round(ay); y <= Math.round(by); y++) {
+        const t = (y - ay) / Math.max(1, by - ay);
+        const x = y <= my ? ax + ((mx - ax) * (y - ay)) / Math.max(1, my - ay) : mx + ((bx - mx) * (y - my)) / Math.max(1, by - my);
+        fn(Math.round(x), y, t);
+      }
+    };
     if (b === 'jeans') {
+      // a lighter wash down the lit side of the thigh, and a turned-up cuff
+      along((x, y, t) => {
+        if (t > 0.15 && t < 0.55 && inside(x - 1, y)) P.set(x - 1, y, lightOf(base));
+      });
       const cy = Math.round(leg.b[1]) - 2;
       for (let x = Math.round(leg.b[0]) - 3; x <= leg.b[0] + 3; x++) if (pm.has(x, cy) && pm.has(x - 1, cy) && pm.has(x + 1, cy)) P.set(x, cy, lightOf(pants));
+    }
+    if (b === 'chinos') {
+      // a pressed crease down the front
+      along((x, y, t) => {
+        if (t > 0.1 && t < 0.92 && inside(x, y)) P.set(x, y, lightOf(base));
+      });
+    }
+    if (b === 'joggers') {
+      // gathered elastic cuffs
+      const cy = Math.round(leg.b[1]) - 1;
+      for (let y = cy - 1; y <= cy; y++)
+        for (let x = Math.round(leg.b[0]) - 4; x <= leg.b[0] + 4; x++) if (pm.has(x, y)) P.set(x, y, y === cy - 1 ? shadowOf(base) : mix(base, LINE, 0.35));
+    }
+    if (b === 'leggings') {
+      // a soft sheen on the lit side
+      along((x, y, t) => {
+        if (t > 0.2 && t < 0.8 && inside(x - 1, y)) P.set(x - 1, y, mix(base, [255, 255, 255], 0.18));
+      });
+    }
+    if (b === 'shorts') {
+      // a turned hem
+      const hy = Math.round(leg.a[1] + (leg.m[1] - leg.a[1]) * 0.8) - 1;
+      for (let x = Math.round(leg.a[0]) - 4; x <= leg.a[0] + 4; x++) if (pm.has(x, hy) && pm.has(x - 1, hy) && pm.has(x + 1, hy)) P.set(x, hy, lightOf(base));
     }
     if (b === 'cargo' && !far) paint(P, M().rrect(leg.m[0] - 3, leg.m[1] - 5, leg.m[0] + 1, leg.m[1] - 1, 1), shadowOf(pants), { flat: true });
   }
@@ -470,19 +511,71 @@ function drawLegs(P: Pix, F: Frame, L: FullLoadout) {
     const hips = M().rrect(F.hx - 9, F.waistY - 1, F.hx + 10, F.hipY + 3, 2);
     paint(P, hips, pants);
     for (let x = F.hx - 8; x < F.hx + 9; x++) if (hips.has(x, F.waistY + 1)) P.set(x, F.waistY + 1, shadowOf(pants));
-  } else {
-    const long = b === 'longskirt';
-    const full = !!ITEM_BY_ID.get(L.top)?.fullLength;
-    const col = full ? topColorOf(L) : pants;
-    const hem = F.sitting ? F.hipY + (long ? 10 : 6) : long ? 98 : 90;
-    const sk = M().poly([
-      [F.hx - 9, F.waistY - 1],
-      [F.hx + 10, F.waistY - 1],
-      [F.hx + (F.sitting ? 16 : 13), hem],
-      [F.hx - (F.sitting ? 9 : 12), hem],
-    ]);
-    paint(P, sk, (x) => (x % 4 === 0 ? shadowOf(col) : col));
+    // joggers tie at the front
+    if (b === 'joggers' && F.view === 'front') P.stamp(F.collar[0] - 1, F.waistY + 2, ['w.w', 'w.w'], { w: lightOf(lightOf(pants)) });
   }
+  if (skirt || isCoat(L)) drawLowerGarment(P, F, L);
+}
+
+const isCoat = (L: FullLoadout) => L.top === 'top.raincoat' || L.top === 'top.labcoat';
+
+/**
+ * Skirts, dresses and coats below the waist, built on the frame: the hem follows the legs (it flares with a
+ * stride, drapes over the lap when sitting). Dresses and skirts fall in soft fanned folds; coats open at the
+ * front over the trousers, with pocket flaps, and show a vent from behind.
+ */
+function drawLowerGarment(P: Pix, F: Frame, L: FullLoadout) {
+  const b = L.bottom.replace('bottom.', '');
+  const coat = isCoat(L);
+  const dress = L.top === 'top.dress';
+  const col = coat || dress ? topColorOf(L) : hx(L.bottomColor);
+  const long = b === 'longskirt' && !coat && !dress;
+  const top = F.waistY - 1;
+  let poly: Array<[number, number]>;
+  let hem: number;
+  if (F.sitting) {
+    hem = F.hipY + (long ? 10 : coat ? 8 : 6);
+    poly = [
+      [F.hx - 9, top],
+      [F.hx + 10, top],
+      [F.hx + 16, hem],
+      [F.hx - 9, hem],
+    ];
+  } else {
+    hem = long ? 98 : coat ? 94 : dress ? 91 : 90;
+    // the legs' x at the hem, so a stride flares the hem
+    const legX = (l: Frame['legNear']) => {
+      const [ax, ay] = l.m;
+      const [bx, by] = l.b;
+      const t = Math.max(0, Math.min(1, (hem - ay) / Math.max(1, by - ay)));
+      return ax + (bx - ax) * t;
+    };
+    const xs = [legX(F.legNear), legX(F.legFar)];
+    poly = [
+      [F.hx - 9, top],
+      [F.hx + 10, top],
+      [Math.max(...xs) + 8, hem],
+      [Math.min(...xs) - 7, hem],
+    ];
+  }
+  const shape = M().poly(poly);
+  const front = F.view === 'front';
+  const split = F.collar[0];
+  if (coat && front && !F.sitting) shape.cut(M().rect(split - 1, F.waistY + 1, split + 1, hem + 1));
+  const shade = shadowOf(col);
+  paint(P, shape, (x, y) => {
+    if (coat) {
+      // the coat's edges along the opening, pocket flaps, and the back vent
+      if (front && !F.sitting && (x === split - 2 || x === split + 1) && y > F.waistY) return shade;
+      if (front && y === F.waistY + 5 && ((x >= F.hx - 7 && x <= F.hx - 4) || (x >= F.hx + 5 && x <= F.hx + 8))) return shade;
+      if (!front && x === split && y > hem - 7) return shade;
+      return col;
+    }
+    // soft folds fanning out from the waist
+    const t = (x - F.hx) / (y - top + 7);
+    const f = t * 3.2 - Math.floor(t * 3.2);
+    return f < 0.16 && y > top + 3 ? shade : col;
+  });
 }
 
 function drawShoes(P: Pix, F: Frame, L: FullLoadout) {
@@ -542,6 +635,14 @@ function drawTorso(P: Pix, F: Frame, L: FullLoadout) {
     const m = placed(map, [TORSO_ORIGIN.x, TORSO_ORIGIN.y + dy], [0, dy]);
     paintMap(P, m.x, m.y, m.rows, c, tint);
     drawPrint(P, F, L);
+    if (L.top === 'top.raincoat') {
+      // a belt at the waist with a brass buckle
+      const torso = M().poly(F.torso);
+      for (let y = F.waistY - 2; y < F.waistY; y++)
+        for (let x = F.hx - 11; x <= F.hx + 12; x++) if (torso.has(x, y)) P.set(x, y, y === F.waistY - 2 ? shadowOf(c) : mix(c, LINE, 0.45));
+      if (F.view === 'front') P.stamp(F.collar[0] - 1, F.waistY - 2, ['gg', 'gg'], { g: GOLD });
+    }
+    if (L.top === 'top.labcoat' && F.view === 'front') P.stamp(F.collar[0] + 4, F.shoulderY + 5, ['b', 'b'], { b: [63, 111, 191] });
     return;
   }
   // Not generated yet: a simple garment on the torso so every look still renders.

@@ -312,3 +312,26 @@ console.log(`${people.length} characters, ${total} issue(s) → ${OUT}/`);
   sheet.save('art/review/assets/faces.png');
   console.log('faces → art/review/assets/faces.png');
 }
+
+/* ------------------------------------------------------------------ trousers close-up */
+{
+  const styles = ['bottom.jeans', 'bottom.chinos', 'bottom.joggers', 'bottom.cargo', 'bottom.leggings', 'bottom.shorts'];
+  const colours = ['#3b5b8a', '#c9b79a', '#3a3a46', '#6b7a4a', '#1b1b22', '#3f8fd8'];
+  const z = 5;
+  const LC = [26, 70, 40, 38];
+  const frames = [
+    ['se', 'stand'],
+    ['se', 'walk1'],
+    ['ne', 'stand'],
+  ] as const;
+  const cw = LC[2] * z + 6;
+  const ch = LC[3] * z + 6;
+  const sheet = new Sheet(cw * styles.length, ch * frames.length, BG);
+  styles.forEach((b, col) =>
+    frames.forEach(([f, p], row) => {
+      const look = { bottom: b, bottomColor: colours[col], top: 'top.tee', topColor: '#f4efe6', shoes: 'shoes.sneakers', shoesColor: '#f4efe6' } as AvatarLoadout;
+      sheet.paste(renderAvatarLayers(look, f, p).px, col * cw + 3, row * ch + 3, z, LC);
+    }),
+  );
+  sheet.save('art/review/assets/trousers.png');
+}

@@ -234,6 +234,7 @@ export const AVATAR_ITEMS: AvatarItem[] = [
   I('top', 'overalls', 'Overalls'),
   I('top', 'blazer', 'Blazer'),
   I('top', 'kimono', 'Wrap top'),
+  I('top', 'apron', 'Café apron'),
   I('top', 'dress', 'Dress', { fullLength: true }),
   I('top', 'raincoat', 'Raincoat', { fullLength: true }),
   I('top', 'labcoat', 'Lab coat', { fullLength: true }),
