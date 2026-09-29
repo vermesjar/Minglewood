@@ -2,7 +2,7 @@
   "name": "minglewood",
   "version": "0.1.0",
   "private": true,
-  "description": "Minglewood — a spatial social layer for remote companies.",
+  "description": "Minglewood \u2014 a spatial social layer for remote companies.",
   "type": "module",
   "engines": {
     "node": ">=20"
@@ -19,7 +19,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "check": "npm run typecheck && npm run lint && npm run test",
-    "reset-data": "tsx src/server/scripts/resetData.ts"
+    "reset-data": "tsx src/server/scripts/resetData.ts",
+    "avatars:review": "tsx --tsconfig tsconfig.json scripts/avatar-review.ts",
+    "avatars:sweep": "tsx --tsconfig tsconfig.json scripts/avatar-sweep.ts",
+    "furniture:review": "tsx --tsconfig tsconfig.json scripts/furniture-review.ts"
   },
   "dependencies": {
     "@discord/embedded-app-sdk": "^2.5.0",
