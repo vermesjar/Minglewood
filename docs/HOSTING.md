@@ -16,7 +16,8 @@ Minglewood runs as two pieces:
                  └────────────────────────────────────────────────────────────────────────────┘
 ```
 
-- **Minglewood Cloud** is the control plane, built in Lovable. It owns *installs* (which Discord
+- **Minglewood Cloud** is the control plane, built in Lovable and live at
+  **https://minglewood-cloud.lovable.app** (operator page: `/setup`). It owns *installs* (which Discord
   servers added Minglewood), slash commands, and durable per-company world state in Lovable Cloud
   Postgres. Lovable project: “Minglewood Cloud”.
 - **The game server** (this repo) renders every company's world, runs realtime presence over
@@ -52,11 +53,11 @@ Only the operator can do these steps (they involve creating accounts and handlin
 ### 1. Create the Discord application
 <https://discord.com/developers/applications> → **New Application** (“Minglewood”).
 - **OAuth2**: copy *Client ID* and *Client Secret*. Add two redirects:
-  - `https://<cloud-site>/api/public/discord-install-callback` (installs)
+  - `https://minglewood-cloud.lovable.app/api/public/discord-install-callback` (installs)
   - `https://<game-server>/api/auth/discord/callback` (employee sign-in)
 - **Bot**: *Reset Token* → copy it. No privileged intents are needed.
 - **General Information**: copy the *Public Key*. Set **Interactions Endpoint URL** to
-  `https://<cloud-site>/api/public/discord-interactions` (Discord pings it to verify — the endpoint
+  `https://minglewood-cloud.lovable.app/api/public/discord-interactions` (Discord pings it to verify — the endpoint
   must be deployed with the public key configured first).
 - **Activities** (optional, for in-Discord mode): enable Activities, and under **URL Mappings**
   map `/` → `<game-server host>`.
@@ -65,14 +66,14 @@ Only the operator can do these steps (they involve creating accounts and handlin
 `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`, `DISCORD_PUBLIC_KEY`, `DISCORD_BOT_TOKEN`,
 `MINGLEWOOD_SERVER_KEY` (a long random string — generate with
 `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`),
-`GAME_SERVER_URL`, `SITE_URL`. Publish the project, open `/setup` to confirm every secret shows
+`GAME_SERVER_URL`, `SITE_URL` (= `https://minglewood-cloud.lovable.app`). Re-publish the project, open `/setup` to confirm every secret shows
 as configured, then click **Register slash commands**.
 
 ### 3. Deploy the game server (Render)
 Push this repo to GitHub → Render → **New → Blueprint** → pick the repo (uses `render.yaml`).
 Fill in: `PUBLIC_URL`, `DISCORD_REDIRECT_URI`, `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`,
-`DISCORD_BOT_TOKEN`, `CONTROL_PLANE_URL` (= `https://<cloud-site>/api/public`),
-`MINGLEWOOD_SERVER_KEY` (same value as in the cloud), `INSTALL_URL` (= `https://<cloud-site>`).
+`DISCORD_BOT_TOKEN`, `CONTROL_PLANE_URL` (= `https://minglewood-cloud.lovable.app/api/public`),
+`MINGLEWOOD_SERVER_KEY` (same value as in the cloud), `INSTALL_URL` (= `https://minglewood-cloud.lovable.app`).
 On boot the log says `cloud: connected`.
 
 ### 4. Try it

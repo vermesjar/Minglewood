@@ -78,6 +78,14 @@ decorations (`shared/world/decor.ts`). The same composition feeds the server's w
 client's renderer, and `placementProblem` (shared) guarantees decorations never block the door or
 a seat — validated on the server, previewed on the client.
 
+### Multi-tenant hosting (Minglewood Cloud)
+Installs and durable state live in a control plane built on Lovable Cloud (Postgres + server
+routes): `organizations`, `org_state`, `install_events`. The game server syncs tenants
+(`cloud/tenantSync.ts`), creates a world per company from `seed/tenant.ts`, persists each company's
+world as one document through `cloud/cloudPersistence.ts`, and resolves Discord users to their
+company from their guild list. Realtime stays on the game server because it needs long-lived
+WebSockets and a gateway connection. Details: [docs/HOSTING.md](docs/HOSTING.md).
+
 ### Calendar-derived presence
 `shared/calendar.ts` defines `CalendarProvider` and `presenceFromCalendar`. The demo uses a
 deterministic mock; Google/Outlook providers implement the same interface. Only busy blocks are

@@ -54,6 +54,13 @@ Requirements: Node 20+ (tested on Node 21). Port 5173 (web) and 8787 (API/realti
 | `npm run check` | All of the above |
 | `npm run reset-data` | Delete local persisted data (guest accounts, bindings, audit) |
 
+## Hosting for many companies
+
+Minglewood Cloud (built in Lovable) handles **Add to Discord**, installs, slash commands and per-company
+world state; this repo is the realtime game server (Docker/Render). Every Discord server that adds
+Minglewood gets its own world. See [docs/HOSTING.md](docs/HOSTING.md) for the architecture and the
+go-live checklist.
+
 ## Discord
 
 Minglewood runs fully in demo mode. To connect a real Discord server (OAuth sign-in, membership
