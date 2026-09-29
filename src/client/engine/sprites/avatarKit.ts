@@ -1,0 +1,962 @@
+/**
+ * Avatar kit v2: bases and parts built on the character frame (avatarFrame.ts).
+ *
+ * A BASE is a complete, hand-shaped body — head silhouette, face, skin, limbs — for one body type. PARTS
+ * (hair, clothes, glasses, hats, held things) are layered on top and read every position from the frame's
+ * anchors, never from their own numbers. Heads are authored as explicit pixel maps; the face is hand-placed
+ * pixels at the frame's eye/nose/mouth anchors.
+ */
+import type { AvatarLoadout } from '@shared/domain/types';
+import { ITEM_BY_ID, normalizeLoadout, type FullLoadout } from '@shared/avatar';
+import { frameFor, type Frame, type Pose, type View } from './avatarFrame';
+import { GOLD, H, LINE, M, PINK, Pix, W, WHITE, hx, lightOf, lineOf, lum, mix, outline, paint, shadowOf, type RGB } from './pixkit';
+import TOP_LIB from './topLib.json';
+import HAT_LIB from './hatLib.json';
+import { HAIR, HAIR_ORIGIN } from './avatarHair';
+import HAIR_LIB from './hairLib.json';
+import FACE_LIB from './faceLib.json';
+
+/**
+ * Paint a hand-drawn tone map at (x0, y0): '#' base, 'h' light, 's' shade, 'd' deep, '.' empty, tinted from
+ * `base`; every pixel on the map's boundary becomes the line colour, so pieces are outlined like the rest.
+ */
+function paintMap(P: Pix, x0: number, y0: number, rows: string[], base: RGB, tint?: (x: number, y: number, c: RGB) => RGB) {
+  const at = (r: number, c: number) => (rows[r]?.[c] ?? '.') !== '.';
+  const tone: Record<string, RGB> = { '#': base, h: lightOf(base), s: shadowOf(base), d: mix(base, LINE, 0.55), l: mix(base, LINE, 0.8) };
+  rows.forEach((row, r) => {
+    for (let c = 0; c < row.length; c++) {
+      const ch = row[c];
+      if (ch === '.') continue;
+      const edge = !at(r - 1, c) || !at(r + 1, c) || !at(r, c - 1) || !at(r, c + 1);
+      let col = edge ? lineOf(base) : (tone[ch] ?? base);
+      if (!edge && tint) col = tint(x0 + c, y0 + r, col);
+      P.set(x0 + c, y0 + r, col);
+    }
+  });
+}
+
+/**
+ * A part library view (art/charkit.py): either a bare map at the part's fixed origin, or a placed map that
+ * carries its own top-left corner in stand-pose frame coordinates (generated parts spill past any fixed box).
+ */
+type LibView = string[] | { x: number; y: number; rows: string[] };
+type Lib = Record<string, { front?: LibView; back?: LibView; behindFront?: LibView }>;
+
+function placed(v: LibView, origin: [number, number], shift: [number, number]) {
+  return Array.isArray(v) ? { x: origin[0], y: origin[1], rows: v } : { x: v.x + shift[0], y: v.y + shift[1], rows: v.rows };
+}
+
+/** How far the head has moved from its stand-pose box (34, 36) in this pose. */
+const headShift = (F: Frame): [number, number] => [F.head[0] - 34, F.head[1] - 36];
+const hairOrigin = (F: Frame): [number, number] => [F.head[0] + HAIR_ORIGIN.dx, F.head[1] + HAIR_ORIGIN.dy];
+
+/** Generated faces (art/facekit.py): eyes and mouths as placed maps on the standard's anchors. */
+type Placed = { x: number; y: number; rows: string[] };
+const FACES = FACE_LIB as unknown as { eyes: Record<string, Placed>; mouth: Record<string, Placed> };
+const USE_GENERATED_EYES = false;
+/** Generated mouths read lopsided or smudged at 1:1; the hand shapes are cleaner. */
+const USE_GENERATED_MOUTHS = false;
+
+/** Generated hairstyles (art/charkit.py) take precedence over the hand-drawn maps. */
+const GENERATED = HAIR_LIB as unknown as Lib;
+
+type HairLook = { front: LibView; back: LibView; behindFront?: LibView; behindBack?: LibView };
+
+function hairStyle(L: FullLoadout): HairLook | null {
+  const id = L.hair.replace('hair.', '');
+  if (id === 'none') return null;
+  const g = GENERATED[id];
+  if (g?.front && g.back) return { front: g.front, back: g.back, behindFront: g.behindFront };
+  return HAIR[id] ?? HAIR.short;
+}
+
+function hairTint(L: FullLoadout) {
+  if (!L.hairHighlight) return undefined;
+  const tip = hx(L.hairHighlight);
+  return (_x: number, y: number, c: RGB) => (y > 70 ? mix(c, tip, 0.7) : c);
+}
+
+function drawHair(P: Pix, F: Frame, L: FullLoadout, layer: 'behind' | 'front') {
+  const st = hairStyle(L);
+  if (!st) return;
+  const v = layer === 'behind' ? (F.view === 'front' ? st.behindFront : st.behindBack) : F.view === 'front' ? st.front : st.back;
+  if (!v) return;
+  const m = placed(v, hairOrigin(F), headShift(F));
+  paintMap(P, m.x, m.y, m.rows, hx(L.hairColor), hairTint(L));
+}
+
+/** Glasses sit on the frame's eyes: a ring round each, a bridge between, an arm back to the ear. */
+function drawGlasses(P: Pix, F: Frame, L: FullLoadout) {
+  const kind = L.eyewear.replace('eye.', '');
+  if (kind === 'none' || F.view !== 'front') return;
+  const frame: RGB =
+    kind === 'heart' ? [226, 76, 156] : kind === 'star' || kind === 'monocle' ? [242, 193, 78] : kind === 'goggles' ? [58, 62, 74] : [34, 26, 36];
+  const lens: RGB | null = kind === 'sun' ? [30, 26, 40] : kind === '3d' ? [224, 60, 70] : null;
+  const [nx, ny] = F.eyeNear;
+  const [fx, fy] = F.eyeFar;
+  const ring = (x0: number, y0: number, w: number, h: number, fill: RGB | null, alpha = 255) => {
+    for (let y = y0; y < y0 + h; y++)
+      for (let x = x0; x < x0 + w; x++) {
+        const border = y === y0 || y === y0 + h - 1 || x === x0 || x === x0 + w - 1;
+        const corner = (y === y0 || y === y0 + h - 1) && (x === x0 || x === x0 + w - 1);
+        if (corner && (kind === 'round' || kind === 'monocle' || kind === 'goggles')) continue;
+        if (border) P.set(x, y, frame);
+        else if (fill) P.set(x, y, fill, alpha);
+      }
+  };
+  if (kind === 'monocle') {
+    ring(fx - 1, fy - 2, 4, 5, null);
+    for (let k = 0; k < 6; k++) P.set(fx + 2 + (k > 2 ? 1 : 0), fy + 3 + k, GOLD);
+    return;
+  }
+  if (kind === 'goggles') {
+    // a strap round the head at eye level, and two big tinted lenses
+    for (let x = F.head[0] + 1; x < nx - 2; x++) {
+      P.set(x, ny - 1, frame);
+      P.set(x, ny, frame);
+    }
+    ring(nx - 3, ny - 3, 6, 6, [120, 200, 220], 110);
+    ring(fx - 1, fy - 3, 5, 6, [120, 200, 220], 110);
+    P.set(nx + 3, ny - 1, frame);
+    P.set(fx - 2, ny - 1, frame);
+    return;
+  }
+  ring(nx - 2, ny - 2, 5, 5, lens);
+  ring(fx - 1, fy - 2, 4, 5, kind === '3d' ? [60, 190, 220] : lens);
+  for (let x = nx + 3; x < fx - 1; x++) P.set(x, ny - 1, frame);
+  for (let x = F.ear[0] + 1; x < nx - 2; x++) P.set(x, ny - 1, frame);
+}
+
+/* ------------------------------------------------------------------ head silhouettes (22 × 22) */
+
+// '#' = head. Round crown; the face and chin swing toward the side we face (right); the back of the
+// skull curves in below the ear on the left.
+const HEAD_FRONT = [
+  '......##########......',
+  '....##############....',
+  '...################...',
+  '..##################..',
+  '.####################.',
+  '.####################.',
+  '######################',
+  '######################',
+  '######################',
+  '######################',
+  '######################',
+  '######################',
+  '.#####################',
+  '..####################',
+  '...###################',
+  '....##################',
+  '.....################.',
+  '......###############.',
+  '.......#############..',
+  '........###########...',
+  '.........#########....',
+  '...........#####......',
+];
+
+const HEAD_BACK = [
+  '......##########......',
+  '....##############....',
+  '...################...',
+  '..##################..',
+  '.####################.',
+  '.####################.',
+  '######################',
+  '######################',
+  '######################',
+  '######################',
+  '######################',
+  '######################',
+  '######################',
+  '.####################.',
+  '.####################.',
+  '..##################..',
+  '...################...',
+  '....##############....',
+  '......##########......',
+  '........######........',
+  '......................',
+  '......................',
+];
+
+export function headMaskOf(F: Frame) {
+  const rows = F.view === 'front' ? HEAD_FRONT : HEAD_BACK;
+  const m = M();
+  const [x0, y0] = F.head;
+  rows.forEach((row, r) => {
+    for (let c = 0; c < row.length; c++) if (row[c] === '#') m.rect(x0 + c, y0 + r, x0 + c + 1, y0 + r + 1);
+  });
+  return m;
+}
+
+/* ------------------------------------------------------------------ the base */
+
+export type BaseId = 'classic';
+
+function skinTones(L: FullLoadout) {
+  const skin = hx(L.skin);
+  return { skin, shade: shadowOf(skin), light: lightOf(skin) };
+}
+
+function limb(P: Pix, a: [number, number], m: [number, number], b: [number, number], r1: number, r2: number, c: RGB, shade = 0) {
+  paint(P, M().capsule(a[0], a[1], m[0], m[1], r1).capsule(m[0], m[1], b[0], b[1], r2), c, { shade });
+}
+
+function drawHeadBase(P: Pix, F: Frame, L: FullLoadout) {
+  const { skin, shade, light } = skinTones(L);
+  const [x0, y0] = F.head;
+  // neck in shadow under the chin
+  paint(P, M().rrect(F.hx - 4, y0 + 17, F.hx + 5, F.shoulderY + 2, 2), shade, { flat: true });
+  const head = headMaskOf(F);
+  paint(P, head, skin, { flat: true });
+  // hand-placed shading: light across the upper-left crown, shade down the far cheek and under the jaw
+  for (let r = 0; r < 22; r++)
+    for (let c = 0; c < 22; c++) {
+      const x = x0 + c;
+      const y = y0 + r;
+      if (!head.has(x, y) || !head.has(x + 1, y) || !head.has(x - 1, y) || !head.has(x, y + 1) || !head.has(x, y - 1)) continue;
+      if (F.view === 'front') {
+        if (r >= 19) P.set(x, y, shade);
+        else if (r >= 1 && r <= 5 && c >= 4 && c <= 10 && c + r <= 13) P.set(x, y, light);
+      } else {
+        if (c >= 17 || r >= 16) P.set(x, y, shade);
+        else if (r <= 5 && c <= 9 && c + r <= 11) P.set(x, y, light);
+      }
+    }
+  if (F.view === 'front') {
+    // ear on the near side, with a fold line
+    const [ex, ey] = F.ear;
+    paint(P, M().rrect(ex - 2, ey - 3, ex + 2, ey + 3, 1.5), skin, { flat: true });
+    P.set(ex - 1, ey - 1, shade);
+    P.set(ex - 1, ey, shade);
+    P.set(ex, ey + 1, shade);
+    // the nose tip breaks the cheek outline
+    const [nx, ny] = F.noseTip;
+    P.stamp(nx - 1, ny - 1, ['s', 'sl', 'l'], { s: skin, l: lineOf(skin) });
+    P.set(nx, ny - 1, lineOf(skin));
+  } else {
+    const [ex, ey] = F.ear;
+    paint(P, M().rrect(ex - 1, ey - 3, ex + 3, ey + 3, 1.5), skin, { flat: true });
+  }
+}
+
+function drawFace(P: Pix, F: Frame, L: FullLoadout) {
+  if (F.view !== 'front') return;
+  // 'blank' (internal): the bare head template the face art is generated on
+  if (L.eyes === 'eyes.blank') return;
+  const { skin } = skinTones(L);
+  const iris = hx(L.eyeColor);
+  // The eye colour only tints the pupil: at 1:1 an eye is two pixels, and a light pupil on light skin
+  // simply disappears. Every pupil is dark enough to read.
+  let pupil = mix(iris, LINE, 0.55);
+  if (lum(pupil) > 0.2) pupil = mix(pupil, LINE, 0.5);
+  const lid = mix(skin, [64, 36, 30], 0.6);
+  const brow = mix(hx(L.hairColor), LINE, 0.5);
+  const [nx, ny] = F.eyeNear;
+  const [fx, fy] = F.eyeFar;
+  const eyes = L.eyes.replace('eyes.', '');
+  // Each eye: a lid pixel above, then a white and a pupil looking the way we face. Closed and happy eyes
+  // are a dark line or arc in the pupil colour, never lid-brown diagonals (those read as scratches).
+  const near: Record<string, string[]> = {
+    dot: ['.b', 'wk', 'wk'],
+    wide: ['.bb', 'wwk', 'wwk'],
+    lashes: ['kb', 'wk', 'wk'],
+    happy: ['.c.', 'c.c'],
+    sleepy: ['bb', 'wk'],
+    wink: ['.b', 'wk', 'wk'],
+    sparkle: ['.b', 'kw', 'kk'],
+  };
+  const far: Record<string, string[]> = {
+    dot: ['b.', 'wk', 'wk'],
+    wide: ['bb', 'wk', 'wk'],
+    lashes: ['bk', 'wk', 'wk'],
+    happy: ['.c.', 'c.c'],
+    sleepy: ['bb', 'wk'],
+    wink: ['..', '..', 'cc'],
+    sparkle: ['b.', 'kw', 'kk'],
+  };
+  // closed and happy eyes are pure line so they still read on the darkest skin
+  const pal = { k: pupil, w: WHITE, b: lid, c: LINE };
+  const [sx, sy] = headShift(F);
+  // Eyes stay simple and identical in shape (generated eyes varied near vs far and read as crooked); what
+  // matters is where they sit, which the frame's anchors decide.
+  const gen = USE_GENERATED_EYES ? FACES.eyes[eyes] : undefined;
+  if (gen) {
+    // generated eyes (art/facekit.py), conformed to the eye anchors: lash line and pupil, white, iris in the
+    // eye colour, highlight, lid crease
+    const tones: Record<string, RGB> = { k: mix(LINE, iris, 0.12), w: WHITE, i: iris, h: WHITE, s: mix(skin, [96, 52, 40], 0.45) };
+    gen.rows.forEach((row, r) => {
+      for (let c = 0; c < row.length; c++) if (tones[row[c]]) P.set(gen.x + c + sx, gen.y + r + sy, tones[row[c]]);
+    });
+  } else {
+    const n = near[eyes] ?? near.dot;
+    const f = far[eyes] ?? far.dot;
+    P.stamp(nx - 1 - (n[0].length > 2 ? 1 : 0), ny - 1, n, pal);
+    P.stamp(fx, fy - 1, f, pal);
+  }
+  // brows
+  const by = F.browY;
+  if (L.brows === 'brows.bold') {
+    P.stamp(nx - 2, by - 1, ['bbbb', '.bb.'], { b: brow });
+    P.stamp(fx - 1, by - 1, ['bbb'], { b: brow });
+  } else if (L.brows !== 'brows.none') {
+    P.stamp(nx - 1, by, ['bbb'], { b: brow });
+    P.stamp(fx, by, ['bb'], { b: brow });
+  }
+  // the nose is only the bump on the cheek's outline (drawHeadBase) — no line inside the face
+  // cheeks
+  if (L.faceDetail === 'fd.blush') {
+    const blush = mix(skin, [255, 110, 130], 0.45);
+    P.stamp(nx - 3, ny + 3, ['bb'], { b: blush });
+    P.set(fx + 1, fy + 3, blush);
+  }
+  if (L.faceDetail === 'fd.freckles') {
+    const fr = mix(skin, [120, 70, 40], 0.45);
+    P.stamp(nx - 3, ny + 3, ['f.f'], { f: fr });
+    P.set(fx + 1, fy + 3, fr);
+  }
+  if (L.faceDetail === 'fd.mole') P.set(fx + 2, F.mouth[1] - 1, mix(skin, [70, 40, 30], 0.7));
+  if (L.faceDetail === 'fd.bandaid') P.stamp(nx - 1, ny + 3, ['bbb', 'bcb'], { b: [238, 204, 158], c: [206, 164, 118] });
+  drawFacialHair(P, F, L);
+  // mouth (a beard darkens it so it still reads through the hair)
+  const [mx, my] = F.mouth;
+  const bearded = L.facialHair === 'fh.beard' || L.facialHair === 'fh.goatee';
+  const mc = bearded ? mix(hx(L.hairColor), LINE, 0.75) : mix(skin, LINE, 0.72);
+  // Small, symmetric mouths on the mouth anchor (mx-2..mx+2): simple shapes read best at 1:1.
+  const mouths: Record<string, string[]> = {
+    smile: ['m...m', '.mmm.'],
+    grin: ['mmmmm', '.mwm.', '..m..'],
+    neutral: ['.mmm.'],
+    smirk: ['....m', '.mmm.'],
+    o: ['.m.', 'mdm', '.m.'],
+    tongue: ['m...m', '.mmm.', '..tt.'],
+  };
+  const gm = USE_GENERATED_MOUTHS ? FACES.mouth[L.mouth.replace('mouth.', '')] : undefined;
+  if (gm) {
+    const tones: Record<string, RGB> = { k: mc, w: WHITE, p: [226, 104, 124] };
+    gm.rows.forEach((row, r) => {
+      for (let c = 0; c < row.length; c++) if (tones[row[c]]) P.set(gm.x + c + sx, gm.y + r + sy, tones[row[c]]);
+    });
+    return;
+  }
+  P.stamp(mx - 2, my, mouths[L.mouth.replace('mouth.', '')] ?? mouths.smile, { m: mc, w: WHITE, t: [226, 104, 124], d: mix(mc, LINE, 0.5) });
+}
+
+/** Facial hair on the lower face, tinted from the hair colour; drawn under the mouth. */
+function drawFacialHair(P: Pix, F: Frame, L: FullLoadout) {
+  const kind = L.facialHair.replace('fh.', '');
+  if (kind === 'none') return;
+  const skin = hx(L.skin);
+  const hair = hx(L.hairColor);
+  const [mx, my] = F.mouth;
+  const [x0, y0] = F.head;
+  const head = headMaskOf(F);
+  const inside = (x: number, y: number) => head.has(x, y) && head.has(x - 1, y) && head.has(x + 1, y) && head.has(x, y + 1) && head.has(x, y - 1);
+  const c = mix(hair, LINE, 0.15);
+  if (kind === 'stubble') {
+    // a dithered shadow along the jaw, chin and upper lip
+    const s = mix(skin, mix(hair, LINE, 0.4), 0.38);
+    for (let y = my - 1; y <= y0 + 21; y++)
+      for (let x = x0 + 6; x <= x0 + 21; x++) if (inside(x, y) && (x + y) % 2 === 0) P.set(x, y, s);
+    return;
+  }
+  if (kind === 'beard') {
+    // jaw and chin from the sideburns round to the far cheek, lips left clear
+    for (let y = y0 + 11; y <= y0 + 21; y++)
+      for (let x = x0 + 3; x <= x0 + 21; x++) {
+        if (!inside(x, y)) continue;
+        const side = x <= x0 + 5;
+        if (!side && y < my - 1) continue;
+        if (y >= my && y <= my + 1 && x >= mx - 2 && x <= mx + 2) continue;
+        P.set(x, y, (x + 2 * y) % 5 === 0 ? mix(c, WHITE, 0.18) : y >= y0 + 19 ? shadowOf(c) : c);
+      }
+    return;
+  }
+  // mustache (and goatee)
+  P.stamp(mx - 3, my - 1, ['.hhhhh.', 'h.....h'], { h: c });
+  if (kind === 'goatee') P.stamp(mx - 2, my + 2, ['.hhh.', '.hhh.', '..h..'], { h: c });
+}
+
+/* ------------------------------------------------------------------ clothes & body on the frame */
+
+const TOPS = TOP_LIB as unknown as Lib;
+const HATS = HAT_LIB as unknown as Lib;
+/** Where generated torso garments sit: the torso zone's corner (stand pose), shifted with the frame. */
+const TORSO_ORIGIN = { x: 34, y: 57 };
+
+const LONG_SLEEVES = new Set([
+  'top.hoodie',
+  'top.shirt',
+  'top.sweater',
+  'top.turtleneck',
+  'top.flannel',
+  'top.cardigan',
+  'top.puffer',
+  'top.blazer',
+  'top.kimono',
+  'top.raincoat',
+  'top.labcoat',
+  'top.northstar-hoodie',
+]);
+
+function topColorOf(L: FullLoadout): RGB {
+  return L.top === 'top.labcoat' ? [246, 244, 240] : hx(L.topColor);
+}
+
+/** Pattern overlays follow the garment's own pixels (stripes, dots, checks, stars, hearts). */
+function patternTint(L: FullLoadout): ((x: number, y: number, c: RGB) => RGB) | undefined {
+  const acc = hx(L.topAccent);
+  switch (L.topPattern) {
+    case 'pat.stripes':
+      return (_x, y, c) => (y % 4 < 2 ? mix(c, acc, 0.85) : c);
+    case 'pat.dots':
+      return (x, y, c) => (x % 4 === 1 && y % 4 === 1 ? acc : c);
+    case 'pat.check':
+      return (x, y, c) => ((Math.floor(x / 2) + Math.floor(y / 2)) % 2 ? mix(c, acc, 0.35) : c);
+    case 'pat.stars':
+      return (x, y, c) => ((x * 7 + y * 13) % 23 === 0 ? acc : c);
+    case 'pat.hearts':
+      return (x, y, c) => ((x * 5 + y * 11) % 23 === 0 ? [226, 76, 120] : c);
+    default:
+      return undefined;
+  }
+}
+
+function drawArm(P: Pix, F: Frame, L: FullLoadout, near: boolean) {
+  const arm = near ? F.armNear : F.armFar;
+  const hand = near ? F.handNear : F.handFar;
+  const skin = hx(L.skin);
+  const shade = near ? 0 : 0.35;
+  const long = LONG_SLEEVES.has(L.top);
+  const bare = L.top === 'top.tank' || L.top === 'top.dress';
+  limb(P, arm.a, arm.m, arm.b, 2.3, 2.1, skin, shade);
+  if (!bare) {
+    const c = topColorOf(L);
+    const tint = patternTint(L);
+    const sleeve = long
+      ? M().capsule(arm.a[0], arm.a[1], arm.m[0], arm.m[1], 2.9).capsule(arm.m[0], arm.m[1], arm.b[0], arm.b[1], 2.7)
+      : M().capsule(arm.a[0], arm.a[1], arm.a[0] + (arm.m[0] - arm.a[0]) * 0.7, arm.a[1] + (arm.m[1] - arm.a[1]) * 0.7, 3);
+    paint(P, sleeve, tint ? (x, y) => tint(x, y, c) : c, { shade });
+  }
+  paint(P, M().ellipse(hand[0], hand[1], 2.4, 2.6), skin, { shade });
+}
+
+function drawLegs(P: Pix, F: Frame, L: FullLoadout) {
+  const skin = hx(L.skin);
+  const pants = hx(L.bottomColor);
+  const b = L.bottom.replace('bottom.', '');
+  const skirt = b === 'skirt' || b === 'longskirt' || !!ITEM_BY_ID.get(L.top)?.fullLength;
+  const r = b === 'leggings' ? 2.6 : b === 'cargo' || b === 'joggers' ? 3.4 : 3.1;
+  for (const [leg, far] of [
+    [F.legFar, true],
+    [F.legNear, false],
+  ] as const) {
+    const shade = far ? 0.35 : 0;
+    limb(P, leg.a, leg.m, leg.b, 2.7, 2.4, skin, shade);
+    if (skirt) continue;
+    const pm = M().capsule(leg.a[0], leg.a[1], leg.m[0], leg.m[1], r);
+    if (b === 'shorts') pm.band(0, Math.round(leg.a[1] + (leg.m[1] - leg.a[1]) * 0.8));
+    else pm.capsule(leg.m[0], leg.m[1], leg.b[0], leg.b[1] - (b === 'joggers' ? 1 : 0), r - 0.3);
+    paint(P, pm, pants, { shade });
+    if (b === 'jeans') {
+      const cy = Math.round(leg.b[1]) - 2;
+      for (let x = Math.round(leg.b[0]) - 3; x <= leg.b[0] + 3; x++) if (pm.has(x, cy) && pm.has(x - 1, cy) && pm.has(x + 1, cy)) P.set(x, cy, lightOf(pants));
+    }
+    if (b === 'cargo' && !far) paint(P, M().rrect(leg.m[0] - 3, leg.m[1] - 5, leg.m[0] + 1, leg.m[1] - 1, 1), shadowOf(pants), { flat: true });
+  }
+  if (!skirt) {
+    const hips = M().rrect(F.hx - 9, F.waistY - 1, F.hx + 10, F.hipY + 3, 2);
+    paint(P, hips, pants);
+    for (let x = F.hx - 8; x < F.hx + 9; x++) if (hips.has(x, F.waistY + 1)) P.set(x, F.waistY + 1, shadowOf(pants));
+  } else {
+    const long = b === 'longskirt';
+    const full = !!ITEM_BY_ID.get(L.top)?.fullLength;
+    const col = full ? topColorOf(L) : pants;
+    const hem = F.sitting ? F.hipY + (long ? 10 : 6) : long ? 98 : 90;
+    const sk = M().poly([
+      [F.hx - 9, F.waistY - 1],
+      [F.hx + 10, F.waistY - 1],
+      [F.hx + (F.sitting ? 16 : 13), hem],
+      [F.hx - (F.sitting ? 9 : 12), hem],
+    ]);
+    paint(P, sk, (x) => (x % 4 === 0 ? shadowOf(col) : col));
+  }
+}
+
+function drawShoes(P: Pix, F: Frame, L: FullLoadout) {
+  const kind = L.shoes.replace('shoes.', '');
+  const c = hx(L.shoesColor);
+  const front = F.view === 'front';
+  for (const [leg, far, heel] of [
+    [F.legFar, true, F.heelFar],
+    [F.legNear, false, F.heelNear],
+  ] as const) {
+    const [ax, ay] = leg.b;
+    const lift = heel ? 1 : 0;
+    const x0 = ax - 3 - (front ? 0 : 2);
+    const x1 = ax + 4 + (front ? 2 : 0);
+    const y0 = ay - lift;
+    const shade = far ? 0.35 : 0;
+    const tall = kind === 'boots' ? 4 : kind === 'rainboots' ? 7 : kind === 'hightops' ? 2 : 0;
+    const shoe = M().rrect(x0, y0, x1, y0 + 5, 2);
+    if (tall) shoe.rect(ax - 3, y0 - tall, ax + 4, y0 + 2);
+    if (kind === 'sandals') {
+      paint(P, M().rrect(x0, y0 + 1, x1, y0 + 5, 2), hx(L.skin), { shade });
+      P.stamp(x0 + 1, y0 + 2, ['cccc'], { c });
+      continue;
+    }
+    paint(P, shoe, kind === 'slippers' ? lightOf(c) : c, { shade });
+    const sole: RGB = kind === 'sneakers' || kind === 'hightops' || kind === 'skates' ? WHITE : [52, 38, 40];
+    for (let x = x0 + 1; x < x1 - 1; x++) if (shoe.has(x, y0 + 3) && shoe.has(x, y0 + 4)) P.set(x, y0 + 3, sole);
+    if (kind === 'sneakers' || kind === 'hightops') P.stamp(ax - 1, y0 + 1, ['ww'], { w: WHITE });
+    if (kind === 'loafers') P.stamp(ax, y0 + 1, ['gg'], { g: GOLD });
+    if (kind === 'skates') for (const wx of [x0 + 1, x0 + 4, x0 + 7]) P.set(wx, y0 + 6, [255, 138, 61]);
+  }
+}
+
+/** Catalog tops drawn on a generated base garment (plus a print where they have one). */
+const TOP_ALIAS: Record<string, string> = {
+  'aurora-tee': 'tee',
+  'northstar-hoodie': 'hoodie',
+  dress: 'tank',
+  raincoat: 'shirt',
+  labcoat: 'blazer',
+};
+
+function drawPrint(P: Pix, F: Frame, L: FullLoadout) {
+  if (F.view !== 'front') return;
+  const [cx, cy] = F.collar;
+  if (L.top === 'top.aurora-tee') P.stamp(cx - 2, cy + 5, ['.w.', 'wrw', 'www', '.o.'], { w: WHITE, r: [224, 80, 63], o: [255, 138, 61] });
+  if (L.top === 'top.northstar-hoodie') P.stamp(cx - 2, cy + 5, ['.g.', 'ggg', 'g.g'], { g: GOLD });
+}
+
+function drawTorso(P: Pix, F: Frame, L: FullLoadout) {
+  const id = L.top.replace('top.', '');
+  const c = topColorOf(L);
+  const tint = patternTint(L);
+  const map = (TOPS[id] ?? TOPS[TOP_ALIAS[id] ?? ''])?.[F.view];
+  const dy = F.shoulderY - 58;
+  if (map) {
+    const m = placed(map, [TORSO_ORIGIN.x, TORSO_ORIGIN.y + dy], [0, dy]);
+    paintMap(P, m.x, m.y, m.rows, c, tint);
+    drawPrint(P, F, L);
+    return;
+  }
+  // Not generated yet: a simple garment on the torso so every look still renders.
+  paint(P, M().poly(F.torso), tint ? (x, y) => tint(x, y, c) : c);
+  if (F.view === 'front' && id !== 'turtleneck') {
+    const [cx, cy] = F.collar;
+    paint(P, M().ellipse(cx, cy, 3.5, 2.2).keep(M().poly(F.torso)), hx(L.skin), { edge: false, flat: true });
+  }
+}
+
+function drawHat(P: Pix, F: Frame, L: FullLoadout) {
+  const id = L.headwear.replace('hat.', '');
+  if (id === 'none') return;
+  const map = HATS[id]?.[F.view];
+  if (!map) return;
+  const m = placed(map, hairOrigin(F), headShift(F));
+  paintMap(P, m.x, m.y, m.rows, hx(L.headwearColor));
+}
+
+function drawNeckwear(P: Pix, F: Frame, L: FullLoadout) {
+  const kind = L.neck.replace('neck.', '');
+  if (kind === 'none') return;
+  const c = hx(L.neckColor);
+  const [cx, cy] = F.collar;
+  const front = F.view === 'front';
+  switch (kind) {
+    case 'scarf':
+      paint(P, M().rrect(cx - 7, cy - 3, cx + 7, cy + 2, 2), (x) => (x % 4 < 2 ? c : lightOf(c)));
+      if (front) paint(P, M().rrect(cx - 5, cy + 1, cx - 2, cy + 11, 1), (_x, y) => (y % 4 < 2 ? c : lightOf(c)));
+      break;
+    case 'bowtie':
+      if (front) paint(P, M().poly([[cx - 4, cy - 1], [cx, cy + 1], [cx - 4, cy + 3]]).poly([[cx + 4, cy - 1], [cx, cy + 1], [cx + 4, cy + 3]]), c);
+      break;
+    case 'tie':
+      if (front) paint(P, M().poly([[cx - 1, cy], [cx + 1, cy], [cx + 2, cy + 12], [cx, cy + 14], [cx - 2, cy + 12]]), c);
+      break;
+    case 'necklace':
+      if (front) for (let k = -4; k <= 4; k++) P.set(cx + k, cy + 2 + Math.round((k * k) / 8), GOLD);
+      break;
+    case 'bandana':
+      if (front) paint(P, M().poly([[cx - 5, cy - 1], [cx + 6, cy - 1], [cx, cy + 6]]), (x, y) => ((x + y) % 4 === 0 ? WHITE : c));
+      break;
+    case 'lanyard':
+      if (front) {
+        for (let k = 0; k < 8; k++) {
+          P.set(cx - 3 + Math.round(k * 0.3), cy + k, c);
+          P.set(cx + 4 - Math.round(k * 0.3), cy + k, c);
+        }
+        paint(P, M().rrect(cx - 2, cy + 7, cx + 3, cy + 12, 1), WHITE, { flat: true });
+      }
+      break;
+  }
+}
+
+function drawAccessory(P: Pix, F: Frame, L: FullLoadout) {
+  const front = F.view === 'front';
+  const [cx, cy] = F.collar;
+  switch (L.accessory) {
+    case 'acc.flower':
+      P.stamp(F.head[0] - 1, F.head[1] + 3, ['.p.', 'pyp', '.p.'], { p: PINK, y: GOLD });
+      break;
+    case 'acc.earrings':
+      if (front) P.stamp(F.ear[0], F.ear[1] + 3, ['g', 'g'], { g: GOLD });
+      break;
+    case 'acc.hearing-aid':
+      P.stamp(F.ear[0] + (front ? -2 : 2), F.ear[1] - 2, ['t', 't'], { t: [43, 179, 163] });
+      break;
+    case 'acc.star-pin':
+    case 'acc.five-year-pin':
+      if (front) P.stamp(cx - 6, cy + 4, ['.y.', 'yyy', L.accessory === 'acc.five-year-pin' ? 'r.r' : '.y.'], { y: GOLD, r: [224, 80, 63] });
+      break;
+    case 'acc.rainbow-pin':
+      if (front) P.stamp(cx - 7, cy + 4, ['rrr', 'y.y', 'b.b'], { r: [224, 80, 63], y: GOLD, b: [63, 143, 216] });
+      break;
+  }
+}
+
+function drawHeld(P: Pix, F: Frame, L: FullLoadout) {
+  if (L.held === 'held.none') return;
+  const [x, y] = F.pose === 'wave' ? F.handFar : F.handNear;
+  const c = hx(L.heldColor);
+  switch (L.held) {
+    case 'held.coffee':
+      paint(P, M().rrect(x - 2, y - 6, x + 3, y + 1, 1), WHITE, { flat: true });
+      paint(P, M().rect(x - 2, y - 4, x + 3, y - 2), [201, 160, 106], { flat: true, edge: false });
+      paint(P, M().rrect(x - 3, y - 8, x + 4, y - 5, 1), [90, 60, 50], { flat: true });
+      break;
+    case 'held.boba':
+      paint(P, M().rrect(x - 2, y - 7, x + 3, y + 1, 1), [236, 206, 170], { flat: true });
+      P.stamp(x - 1, y - 2, ['k.k'], { k: [59, 37, 24] });
+      for (let k = 0; k < 4; k++) P.set(x + 2, y - 8 - k, c);
+      break;
+    case 'held.laptop':
+      paint(P, M().rrect(x - 6, y - 2, x + 5, y + 1, 1), [201, 206, 214]);
+      break;
+    case 'held.book':
+      paint(P, M().rrect(x - 2, y - 6, x + 4, y + 1, 1), c);
+      break;
+    case 'held.plant':
+      paint(P, M().rrect(x - 2, y - 3, x + 3, y + 2, 1), [201, 98, 63]);
+      paint(P, M().ellipse(x - 1, y - 5, 2, 1.6).ellipse(x + 2, y - 6, 2, 1.6), [94, 156, 74]);
+      break;
+    case 'held.icecream':
+      paint(P, M().poly([[x - 2, y - 3], [x + 3, y - 3], [x + 0.5, y + 3]]), [232, 179, 90]);
+      paint(P, M().ellipse(x + 0.5, y - 5, 2.8, 2.6), c);
+      break;
+    case 'held.balloon':
+      // floats above and beside the head, on a string that leans out from the hand
+      // the string leans well out from the hand so it never runs along the head
+      for (let k = 0; k < 40; k++) P.set(x - Math.round(k / 3.4), y - k, [142, 138, 132]);
+      paint(P, M().ellipse(x - 13, y - 46, 5, 6), c, { shine: true });
+      break;
+    case 'held.umbrella':
+      // the canopy opens above the head, never across the face
+      {
+        // the canopy opens centred over the head; the pole runs from the hand up to it
+        const tx = F.hx - 1;
+        const ty = F.head[1] - 5; // opens a little above the head
+        const len = y - ty;
+        for (let k = 0; k <= len; k++) P.set(Math.round(x + ((tx - x) * k) / len), y - k, [58, 40, 42]);
+        paint(P, M().ellipse(tx, ty, 17, 8).band(0, ty + 1), (px) => (Math.floor((px - tx) / 5) % 2 ? c : lightOf(c)));
+      }
+      break;
+  }
+}
+
+function drawPet(P: Pix, L: FullLoadout, pose: Pose) {
+  const kind = L.pet.replace('pet.', '');
+  if (kind === 'none') return;
+  const c = hx(L.petColor);
+  const hop = pose === 'walk1' ? -2 : 0;
+  const x = 14;
+  const y = 99 + hop;
+  const eye: RGB = LINE;
+  switch (kind) {
+    case 'cat':
+      paint(P, M().ellipse(x, y, 7, 4).capsule(x - 6, y - 2, x - 8, y - 9, 1.4), c);
+      paint(P, M().ellipse(x + 6, y - 5, 4.2, 3.8).poly([[x + 3, y - 8], [x + 4, y - 12], [x + 6, y - 9]]).poly([[x + 7, y - 9], [x + 9, y - 12], [x + 9, y - 7]]), c);
+      P.stamp(x + 6, y - 6, ['k.k'], { k: eye });
+      break;
+    case 'dog':
+      paint(P, M().ellipse(x, y, 7.5, 4.5).capsule(x - 6, y - 2, x - 8, y - 6, 1.4), c);
+      paint(P, M().ellipse(x + 6, y - 6, 4.2, 3.8).ellipse(x + 9, y - 4, 2.4, 1.8), c);
+      paint(P, M().ellipse(x + 3, y - 6, 1.6, 3.2), shadowOf(c), { flat: true });
+      P.set(x + 6, y - 7, eye);
+      break;
+    case 'duck':
+      paint(P, M().ellipse(x, y - 1, 6, 4), c);
+      paint(P, M().ellipse(x + 4, y - 7, 3.4, 3.4), c);
+      P.stamp(x + 7, y - 7, ['oo'], { o: [255, 159, 28] });
+      P.set(x + 5, y - 8, eye);
+      break;
+    case 'bunny':
+      paint(P, M().ellipse(x, y, 6, 4).ellipse(x + 5, y - 5, 3.8, 3.4).capsule(x + 3, y - 8, x + 2, y - 14, 1.3).capsule(x + 6, y - 8, x + 7, y - 14, 1.3), c);
+      P.set(x + 6, y - 6, eye);
+      break;
+    case 'frog':
+      paint(P, M().ellipse(x, y - 1, 7, 4), c);
+      paint(P, M().ellipse(x - 3, y - 5, 2.2, 2.2).ellipse(x + 3, y - 5, 2.2, 2.2), c);
+      P.stamp(x - 3, y - 6, ['k.....k'], { k: eye });
+      break;
+  }
+}
+
+function drawWheelchair(P: Pix, F: Frame, part: 'back' | 'front') {
+  const frame: RGB = [58, 63, 75];
+  const metal: RGB = [201, 206, 214];
+  if (part === 'back') {
+    paint(P, M().rrect(F.hx - 15, F.shoulderY + 2, F.hx - 11, F.hipY + 8, 1.5), frame);
+    paint(P, M().rrect(F.hx - 12, F.hipY + 4, F.hx + 13, F.hipY + 8, 1.5), frame);
+    return;
+  }
+  const cx = F.hx - 6;
+  const cy = F.hipY + 11;
+  paint(P, M().ellipse(cx, cy, 10, 10).cut(M().ellipse(cx, cy, 8, 8)), [47, 53, 66]);
+  paint(P, M().ellipse(cx, cy, 7.5, 7.5).cut(M().ellipse(cx, cy, 6.5, 6.5)), [142, 150, 163], { flat: true });
+  const spin = F.pose === 'walk1' ? 0.5 : F.pose === 'walk2' ? 1 : 0;
+  for (let k = 0; k < 3; k++) {
+    const a = ((k + spin) / 3) * Math.PI;
+    for (let r = -6; r <= 6; r++) P.set(cx + Math.cos(a) * r, cy + Math.sin(a) * r, metal);
+  }
+  paint(P, M().ellipse(F.hx + 14, 101, 2.2, 2.2), [47, 53, 66]);
+  paint(P, M().rrect(F.hx + 10, 96, F.hx + 19, 98, 1), metal, { flat: true });
+}
+
+function drawCane(P: Pix, F: Frame) {
+  const [x, y] = F.handNear;
+  for (let yy = y; yy < 104; yy++) P.set(x - 1, yy, [138, 90, 59]);
+  P.stamp(x - 1, y - 2, ['bbb', '..b'], { b: [107, 68, 40] });
+}
+
+/* ------------------------------------------------------------------ assembly */
+
+/** Part layers, in the order they can appear; Pix.owner records which one painted each pixel. */
+export const LAYER = {
+  none: 0,
+  pet: 1,
+  chairBack: 2,
+  hairBehind: 3,
+  armBack: 4,
+  held: 5,
+  legs: 6,
+  shoes: 7,
+  torso: 8,
+  neck: 9,
+  head: 10,
+  face: 11,
+  hair: 12,
+  hat: 13,
+  glasses: 14,
+  accessory: 15,
+  armFront: 16,
+  chairFront: 17,
+  cane: 18,
+  outline: 19,
+} as const;
+
+export function drawAvatarV2(input: AvatarLoadout, view: View, requested: Pose): Pix {
+  const L = normalizeLoadout(input);
+  const wheelchair = L.mobility === 'mob.wheelchair';
+  const pose: Pose = wheelchair && requested !== 'wave' ? 'sit' : requested;
+  let F = frameFor(view, pose);
+  if (wheelchair && pose === 'wave') {
+    const sit = frameFor(view, 'sit');
+    F = { ...sit, pose: 'wave', armNear: F.armNear, handNear: F.handNear };
+  }
+  const coversHair = !!ITEM_BY_ID.get(L.headwear)?.coversHair;
+  const P = new Pix();
+  const on = (layer: number) => (P.layer = layer);
+  on(LAYER.pet);
+  drawPet(P, L, requested);
+  on(LAYER.chairBack);
+  if (wheelchair) drawWheelchair(P, F, 'back');
+  on(LAYER.hairBehind);
+  if (!coversHair) drawHair(P, F, L, 'behind');
+  on(LAYER.armBack);
+  drawArm(P, F, L, view !== 'front');
+  // Seen from behind, the holding hand is in front of the body: what it holds hides behind the torso
+  // (a balloon or umbrella still shows above it).
+  on(LAYER.held);
+  if (view === 'back' || L.held === 'held.balloon') drawHeld(P, F, L);
+  on(LAYER.legs);
+  drawLegs(P, F, L);
+  on(LAYER.shoes);
+  drawShoes(P, F, L);
+  on(LAYER.torso);
+  drawTorso(P, F, L);
+  on(LAYER.head);
+  drawHeadBase(P, F, L);
+  // neckwear goes over the neck (it was hidden under it)
+  on(LAYER.neck);
+  drawNeckwear(P, F, L);
+  on(LAYER.face);
+  drawFace(P, F, L);
+  on(LAYER.hair);
+  if (!coversHair) drawHair(P, F, L, 'front');
+  on(LAYER.hat);
+  drawHat(P, F, L);
+  on(LAYER.glasses);
+  drawGlasses(P, F, L);
+  on(LAYER.accessory);
+  drawAccessory(P, F, L);
+  on(LAYER.armFront);
+  drawArm(P, F, L, view === 'front');
+  on(LAYER.chairFront);
+  if (wheelchair) drawWheelchair(P, F, 'front');
+  on(LAYER.held);
+  if (view === 'front' && L.held !== 'held.balloon') drawHeld(P, F, L);
+  on(LAYER.cane);
+  if (L.mobility === 'mob.cane' && !F.sitting) drawCane(P, F);
+  sealHairPockets(P, L);
+  on(LAYER.outline);
+  outline(P);
+  sealPinholes(P);
+  return P;
+}
+
+/**
+ * The outline traces round concave edges (a curl, a notch) and can enclose single pixels; any small pocket
+ * left fully enclosed after it is closed with the outline's own tone.
+ */
+function sealPinholes(P: Pix) {
+  const solid = (i: number) => P.d[i * 4 + 3] > 0;
+  const outside = new Uint8Array(W * H);
+  const stack: number[] = [];
+  for (let x = 0; x < W; x++) stack.push(x, (H - 1) * W + x);
+  for (let y = 0; y < H; y++) stack.push(y * W, y * W + W - 1);
+  while (stack.length) {
+    const i = stack.pop()!;
+    if (outside[i] || solid(i)) continue;
+    outside[i] = 1;
+    const x = i % W;
+    if (x > 0) stack.push(i - 1);
+    if (x < W - 1) stack.push(i + 1);
+    if (i >= W) stack.push(i - W);
+    if (i < W * (H - 1)) stack.push(i + W);
+  }
+  const seen = new Uint8Array(W * H);
+  for (let s = 0; s < W * H; s++) {
+    if (solid(s) || outside[s] || seen[s]) continue;
+    const pocket: number[] = [];
+    const q = [s];
+    seen[s] = 1;
+    const acc = [0, 0, 0, 0];
+    let owner = LAYER.outline as number;
+    while (q.length) {
+      const i = q.pop()!;
+      pocket.push(i);
+      const x = i % W;
+      for (const j of [x > 0 ? i - 1 : -1, x < W - 1 ? i + 1 : -1, i - W, i + W]) {
+        if (j < 0 || j >= W * H) continue;
+        if (solid(j)) {
+          acc[0] += P.d[j * 4];
+          acc[1] += P.d[j * 4 + 1];
+          acc[2] += P.d[j * 4 + 2];
+          acc[3]++;
+          if (P.owner[j] !== LAYER.outline) owner = P.owner[j];
+        } else if (!seen[j] && !outside[j]) {
+          seen[j] = 1;
+          q.push(j);
+        }
+      }
+    }
+    if (pocket.length > 8 || !acc[3]) continue;
+    const c = mix([acc[0] / acc[3], acc[1] / acc[3], acc[2] / acc[3]], LINE, 0.6);
+    for (const i of pocket) {
+      P.d.set([c[0], c[1], c[2], 255], i * 4);
+      P.owner[i] = owner;
+    }
+  }
+}
+
+/**
+ * Close see-through pockets that hair or a hat encloses against the head, neck or shoulders (under a bob,
+ * inside a curl): they are painted as the part's own shadow, the way hair falls behind the neck. Gaps framed
+ * by the body itself (a waving arm beside the head) stay open.
+ */
+function sealHairPockets(P: Pix, L: FullLoadout) {
+  const solid = (i: number) => P.d[i * 4 + 3] > 0;
+  const outside = new Uint8Array(W * H);
+  const stack: number[] = [];
+  for (let x = 0; x < W; x++) stack.push(x, (H - 1) * W + x);
+  for (let y = 0; y < H; y++) stack.push(y * W, y * W + W - 1);
+  while (stack.length) {
+    const i = stack.pop()!;
+    if (outside[i] || solid(i)) continue;
+    outside[i] = 1;
+    const x = i % W;
+    if (x > 0) stack.push(i - 1);
+    if (x < W - 1) stack.push(i + 1);
+    if (i >= W) stack.push(i - W);
+    if (i < W * (H - 1)) stack.push(i + W);
+  }
+  const seen = new Uint8Array(W * H);
+  const hairy = new Set<number>([LAYER.hair, LAYER.hairBehind, LAYER.hat]);
+  for (let s = 0; s < W * H; s++) {
+    if (solid(s) || outside[s] || seen[s]) continue;
+    const pocket: number[] = [];
+    const q = [s];
+    seen[s] = 1;
+    let byHair = 0;
+    let border = 0;
+    let hatBorder = 0;
+    while (q.length) {
+      const i = q.pop()!;
+      pocket.push(i);
+      const x = i % W;
+      for (const j of [x > 0 ? i - 1 : -1, x < W - 1 ? i + 1 : -1, i - W, i + W]) {
+        if (j < 0 || j >= W * H) continue;
+        if (solid(j)) {
+          border++;
+          if (hairy.has(P.owner[j])) byHair++;
+          if (P.owner[j] === LAYER.hat) hatBorder++;
+        } else if (!seen[j] && !outside[j]) {
+          seen[j] = 1;
+          q.push(j);
+        }
+      }
+    }
+    // small notches (where hair meets the shoulders) are always sealed; bigger pockets only where hair or a
+    // hat frames them
+    if (pocket.length > 12 && (pocket.length > 40 || byHair < border * 0.4)) continue;
+    if (byHair === 0 && pocket.length > 12) continue;
+    const base = hatBorder > byHair / 2 ? hx(L.headwearColor) : hx(L.hairColor);
+    const shade = mix(base, LINE, 0.55);
+    const layer = hatBorder > byHair / 2 ? LAYER.hat : LAYER.hairBehind;
+    for (const i of pocket) {
+      P.d[i * 4] = shade[0];
+      P.d[i * 4 + 1] = shade[1];
+      P.d[i * 4 + 2] = shade[2];
+      P.d[i * 4 + 3] = 255;
+      P.owner[i] = layer;
+    }
+  }
+}
+
+/** Debug: the frame's anchor points, for the workbench. */
+export function frameAnchors(view: View, pose: Pose): Array<[string, number, number]> {
+  const F = frameFor(view, pose);
+  return [
+    ['crown', ...F.crown],
+    ['eyeN', ...F.eyeNear],
+    ['eyeF', ...F.eyeFar],
+    ['nose', ...F.nose],
+    ['tip', ...F.noseTip],
+    ['mouth', ...F.mouth],
+    ['ear', ...F.ear],
+    ['chin', ...F.chin],
+    ['collar', ...F.collar],
+    ['handN', ...F.handNear],
+    ['handF', ...F.handFar],
+    ['kneeN', ...F.legNear.m],
+    ['footN', ...F.legNear.b],
+    ['footF', ...F.legFar.b],
+  ];
+}
+
+export { W as AV_W, H as AV_H };

@@ -16,6 +16,8 @@ import { clearSpriteCache, spriteFor } from '../engine/sprites/registry';
 import { avatarSprite, type Pose } from '../engine/sprites/avatar';
 import { blit } from '../engine/sprites/painter';
 import { setSkyOverride, type Sky } from '../engine/weather';
+import { AV_H, AV_W, drawAvatarV2, frameAnchors } from '../engine/sprites/avatarKit';
+import type { Pose as FPose, View as FView } from '../engine/sprites/avatarFrame';
 
 const seed = buildSeed();
 const noop = () => undefined;
@@ -284,6 +286,128 @@ async function catalog(o: { name?: string; extra?: Array<{ key: string; footprin
   return snap(canvas, o.name ?? 'catalog');
 }
 
+/**
+ * Avatar workbench (kit v2): looks × views × poses at a big zoom, optionally with the frame's anchor
+ * points, so the base and every part can be judged on the frame before it goes anywhere else.
+ */
+async function bench(o: { looks?: AvatarLoadout[]; zoom?: number; anchors?: boolean; name?: string; views?: FView[]; poses?: FPose[]; count?: number } = {}) {
+  const looks = o.looks ?? seed.members.slice(0, o.count ?? 4).map((m) => m.avatar);
+  const views: FView[] = o.views ?? ['front', 'back'];
+  const poses: FPose[] = o.poses ?? ['stand', 'walk1', 'walk2', 'sit', 'wave'];
+  const Z = o.zoom ?? 5;
+  const cw = 60 * Z;
+  const ch = 84 * Z;
+  const cols = views.length * poses.length;
+  const W = cols * cw;
+  const H = looks.length * ch;
+  const canvas = freshCanvas(W, H);
+  canvas.width = W;
+  canvas.height = H;
+  const c = canvas.getContext('2d')!;
+  c.imageSmoothingEnabled = false;
+  c.fillStyle = '#e8dcc6';
+  c.fillRect(0, 0, W, H);
+  const tmp = document.createElement('canvas');
+  tmp.width = AV_W;
+  tmp.height = AV_H;
+  const t = tmp.getContext('2d')!;
+  looks.forEach((L, r) =>
+    views.forEach((v, vi) =>
+      poses.forEach((p, pi) => {
+        const col = vi * poses.length + pi;
+        const P = drawAvatarV2(L, v, p);
+        const img = t.createImageData(AV_W, AV_H);
+        img.data.set(P.d);
+        t.putImageData(img, 0, 0);
+        const ox = col * cw + cw / 2 - 45 * Z;
+        const oy = r * ch + ch - 106 * Z;
+        c.fillStyle = 'rgba(40,30,50,0.22)';
+        c.beginPath();
+        c.ellipse(ox + 45 * Z, oy + 104 * Z, 10 * Z, 4 * Z, 0, 0, Math.PI * 2);
+        c.fill();
+        c.drawImage(tmp, ox, oy, AV_W * Z, AV_H * Z);
+        if (o.anchors) {
+          c.fillStyle = '#e0335b';
+          for (const [, x, y] of frameAnchors(v, p)) c.fillRect(ox + x * Z + Z * 0.25, oy + y * Z + Z * 0.25, Z * 0.5, Z * 0.5);
+        }
+      }),
+    ),
+  );
+  return snap(canvas, o.name ?? 'bench');
+}
+
+/** One kit figure at an exact integer scale on a transparent canvas (a tracing reference for generation). */
+async function figure(o: { look?: AvatarLoadout; view?: FView; pose?: FPose; scale?: number; name: string }) {
+  const Z = o.scale ?? 8;
+  const P = drawAvatarV2(o.look ?? seed.members[0].avatar, o.view ?? 'front', o.pose ?? 'stand');
+  const canvas = freshCanvas(AV_W * Z, AV_H * Z);
+  canvas.width = AV_W * Z;
+  canvas.height = AV_H * Z;
+  const c = canvas.getContext('2d')!;
+  c.imageSmoothingEnabled = false;
+  const tmp = document.createElement('canvas');
+  tmp.width = AV_W;
+  tmp.height = AV_H;
+  const t = tmp.getContext('2d')!;
+  const img = t.createImageData(AV_W, AV_H);
+  img.data.set(P.d);
+  t.putImageData(img, 0, 0);
+  c.drawImage(tmp, 0, 0, AV_W * Z, AV_H * Z);
+  return snap(canvas, o.name);
+}
+
+/** A contact sheet of kit figures: many looks in one view/pose, tiled in a grid, labelled. */
+async function sheet(o: {
+  looks: AvatarLoadout[];
+  labels?: string[];
+  view?: FView;
+  pose?: FPose;
+  cols?: number;
+  zoom?: number;
+  /** Only this part of each figure (art px), e.g. the head. */
+  crop?: { x: number; y: number; w: number; h: number };
+  name: string;
+}) {
+  const Z = o.zoom ?? 4;
+  const cols = o.cols ?? 8;
+  const cr = o.crop;
+  const cw = (cr ? cr.w + 2 : 50) * Z;
+  const ch = (cr ? cr.h + (o.labels ? 8 : 2) : 88) * Z;
+  const rows = Math.ceil(o.looks.length / cols);
+  const canvas = freshCanvas(cols * cw, rows * ch);
+  canvas.width = cols * cw;
+  canvas.height = rows * ch;
+  const c = canvas.getContext('2d')!;
+  c.imageSmoothingEnabled = false;
+  c.fillStyle = '#e8dcc6';
+  c.fillRect(0, 0, canvas.width, canvas.height);
+  const tmp = document.createElement('canvas');
+  tmp.width = AV_W;
+  tmp.height = AV_H;
+  const t = tmp.getContext('2d')!;
+  o.looks.forEach((L, i) => {
+    const P = drawAvatarV2(L, o.view ?? 'front', o.pose ?? 'stand');
+    const img = t.createImageData(AV_W, AV_H);
+    img.data.set(P.d);
+    t.putImageData(img, 0, 0);
+    if (cr) {
+      const ox = (i % cols) * cw + Z;
+      const oy = Math.floor(i / cols) * ch + ch - (cr.h + 1) * Z;
+      c.drawImage(tmp, cr.x, cr.y, cr.w, cr.h, ox, oy, cr.w * Z, cr.h * Z);
+    } else {
+      const ox = (i % cols) * cw + cw / 2 - 45 * Z;
+      const oy = Math.floor(i / cols) * ch + ch - 108 * Z;
+      c.drawImage(tmp, ox, oy, AV_W * Z, AV_H * Z);
+    }
+    if (o.labels?.[i]) {
+      c.fillStyle = '#2a1f2d';
+      c.font = `${6 * Z}px system-ui`;
+      c.fillText(o.labels[i], (i % cols) * cw + 4, Math.floor(i / cols) * ch + 7 * Z);
+    }
+  });
+  return snap(canvas, o.name);
+}
+
 const ready = loadArt().then(clearSpriteCache);
 const lab = {
   ready,
@@ -301,6 +425,20 @@ const lab = {
   },
   /** Force the sky for renders, e.g. lab.sky({ phase: 'night', weather: 'rain' }); lab.sky(null) to follow the clock. */
   sky: (o: Partial<Sky> | null) => setSkyOverride(o),
+  /** The seeded members' looks (for sheets of real loadouts). */
+  members: () => seed.members.map((m) => ({ name: m.displayName, look: m.avatar })),
+  sheet: async (o: Parameters<typeof sheet>[0]) => {
+    await ready;
+    return sheet(o);
+  },
+  figure: async (o: Parameters<typeof figure>[0]) => {
+    await ready;
+    return figure(o);
+  },
+  bench: async (o?: Parameters<typeof bench>[0]) => {
+    await ready;
+    return bench(o);
+  },
   catalog: async (o?: { name?: string; extra?: Array<{ key: string; footprint: [number, number] }> }) => {
     await ready;
     return catalog(o);

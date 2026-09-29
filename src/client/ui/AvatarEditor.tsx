@@ -43,7 +43,6 @@ const CATEGORIES: Category[] = [
     icon: '🙂',
     sections: [
       { kind: 'colors', title: 'Skin tone', field: 'skin', palette: SKIN_TONES, extra: { label: 'Just for fun', palette: FANTASY_SKIN } },
-      { kind: 'items', title: 'Getting around', slot: 'mobility', field: 'mobility', crop: 'full' },
     ],
   },
   {

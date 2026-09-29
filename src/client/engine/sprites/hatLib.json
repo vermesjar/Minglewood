@@ -1,0 +1,720 @@
+{
+ "beanie": {
+  "front": {
+   "x": 34,
+   "y": 33,
+   "rows": [
+    "......lllllll",
+    "....ll####h##lll",
+    "...l###hh###h###l",
+    "..l####hh###h##h#l",
+    "..l#########llssssl",
+    ".l####h##ssssssssh#l",
+    ".l#####ls########h##l",
+    "l####ls#h##h##hh#h##l",
+    "l###l#h#h##h##h##h###l",
+    "l##l#..............##l",
+    ".ls##..............l#l",
+    ".sl##...............ll",
+    ".l###",
+    ".l###",
+    ".l#ss",
+    ".l#sl",
+    "..lsl",
+    "...ll"
+   ]
+  },
+  "back": {
+   "x": 33,
+   "y": 33,
+   "rows": [
+    ".....llll.....lll",
+    "....l####l...l##sdl",
+    "....ls###lllll##ssl",
+    "...ls###s##s##s##ssl",
+    "..ld###s######ss##sd",
+    "..ls###s####s##s##ssl",
+    "..l###s#####s##s###sl",
+    "..l###s####s####s##sl",
+    ".dd###s####s####s##sd",
+    "l##ssss####s####ssdssl",
+    "l#####sdsddsddddsd#ssl",
+    "l##s##sdsddsddds###ssl",
+    "l##s#s##s##s##s#ss#ssl",
+    "l##s#s##s##s##s#ss#dsl",
+    "ll#s#s##s##s##s#ss#sll",
+    ".lls#s##s##s##s##sssl",
+    "...lss##s##s##s##ssl",
+    "....lllllllllllllll"
+   ]
+  }
+ },
+ "beret": {
+  "front": {
+   "x": 32,
+   "y": 31,
+   "rows": [
+    ".............lllll",
+    "...........lll####l",
+    "...........l######llll",
+    ".......llll##########l",
+    "......l##############sl",
+    ".....ll#############ssl",
+    "....l#hh############dsl",
+    "...l#hh#########s##ldsl",
+    "..l##h##########ssldsl",
+    ".ll#h########sssslsssl",
+    "l##########sslllldlll",
+    "l######",
+    "l######",
+    "l#sssss",
+    ".llssll",
+    "...lll"
+   ]
+  },
+  "back": {
+   "x": 32,
+   "y": 32,
+   "rows": [
+    "...........lll",
+    "...........##l",
+    "...........##lll###l",
+    "........lll##l######ll",
+    ".......l##lsd########sl",
+    ".....lll###ld########sl",
+    "...ll################sl",
+    "...##################sl",
+    "..l##################sl",
+    ".l##################ssl",
+    "l#################ssssl",
+    "l#################sssd",
+    "l################ssssl",
+    "l############sssssslll",
+    "l#######sssssssslll",
+    "l#s#sss#ssssssssl",
+    ".lsssssssslllll",
+    "..lllllllls"
+   ]
+  }
+ },
+ "bow": {
+  "front": {
+   "x": 35,
+   "y": 30,
+   "rows": [
+    "....lll",
+    "...l###l",
+    "..l#hh#sl",
+    ".l##hh##sl",
+    ".l##h###sll....ldlllll",
+    ".l###ss###lllllld####l",
+    ".l####ss#dsssl##hhhh#l",
+    "l#h####sl#hh#l####hh#l",
+    "l#######l#hh#lssss##sl",
+    "ls####slsd##sdsss###sl",
+    ".llllllsdllllss####sl",
+    ".lss#ssl......ls###sl",
+    ".l##..............sdd",
+    ".lsl..............lhl",
+    ".lsl",
+    "..ll"
+   ]
+  },
+  "back": {
+   "x": 34,
+   "y": 30,
+   "rows": [
+    "....llll",
+    "...lhhhhl",
+    "...####hh",
+    "..l#####hll",
+    "..l#####hhll",
+    "..l######hhl....llllll",
+    ".ll###sss#hll.llhhhhhhl",
+    ".l######sslhhllh######l",
+    ".l#######l###l########l",
+    ".lsss#sllls##lsss#####l",
+    ".lllllsssslllss#######l",
+    ".lllls#sssllls########l",
+    ".ll##s###l#lssss#####l",
+    "ll######ldhl##lss####l",
+    "l#######l...###llls#l",
+    "l#######....####l#ll",
+    "...l###.....###s##l",
+    "...l#ll......l#####l",
+    "....ll.......l#####l",
+    ".............l#lllll",
+    ".............l#l"
+   ]
+  }
+ },
+ "bucket": {
+  "front": {
+   "x": 33,
+   "y": 33,
+   "rows": [
+    ".........llllllllll",
+    "......lllh###hhh#hlll",
+    ".....l##h#h#hhh#hhh##l",
+    "....l###h#hhhh#hhh###l",
+    "....l####h#hh##h#####l",
+    "....l################l",
+    "....l#################l",
+    "....l#################l",
+    "...l##################l",
+    "...l##..............###l",
+    "..l###..............####l",
+    ".l####..............ll##ll",
+    "l###ll................ll#l",
+    "l##lsl...................l",
+    ".lls#l",
+    "...lll"
+   ]
+  },
+  "back": {
+   "x": 32,
+   "y": 34,
+   "rows": [
+    "........llllllll",
+    ".......#hhhhhhhh#h#",
+    ".....ll#hhhhhhhhhh#s",
+    "....l##hhhhhhhhhhh###l",
+    "....l####hhhhhhhh####l",
+    "....l####hh##########l",
+    "....l################l",
+    "...dl################l",
+    "..ll##################ll",
+    "..l####################l",
+    ".l######################l",
+    "l########################l",
+    "l########################l",
+    ".l######################l",
+    ".llll################lll",
+    "....ll###############l",
+    "......lllllllllllllll"
+   ]
+  }
+ },
+ "cap": {
+  "front": {
+   "x": 35,
+   "y": 30,
+   "rows": [
+    "........lll",
+    ".......ls#sl",
+    "....llldsssdlll",
+    "...ls###s#####sl",
+    "..l#s###s#####sll",
+    ".ll####s########l",
+    ".l####s##########l",
+    "ll####s##########l",
+    "l#####s##########ll",
+    "ll####s#####ssssssllll",
+    ".l####s##sss#########sl",
+    ".ls###s#ss######ssdss#sl",
+    ".ls#..............sss#sl",
+    ".lll..............lldssl",
+    "...................llll"
+   ]
+  },
+  "back": {
+   "x": 35,
+   "y": 31,
+   "rows": [
+    ".......llllll",
+    ".......l####l",
+    "...l###sll#ls##ll",
+    "..l#####lll#####l",
+    ".l###############ll",
+    "l#############s####l",
+    "l##################l",
+    "l##################l",
+    "l#################ll",
+    "l######ll##########lll",
+    "l#####llls#########l##l",
+    "l####ldddll########l###l",
+    "l####llllll######ll####l",
+    ".l###sss#s######sllllll",
+    "..llllllllllllllll"
+   ]
+  }
+ },
+ "capback": {
+  "front": {
+   "x": 32,
+   "y": 34,
+   "rows": [
+    "..........lllllll",
+    ".......llll######lll",
+    "......llss##########l",
+    ".....llss############l",
+    ".....lsss############l",
+    ".....lsss######llll###l",
+    "...lllsss#####l####l##l",
+    "..lsllsss#####l####l##l",
+    ".lsssls..............ll",
+    "lssssls",
+    "lssssll",
+    ".lsssl",
+    "..llll"
+   ]
+  },
+  "back": {
+   "x": 31,
+   "y": 34,
+   "rows": [
+    "..........llllllll",
+    "........ll#ll###l#l",
+    ".......ll#hhhhh####l",
+    ".....llh##h#hhhh####sl",
+    ".....l#h#####h#######s",
+    ".....h################l",
+    ".....hh###############l",
+    ".....h################l",
+    ".....h################l",
+    "....l#######lllll####sl",
+    "..l##l#####llhhhsl##s#l",
+    "ll#h##ls###d#####l##sl",
+    "lh######ll#ll#ll#l#lll",
+    "lh###llll",
+    ".lllsl",
+    "....ll"
+   ]
+  }
+ },
+ "catears": {
+  "front": {
+   "x": 38,
+   "y": 32,
+   "rows": [
+    ".lll............lll",
+    "l###ll........ll###l",
+    "l####sl......l#####l",
+    "l#hh###l....l###hh#l",
+    "l#hhh##llllll##hh##l",
+    "l#hhhdl######ldhh##l",
+    "l###d##########lhhsl",
+    ".l#h#############sl",
+    ".ls##sllldllld###sl",
+    "l#ssll.......lls#ssl",
+    "l..............lsssl",
+    "................lssl",
+    ".................ll"
+   ]
+  },
+  "back": {
+   "x": 34,
+   "y": 32,
+   "rows": [
+    ".lll.............lll",
+    "l###l...........l###l",
+    "l####l.........l####l",
+    "l#h##l.........l#h##l",
+    "l#hhh#ll.....ll#h###l",
+    "l#hhh##llllll##hh#h#l",
+    "l#hlll#########ll#h#l",
+    "l#hlll#########lllh#l",
+    "l#l##############ll#l",
+    ".l####lllllllll####l",
+    "l##lll........lll###l",
+    "l#ll............l#l#l",
+    "l#l..............ll#l",
+    "lll...............lll"
+   ]
+  }
+ },
+ "cowboy": {
+  "front": {
+   "x": 32,
+   "y": 32,
+   "rows": [
+    ".........llll.dllll",
+    "........l####lll###l",
+    ".......ll######ls###l",
+    ".......l########l###l",
+    ".......l########s###l....ll",
+    "...lllll############l...l##l",
+    ".lll#lllss##########slllss#l",
+    "ll####lllsss###sdddssllsss#l",
+    "l#ssss##llsssssd...dslsss##l",
+    "lsssssss##llsssd...dslls##l",
+    "lsssssd..............s####l",
+    ".lsssdl..............####l",
+    "..lssl...............llll",
+    "...lll"
+   ]
+  },
+  "back": {
+   "x": 30,
+   "y": 32,
+   "rows": [
+    ".........lll.....lll",
+    "........l###l...l##ll",
+    ".......l##h#lllllhhssl",
+    ".......l##h##lll#hhssl",
+    "......l############sssl",
+    "......l#######h####sssl",
+    "......l#######h####sssl",
+    ".lll..l############sssl..lll",
+    "l###l.l############sssl.l#h#l",
+    "lh#s#llh###########sshlls##hl",
+    "l###sslhh#########sshhlss###l",
+    "ll##sslhhhhhhhhhhhh#hllss##l",
+    ".l###ssllhhhhhhhhhh#llss###l",
+    "..ls####slllllllllldss###sll",
+    "..ll#####lll#lll#s#ls####l",
+    "...ls######s##s##s#######l",
+    "....llss##############lll",
+    "........ll###s#####lll",
+    ".........lllllllllll"
+   ]
+  }
+ },
+ "crown": {
+  "front": {
+   "x": 37,
+   "y": 32,
+   "rows": [
+    ".........lll",
+    "..ll....ll#ll...lll",
+    ".l##l...l###l..l##ll",
+    "ll##dl.l#ss##ll#ss#l",
+    "l#ds#ll##dddhlssdd#l",
+    "l#dd###h#dddhh#sdd#l",
+    ".ldd##h#sdddhh##ssl",
+    ".l####hh####hh####l",
+    ".l####hhhhhhh#####l",
+    ".l################l",
+    ".l...............dl"
+   ]
+  },
+  "back": {
+   "x": 35,
+   "y": 32,
+   "rows": [
+    ".........ll",
+    "........l##ll",
+    "........l###l",
+    "lll....ll###l....lll",
+    "l##l..l######ll.lldl",
+    "l###lll##dd##lllsddl",
+    "l###ll###ddd#ssldddl",
+    ".ll######dd##sssddl",
+    "..ldd########ssdddl",
+    "..lddd#######ssdddl",
+    "..ldd########ssdddl",
+    "..lsssssssssssssddl",
+    "..llddlllllllllllll"
+   ]
+  }
+ },
+ "flowers": {
+  "front": {
+   "x": 39,
+   "y": 34,
+   "rows": [
+    ".ll...ll",
+    "l#ll.l#ll.......l",
+    "l##llll#llllll.l#l",
+    "l###lhhl#l###lll#l",
+    "ll#l...lll###llhll",
+    ".llh....llssl....ll",
+    ".l#h....l#llh....l#l",
+    ".l#dl...ls##l....l#l",
+    "................l##l",
+    "...............lsll",
+    "................l#l",
+    "................lsl"
+   ]
+  },
+  "back": {
+   "x": 35,
+   "y": 34,
+   "rows": [
+    "......lllllll",
+    "..llll########ldl",
+    "..l############ll",
+    "...############l",
+    "...lds###s##s#sl",
+    "...lll#sdll#ssll",
+    ".....llslh#lsll",
+    "......lllh#lll",
+    "......l#hhhh#l",
+    "......l#hhhhhl....l",
+    "lllhhllll##llldhll#l",
+    "lsllhl#sll#l##dhl#sl",
+    ".lslllssdllsssslssl",
+    ".llllldssssssslllll",
+    "......llllslssl",
+    ".........llll"
+   ]
+  }
+ },
+ "headband": {
+  "front": {
+   "x": 38,
+   "y": 37,
+   "rows": [
+    "....lllllllll",
+    "..llh#hhhhhhhlll",
+    ".l###########hh#l",
+    "l################d",
+    "l################sl",
+    "l..............##dl",
+    "...............##sl",
+    "...............dssl",
+    "................ldl"
+   ]
+  },
+  "back": {
+   "x": 36,
+   "y": 38,
+   "rows": [
+    "ldl............llll",
+    "ldll..........llddl",
+    "l###llllllllll##s#l",
+    "l################sl",
+    "l################sl",
+    "l##############sssl",
+    "ls#############ssll",
+    "llll##########llll",
+    "....llllllllll"
+   ]
+  }
+ },
+ "headphones": {
+  "front": {
+   "x": 34,
+   "y": 37,
+   "rows": [
+    ".......lllllllllll",
+    ".....ll###########ll",
+    "....l######s#ss#####l",
+    "...l####sllllllllls##l",
+    "...l##sll........lll#l",
+    "...l#..............lsl",
+    "...l#...............ll",
+    "..lll...............lll",
+    ".l##l...............l##l",
+    "l####",
+    "l####",
+    "l####",
+    "l####",
+    "ls##s",
+    ".lssl",
+    ".llll"
+   ]
+  },
+  "back": {
+   "x": 33,
+   "y": 37,
+   "rows": [
+    ".......lllllllllll",
+    ".....lllh#hhhhh##ll",
+    "....ll###########hhll",
+    "...ll#############h#l",
+    "...l####lllllllll###ll",
+    "..lh##ll.........d##hl",
+    "..l##ll...........ll#s",
+    "..l#ll.............l#s",
+    ".lllll.............lllll",
+    ".hh##l.............#####",
+    "l#h##l.............#####l",
+    "l####l.............###hhl",
+    "l####l.............#####l",
+    "l####l.............#####l",
+    ".l##ll.............l###l"
+   ]
+  }
+ },
+ "hijab": {
+  "front": {
+   "x": 32,
+   "y": 36,
+   "rows": [
+    "......##############",
+    ".....####llllllllll##",
+    "....###lllhhhhhh##l###",
+    "...###l#hhhhhhhh###l###",
+    "..###l#hh#######hh##l###",
+    "..##l#########hhhhh#l###",
+    "....l##",
+    "....l##",
+    "...l###",
+    "..ls###",
+    "..ls###",
+    "..lss##",
+    "..lss##",
+    "..lss##",
+    "..lss##",
+    "..lss##",
+    "..lsss#",
+    "...lss#",
+    "...lss#",
+    "...lss#",
+    "...lsss###l........ll",
+    "....lsss###llllllll#dl",
+    "...lsllss###ss#####s##l",
+    "..l####lss####sssss##ssl",
+    "..ls####lls##########s#l",
+    ".lsll#####sls#######s###l",
+    ".lsssl#####llll###sss###l",
+    "lsssss######lll###ss####l",
+    "lsssssls#######ssss#####l",
+    "lllllllllll##########llll",
+    "..........llll######l",
+    ".............lllllll"
+   ]
+  },
+  "back": {
+   "x": 32,
+   "y": 36,
+   "rows": [
+    "......###llllll#####",
+    ".....##ll######lll###",
+    "....##ll########ls####",
+    "...##l###########sl###",
+    "..##l#################",
+    "..##l#################",
+    "..##l#################",
+    "..#l##s###############",
+    "..ll##s###############",
+    "..l###s###############",
+    "..l##s################",
+    "..ll#s################",
+    "..#lss################",
+    "..##ls################",
+    "..##ls################",
+    "....ls#",
+    "....ls#",
+    ".....l#",
+    ".....ls###ssss######l",
+    "....l#s####ssssssssssl",
+    "...ls##ss###sssssssssl",
+    "..lss##ss###ssssss####ll",
+    ".l###s#sss############sl",
+    ".l###s###s#########ssssll",
+    "l###ss####sss##ssss######l",
+    "l###sss####ssssss####ss##l",
+    "l###sss#####ssss#####ss##l",
+    ".llllss#####sss####lllllll",
+    "....lll##########ll",
+    ".......ll######ll"
+   ]
+  }
+ },
+ "party": {
+  "front": {
+   "x": 36,
+   "y": 22,
+   "rows": [
+    "...llll",
+    "..l###dl",
+    ".l####sl",
+    ".l###ssl",
+    ".l###ssll",
+    "..lsssld",
+    "..llllll",
+    "....lhhsl",
+    "....lh##dl",
+    "...ld####l",
+    "...ls###hh",
+    "..lss##",
+    "..lss.....hl",
+    "..lsh.....#ld",
+    "..lhh...####dl",
+    "..hhhh######hl",
+    ".lhhs######...l",
+    ".lsss#####....#l",
+    ".lsss####.....sdl",
+    "lssss##......#ssl",
+    "lds",
+    "ls"
+   ]
+  },
+  "back": {
+   "x": 36,
+   "y": 22,
+   "rows": [
+    "......llll",
+    "......l#ssl",
+    ".....l##ssl",
+    ".....l##h##l",
+    ".......#h##l",
+    ".......h#s#sl",
+    "...ll..##hh#l",
+    "..l######h#h#",
+    "..l####h#h#hsl",
+    "..l###hh###hsl",
+    ".l##########ssl",
+    ".lhh#h######ssl",
+    ".lh#h########hl",
+    "l##########h#hss",
+    "l##########h#ss#l",
+    "l#####.....#hsssl",
+    "..l##......##l",
+    "...ll...###ll",
+    ".......lllll"
+   ]
+  }
+ },
+ "turban": {
+  "front": {
+   "x": 34,
+   "y": 30,
+   "rows": [
+    "............ll",
+    "........lllll#lll",
+    ".......ll####sllsl",
+    ".....ll######l##ss",
+    "....l#######lll##sll",
+    "...l#######l...l###ll",
+    "..l####slllh####l##ssl",
+    ".l####ld##lh####ll#ssl",
+    ".l###l#####l#####slsssl",
+    "l###l######l###l###lssl",
+    "l##d######sl###l###slsl",
+    "l#sl####sll#####ls##sdl",
+    "lsl##..............#sl",
+    ".l###..............s#l",
+    ".ls#s..............lsl",
+    ".lssl...............l",
+    ".lssl",
+    "..lsl",
+    "..lsl",
+    "...l"
+   ]
+  },
+  "back": {
+   "x": 34,
+   "y": 30,
+   "rows": [
+    "........lllll",
+    ".......l####ll",
+    ".....lll#####llll",
+    "...ll##lls####l##l",
+    "..ll###lll##ssl##ll",
+    ".lls####sllsssl###lll",
+    ".l########lllls#####l",
+    ".l###########lllssddl",
+    "ll############lllssdll",
+    "##lss##########ddldd##",
+    "###llll####ssss##l####",
+    "###slllss###sss######s",
+    "#####dslllsss########d",
+    "#######lllls##########",
+    "ss########lll#ss####sd",
+    "lllds######llslllsssll",
+    "#lll#########llllsssl",
+    "#l#llsss#########lssl",
+    "#l###llsss########lll",
+    "#l###l#lss########l#",
+    "#l#####llll#######l#",
+    "..ld######llllssssl",
+    "..lll#s###s#sslssll",
+    "....ls######sllssl",
+    "....llllllllllhlll"
+   ]
+  }
+ }
+}

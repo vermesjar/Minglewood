@@ -1,0 +1,138 @@
+{
+ "eyes": {
+  "dot": {
+   "x": 39,
+   "y": 45,
+   "rows": [
+    "..........k",
+    ".kkk.....kkw",
+    "kkwsk....kwk",
+    "kwikk....sik",
+    "..ikk....siis",
+    ".wiis"
+   ]
+  },
+  "wide": {
+   "x": 38,
+   "y": 45,
+   "rows": [
+    "..kkk......k",
+    ".kwwik....kwwi",
+    "kwwiwk....kiiw",
+    "kwwiwk....kwiw",
+    "kwwikk....kwi",
+    "kwwikk....kii"
+   ]
+  },
+  "lashes": {
+   "x": 38,
+   "y": 46,
+   "rows": [
+    "k.kkkkk....kk",
+    ".kkwiwk...kkw",
+    "..kwikk...kwk",
+    "...wikk....wi",
+    "...........sk"
+   ]
+  },
+  "happy": {
+   "x": 39,
+   "y": 46,
+   "rows": [
+    ".kkk......kk",
+    "kk.kk....kkk",
+    "k...k...kk",
+    "k.......k"
+   ]
+  },
+  "sleepy": {
+   "x": 39,
+   "y": 46,
+   "rows": [
+    "kkkkk....kkk",
+    "kkkkk....kkk",
+    ".wiii.....ii"
+   ]
+  },
+  "wink": {
+   "x": 38,
+   "y": 45,
+   "rows": [
+    "...kkkk",
+    ".kkkwkk....sk",
+    "kkkwiwk...kkk",
+    "..kwikk..kk",
+    "...iikk",
+    "...wiii"
+   ]
+  },
+  "sparkle": {
+   "x": 39,
+   "y": 45,
+   "rows": [
+    "..kk",
+    ".kiik....kii",
+    "kkwwk....kww",
+    "kwikk....wi",
+    "kwikk....wii",
+    "kwiik....swi"
+   ]
+  }
+ },
+ "mouth": {
+  "smile": {
+   "x": 44,
+   "y": 52,
+   "rows": [
+    ".....k",
+    "k...k",
+    ".kkk"
+   ]
+  },
+  "o": {
+   "x": 46,
+   "y": 51,
+   "rows": [
+    "kkk",
+    "k.k",
+    "kkk"
+   ]
+  },
+  "smirk": {
+   "x": 44,
+   "y": 51,
+   "rows": [
+    "k....k",
+    ".kkkk",
+    "..k"
+   ]
+  },
+  "grin": {
+   "x": 44,
+   "y": 51,
+   "rows": [
+    "kkkkkwk",
+    "k.wwwwk",
+    ".kwwwk",
+    "..kkk"
+   ]
+  },
+  "neutral": {
+   "x": 45,
+   "y": 52,
+   "rows": [
+    "kkkk"
+   ]
+  },
+  "tongue": {
+   "x": 45,
+   "y": 51,
+   "rows": [
+    "k...kk",
+    "kkkkk",
+    ".kppk",
+    ".kppk"
+   ]
+  }
+ }
+}
