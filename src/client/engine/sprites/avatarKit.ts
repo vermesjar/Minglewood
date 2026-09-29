@@ -664,11 +664,26 @@ function drawShoes(P: Pix, F: Frame, L: FullLoadout) {
       P.stamp(x0 + 1, y0 + 2, ['cccc'], { c });
       continue;
     }
+    if (kind === 'heels') {
+      // a slim pointed pump: the toe box, an instep gap, and a thin heel under the back of the foot
+      const back = front ? x0 : x1 - 2;
+      const toe = front ? x1 : x0;
+      const pump = M().rrect(Math.min(back, toe - (front ? 5 : 0)), y0 + 1, Math.max(back + 2, toe + (front ? 0 : 5)), y0 + 4, 1.5);
+      paint(P, pump, c, { shade });
+      const hx0 = front ? x0 + 1 : x1 - 3;
+      paint(P, M().rect(hx0, y0 + 3, hx0 + 2, y0 + 6), mix(c, LINE, 0.35), { shade, flat: true });
+      continue;
+    }
     paint(P, shoe, kind === 'slippers' ? lightOf(c) : c, { shade });
     const sole: RGB = kind === 'sneakers' || kind === 'hightops' || kind === 'skates' ? WHITE : [52, 38, 40];
     for (let x = x0 + 1; x < x1 - 1; x++) if (shoe.has(x, y0 + 3) && shoe.has(x, y0 + 4)) P.set(x, y0 + 3, sole);
     if (kind === 'sneakers' || kind === 'hightops') P.stamp(ax - 1, y0 + 1, ['ww'], { w: WHITE });
     if (kind === 'loafers') P.stamp(ax, y0 + 1, ['gg'], { g: GOLD });
+    if (kind === 'slippers') {
+      // a fluffy cuff round the opening
+      const fluff = mix(lightOf(c), WHITE, 0.55);
+      for (let x = x0; x < x1; x++) if (shoe.has(x, y0) || shoe.has(x, y0 + 1)) P.set(x, y0 + (x % 2), fluff);
+    }
     if (kind === 'skates') for (const wx of [x0 + 1, x0 + 4, x0 + 7]) P.set(wx, y0 + 6, [255, 138, 61]);
   }
 }

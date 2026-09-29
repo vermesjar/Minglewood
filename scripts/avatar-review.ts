@@ -499,3 +499,25 @@ console.log(`${people.length} characters, ${total} issue(s) → ${OUT}/`);
     sheet.save(`art/review/assets/${file}.png`);
   }
 }
+
+/* ------------------------------------------------------------------ shoes close-up */
+{
+  const shoes = [...ITEM_BY_ID.values()].filter((i) => i.slot === 'shoes').map((i) => i.id);
+  const z = 6;
+  const SC = [30, 88, 30, 20];
+  const frames = [
+    ['se', 'stand'],
+    ['se', 'walk1'],
+    ['ne', 'stand'],
+  ] as const;
+  const cw = SC[2] * z + 4;
+  const ch = SC[3] * z + 4;
+  const sheet = new Sheet(cw * shoes.length, ch * frames.length, BG);
+  shoes.forEach((sh, col) =>
+    frames.forEach(([f, p], row) => {
+      const look = { shoes: sh, shoesColor: '#c0392b', bottom: 'bottom.jeans', bottomColor: '#1f2a44' } as AvatarLoadout;
+      sheet.paste(renderAvatarLayers(look, f, p).px, col * cw + 2, row * ch + 2, z, SC);
+    }),
+  );
+  sheet.save('art/review/assets/shoes-close.png');
+}
