@@ -201,3 +201,36 @@ export async function groundCost() {
     longestSlice: +groundStats.longestSlice.toFixed(1),
   };
 }
+
+/** Every park bench with someone on each cushion, around the plaza (seat review for outdoor benches). */
+export async function benches(o: { at?: [number, number]; zoom?: number; w?: number; h?: number; name?: string } = {}) {
+  await ready;
+  setSkyOverride({ phase: 'day', weather: 'clear' });
+  const scene = getScene(TOWN_ID)!;
+  const { seatSpots } = await import('@shared/world/seats');
+  const { isSeat } = await import('@shared/world/scene');
+  const occ: Occupant[] = [];
+  let k = 0;
+  for (const b of scene.objects.filter((x) => isSeat(x)))
+    for (const s of seatSpots(b, scene)) {
+      const m = seed.members[k++ % seed.members.length];
+      occ.push({ memberId: m.id, x: s.x, y: s.y, facing: s.facing, sittingOn: b.id, status: 'available', avatar: m.avatar, via: 'sim' });
+    }
+  document.body.replaceChildren();
+  const canvas = document.createElement('canvas');
+  canvas.style.width = `${o.w ?? 1400}px`;
+  canvas.style.height = `${o.h ?? 900}px`;
+  document.body.append(canvas);
+  const view = new WorldView(canvas, { onGroundClick: noop, onActorClick: noop, onObjectClick: noop, onObjectActivate: noop, nameOf: () => '' });
+  view.loadScene(scene, occ, { meId: '', activeDecor: new Set(), festiveRooms: new Set(), party: false });
+  const v = view as unknown as View;
+  const p = isoToScreen(...(o.at ?? [35.5, 36]));
+  v.camera.jump(p.x, p.y, o.zoom ?? 3);
+  v.ground?.finishNow?.();
+  v.update(0.05);
+  v.draw();
+  const r = await snap(canvas, o.name ?? 'town-benches');
+  view.destroy();
+  setSkyOverride(null);
+  return r;
+}

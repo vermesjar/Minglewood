@@ -492,23 +492,23 @@
     },
     "bench": {
       "footprint": [
-        1,
+        2,
         1
       ],
       "fit": "anchor",
       "facings": {
-        "se": {
-          "file": "bench.se.png",
+        "sw": {
+          "file": "bench.sw.png",
           "anchor": [
-            52,
-            73
+            36,
+            65
           ]
         },
         "ne": {
           "file": "bench.ne.png",
           "anchor": [
-            52,
-            63
+            36,
+            55
           ]
         }
       },

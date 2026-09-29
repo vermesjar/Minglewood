@@ -360,10 +360,11 @@ export function buildTown(): SceneDef {
 
   // Plaza: the fountain at the crossroads, benches facing it, flower beds at the corners.
   add({ id: 'fountain', sprite: 'fountain', x: 34, y: 34, w: 3, d: 3, label: 'Founders’ Fountain' });
-  add({ sprite: 'bench', x: 31, y: 32, facing: 'se', actions: [{ kind: 'sit' }] });
-  add({ sprite: 'bench', x: 39, y: 32, facing: 'sw', actions: [{ kind: 'sit' }] });
-  add({ sprite: 'bench', x: 31, y: 39, facing: 'ne', actions: [{ kind: 'sit' }] });
-  add({ sprite: 'bench', x: 39, y: 39, facing: 'nw', actions: [{ kind: 'sit' }] });
+  // park benches seat two, their length across the way they face (se/nw: along y; sw/ne: along x)
+  add({ sprite: 'bench', x: 31, y: 32, d: 2, facing: 'se', actions: [{ kind: 'sit' }] });
+  add({ sprite: 'bench', x: 39, y: 32, w: 2, facing: 'sw', actions: [{ kind: 'sit' }] });
+  add({ sprite: 'bench', x: 31, y: 39, w: 2, facing: 'ne', actions: [{ kind: 'sit' }] });
+  add({ sprite: 'bench', x: 39, y: 39, d: 2, facing: 'nw', actions: [{ kind: 'sit' }] });
   add({ sprite: 'flowerbed', x: 29, y: 29, variant: 'pink' });
   add({ sprite: 'flowerbed', x: 41, y: 29, variant: 'yellow' });
   add({ sprite: 'flowerbed', x: 29, y: 41, variant: 'blue' });
@@ -424,6 +425,7 @@ export function buildTown(): SceneDef {
     sprite: 'bench',
     x: 48,
     y: 49,
+    w: 2,
     facing: 'ne',
     variant: 'plaque',
     artifactId: 'art-1000-bench',
@@ -462,8 +464,8 @@ export function buildTown(): SceneDef {
     for (let ox = 0; ox < 4; ox++) add({ sprite: 'tree/round', x: 47 + ox * 3, y: 8 + oy * 3 + (ox % 2), variant: 'b' });
   // The park south of the hall: picnic, benches, boats at the shore.
   add({ sprite: 'picnic', x: 47, y: 51, w: 2, d: 2 });
-  add({ sprite: 'bench', x: 41, y: 49, facing: 'ne', actions: [{ kind: 'sit' }] });
-  add({ sprite: 'bench', x: 46, y: 44, facing: 'sw', actions: [{ kind: 'sit' }] });
+  add({ sprite: 'bench', x: 41, y: 49, w: 2, facing: 'ne', actions: [{ kind: 'sit' }] });
+  add({ sprite: 'bench', x: 46, y: 44, w: 2, facing: 'sw', actions: [{ kind: 'sit' }] });
   add({ sprite: 'flowerbed', x: 40, y: 44, variant: 'yellow' });
   add({ sprite: 'flowerbed', x: 45, y: 49, variant: 'blue' });
   // Rowboats moored in open water: one beside the pier, one off the park shore.
