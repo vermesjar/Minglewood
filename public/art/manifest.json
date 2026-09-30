@@ -432,51 +432,68 @@
       ]
     },
     "armchair.green": {
+      "name": "Green wingback",
+      "category": "seating",
+      "tags": [
+        "armchair",
+        "green",
+        "wingback",
+        "leather"
+      ],
+      "rooms": [
+        "lounge"
+      ],
       "footprint": [
         1,
         1
       ],
-      "fit": "anchor",
+      "height": 23,
+      "rotation": "full",
       "facings": {
         "se": {
           "file": "armchair.green.se.png",
           "anchor": [
-            31,
-            48
+            32,
+            45
+          ]
+        },
+        "sw": {
+          "file": "armchair.green.sw.png",
+          "anchor": [
+            30,
+            45
+          ]
+        },
+        "ne": {
+          "file": "armchair.green.ne.png",
+          "anchor": [
+            32,
+            40
           ]
         },
         "nw": {
           "file": "armchair.green.nw.png",
           "anchor": [
-            31,
-            44
+            30,
+            40
           ]
         }
       },
-      "seat": 10.9,
-      "sitStyle": "chair",
-      "backrest": true,
-      "rotation": "mirror",
-      "name": "Green armchair",
-      "category": "seating",
-      "tags": [
-        "armchair",
-        "green",
-        "seating"
-      ],
-      "rooms": [
-        "lounge"
-      ],
-      "height": 28,
+      "fit": "anchor",
       "base": "filled",
       "walk": "seat",
       "layer": "object",
+      "seat": 9,
+      "sitStyle": "lounge",
+      "backrest": true,
+      "arms": true,
       "use": {
         "face": "front",
         "actions": [
           "sit"
         ]
-      }
+      },
+      "note": "built from its seat spec (armchair; src/shared/art/seatCatalog.ts): a deep green Chesterfield wingback: tufted back, rolled arms, turned walnut feet"
     },
     "armchair.mustard": {
       "name": "Mustard armchair",
@@ -484,7 +501,8 @@
       "tags": [
         "armchair",
         "mustard",
-        "seating"
+        "yellow",
+        "club"
       ],
       "rooms": [
         "lobby",
@@ -496,84 +514,117 @@
         1,
         1
       ],
-      "rotation": "mirror",
-      "height": 20,
-      "base": "filled",
-      "walk": "seat",
-      "layer": "object",
-      "seat": 12,
-      "sitStyle": "chair",
-      "backrest": true,
-      "use": {
-        "face": "front",
-        "actions": [
-          "sit"
-        ]
-      },
-      "fit": "anchor",
+      "height": 21,
+      "rotation": "full",
       "facings": {
         "se": {
           "file": "armchair.mustard.se.png",
           "anchor": [
             32,
-            32
+            41
+          ]
+        },
+        "sw": {
+          "file": "armchair.mustard.sw.png",
+          "anchor": [
+            30,
+            41
+          ]
+        },
+        "ne": {
+          "file": "armchair.mustard.ne.png",
+          "anchor": [
+            32,
+            34
           ]
         },
         "nw": {
           "file": "armchair.mustard.nw.png",
           "anchor": [
-            32,
-            32
-          ]
-        }
-      }
-    },
-    "armchair.rust": {
-      "footprint": [
-        1,
-        1
-      ],
-      "fit": "anchor",
-      "facings": {
-        "se": {
-          "file": "armchair.rust.se.png",
-          "anchor": [
-            31,
-            49
-          ]
-        },
-        "nw": {
-          "file": "armchair.rust.nw.png",
-          "anchor": [
-            31,
-            45
+            30,
+            34
           ]
         }
       },
-      "seat": 11.5,
-      "sitStyle": "chair",
-      "backrest": true,
-      "rotation": "mirror",
-      "name": "Rust armchair",
-      "category": "seating",
-      "tags": [
-        "armchair",
-        "rust",
-        "seating"
-      ],
-      "rooms": [
-        "lounge"
-      ],
-      "height": 29,
+      "fit": "anchor",
       "base": "filled",
       "walk": "seat",
       "layer": "object",
+      "seat": 9,
+      "sitStyle": "lounge",
+      "backrest": true,
+      "arms": true,
       "use": {
         "face": "front",
         "actions": [
           "sit"
         ]
-      }
+      },
+      "note": "built from its seat spec (armchair; src/shared/art/seatCatalog.ts): a mustard club chair with rolled arms on oak feet"
+    },
+    "armchair.rust": {
+      "name": "Rust wingback",
+      "category": "seating",
+      "tags": [
+        "armchair",
+        "rust",
+        "wingback",
+        "leather"
+      ],
+      "rooms": [
+        "lounge"
+      ],
+      "footprint": [
+        1,
+        1
+      ],
+      "height": 23,
+      "rotation": "full",
+      "facings": {
+        "se": {
+          "file": "armchair.rust.se.png",
+          "anchor": [
+            32,
+            45
+          ]
+        },
+        "sw": {
+          "file": "armchair.rust.sw.png",
+          "anchor": [
+            30,
+            45
+          ]
+        },
+        "ne": {
+          "file": "armchair.rust.ne.png",
+          "anchor": [
+            32,
+            40
+          ]
+        },
+        "nw": {
+          "file": "armchair.rust.nw.png",
+          "anchor": [
+            30,
+            40
+          ]
+        }
+      },
+      "fit": "anchor",
+      "base": "filled",
+      "walk": "seat",
+      "layer": "object",
+      "seat": 9,
+      "sitStyle": "lounge",
+      "backrest": true,
+      "arms": true,
+      "use": {
+        "face": "front",
+        "actions": [
+          "sit"
+        ]
+      },
+      "note": "built from its seat spec (armchair; src/shared/art/seatCatalog.ts): a rust leather wingback with a tufted back and brass nailheads"
     },
     "backbar": {
       "footprint": [
@@ -808,254 +859,330 @@
       "layer": "object"
     },
     "beanbag.cyan": {
-      "footprint": [
-        1,
-        1
-      ],
-      "fit": "anchor",
-      "seat": 9.5,
-      "facings": {
-        "se": {
-          "file": "beanbag.cyan.png",
-          "anchor": [
-            26,
-            20
-          ]
-        },
-        "nw": {
-          "file": "beanbag.cyan.nw.png",
-          "anchor": [
-            26,
-            15
-          ]
-        }
-      },
-      "sitStyle": "floor",
-      "backrest": true,
-      "rotation": "mirror",
       "name": "Cyan beanbag",
       "category": "seating",
       "tags": [
         "beanbag",
         "cyan",
-        "seating"
+        "vinyl"
       ],
       "rooms": [
         "office",
         "lab",
         "arcade"
       ],
-      "height": 14,
-      "base": "filled",
+      "footprint": [
+        1,
+        1
+      ],
+      "height": 11,
+      "rotation": "full",
+      "facings": {
+        "se": {
+          "file": "beanbag.cyan.se.png",
+          "anchor": [
+            30,
+            21
+          ]
+        },
+        "sw": {
+          "file": "beanbag.cyan.sw.png",
+          "anchor": [
+            30,
+            21
+          ]
+        },
+        "ne": {
+          "file": "beanbag.cyan.ne.png",
+          "anchor": [
+            30,
+            11
+          ]
+        },
+        "nw": {
+          "file": "beanbag.cyan.nw.png",
+          "anchor": [
+            30,
+            11
+          ]
+        }
+      },
+      "fit": "anchor",
+      "base": "centred",
       "walk": "seat",
       "layer": "object",
+      "seat": 4.5,
+      "sitStyle": "floor",
+      "backrest": true,
       "use": {
         "face": "front",
         "actions": [
           "sit"
         ]
-      }
+      },
+      "note": "built from its seat spec (beanbag; src/shared/art/seatCatalog.ts)"
     },
     "beanbag.orange": {
-      "footprint": [
-        1,
-        1
-      ],
-      "fit": "anchor",
-      "seat": 10.15,
-      "facings": {
-        "se": {
-          "file": "beanbag.orange.png",
-          "anchor": [
-            26,
-            21
-          ]
-        },
-        "nw": {
-          "file": "beanbag.orange.nw.png",
-          "anchor": [
-            26,
-            15
-          ]
-        }
-      },
-      "sitStyle": "floor",
-      "backrest": true,
-      "rotation": "mirror",
       "name": "Orange beanbag",
       "category": "seating",
       "tags": [
         "beanbag",
         "orange",
-        "seating"
+        "vinyl"
       ],
       "rooms": [
         "office",
         "lab"
       ],
-      "height": 15,
-      "base": "filled",
+      "footprint": [
+        1,
+        1
+      ],
+      "height": 11,
+      "rotation": "full",
+      "facings": {
+        "se": {
+          "file": "beanbag.orange.se.png",
+          "anchor": [
+            30,
+            21
+          ]
+        },
+        "sw": {
+          "file": "beanbag.orange.sw.png",
+          "anchor": [
+            30,
+            21
+          ]
+        },
+        "ne": {
+          "file": "beanbag.orange.ne.png",
+          "anchor": [
+            30,
+            11
+          ]
+        },
+        "nw": {
+          "file": "beanbag.orange.nw.png",
+          "anchor": [
+            30,
+            11
+          ]
+        }
+      },
+      "fit": "anchor",
+      "base": "centred",
       "walk": "seat",
       "layer": "object",
+      "seat": 4.5,
+      "sitStyle": "floor",
+      "backrest": true,
       "use": {
         "face": "front",
         "actions": [
           "sit"
         ]
-      }
+      },
+      "note": "built from its seat spec (beanbag; src/shared/art/seatCatalog.ts)"
     },
     "beanbag.pink": {
-      "footprint": [
-        1,
-        1
-      ],
-      "fit": "anchor",
-      "seat": 9.5,
-      "facings": {
-        "se": {
-          "file": "beanbag.pink.png",
-          "anchor": [
-            26,
-            20
-          ]
-        },
-        "nw": {
-          "file": "beanbag.pink.nw.png",
-          "anchor": [
-            26,
-            15
-          ]
-        }
-      },
-      "sitStyle": "floor",
-      "backrest": true,
-      "rotation": "mirror",
       "name": "Pink beanbag",
       "category": "seating",
       "tags": [
         "beanbag",
         "pink",
-        "seating"
+        "vinyl"
       ],
       "rooms": [
         "arcade"
       ],
-      "height": 14,
-      "base": "filled",
+      "footprint": [
+        1,
+        1
+      ],
+      "height": 11,
+      "rotation": "full",
+      "facings": {
+        "se": {
+          "file": "beanbag.pink.se.png",
+          "anchor": [
+            30,
+            21
+          ]
+        },
+        "sw": {
+          "file": "beanbag.pink.sw.png",
+          "anchor": [
+            30,
+            21
+          ]
+        },
+        "ne": {
+          "file": "beanbag.pink.ne.png",
+          "anchor": [
+            30,
+            11
+          ]
+        },
+        "nw": {
+          "file": "beanbag.pink.nw.png",
+          "anchor": [
+            30,
+            11
+          ]
+        }
+      },
+      "fit": "anchor",
+      "base": "centred",
       "walk": "seat",
       "layer": "object",
+      "seat": 4.5,
+      "sitStyle": "floor",
+      "backrest": true,
       "use": {
         "face": "front",
         "actions": [
           "sit"
         ]
-      }
+      },
+      "note": "built from its seat spec (beanbag; src/shared/art/seatCatalog.ts)"
     },
     "beanbag.purple": {
-      "footprint": [
-        1,
-        1
-      ],
-      "fit": "anchor",
-      "seat": 9.5,
-      "facings": {
-        "se": {
-          "file": "beanbag.purple.png",
-          "anchor": [
-            26,
-            20
-          ]
-        },
-        "nw": {
-          "file": "beanbag.purple.nw.png",
-          "anchor": [
-            26,
-            15
-          ]
-        }
-      },
-      "sitStyle": "floor",
-      "backrest": true,
-      "rotation": "mirror",
       "name": "Purple beanbag",
       "category": "seating",
       "tags": [
         "beanbag",
         "purple",
-        "seating"
+        "vinyl"
       ],
       "rooms": [
         "office",
         "arcade"
       ],
-      "height": 14,
-      "base": "filled",
+      "footprint": [
+        1,
+        1
+      ],
+      "height": 11,
+      "rotation": "full",
+      "facings": {
+        "se": {
+          "file": "beanbag.purple.se.png",
+          "anchor": [
+            30,
+            21
+          ]
+        },
+        "sw": {
+          "file": "beanbag.purple.sw.png",
+          "anchor": [
+            30,
+            21
+          ]
+        },
+        "ne": {
+          "file": "beanbag.purple.ne.png",
+          "anchor": [
+            30,
+            11
+          ]
+        },
+        "nw": {
+          "file": "beanbag.purple.nw.png",
+          "anchor": [
+            30,
+            11
+          ]
+        }
+      },
+      "fit": "anchor",
+      "base": "centred",
       "walk": "seat",
       "layer": "object",
+      "seat": 4.5,
+      "sitStyle": "floor",
+      "backrest": true,
       "use": {
         "face": "front",
         "actions": [
           "sit"
         ]
-      }
+      },
+      "note": "built from its seat spec (beanbag; src/shared/art/seatCatalog.ts)"
     },
     "bench": {
-      "footprint": [
-        2,
-        1
-      ],
-      "fit": "anchor",
-      "facings": {
-        "sw": {
-          "file": "bench.sw.png",
-          "anchor": [
-            36,
-            49
-          ]
-        },
-        "ne": {
-          "file": "bench.ne.png",
-          "anchor": [
-            36,
-            39
-          ]
-        }
-      },
-      "seat": 10.5,
-      "sitStyle": "chair",
-      "backrest": true,
-      "rotation": "mirror",
-      "name": "Bench",
+      "name": "Park bench",
       "category": "seating",
       "tags": [
         "bench",
-        "seating"
+        "park",
+        "oak",
+        "iron"
       ],
       "rooms": [
         "outdoors",
         "lobby",
         "lab"
       ],
-      "height": 31,
+      "footprint": [
+        2,
+        1
+      ],
+      "height": 20.5,
+      "rotation": "full",
+      "facings": {
+        "se": {
+          "file": "bench.se.png",
+          "anchor": [
+            55,
+            36
+          ]
+        },
+        "sw": {
+          "file": "bench.sw.png",
+          "anchor": [
+            23,
+            36
+          ]
+        },
+        "ne": {
+          "file": "bench.ne.png",
+          "anchor": [
+            23,
+            29
+          ]
+        },
+        "nw": {
+          "file": "bench.nw.png",
+          "anchor": [
+            55,
+            29
+          ]
+        }
+      },
+      "fit": "anchor",
       "base": "filled",
       "walk": "seat",
       "layer": "object",
+      "seat": 9.5,
+      "sitStyle": "chair",
+      "backrest": true,
       "use": {
         "face": "front",
         "actions": [
-          "sit",
-          "artifact"
+          "sit"
         ]
-      }
+      },
+      "note": "built from its seat spec (bench; src/shared/art/seatCatalog.ts): oak slats on cast-iron ends, a two-board back"
     },
     "bench-garden.teal": {
       "name": "Teal garden bench",
       "category": "seating",
       "tags": [
-        "garden",
         "bench",
+        "garden",
         "teal",
-        "wood"
+        "painted"
       ],
       "rooms": [
         "outdoors",
@@ -1065,11 +1192,43 @@
         2,
         1
       ],
-      "height": 28,
-      "rotation": "mirror",
-      "layer": "object",
+      "height": 20.5,
+      "rotation": "full",
+      "facings": {
+        "se": {
+          "file": "bench-garden.teal.se.png",
+          "anchor": [
+            54,
+            36
+          ]
+        },
+        "sw": {
+          "file": "bench-garden.teal.sw.png",
+          "anchor": [
+            22,
+            36
+          ]
+        },
+        "ne": {
+          "file": "bench-garden.teal.ne.png",
+          "anchor": [
+            22,
+            29
+          ]
+        },
+        "nw": {
+          "file": "bench-garden.teal.nw.png",
+          "anchor": [
+            54,
+            29
+          ]
+        }
+      },
+      "fit": "anchor",
+      "base": "filled",
       "walk": "seat",
-      "seat": 10,
+      "layer": "object",
+      "seat": 9.5,
       "sitStyle": "chair",
       "backrest": true,
       "use": {
@@ -1078,72 +1237,71 @@
           "sit"
         ]
       },
-      "base": "filled",
-      "fit": "anchor",
-      "facings": {
-        "ne": {
-          "file": "bench-garden.teal.ne.png",
-          "anchor": [
-            32,
-            32
-          ]
-        },
-        "sw": {
-          "file": "bench-garden.teal.sw.png",
-          "anchor": [
-            32,
-            44
-          ]
-        }
-      }
+      "note": "built from its seat spec (bench; src/shared/art/seatCatalog.ts): a painted teal garden bench, boards on plank ends"
     },
     "bench.navy": {
-      "footprint": [
-        2,
-        1
-      ],
-      "fit": "anchor",
-      "facings": {
-        "sw": {
-          "file": "bench.navy.sw.png",
-          "anchor": [
-            32,
-            24
-          ]
-        },
-        "ne": {
-          "file": "bench.navy.ne.png",
-          "anchor": [
-            32,
-            25
-          ]
-        }
-      },
-      "seat": 12.1,
-      "sitStyle": "chair",
-      "backrest": false,
-      "rotation": "mirror",
       "name": "Navy bench",
       "category": "seating",
       "tags": [
         "bench",
         "navy",
-        "seating"
+        "velvet",
+        "brass"
       ],
       "rooms": [
         "lobby",
         "lab"
       ],
-      "height": 19,
+      "footprint": [
+        2,
+        1
+      ],
+      "height": 9.5,
+      "rotation": "full",
+      "facings": {
+        "se": {
+          "file": "bench.navy.se.png",
+          "anchor": [
+            54,
+            15
+          ]
+        },
+        "sw": {
+          "file": "bench.navy.sw.png",
+          "anchor": [
+            22,
+            15
+          ]
+        },
+        "ne": {
+          "file": "bench.navy.ne.png",
+          "anchor": [
+            22,
+            15
+          ]
+        },
+        "nw": {
+          "file": "bench.navy.nw.png",
+          "anchor": [
+            54,
+            15
+          ]
+        }
+      },
+      "fit": "anchor",
       "base": "filled",
       "walk": "seat",
       "layer": "object",
+      "seat": 9.5,
+      "sitStyle": "chair",
+      "backrest": false,
       "use": {
         "face": "front",
         "actions": [
           "sit"
         ]
-      }
+      },
+      "note": "built from its seat spec (bench; src/shared/art/seatCatalog.ts): a tufted navy velvet bench on tapered brass legs"
     },
     "bike-rack": {
       "footprint": [
@@ -2040,10 +2198,10 @@
       "name": "Sage bistro chair",
       "category": "seating",
       "tags": [
+        "chair",
         "bistro",
-        "bentwood",
         "sage",
-        "wood"
+        "cane"
       ],
       "rooms": [
         "cafe",
@@ -2053,11 +2211,43 @@
         1,
         1
       ],
-      "height": 30,
-      "rotation": "mirror",
-      "layer": "object",
+      "height": 22,
+      "rotation": "full",
+      "facings": {
+        "se": {
+          "file": "chair-bistro.sage.se.png",
+          "anchor": [
+            20,
+            39
+          ]
+        },
+        "sw": {
+          "file": "chair-bistro.sage.sw.png",
+          "anchor": [
+            20,
+            39
+          ]
+        },
+        "ne": {
+          "file": "chair-bistro.sage.ne.png",
+          "anchor": [
+            20,
+            32
+          ]
+        },
+        "nw": {
+          "file": "chair-bistro.sage.nw.png",
+          "anchor": [
+            20,
+            32
+          ]
+        }
+      },
+      "fit": "anchor",
+      "base": "centred",
       "walk": "seat",
-      "seat": 13.75,
+      "layer": "object",
+      "seat": 10,
       "sitStyle": "chair",
       "backrest": true,
       "use": {
@@ -2066,106 +2256,82 @@
           "sit"
         ]
       },
-      "base": "centred",
-      "fit": "anchor",
-      "facings": {
-        "nw": {
-          "file": "chair-bistro.sage.nw.png",
-          "anchor": [
-            22,
-            39
-          ]
-        },
-        "se": {
-          "file": "chair-bistro.sage.se.png",
-          "anchor": [
-            22,
-            45
-          ]
-        }
-      }
+      "note": "built from its seat spec (chair; src/shared/art/seatCatalog.ts): a sage-painted bentwood bistro chair with a cane seat"
     },
     "chair.cafe": {
-      "footprint": [
-        1,
-        1
-      ],
-      "fit": "anchor",
-      "facings": {
-        "se": {
-          "file": "chair.cafe.se.png",
-          "anchor": [
-            24,
-            55
-          ]
-        },
-        "nw": {
-          "file": "chair.cafe.nw.png",
-          "anchor": [
-            24,
-            48
-          ]
-        }
-      },
-      "seat": 16.9,
-      "sitStyle": "chair",
-      "backrest": true,
-      "rotation": "mirror",
       "name": "Caf\u00e9 chair",
       "category": "seating",
       "tags": [
         "chair",
         "cafe",
-        "seating"
+        "bentwood",
+        "oak",
+        "cane"
       ],
       "rooms": [
         "outdoors",
         "cafe",
         "hall"
       ],
-      "height": 32,
-      "base": "filled",
+      "footprint": [
+        1,
+        1
+      ],
+      "height": 22,
+      "rotation": "full",
+      "facings": {
+        "se": {
+          "file": "chair.cafe.se.png",
+          "anchor": [
+            20,
+            39
+          ]
+        },
+        "sw": {
+          "file": "chair.cafe.sw.png",
+          "anchor": [
+            20,
+            39
+          ]
+        },
+        "ne": {
+          "file": "chair.cafe.ne.png",
+          "anchor": [
+            20,
+            32
+          ]
+        },
+        "nw": {
+          "file": "chair.cafe.nw.png",
+          "anchor": [
+            20,
+            32
+          ]
+        }
+      },
+      "fit": "anchor",
+      "base": "centred",
       "walk": "seat",
       "layer": "object",
+      "seat": 10,
+      "sitStyle": "chair",
+      "backrest": true,
       "use": {
         "face": "front",
         "actions": [
           "sit"
         ]
-      }
+      },
+      "note": "built from its seat spec (chair; src/shared/art/seatCatalog.ts): an oak bentwood caf\u00e9 chair with a cane seat"
     },
     "chair.office": {
-      "footprint": [
-        1,
-        1
-      ],
-      "fit": "anchor",
-      "facings": {
-        "se": {
-          "file": "chair.office.se.png",
-          "anchor": [
-            20,
-            44
-          ]
-        },
-        "nw": {
-          "file": "chair.office.nw.png",
-          "anchor": [
-            20,
-            34
-          ]
-        }
-      },
-      "seat": 12.75,
-      "sitStyle": "chair",
-      "backrest": true,
-      "rotation": "mirror",
       "name": "Office chair",
       "category": "seating",
       "tags": [
         "chair",
         "office",
-        "seating"
+        "desk",
+        "mesh"
       ],
       "rooms": [
         "lobby",
@@ -2173,111 +2339,186 @@
         "lab",
         "studio"
       ],
-      "height": 30,
+      "footprint": [
+        1,
+        1
+      ],
+      "height": 23,
+      "rotation": "full",
+      "facings": {
+        "se": {
+          "file": "chair.office.se.png",
+          "anchor": [
+            24,
+            43
+          ]
+        },
+        "sw": {
+          "file": "chair.office.sw.png",
+          "anchor": [
+            24,
+            43
+          ]
+        },
+        "ne": {
+          "file": "chair.office.ne.png",
+          "anchor": [
+            24,
+            35
+          ]
+        },
+        "nw": {
+          "file": "chair.office.nw.png",
+          "anchor": [
+            24,
+            35
+          ]
+        }
+      },
+      "fit": "anchor",
       "base": "centred",
       "walk": "seat",
       "layer": "object",
+      "seat": 10,
+      "sitStyle": "chair",
+      "backrest": true,
+      "arms": true,
       "use": {
         "face": "front",
         "actions": [
           "sit"
         ]
       },
-      "arms": true
+      "note": "built from its seat spec (chair; src/shared/art/seatCatalog.ts): a charcoal mesh task chair on a caster base, a blue seat"
     },
     "chair.red": {
+      "name": "Red banquet chair",
+      "category": "seating",
+      "tags": [
+        "chair",
+        "red",
+        "velvet",
+        "gold",
+        "banquet"
+      ],
+      "rooms": [
+        "hall"
+      ],
       "footprint": [
         1,
         1
       ],
-      "fit": "anchor",
+      "height": 22,
+      "rotation": "full",
       "facings": {
         "se": {
           "file": "chair.red.se.png",
           "anchor": [
+            21,
+            39
+          ]
+        },
+        "sw": {
+          "file": "chair.red.sw.png",
+          "anchor": [
             20,
-            36
+            39
+          ]
+        },
+        "ne": {
+          "file": "chair.red.ne.png",
+          "anchor": [
+            21,
+            32
           ]
         },
         "nw": {
           "file": "chair.red.nw.png",
           "anchor": [
-            22,
-            30
+            20,
+            32
           ]
         }
       },
-      "seat": 11.3,
-      "sitStyle": "chair",
-      "backrest": true,
-      "rotation": "mirror",
-      "name": "Red chair",
-      "category": "seating",
-      "tags": [
-        "chair",
-        "red",
-        "seating"
-      ],
-      "rooms": [
-        "hall"
-      ],
-      "height": 25,
+      "fit": "anchor",
       "base": "centred",
       "walk": "seat",
       "layer": "object",
+      "seat": 10,
+      "sitStyle": "chair",
+      "backrest": true,
       "use": {
         "face": "front",
         "actions": [
           "sit"
         ]
-      }
+      },
+      "note": "built from its seat spec (chair; src/shared/art/seatCatalog.ts): a red velvet banquet chair on a gold frame"
     },
     "chair.wood": {
+      "name": "Captain's chair",
+      "category": "seating",
+      "tags": [
+        "chair",
+        "wood",
+        "oak",
+        "leather",
+        "captain"
+      ],
+      "rooms": [
+        "lounge"
+      ],
       "footprint": [
         1,
         1
       ],
-      "fit": "anchor",
+      "height": 22,
+      "rotation": "full",
       "facings": {
         "se": {
           "file": "chair.wood.se.png",
           "anchor": [
-            22,
-            35
+            25,
+            41
+          ]
+        },
+        "sw": {
+          "file": "chair.wood.sw.png",
+          "anchor": [
+            24,
+            41
+          ]
+        },
+        "ne": {
+          "file": "chair.wood.ne.png",
+          "anchor": [
+            25,
+            33
           ]
         },
         "nw": {
           "file": "chair.wood.nw.png",
           "anchor": [
-            22,
+            24,
             33
           ]
         }
       },
-      "seat": 9.97,
-      "sitStyle": "chair",
-      "backrest": true,
-      "rotation": "mirror",
-      "name": "Wooden chair",
-      "category": "seating",
-      "tags": [
-        "chair",
-        "wood",
-        "seating"
-      ],
-      "rooms": [
-        "lounge"
-      ],
-      "height": 25,
-      "base": "centred",
+      "fit": "anchor",
+      "base": "filled",
       "walk": "seat",
       "layer": "object",
+      "seat": 10,
+      "sitStyle": "chair",
+      "backrest": true,
+      "arms": true,
       "use": {
         "face": "front",
         "actions": [
           "sit"
         ]
-      }
+      },
+      "note": "built from its seat spec (chair; src/shared/art/seatCatalog.ts): an oak captain's chair with a green leather seat"
     },
     "claw-machine": {
       "footprint": [
@@ -2498,61 +2739,81 @@
       "animated": true
     },
     "couch.blue": {
-      "footprint": [
-        2,
-        1
-      ],
-      "fit": "anchor",
-      "facings": {
-        "sw": {
-          "file": "couch.blue.sw.png",
-          "anchor": [
-            32,
-            31
-          ]
-        },
-        "ne": {
-          "file": "couch.blue.ne.png",
-          "anchor": [
-            32,
-            29
-          ]
-        }
-      },
-      "seat": 11,
-      "sitStyle": "lounge",
-      "backrest": true,
-      "rotation": "mirror",
-      "name": "Blue couch",
+      "name": "Navy sofa",
       "category": "seating",
       "tags": [
         "couch",
+        "sofa",
+        "navy",
         "blue",
-        "seating"
+        "velvet"
       ],
       "rooms": [
         "lobby",
         "office",
         "lab"
       ],
-      "height": 22,
+      "footprint": [
+        2,
+        1
+      ],
+      "height": 21,
+      "rotation": "full",
+      "facings": {
+        "se": {
+          "file": "couch.blue.se.png",
+          "anchor": [
+            64,
+            41
+          ]
+        },
+        "sw": {
+          "file": "couch.blue.sw.png",
+          "anchor": [
+            29,
+            41
+          ]
+        },
+        "ne": {
+          "file": "couch.blue.ne.png",
+          "anchor": [
+            32,
+            33
+          ]
+        },
+        "nw": {
+          "file": "couch.blue.nw.png",
+          "anchor": [
+            61,
+            33
+          ]
+        }
+      },
+      "fit": "anchor",
       "base": "filled",
       "walk": "seat",
       "layer": "object",
+      "seat": 9,
+      "sitStyle": "lounge",
+      "backrest": true,
+      "arms": true,
       "use": {
         "face": "front",
         "actions": [
           "sit"
         ]
-      }
+      },
+      "note": "built from its seat spec (couch; src/shared/art/seatCatalog.ts): a navy velvet mid-century sofa on walnut feet"
     },
     "couch.green": {
-      "name": "Green couch",
+      "name": "Green Chesterfield",
       "category": "seating",
       "tags": [
         "couch",
+        "sofa",
         "green",
-        "seating"
+        "leather",
+        "chesterfield"
       ],
       "rooms": [
         "cafe",
@@ -2563,84 +2824,122 @@
         2,
         1
       ],
-      "rotation": "mirror",
-      "height": 21,
+      "height": 22,
+      "rotation": "full",
+      "facings": {
+        "se": {
+          "file": "couch.green.se.png",
+          "anchor": [
+            64,
+            43
+          ]
+        },
+        "sw": {
+          "file": "couch.green.sw.png",
+          "anchor": [
+            30,
+            43
+          ]
+        },
+        "ne": {
+          "file": "couch.green.ne.png",
+          "anchor": [
+            32,
+            35
+          ]
+        },
+        "nw": {
+          "file": "couch.green.nw.png",
+          "anchor": [
+            62,
+            35
+          ]
+        }
+      },
+      "fit": "anchor",
       "base": "filled",
       "walk": "seat",
       "layer": "object",
-      "seat": 10.15,
+      "seat": 9,
       "sitStyle": "lounge",
       "backrest": true,
+      "arms": true,
       "use": {
         "face": "front",
         "actions": [
           "sit"
         ]
       },
-      "fit": "anchor",
-      "facings": {
-        "sw": {
-          "file": "couch.green.sw.png",
-          "anchor": [
-            32,
-            30
-          ]
-        },
-        "nw": {
-          "file": "couch.green.nw.png",
-          "anchor": [
-            64,
-            28
-          ]
-        }
-      }
+      "note": "built from its seat spec (couch; src/shared/art/seatCatalog.ts): a green leather Chesterfield: tufted back, rolled arms"
     },
     "couch.purple": {
+      "name": "Purple loveseat",
+      "category": "seating",
+      "tags": [
+        "couch",
+        "loveseat",
+        "purple",
+        "satin",
+        "neon"
+      ],
+      "rooms": [
+        "arcade"
+      ],
+      "themes": [
+        "neon",
+        "dim"
+      ],
       "footprint": [
         2,
         1
       ],
-      "fit": "anchor",
+      "height": 21,
+      "rotation": "full",
       "facings": {
+        "se": {
+          "file": "couch.purple.se.png",
+          "anchor": [
+            64,
+            41
+          ]
+        },
         "sw": {
           "file": "couch.purple.sw.png",
           "anchor": [
-            32,
-            40
+            29,
+            41
           ]
         },
         "ne": {
           "file": "couch.purple.ne.png",
           "anchor": [
             32,
-            29
+            33
+          ]
+        },
+        "nw": {
+          "file": "couch.purple.nw.png",
+          "anchor": [
+            61,
+            33
           ]
         }
       },
-      "seat": 12.7,
-      "sitStyle": "lounge",
-      "backrest": true,
-      "rotation": "mirror",
-      "name": "Purple couch",
-      "category": "seating",
-      "tags": [
-        "couch",
-        "purple",
-        "seating"
-      ],
-      "rooms": [
-        "arcade"
-      ],
-      "height": 26,
+      "fit": "anchor",
       "base": "filled",
       "walk": "seat",
       "layer": "object",
+      "seat": 9,
+      "sitStyle": "lounge",
+      "backrest": true,
+      "arms": true,
       "use": {
         "face": "front",
         "actions": [
           "sit"
         ]
-      }
+      },
+      "note": "built from its seat spec (couch; src/shared/art/seatCatalog.ts): a glossy purple loveseat with rolled arms on chrome feet"
     },
     "cups": {
       "footprint": [
@@ -4193,51 +4492,68 @@
       }
     },
     "heirloom-throne": {
+      "name": "The Founders' Throne",
+      "category": "seating",
+      "tags": [
+        "throne",
+        "heirloom",
+        "gold",
+        "velvet"
+      ],
+      "rooms": [
+        "lobby"
+      ],
       "footprint": [
         1,
         1
       ],
-      "fit": "anchor",
+      "height": 29,
+      "rotation": "full",
       "facings": {
         "se": {
           "file": "heirloom-throne.se.png",
           "anchor": [
             32,
-            60
+            51
+          ]
+        },
+        "sw": {
+          "file": "heirloom-throne.sw.png",
+          "anchor": [
+            32,
+            51
+          ]
+        },
+        "ne": {
+          "file": "heirloom-throne.ne.png",
+          "anchor": [
+            32,
+            44
           ]
         },
         "nw": {
           "file": "heirloom-throne.nw.png",
           "anchor": [
             32,
-            47
+            44
           ]
         }
       },
-      "seat": 8.05,
-      "sitStyle": "chair",
-      "backrest": true,
-      "rotation": "mirror",
-      "name": "Founders\u2019 throne",
-      "category": "seating",
-      "tags": [
-        "heirloom",
-        "throne",
-        "seating"
-      ],
-      "rooms": [
-        "lobby"
-      ],
-      "height": 34,
+      "fit": "anchor",
       "base": "filled",
       "walk": "seat",
       "layer": "object",
+      "seat": 10,
+      "sitStyle": "chair",
+      "backrest": true,
+      "arms": true,
       "use": {
         "face": "front",
         "actions": [
           "sit"
         ]
-      }
+      },
+      "note": "built from its seat spec (throne; src/shared/art/seatCatalog.ts): a gold throne with a tufted blue velvet seat and back and a sunburst crest"
     },
     "heirloom-trophy": {
       "footprint": [
@@ -5051,52 +5367,42 @@
       }
     },
     "ottoman.green": {
-      "footprint": [
-        1,
-        1
-      ],
-      "fit": "anchor",
-      "facings": {
-        "se": {
-          "file": "ottoman.green.se.png",
-          "anchor": [
-            18,
-            10
-          ]
-        },
-        "nw": {
-          "file": "ottoman.green.nw.png",
-          "anchor": [
-            18,
-            10
-          ]
-        }
-      },
-      "seat": 8,
-      "sitStyle": "chair",
-      "backrest": false,
-      "rotation": "mirror",
-      "name": "Green ottoman",
+      "name": "Green pouf",
       "category": "seating",
       "tags": [
         "ottoman",
+        "pouf",
         "green",
-        "seating"
+        "velvet"
       ],
       "rooms": [
         "lounge"
       ],
-      "height": 13,
+      "footprint": [
+        1,
+        1
+      ],
+      "height": 7.5,
+      "rotation": "radial",
+      "file": "ottoman.green.se.png",
+      "anchor": [
+        23,
+        11
+      ],
+      "fit": "anchor",
       "base": "centred",
-      "sameFromBehind": true,
       "walk": "seat",
       "layer": "object",
+      "seat": 7.5,
+      "sitStyle": "chair",
+      "backrest": false,
       "use": {
         "face": "front",
         "actions": [
           "sit"
         ]
-      }
+      },
+      "note": "built from its seat spec (ottoman; src/shared/art/seatCatalog.ts): a round tufted green velvet pouf on turned feet"
     },
     "paper-bin": {
       "footprint": [
@@ -6721,25 +7027,13 @@
       "animated": true
     },
     "stool": {
-      "footprint": [
-        1,
-        1
-      ],
-      "fit": "anchor",
-      "file": "stool.png",
-      "anchor": [
-        18,
-        38
-      ],
-      "seat": 21.9,
-      "sitStyle": "stool",
-      "backrest": false,
-      "rotation": "radial",
-      "name": "Stool",
+      "name": "Bar stool",
       "category": "seating",
       "tags": [
         "stool",
-        "seating"
+        "bar",
+        "oak",
+        "iron"
       ],
       "rooms": [
         "cafe",
@@ -6747,103 +7041,112 @@
         "arcade",
         "studio"
       ],
-      "height": 25,
+      "footprint": [
+        1,
+        1
+      ],
+      "height": 15,
+      "rotation": "radial",
+      "file": "stool.se.png",
+      "anchor": [
+        23,
+        24
+      ],
+      "fit": "anchor",
       "base": "centred",
       "walk": "seat",
       "layer": "object",
+      "seat": 15,
+      "sitStyle": "stool",
+      "backrest": false,
       "use": {
         "face": "front",
         "actions": [
           "sit"
         ]
-      }
+      },
+      "note": "built from its seat spec (barstool; src/shared/art/seatCatalog.ts): an oak-topped bar stool on an iron column with a footring"
     },
     "stool.drafting": {
-      "footprint": [
-        1,
-        1
-      ],
-      "fit": "anchor",
-      "facings": {
-        "se": {
-          "file": "stool.drafting.se.png",
-          "anchor": [
-            14,
-            25
-          ]
-        },
-        "nw": {
-          "file": "stool.drafting.nw.png",
-          "anchor": [
-            14,
-            25
-          ]
-        }
-      },
-      "seat": 16.7,
-      "sitStyle": "stool",
-      "backrest": false,
-      "rotation": "mirror",
       "name": "Drafting stool",
       "category": "seating",
       "tags": [
         "stool",
         "drafting",
-        "seating"
+        "yellow",
+        "chrome"
       ],
       "rooms": [
         "studio"
       ],
-      "height": 20,
+      "footprint": [
+        1,
+        1
+      ],
+      "height": 13,
+      "rotation": "radial",
+      "file": "stool.drafting.se.png",
+      "anchor": [
+        23,
+        20
+      ],
+      "fit": "anchor",
       "base": "centred",
-      "sameFromBehind": true,
       "walk": "seat",
       "layer": "object",
+      "seat": 13,
+      "sitStyle": "stool",
+      "backrest": false,
       "use": {
         "face": "front",
         "actions": [
           "sit"
         ]
-      }
+      },
+      "note": "built from its seat spec (barstool; src/shared/art/seatCatalog.ts): a yellow vinyl drafting stool on a chrome gas lift"
     },
     "stool.neon": {
-      "footprint": [
-        1,
-        1
-      ],
-      "fit": "anchor",
-      "file": "stool.neon.png",
-      "anchor": [
-        15,
-        31
-      ],
-      "seat": 19.7,
-      "sitStyle": "stool",
-      "backrest": false,
-      "rotation": "radial",
-      "name": "Neon stool",
+      "name": "Diner stool",
       "category": "seating",
       "tags": [
         "stool",
-        "neon",
-        "seating"
+        "diner",
+        "pink",
+        "chrome",
+        "neon"
       ],
       "rooms": [
         "arcade"
       ],
       "themes": [
-        "neon"
+        "neon",
+        "dim"
       ],
-      "height": 23,
+      "footprint": [
+        1,
+        1
+      ],
+      "height": 15,
+      "rotation": "radial",
+      "file": "stool.neon.se.png",
+      "anchor": [
+        23,
+        24
+      ],
+      "fit": "anchor",
       "base": "centred",
       "walk": "seat",
       "layer": "object",
+      "seat": 15,
+      "sitStyle": "stool",
+      "backrest": false,
       "use": {
         "face": "front",
         "actions": [
           "sit"
         ]
-      }
+      },
+      "note": "built from its seat spec (barstool; src/shared/art/seatCatalog.ts): a pink vinyl diner stool on a chrome pedestal"
     },
     "stump": {
       "footprint": [

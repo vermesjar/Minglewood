@@ -262,7 +262,7 @@ export function wallFit(
 
 /**
  * The seat section is the seat standard's own SeatProfile (src/shared/world/seats.ts: seat, sitStyle, backrest,
- * arms); how people sit in it is its model's (art/seat-models.json). A colour variant without its own borrows its
+ * arms), written by scripts/seat-build.ts from the seat's spec (src/shared/art/seatCatalog.ts). A colour variant without its own borrows its
  * family's.
  */
 export interface ModelSpec extends Partial<SeatProfile> {

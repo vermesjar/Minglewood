@@ -4,8 +4,7 @@ import type { AddressInfo } from 'node:net';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { SeatModel } from '@shared/world/seatModels';
-import { cleanFurniture, cleanSeatModel, devLabRoutes, DraftStore, isLocalRequest, LabError, MAX_REF_BYTES, zipDir } from './devLab';
+import { cleanFurniture, devLabRoutes, DraftStore, isLocalRequest, LabError, MAX_REF_BYTES, zipDir } from './devLab';
 
 const req = (over: { ip?: string; headers?: Record<string, string>; method?: string } = {}) => ({
   socket: { remoteAddress: over.ip ?? '127.0.0.1' },
@@ -95,38 +94,10 @@ describe('drafts on disk', () => {
     expect(cleanFurniture({ name: 'x'.repeat(100) }).name).toHaveLength(40);
   });
 
-  it('keeps a seat model on seating only, with its per-view sitting points and traced over layers', () => {
-    const model: SeatModel = {
-      size: [1, 1],
-      parts: [
-        { part: 'seat', u: [0.1, 0.9], v: [0, 0.9], z: [4, 11.004] },
-        { part: 'back', u: [0, 1], v: [0.7, 0.95], z: [11, 26] },
-      ],
-      sits: [[0.5, 0.45, 11]],
-      views: { ne: [[0.5, 0.8]], sw: [[0.5, 0.4, 3] as never] },
-      over: { nw: [[[1, 2], [30, 2], [30, 20]], [[1, 1]]] },
-      fitted: '2026-09-29',
-      reviewed: '2026-09-29',
-    };
-    const draft = { model, reviewed: '2026-09-30', for: 'sig' };
-    expect(cleanFurniture({ category: 'decor', seatModel: draft }).seatModel).toBeNull();
-    const kept = cleanFurniture({ category: 'seating', seatModel: draft }).seatModel!;
-    expect(kept.reviewed).toBe('2026-09-30');
-    expect(kept.for).toBe('sig');
-    expect(kept.model.parts[0].z).toEqual([4, 11]);
-    // a well-formed view's nudge is kept, a malformed one dropped; a traced layer keeps its polygons (not a lone point)
-    expect(kept.model.views).toEqual({ ne: [[0.5, 0.8]] });
-    expect(kept.model.over).toEqual({ nw: [[[1, 2], [30, 2], [30, 20]]] });
-    expect(kept.model.fitted).toBe('2026-09-29');
-    // the day it's passed is the draft's; the model's own stamps are written at publish (scripts/lab-model.ts)
-    expect(kept.model.reviewed).toBeUndefined();
-    expect(cleanSeatModel({ model: { ...model, parts: [] }, for: 'sig' })).toBeNull();
-  });
-
-  it('keeps nothing of how seats were rigged and calibrated before their models', () => {
-    // a draft saved by the old Lab: its rig, its calibration and the catalog's hip depths go on its next save
-    const f = cleanFurniture({ category: 'seating', seatRig: { views: {} }, seatCalibration: { cushion: [1, 2] }, catalogProfile: { seatDepth: 0 } } as never);
-    expect(Object.keys(f).filter((k) => /seat|profile|calibration/i.test(k)).sort()).toEqual(['seat', 'seatModel']);
+  it('keeps nothing of how seats were rigged, calibrated or modelled before the seat framework', () => {
+    // a draft saved by the old Lab: its rig, its calibration, its model and the catalog's hip depths go on its next save
+    const f = cleanFurniture({ category: 'seating', seatRig: { views: {} }, seatCalibration: { cushion: [1, 2] }, seatModel: { model: {} }, catalogProfile: { seatDepth: 0 } } as never);
+    expect(Object.keys(f).filter((k) => /seat|profile|calibration|model/i.test(k)).sort()).toEqual(['seat']);
   });
 
   it('clamps a spec to what the pipeline accepts', () => {

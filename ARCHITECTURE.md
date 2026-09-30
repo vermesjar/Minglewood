@@ -41,6 +41,10 @@ Evaluated Phaser and PixiJS. Chose a small purpose-built Canvas2D engine because
 - No WebGL context requirements inside the Discord iframe; zero engine dependencies.
 - The seam for a future move to WebGL or real art is `sprites/registry.ts` (sprite key → Sprite)
   and `WorldView` (the only renderer). Scene data and game logic don't know how things are drawn.
+- **Seats are rendered from their models** (`src/shared/art/seatRender.ts`, docs/seating.md): a seat is a
+  spec on a kind sized from the figure, drawn in all four facings with a per-pixel depth map, and sitters
+  are composed against that depth pixel by pixel (`seatCompose.ts`). The same pure code runs in the client,
+  the scripts that write the catalog's PNGs, and the gate that grades every seat offline and live.
 
 ### Realtime: authoritative Node hub over WebSockets, scene-scoped
 - One `OrgHub` per organization (tenancy boundary). A socket subscribes to exactly one scene and

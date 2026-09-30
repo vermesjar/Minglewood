@@ -9,7 +9,6 @@ import { getScene } from '@shared/world';
 import { isSeat, type Facing } from '@shared/world/scene';
 import { seatSpots } from '@shared/world/seats';
 import { WorldView } from '../engine/WorldView';
-import { setSeatModelsEnabled } from '../engine/sprites/art';
 import { avatarSprite, type Pose } from '../engine/sprites/avatar';
 import { blit } from '../engine/sprites/painter';
 
@@ -31,8 +30,6 @@ export interface SeatShotOpts {
   facings?: Facing[];
   /** Stand everyone on their cushion's tile instead of seating them (the moment before sitting or stepping off). */
   standing?: boolean;
-  /** Draw seats by their 3D models (on) or their rigs (off); default: as the game does. */
-  models?: boolean;
 }
 
 const noop = () => undefined;
@@ -193,7 +190,6 @@ export async function seatShots(o: SeatShotOpts): Promise<Partial<Record<Facing,
         });
       }
   }
-  if (o.models !== undefined) setSeatModelsEnabled(o.models);
   const view = new WorldView(canvas, { onGroundClick: noop, onActorClick: noop, onObjectClick: noop, onObjectActivate: noop, nameOf: () => '' });
   view.loadScene(scene, occupants, { meId: '', activeDecor: new Set(), festiveRooms: new Set(), party: false });
   const v = view as unknown as {

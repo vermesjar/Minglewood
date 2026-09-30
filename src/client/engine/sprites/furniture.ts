@@ -1,8 +1,8 @@
-/** Interior furniture sprites. Footprints match the scene data (w×d tiles). */
+/** Interior furniture sprites (the procedural fallbacks for pieces without finished art). Seats are never drawn here: every seat is built from its spec (src/shared/art/seatCatalog.ts). Footprints match the scene data (w×d tiles). */
 import type { Facing } from '@shared/world/scene';
 import { darken, lighten } from './color';
 import { IsoPainter, rng, type Sprite } from './painter';
-import { rocketStatueSprite, seatSprite } from './nature';
+import { rocketStatueSprite } from './nature';
 
 const WOOD = '#b07a4a';
 const COLORS: Record<string, string> = {
@@ -22,50 +22,6 @@ const COLORS: Record<string, string> = {
   light: '#e9d7b8',
 };
 const col = (v: string | undefined, fallback: string) => (v && COLORS[v]) || fallback;
-
-export function chairSprite(facing: Facing, variant?: string): Sprite {
-  if (variant === 'office') return seatSprite(facing, { color: '#3a3a46', seat: '#5b5fc7' });
-  if (variant === 'red') return seatSprite(facing, { color: '#9e3a2e', seat: '#c6412f' });
-  return seatSprite(facing, { color: WOOD, seat: lighten(WOOD, 0.1) });
-}
-
-export function stoolSprite(): Sprite {
-  const P = new IsoPainter(1, 1, 16);
-  P.cylinder(0.5, 0.5, 0, 0.05, 9, '#3a3a46');
-  P.cylinder(0.5, 0.5, 9, 0.22, 2, '#e0b03f');
-  return P.finish();
-}
-
-export function couchSprite(w: number, d: number, facing: Facing, variant?: string): Sprite {
-  const P = new IsoPainter(w, d, 24);
-  const c = col(variant, '#5f9f6e');
-  const along = facing === 'ne' || facing === 'sw' ? 'x' : 'y';
-  const back = () => {
-    if (facing === 'se') P.box(0.05, 0.05, 0, 0.25, d - 0.1, 14, darken(c, 0.05));
-    if (facing === 'sw') P.box(0.05, 0.05, 0, w - 0.1, 0.25, 14, darken(c, 0.05));
-    if (facing === 'nw') P.box(w - 0.3, 0.05, 0, 0.25, d - 0.1, 14, darken(c, 0.05));
-    if (facing === 'ne') P.box(0.05, d - 0.3, 0, w - 0.1, 0.25, 14, darken(c, 0.05));
-  };
-  if (facing === 'se' || facing === 'sw') back();
-  P.box(0.08, 0.08, 0, w - 0.16, d - 0.16, 7, c);
-  // cushions seams
-  if (along === 'x') P.box(w / 2 - 0.02, 0.1, 7, 0.04, d - 0.2, 0, darken(c, 0.2));
-  else P.box(0.1, d / 2 - 0.02, 7, w - 0.2, 0.04, 0, darken(c, 0.2));
-  // arms
-  if (along === 'x') {
-    P.box(0.02, 0.05, 0, 0.2, d - 0.1, 10, darken(c, 0.08));
-    P.box(w - 0.22, 0.05, 0, 0.2, d - 0.1, 10, darken(c, 0.08));
-  } else {
-    P.box(0.05, 0.02, 0, w - 0.1, 0.2, 10, darken(c, 0.08));
-    P.box(0.05, d - 0.22, 0, w - 0.1, 0.2, 10, darken(c, 0.08));
-  }
-  if (facing === 'ne' || facing === 'nw') back();
-  return P.finish();
-}
-
-export function armchairSprite(facing: Facing, variant?: string): Sprite {
-  return couchSprite(1, 1, facing, variant);
-}
 
 export function tableRoundSprite(): Sprite {
   const P = new IsoPainter(1, 1, 22);
@@ -184,26 +140,6 @@ export function serverRackSprite(): Sprite {
     P.faceRect('left', 0.65, 0.25 + rand() * 0.4, 4.5 + i * 4, 0.04, 1, rand() > 0.3 ? '#7cf57c' : '#ffb347');
   }
   P.faceRect('left', 0.65, 0.3, 30, 0.35, 1, '#ffd23f');
-  return P.finish();
-}
-
-export function beanbagSprite(variant?: string): Sprite {
-  const P = new IsoPainter(1, 1, 16);
-  const c = col(variant, '#ff8a3d');
-  const [cx, cy] = P.p(0.5, 0.5, 4);
-  const ctx = P.ctx;
-  ctx.fillStyle = darken(c, 0.25);
-  ctx.beginPath();
-  ctx.ellipse(cx + 1, cy + 1, 12, 7, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = c;
-  ctx.beginPath();
-  ctx.ellipse(cx, cy - 1, 11, 7, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = lighten(c, 0.25);
-  ctx.beginPath();
-  ctx.ellipse(cx - 3, cy - 4, 5, 3, 0, 0, Math.PI * 2);
-  ctx.fill();
   return P.finish();
 }
 

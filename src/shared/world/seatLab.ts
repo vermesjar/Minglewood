@@ -28,7 +28,7 @@ const THEME: InteriorTheme = {
 
 /**
  * A seat's footprint [width, depth]: given in the id (`seatlab-<key>~2x1`), else its family's (couches and benches
- * are two cushions wide). Never read from art/seat-models.json: the dev server imports this file, and a model saved
+ * are two cushions wide). Never read from the catalog's builds: the dev server imports this file, and a spec saved
  * every few seconds by the fitting tools would restart it under everyone's bots.
  */
 function sizeOf(key: string, given?: string): [number, number] {

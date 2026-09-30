@@ -30,7 +30,7 @@ const FACINGS: Facing[] = ['se', 'sw', 'ne', 'nw'];
 const MIRROR: Record<Facing, Facing> = { se: 'sw', sw: 'se', ne: 'nw', nw: 'ne' };
 const OUT = 'art/review/furniture';
 /** Things drawn once for every rotation because they look the same from all sides. */
-const ROUND = /^(plant|lamp|stool|jar|grinder|cake-stand|cups|beanbag|table-round|table-low|heirloom-globe|heirloom-bell|heirloom-trophy|time-capsule|heirloom-gold)/;
+const ROUND = /^(plant|lamp|stool|ottoman|jar|grinder|cake-stand|cups|beanbag|table-round|table-low|heirloom-globe|heirloom-bell|heirloom-trophy|time-capsule|heirloom-gold)/;
 const SEATS = /^(chair|armchair|couch|stool|beanbag|bench|heirloom-throne)/;
 /**
  * Keys placed inside rooms (and so in the rearrangeable furniture catalogue): these need every rotation.
@@ -167,14 +167,15 @@ export function resolve(e: Entry, facing: Facing, sprites: string): Placed | nul
   let [w, d] = e.footprint;
   let mirror = false;
   if (e.facings) {
+    // a drawing per facing is for the footprint as placed in that facing (models.ts footprintFacing): a long piece
+    // facing se or nw is turned
+    if (facing === 'se' || facing === 'nw') [w, d] = [d, w];
     rec = e.facings[facing];
     if (!rec && e.facings[MIRROR[facing]]) {
       rec = e.facings[MIRROR[facing]];
       mirror = true;
     }
     rec ??= Object.values(e.facings)[0];
-    // a long piece turned 90° swaps its footprint
-    if (mirror && w !== d) [w, d] = [d, w];
   } else if (w !== d && (facing === 'sw' || facing === 'nw')) {
     // a single drawing of a long piece: as authored (se, ne), or turned 90° — its mirror with the footprint
     // swapped (sw, nw), exactly as art.ts does for an object placed with w and d swapped

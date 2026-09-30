@@ -1,4 +1,4 @@
-/** Small raster helpers for review sheets (scripts/seat-model.ts): plot, rectangles, lines, pasting, stacking. */
+/** Small raster helpers for review sheets (scripts/seat-grade.ts): plot, rectangles, lines, pasting, stacking. */
 import { blank, type Img } from './png';
 
 export type RGB = [number, number, number];

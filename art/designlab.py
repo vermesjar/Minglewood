@@ -318,36 +318,12 @@ def wall_standard(e: dict, img: Image.Image):
     e["height"] = h
 
 
-def model_check(d: Path, draft: dict, e: dict, write: bool = False) -> list[str]:
-    """THE SEAT CHECK (scripts/lab-model.ts: seatLayers.ts seatProblems, the gate's): the seat's model holding in every
-    facing on the staged drawings, and passed by the reviewer; with `write`, stored in art/seat-models.json (after the
-    piece is published). A seat is published with its model: that's how people are drawn sitting in it."""
-    if e.get("walk") != "seat":
+def seat_checks(_d: Path, draft: dict, e: dict) -> list[str]:
+    """Seats aren't drafted here: every seat is built from its spec on the seat framework (src/shared/world/seatSpec.ts,
+    the catalog in src/shared/art/seatCatalog.ts, scripts/seat-build.ts), never drawn. A seating draft can't publish."""
+    if e.get("walk") != "seat" and draft["furniture"].get("category") != "seating":
         return []
-    model = draft["furniture"].get("seatModel")
-    if not model or not model.get("model"):
-        return ["give the seat its model: Auto-fit in How people sit in it, tune it and pass it"]
-    (d / "stage" / "model.json").write_text(json.dumps(model), encoding="utf-8")
-    # (--no-maglev: Node 24.12's Maglev JIT crashes node on this machine)
-    args = ["node", "--no-maglev", *studio.TSX, "scripts/lab-model.ts", "--entries", str(d / "stage" / "entries.json"),
-            "--sprites", str(d / "stage" / "sprites"), "--key", draft["key"], "--model", str(d / "stage" / "model.json")]
-    if write:
-        args.append("--write")
-    r = subprocess.run(args, cwd=HERE.parent, capture_output=True, text=True, encoding="utf-8")
-    lines = [ln for ln in r.stdout.splitlines() if ln.startswith("{")]
-    res = json.loads(lines[-1]) if lines else {"error": (r.stderr or "model check failed").strip()[-400:]}
-    if res.get("error"):
-        return [f"seat model: {res['error']}"]
-    return [f"seat model, {p_}" for p_ in res.get("problems", [])]
-
-
-def has_model(draft: dict) -> bool:
-    return bool((draft["furniture"].get("seatModel") or {}).get("model"))
-
-
-def seat_checks(d: Path, draft: dict, e: dict) -> list[str]:
-    """What a seat must pass to publish: its model, holding in every facing and passed by the reviewer."""
-    return model_check(d, draft, e)
+    return ["seats are built from the seat framework (src/shared/art/seatCatalog.ts), not drawn here"]
 
 
 def cmd_furniture_check(a):
@@ -376,7 +352,7 @@ def cmd_furniture_publish(a):
     e, sprites = stage(d, draft)
     seat = seat_checks(d, draft, e)
     if seat:
-        out({"error": "the seat isn't ready: its model doesn't hold yet", "problems": seat}, 1)
+        out({"error": "seats are built from the seat framework, not published from the Lab", "problems": seat}, 1)
     # a key already in the catalog is only replaced by its own draft: opened from the library, or published from here
     args = ["lab-publish", "--entries", str(d / "stage" / "entries.json"), "--sprites", str(sprites)]
     if draft.get("origin") == key or draft.get("published"):
@@ -385,10 +361,6 @@ def cmd_furniture_publish(a):
     if not res.get("ok"):
         problems = [p_ for ps in (res.get("problems") or {}).values() for p_ in ps]
         out({"error": res.get("error") or "the model check refuses it", "problems": problems}, 1)
-    if has_model(draft):
-        model = model_check(d, draft, e, write=True)
-        if model:
-            out({"error": "published, but its model couldn't be stored in art/seat-models.json", "problems": model}, 1)
     draft["published"] = time.strftime("%Y-%m-%dT%H:%M:%S")
     save(d, draft)
     history(d, "publish", key=key)

@@ -1,5 +1,4 @@
 /** Outdoor sprites: trees, shrubs, street furniture, landmarks. */
-import type { Facing } from '@shared/world/scene';
 import { darken, lighten } from './color';
 import { IsoPainter, rng, type Sprite } from './painter';
 
@@ -125,32 +124,6 @@ export function flowerbedSprite(variant: string): Sprite {
     P.px(x, y, 3, 0, -3, 1, 3, '#4f8f3c');
     P.px(x, y, 3, -1, -5, 3, 2, i % 3 ? col : '#fffaf0');
   }
-  return P.finish();
-}
-
-/** Seat with a backrest on the side opposite `facing`. Shared by benches and chairs. */
-export function seatSprite(facing: Facing, opts: { color: string; seat?: string; wide?: boolean; plaque?: boolean; height?: number }): Sprite {
-  const P = new IsoPainter(1, 1, 28);
-  const c = opts.color;
-  const seatC = opts.seat ?? c;
-  const sh = opts.height ?? 7;
-  const legs = (x: number, y: number) => P.box(x, y, 0, 0.06, 0.06, sh, darken(c, 0.3));
-  const inset = opts.wide ? 0.05 : 0.2;
-  legs(inset, inset);
-  legs(1 - inset - 0.06, inset);
-  legs(inset, 1 - inset - 0.06);
-  legs(1 - inset - 0.06, 1 - inset - 0.06);
-  const back = () => {
-    const bh = 10;
-    if (facing === 'se') P.box(inset - 0.02, inset, sh, 0.1, 1 - inset * 2, bh + 2, c);
-    if (facing === 'sw') P.box(inset, inset - 0.02, sh, 1 - inset * 2, 0.1, bh + 2, c);
-    if (facing === 'nw') P.box(1 - inset - 0.08, inset, sh, 0.1, 1 - inset * 2, bh + 2, c);
-    if (facing === 'ne') P.box(inset, 1 - inset - 0.08, sh, 1 - inset * 2, 0.1, bh + 2, c);
-  };
-  if (facing === 'se' || facing === 'sw') back();
-  P.box(inset, inset, sh, 1 - inset * 2, 1 - inset * 2, 2, seatC);
-  if (facing === 'ne' || facing === 'nw') back();
-  if (opts.plaque) P.px(0.5, 0.5, sh + 8, -1, 0, 3, 2, '#ffd23f');
   return P.finish();
 }
 

@@ -13,7 +13,6 @@ import type { IncomingHttpHeaders } from 'node:http';
 import { CATEGORIES, ROOM_KINDS, THEMES, wallSpanFor, type ModelCategory, type RoomKind, type Theme } from '@shared/models';
 import { humanizeKey, NAME_MAX } from '@shared/catalogName';
 import { seatProfile } from '@shared/world/seats';
-import { MODEL_FACINGS, modelShapeProblems, tidyModel, type SeatModel, type SeatModels } from '@shared/world/seatModels';
 
 /* ------------------------------------------------------------------ the guard */
 
@@ -264,11 +263,6 @@ export interface FurnitureSpec {
   sitStyle: 'chair' | 'stool' | 'lounge' | 'floor';
   backrest: boolean;
   arms: boolean;
-  /**
-   * How people sit in it: its 3D model (the seat model standard, src/shared/world/seatModels.ts; the Lab's
-   * ModelPanel), the day the reviewer passed it and the drawings it was made on. A seat publishes with one.
-   */
-  seatModel?: SeatModelDraft | null;
   surface: number | null;
   light: { x: number; y: number; r?: number } | null;
   wallV?: [number, number];
@@ -326,7 +320,6 @@ function defaultFurniture(): FurnitureSpec {
     sitStyle: 'chair',
     backrest: true,
     arms: false,
-    seatModel: null,
     surface: null,
     light: null,
     actions: [],
@@ -379,7 +372,6 @@ export function cleanFurniture(f: Partial<FurnitureSpec>): FurnitureSpec {
     sitStyle: (['chair', 'stool', 'lounge', 'floor'] as const).includes(f.sitStyle as never) ? (f.sitStyle as FurnitureSpec['sitStyle']) : 'chair',
     backrest: f.backrest === undefined ? true : !!f.backrest,
     arms: category === 'seating' && !!f.arms,
-    seatModel: category === 'seating' ? cleanSeatModel(f.seatModel) : null,
     surface: f.surface === null || f.surface === undefined || (f.surface as unknown) === '' ? null : num(f.surface, 0, 80, 20),
     light,
     wallV: rotation === 'flat' ? [num(f.wallV?.[0], 0, 60, 18), num(f.wallV?.[1], 1, 62, 47)] : undefined,
@@ -394,52 +386,6 @@ export function cleanFurniture(f: Partial<FurnitureSpec>): FurnitureSpec {
     quality: f.quality === 'high' || f.quality === 'low' ? f.quality : 'medium',
     colors: num(f.colors, 8, 64, d.colors),
   };
-}
-
-const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
-const finite = (x: unknown): x is number => typeof x === 'number' && Number.isFinite(x);
-
-/**
- * A draft's seat model (src/client/studio/ModelPanel.tsx DraftModel): the model (its boxes, its sitting points, each
- * view's own sitting points `views` and traced over layer `over`, the day it was fitted, a note), the day the
- * reviewer passed it, and the drawings it was made on.
- */
-export interface SeatModelDraft {
-  model: SeatModel;
-  reviewed?: string;
-  for: string;
-}
-
-/** A seat model as a draft may keep it: well-formed and in range, or null (anything malformed in a view is dropped). */
-export function cleanSeatModel(v: unknown): SeatModelDraft | null {
-  const r = v as Partial<SeatModelDraft> | null | undefined;
-  if (!r || typeof r !== 'object' || !r.model || typeof r.model !== 'object') return null;
-  const m = r.model;
-  const base: SeatModel = { size: m.size, parts: m.parts, sits: m.sits };
-  if (modelShapeProblems(base).length || m.parts.length > 48 || m.sits.length > 8) return null;
-  const views: NonNullable<SeatModel['views']> = {};
-  const over: NonNullable<SeatModel['over']> = {};
-  for (const f of MODEL_FACINGS) {
-    const list = (m.views as Record<string, unknown> | undefined)?.[f];
-    if (Array.isArray(list) && list.length === m.sits.length && list.every((q) => Array.isArray(q) && q.length === 2 && q.every(finite)))
-      views[f] = (list as number[][]).map((q): [number, number] => [num(q[0], -4, 8, 0), num(q[1], -4, 8, 0)]);
-    const polys = (m.over as Record<string, unknown> | undefined)?.[f];
-    if (!Array.isArray(polys)) continue;
-    const kept = polys
-      .slice(0, 32)
-      .filter((poly): poly is unknown[] => Array.isArray(poly) && poly.length <= 4000)
-      .map((poly) => poly.filter((q): q is number[] => Array.isArray(q) && q.length === 2 && q.every(finite)).map((q): [number, number] => [num(q[0], -4000, 4000, 0), num(q[1], -4000, 4000, 0)]))
-      .filter((poly) => poly.length >= 3);
-    if (kept.length) over[f] = kept;
-  }
-  const model = tidyModel({
-    ...base,
-    ...(Object.keys(views).length ? { views } : {}),
-    ...(Object.keys(over).length ? { over } : {}),
-    ...(typeof m.fitted === 'string' && DAY_RE.test(m.fitted) ? { fitted: m.fitted } : {}),
-    ...(typeof m.note === 'string' ? { note: str(m.note, 200) } : {}),
-  });
-  return { model, ...(typeof r.reviewed === 'string' && DAY_RE.test(r.reviewed) ? { reviewed: r.reviewed } : {}), for: str(r.for, 4000) };
 }
 
 export function cleanPart(p: Partial<PartSpec>): PartSpec {
@@ -647,8 +593,6 @@ export function devLabRoutes(root = resolve(ART, 'drafts'), opts: { run?: typeof
   const r = Router();
   const PUBLIC_ART = resolve(process.cwd(), 'public', 'art');
   const readManifest = () => JSON.parse(readFileSync(resolve(PUBLIC_ART, 'manifest.json'), 'utf8')) as { scale: number; sprites: Record<string, Record<string, unknown>> };
-  const MODELS_FILE = resolve(ART, 'seat-models.json');
-  const readModels = (): SeatModels => (existsSync(MODELS_FILE) ? (JSON.parse(readFileSync(MODELS_FILE, 'utf8')) as SeatModels) : {});
   const wrap = (fn: (req: Request, res: Response) => Promise<unknown> | unknown) => async (req: Request, res: Response) => {
     try {
       const v = await fn(req, res);
@@ -867,21 +811,8 @@ export function devLabRoutes(root = resolve(ART, 'drafts'), opts: { run?: typeof
       const measured = e as { height?: number; base?: string };
       if (measured.height !== undefined || measured.base !== undefined)
         (d as Draft & { measured?: Record<string, unknown> }).measured = { ...(measured.height !== undefined ? { height: measured.height } : {}), ...(measured.base !== undefined ? { base: measured.base } : {}) };
-      // a seat comes with its model (art/seat-models.json), passed as the catalog has it: tune it here
-      if (d.furniture && e.seat !== undefined) {
-        d.furniture.arms = !!seatProfile(key.split('.')[0], { arms: (e as { arms?: boolean }).arms }).arms;
-        const own = readModels()[key];
-        if (own) {
-          // the drawings it's on (the Lab's seatLab.ts drawingsSignature): the catalog's, as this draft has them
-          const sig = JSON.stringify(
-            Object.entries(d.views)
-              .filter(([, v]) => v.file)
-              .sort(([a], [b]) => a.localeCompare(b))
-              .map(([k, v]) => [k, v.file, v.anchor, v.nudge ?? [0, 0]]),
-          );
-          d.furniture.seatModel = cleanSeatModel({ model: own, reviewed: own.reviewed, for: sig });
-        }
-      }
+      // a seat's arms, as its family has them (the seat framework builds the seat itself: src/shared/art/seatCatalog.ts)
+      if (d.furniture && e.seat !== undefined) d.furniture.arms = !!seatProfile(key.split('.')[0], { arms: (e as { arms?: boolean }).arms }).arms;
       store.write(d);
       return d;
     }),
@@ -900,9 +831,6 @@ export function devLabRoutes(root = resolve(ART, 'drafts'), opts: { run?: typeof
         const f = d.furniture;
         const e: Record<string, unknown> = { name: f.name, category: f.category, footprint: f.footprint, height: f.height, fit: 'anchor', rotation: f.rotation };
         if (f.seat !== null) Object.assign(e, { seat: f.seat, sitStyle: f.sitStyle, backrest: f.backrest, arms: f.arms });
-        // the renderer takes a draft's own model from its sandbox entry (art.ts artSeatModel): people sit in the
-        // sandbox as they will in the game (sprites/seatLayers.ts)
-        if (f.seatModel) e.seatModel = f.seatModel.model;
         if (f.surface !== null) e.surface = f.surface;
         if (f.light) e.light = f.light;
         if (f.rotation === 'flat') {
@@ -955,7 +883,6 @@ export function devLabRoutes(root = resolve(ART, 'drafts'), opts: { run?: typeof
     '/library',
     wrap(async () => {
       const m = readManifest();
-      const models = readModels();
       const [fr, model] = await Promise.all([review(), modelCheckCatalog()]);
       const out = [];
       for (const [key, e] of Object.entries(m.sprites)) {
@@ -974,7 +901,6 @@ export function devLabRoutes(root = resolve(ART, 'drafts'), opts: { run?: typeof
           footprint: e.footprint,
           seat: e.seat ?? null,
           facings: Object.keys((e.facings as object) ?? {}),
-          ...(e.seat !== undefined ? { model: models[key] ? (models[key].reviewed ? 'reviewed' : 'fitted') : 'none' } : {}),
           issues,
         });
       }

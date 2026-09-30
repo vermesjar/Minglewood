@@ -7,14 +7,13 @@ import type { Facing, SceneObject } from '@shared/world/scene';
 import { makeCanvas, type Sprite } from './painter';
 import { centredAnchor } from './footing';
 import { seatProfile, type SeatProfile } from '@shared/world/seats';
-import type { SeatModel, SeatModels } from '@shared/world/seatModels';
+import type { SeatModel } from '@shared/world/seatModels';
+import { isCatalogSeat, seatArtOf, seatBuildOf } from '@shared/art/seatCatalog';
 import type { Drawing, ModelSpec, Rotation } from '@shared/models';
 import { WALL_PX_PER_TILE, wallFit, type Manifest as WallManifest } from '@shared/models';
 import { registerWallArt } from '@shared/world/decor';
 import type { Pixels } from '@shared/art/footing';
 import type { ArtSource } from '@shared/art/source';
-// the seat models: every seat's 3D proxy, shared by its four facings (src/shared/world/seatModels.ts; scripts/seat-model.ts)
-import MODELS_JSON from '../../../../art/seat-models.json';
 
 /** A drawing of a model and a manifest entry: THE MODEL SPEC (src/shared/models.ts). */
 type ArtFile = Drawing;
@@ -85,28 +84,44 @@ function keyFor(o: SceneObject): string | null {
   return manifest.sprites[o.sprite] ? o.sprite : null;
 }
 
-const MODELS = MODELS_JSON as unknown as SeatModels;
 /**
- * The game draws seats Habbo's way, in layers — the seat's drawing behind its sitters and its parts between them and
- * us over them — and those layers, the sitting points and the legs all come from the seat's 3D model
- * (sprites/seatLayers.ts). (Per-pixel depth against a flat figure kept misplacing bodies, Carter 2026-09-29: the
- * model no longer decides anything pixel by pixel against a body.) Off only for comparison renders.
+ * The game draws seats Habbo's way, in layers — the seat behind its sitters and what of it stands between them and us
+ * over them — from the seat's own model (src/shared/world/seatSpec.ts): every catalog seat is built and drawn from
+ * its spec (src/shared/art/seatCatalog.ts), so its pixels and its depth are one thing (sprites/seatLayers.ts).
  */
-let modelsOff = false;
-export function setSeatModelsEnabled(on: boolean) {
-  modelsOff = !on;
+
+/** The seat's model (the framework's build of it), or null for anything that isn't a catalog seat. */
+export function artSeatModel(o: SceneObject): SeatModel | null {
+  const key = keyFor(o) ?? (o.variant ? `${o.sprite}.${o.variant}` : o.sprite);
+  return seatBuildOf(key)?.model ?? null;
 }
 
-/**
- * The seat's model (its 3D proxy: the seat model standard), or null for a seat without one (the renderer then falls
- * back to its rig, else to inferring it). Only for the 2×-density art it was fitted to. A Design Lab draft carries its
- * own in its sandbox manifest entry (`seatModel`).
- */
-export function artSeatModel(o: SceneObject, sp: Sprite): SeatModel | null {
-  const key = keyFor(o);
-  if (modelsOff || !key || !manifest || (sp.scale ?? 1) !== 2) return null;
-  const own = (manifest.sprites[key] as ArtEntry & { seatModel?: SeatModel }).seatModel;
-  return own ?? MODELS[key] ?? null;
+/** The catalog key a seat is built from, or null. */
+export function artSeatKey(o: SceneObject): string | null {
+  const key = keyFor(o) ?? (o.variant ? `${o.sprite}.${o.variant}` : o.sprite);
+  return isCatalogSeat(key) ? key : null;
+}
+
+const seatSprites = new Map<string, Sprite>();
+
+/** A catalog seat's sprite in a facing: its render painted into a canvas (once per key and facing). */
+function seatSpriteFor(key: string, facing: Facing): Sprite | null {
+  const k = `${key}|${facing}`;
+  const had = seatSprites.get(k);
+  if (had) return had;
+  const art = seatArtOf(key, facing);
+  if (!art) return null;
+  const { w, h } = art.px;
+  const canvas = makeCanvas(w, h);
+  const ctx = canvas.getContext('2d')!;
+  const img = ctx.createImageData(w, h);
+  img.data.set(art.px.d);
+  ctx.putImageData(img, 0, 0);
+  const mask = new Uint8Array(w * h);
+  for (let i = 0; i < mask.length; i++) mask[i] = art.px.d[i * 4 + 3] > 0 ? 1 : 0;
+  const sp: Sprite = { canvas, ax: art.ax, ay: art.ay, mask, scale: 2, file: `${key}.${facing}.png` };
+  seatSprites.set(k, sp);
+  return sp;
 }
 
 /** Flat wall art for a wall-mounted object, if it has been drawn. */
@@ -226,6 +241,9 @@ function computeLight(o: SceneObject): { dx: number; dy: number; r: number } | n
 
 /** The finished art for a scene object, or null to fall back to procedural drawing. */
 export function artSprite(o: SceneObject): Sprite | null {
+  // a seat is drawn from its spec, not from a file (the PNGs in the catalog are the same render, for the server)
+  const seatKey = artSeatKey(o);
+  if (seatKey) return seatSpriteFor(seatKey, o.facing ?? 'se');
   const e = entryFor(o);
   if (!e || !manifest) return null;
   const facing = o.facing ?? 'se';

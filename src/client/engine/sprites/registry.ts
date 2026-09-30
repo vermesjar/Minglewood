@@ -17,7 +17,6 @@ import {
   lighthouseSprite,
   picnicSprite,
   rocketStatueSprite,
-  seatSprite,
   signpostSprite,
   smallProp,
   treeSprite,
@@ -25,13 +24,9 @@ import {
 } from './nature';
 import {
   arcadeCabinetSprite,
-  armchairSprite,
-  beanbagSprite,
   bookshelfSprite,
   cakeTableSprite,
-  chairSprite,
   counterSprite,
-  couchSprite,
   deskSprite,
   easelSprite,
   fireplaceSprite,
@@ -43,7 +38,6 @@ import {
   rocketModelSprite,
   serverRackSprite,
   speakerSprite,
-  stoolSprite,
   tableLongSprite,
   tableLowSprite,
   tableRoundSprite,
@@ -68,8 +62,6 @@ function build(o: SceneObject): Sprite | null {
       return bushSprite(v);
     case 'flowerbed':
       return flowerbedSprite(v);
-    case 'bench':
-      return seatSprite(f, { color: '#9c6a42', seat: '#c08a55', wide: true, plaque: v === 'plaque' });
     case 'lamp-post':
       return lampPostSprite();
     case 'fountain':
@@ -92,14 +84,6 @@ function build(o: SceneObject): Sprite | null {
       return lighthouseSprite();
     case 'balloons':
       return balloonsSprite(v);
-    case 'chair':
-      return chairSprite(f, o.variant);
-    case 'stool':
-      return stoolSprite();
-    case 'couch':
-      return couchSprite(w, d, f, o.variant);
-    case 'armchair':
-      return armchairSprite(f, o.variant);
     case 'table-round':
       return tableRoundSprite();
     case 'table-low':
@@ -116,8 +100,6 @@ function build(o: SceneObject): Sprite | null {
       return bookshelfSprite(o.variant);
     case 'server-rack':
       return serverRackSprite();
-    case 'beanbag':
-      return beanbagSprite(o.variant);
     case 'plant':
       return plantSprite(o.variant);
     case 'lamp':

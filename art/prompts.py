@@ -40,31 +40,5 @@ transparent background filling its cell edge to edge: no wall, no shadow, no tex
 watermark."""
 
 
-# THE SEATING TYPES — what the game's seat rules assume of a drawing, per family (src/client/engine/sprites/
-# seatModelFit.ts familyOf; the kinds the rules read off the fitted model: src/shared/world/seatModels.ts seatKind).
-# Every seat is drawn to its construction guide: the floor diamond is its footprint, the wire box its height, and the
-# thin GREEN rectangle the top of its cushion — the surface a person sits on. The backrest stands directly behind the
-# cushion at the far edge of the footprint (never beside it), arms at the sides, legs inside the footprint. The back
-# view is the same three-quarter 2:1 view turned round, never a straight-on rear view.
-SEAT_FAMILIES = {
-    "chair": "A single chair for one person: a cushion or seat pan filling most of the footprint with its top exactly at "
-             "the green cushion plane, four legs inside the footprint, a backrest rising from the cushion's back edge, "
-             "no arms unless described.",
-    "armchair": "A single armchair for one person: a deep cushion with its top exactly at the green cushion plane, a thick "
-                "padded backrest rising from the cushion's back edge, padded arms of equal height along both sides, "
-                "short feet inside the footprint.",
-    "couch": "A two-seat sofa filling its two-tile footprint: one long cushion (or two side by side) with its top exactly "
-             "at the green cushion plane, a padded backrest along the whole back edge, matching arms at both ends, "
-             "short feet inside the footprint.",
-    "bench": "A two-seat bench filling its two-tile footprint: a long flat seat with its top exactly at the green cushion "
-             "plane, on legs or a frame inside the footprint; a backrest along the back edge only if described.",
-    "stool": "A round stool for one person, no back and no arms: a small round seat with its top exactly at the green "
-             "cushion plane, on legs or a column centred in the footprint.",
-    "beanbag": "A beanbag for one person: a soft sack squashed into a seat, its dented top at the green cushion plane and "
-               "a plump rise behind it as a backrest, filling most of the footprint, no legs.",
-    "ottoman": "A round upholstered ottoman for one person, no back and no arms: a padded top exactly at the green "
-               "cushion plane, on short feet inside the footprint.",
-    "throne": "A single throne for one person: a cushion with its top exactly at the green cushion plane, a very tall "
-              "ornate backrest rising from its back edge, solid arms along both sides, on a base inside the footprint.",
-}
+# (Seats aren't drawn: every seat is built from its spec on the seat framework, src/shared/art/seatCatalog.ts.)
 

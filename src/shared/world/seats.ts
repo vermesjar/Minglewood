@@ -11,7 +11,7 @@ import { footprint, isSeat, isSolid, type Facing, type SceneDef, type SceneObjec
 
 /**
  * The seat profile — what a seat's manifest entry says about sitting in it (the model spec's seat section); how people
- * are placed and drawn in it is its model's (art/seat-models.json, src/client/engine/sprites/seatLayers.ts).
+ * are placed and drawn in it is its spec's build (src/shared/world/seatSpec.ts, src/client/engine/sprites/seatLayers.ts).
  *   seat       height of the cushion surface where the hips rest, world px above the floor (it seeds the model's fit)
  *   sitStyle   chair | stool | lounge | floor: which sitting pose the figure takes (avatarFrame SIT_POSE) and how its
  *              legs lie (sitLegs.ts)

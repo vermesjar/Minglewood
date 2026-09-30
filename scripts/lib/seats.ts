@@ -1,7 +1,7 @@
 /**
  * The catalog's seats from Node: which kinds there are, each one's drawing in a facing resolved exactly as the game
  * resolves it (art.ts: its own drawing for a facing, else its partner's mirrored; small seats centred), and its
- * profile. The seat tools (seat-model.ts, seat-layers.ts) and the Design Lab's publish check (lab-model.ts) share it.
+ * profile. The review tools (furniture-review.ts, seat-shots.ts) share it; the seat grade reads the catalog's builds instead.
  */
 import { existsSync } from 'node:fs';
 import { centredAnchor, type Pixels } from '../../src/client/engine/sprites/footing';

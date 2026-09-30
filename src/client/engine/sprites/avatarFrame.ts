@@ -215,43 +215,24 @@ const STYLE_OF: Partial<Record<Pose, SitStyle>> = { sit: 'chair', 'sit-stool': '
 /**
  * Seated legs from the seat (sitLegs.ts), in this frame's px: the thighs from the hip joints forward to the knees and
  * the shins down to the soles, projected the way the world is (a tile forward is 32 px across and 16 px down from the
- * front, 16 px up from behind; a world px of height is 2 px). Seen from behind the legs run away from us: the thighs
- * out along the seat to the knees, and nothing below them (`BackLegs`).
+ * front, 16 px up from behind; a world px of height is 2 px). Seen from behind the legs run away from us, the thighs
+ * out along the seat and the shins down beyond it: the seat itself hides what stands between them and us (the
+ * compositor, src/shared/art/seatCompose.ts), so nothing here decides what shows.
  */
-function seatedLegs(view: View, h: number, S: SitLegs, behind: BackLegs): { near: Limb; far: Limb } {
+function seatedLegs(view: View, h: number, S: SitLegs): { near: Limb; far: Limb } {
   const back = view === 'back';
-  // (from behind, tucked out of sight: a stub of thigh, no feet)
-  const tucked = back && behind === 'tucked';
-  const reach = tucked ? HIDDEN_REACH : S.reach;
-  const kx = 32 * reach;
-  const ky = (back ? -16 : 16) * reach - 2 * S.rise;
+  const dir = back ? -16 : 16;
+  const kx = 32 * S.reach;
+  const ky = dir * S.reach - 2 * S.rise;
   const leg = (x: number, y: number): Limb => {
     const m: Pt = [x + kx, y + ky];
-    if (back) return { a: [x, y], m, b: m };
     // the ankle: the sole `drop` below the knee, `toe` further forward; the shoe is drawn 5 px tall above the sole
     const sx = m[0] + 32 * S.toe;
-    const sy = m[1] + 16 * S.toe + 2 * S.drop;
+    const sy = m[1] + dir * S.toe + 2 * S.drop;
     return { a: [x, y], m, b: [sx, sy - 5] };
   };
   return { near: leg(CX - 4, h), far: leg(CX + 4, h - 1) };
 }
-
-/**
- * How a sitter's legs show seen from behind:
- *   thighs  the thighs out along the seat to the knees, so a sitter faces the way the seat does (couches, benches,
- *           chairs, stools); nothing below the knees
- *   tucked  a stub of thigh: in a seat whose back hides its sitter (a throne), and on a chair tall enough that the
- *           feet are TALL_CHAIR world px or more off the floor (a café chair's are 7.5)
- * Every way of showing the feet from behind failed at play scale (Carter, 2026-09-30): a shoe just under the knee read
- * as a foot pointing down at the floor, the same shoe level with it as a leg held straight out, and shins hanging to the
- * feet as someone standing beside the chair ("the legs are totally broken"). A foot on the floor past the seat's front
- * is hidden by the seat anyway.
- */
-export type BackLegs = 'thighs' | 'tucked';
-export const TALL_CHAIR = 6;
-/** Tucked legs seen from behind: the thighs are drawn this long (tiles). */
-const HIDDEN_REACH = 0.1;
-const backLegs = (pose: Pose, S: SitLegs): BackLegs => (S.hidden || (pose !== 'sit-stool' && S.hang >= TALL_CHAIR) ? 'tucked' : 'thighs');
 
 /**
  * `carry`: holding something to show (a cup, a soda, popcorn, a plush): one arm is bent with the hand raised in
@@ -400,7 +381,7 @@ export function frameFor(view: View, pose: Pose, body: Body = 'a', carry = false
     heelNear = true;
   } else if (sitting && legs !== 'legacy') {
     const S = legs ?? NATURAL_LEGS[STYLE_OF[pose] ?? 'chair'];
-    ({ near: legNear, far: legFar } = seatedLegs(view, h, S, backLegs(pose, S)));
+    ({ near: legNear, far: legFar } = seatedLegs(view, h, S));
   } else if (sitting && view === 'back') {
     // seen from behind the thighs run straight out, away from us along the seat: up the screen at the floor's 2:1,
     // the torso hiding their near end and the far one showing past it; the shins drop beyond the seat's front edge,

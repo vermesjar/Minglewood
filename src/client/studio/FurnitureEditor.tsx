@@ -4,7 +4,6 @@ import { CATEGORIES, heightClass, ROOM_KINDS, THEMES } from '@shared/models';
 import { estimate, humanizeKey, lab, NAME_MAX, type CheckResult, type Draft, type Facing, type FurnitureSpec, type Usage } from './api';
 import { drawView, drawnViews, FACINGS, footprintFor, gameAnchor, loadImg, sourceOf } from './pixels';
 import { Sandbox } from './Sandbox';
-import { ModelPanel, type ModelStatus } from './ModelPanel';
 import { Confirm, Field, RefsPanel, Takes } from './common';
 
 const ROTATION_HELP: Record<FurnitureSpec['rotation'], string> = {
@@ -22,7 +21,6 @@ export function FurnitureEditor({ id, usage, onUsage, onClose }: { id: string; u
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [checks, setChecks] = useState<CheckResult | null>(null);
-  const [modelStatus, setModelStatus] = useState<ModelStatus>('loading');
   const [confirm, setConfirm] = useState<{ view?: string; note?: string } | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout>>();
 
@@ -108,11 +106,10 @@ export function FurnitureEditor({ id, usage, onUsage, onClose }: { id: string; u
   const problems = checks?.problems ?? [];
   const placementBad = (checks?.placement ?? []).filter((p) => !p.ok);
   const seating = f.category === 'seating' && f.rotation !== 'flat';
-  // a seat publishes with its model (How people sit in it): holding in every facing by the gate's check
-  // (seatLayers.ts seatProblems) and passed by the reviewer; the publish checks it again on the staged drawings
-  // (scripts/lab-model.ts) and stores it in art/seat-models.json
-  const seatOk = !seating || modelStatus === 'ok';
-  const canPublish = allAccepted && !problems.length && !placementBad.length && seatOk && !busy;
+  // seats aren't drawn here: every seat is built from its spec on the seat framework (src/shared/art/seatCatalog.ts),
+  // so the Lab neither draws nor publishes one
+  const SEAT_NOTE = 'Seats are built from the seat framework (src/shared/art/seatCatalog.ts), not drawn here: add a spec there and run scripts/seat-build.ts.';
+  const canPublish = allAccepted && !problems.length && !placementBad.length && !seating && !busy;
 
   return (
     <div className="editor">
@@ -313,9 +310,10 @@ export function FurnitureEditor({ id, usage, onUsage, onClose }: { id: string; u
             ))}
           </div>
         </Field>
-        <button className="btn primary big" disabled={!!busy || !f.prompt.trim()} onClick={() => setConfirm({})}>
-          {have.length ? '✦ Draw it again' : '✦ Draw it'} <small>{needed.length === 1 ? 'one drawing' : `${needed.length} views (${needed.join(' + ')})`}</small>
+        <button className="btn primary big" disabled={!!busy || !f.prompt.trim() || seating} title={seating ? SEAT_NOTE : undefined} onClick={() => setConfirm({})}>
+          {have.length ? '✦ Draw it again' : '✦ Draw it'} <small>{seating ? 'not for seating' : needed.length === 1 ? 'one drawing' : `${needed.length} views (${needed.join(' + ')})`}</small>
         </button>
+        {seating && <p className="muted small">{SEAT_NOTE}</p>}
       </aside>
 
       <main className="work">
@@ -360,7 +358,6 @@ export function FurnitureEditor({ id, usage, onUsage, onClose }: { id: string; u
             </div>
           )}
         </section>
-        {seating && have.length > 0 && <ModelPanel draft={draft} onPatch={patch} onStatus={setModelStatus} />}
         {have.length > 0 && <Sandbox draft={draft} version={version} onNote={setNote} />}
       </main>
 
@@ -382,21 +379,7 @@ export function FurnitureEditor({ id, usage, onUsage, onClose }: { id: string; u
                   <b>{p.facing}</b> {p.notes.length ? p.notes.join(' · ') : 'sits on its footprint, clean edges, no stray pixels'}
                 </li>
               ))}
-              {seating && (
-                <li className={modelStatus === 'ok' ? 'good' : modelStatus === 'unreviewed' || modelStatus === 'loading' || modelStatus === 'stale' ? 'warn' : 'bad'}>
-                  {modelStatus === 'ok'
-                    ? 'Seat model: holds in every facing, passed by the reviewer'
-                    : modelStatus === 'none'
-                      ? 'Seat model: none yet; Auto-fit it in How people sit in it'
-                      : modelStatus === 'bad'
-                        ? 'Seat model: some facings don’t hold (see How people sit in it)'
-                        : modelStatus === 'unreviewed'
-                          ? 'Seat model: holds in every facing; waiting for the reviewer to pass it'
-                          : modelStatus === 'stale'
-                            ? 'Seat model: the drawings changed; checking it again'
-                            : 'Seat model: loading…'}
-                </li>
-              )}
+              {seating && <li className="bad">{SEAT_NOTE}</li>}
               <li className={allAccepted ? 'good' : 'warn'}>{allAccepted ? 'Every view accepted' : `Accept: ${needed.filter((v) => !draft.views[v]?.accepted).join(', ') || '—'}`}</li>
             </ul>
           )}

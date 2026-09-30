@@ -611,12 +611,6 @@ function drawGesture(P: Pix, F: Frame, [x, y]: [number, number], skin: RGB) {
   }
 }
 
-/**
- * Seated and seen from behind, the legs run away from us on the far side of the body: the thighs show, out along the
- * seat, and nothing below the knee (avatarFrame BackLegs).
- */
-export const seatedFromBehind = (F: Frame) => F.sitting && F.view === 'back';
-
 function drawLegs(P: Pix, F: Frame, L: FullLoadout) {
   const skin = hx(L.skin);
   const pants = hx(L.bottomColor);
@@ -631,11 +625,6 @@ function drawLegs(P: Pix, F: Frame, L: FullLoadout) {
     limb(P, leg.a, leg.m, leg.b, 2.7, 2.4, skin, shade);
     if (skirt) continue;
     const pm = M().capsule(leg.a[0], leg.a[1], leg.m[0], leg.m[1], r);
-    if (seatedFromBehind(F)) {
-      // the thigh only, out to the knee
-      paint(P, pm, pants, { shade });
-      continue;
-    }
     if (b === 'shorts') pm.band(0, Math.round(leg.a[1] + (leg.m[1] - leg.a[1]) * 0.8));
     else pm.capsule(leg.m[0], leg.m[1], leg.b[0], leg.b[1] - (b === 'joggers' ? 1 : 0), r - 0.3);
     paint(P, pm, pants, { shade });
@@ -774,7 +763,6 @@ function drawLowerGarment(P: Pix, F: Frame, L: FullLoadout) {
 }
 
 function drawShoes(P: Pix, F: Frame, L: FullLoadout) {
-  if (seatedFromBehind(F)) return;
   const kind = L.shoes.replace('shoes.', '');
   const c = hx(L.shoesColor);
   const front = F.view === 'front';

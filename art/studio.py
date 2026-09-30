@@ -1125,16 +1125,6 @@ VIEWS = {"radial": [None], "flat": [None], "fixed": [None], "mirror": ["se", "nw
 DRAW_FIELDS = ("key", "prompt", "prompts", "width", "fill", "fit", "colors", "quality", "nudge")
 
 
-def seat_family(key: str) -> str:
-    """The seat family a key belongs to (seatModelFit.ts familyOf): which SEATING TYPE it is drawn and fitted as."""
-    if key.startswith("heirloom-throne"):
-        return "throne"
-    for fam in ("armchair", "couch", "sofa", "stool", "bench", "beanbag", "ottoman", "pouf"):
-        if key.startswith(fam):
-            return {"sofa": "couch", "pouf": "ottoman"}.get(fam, fam)
-    return "chair"
-
-
 def cmd_lab_generate(a):
     try:
         spec = json.loads(Path(a.spec).read_text(encoding="utf-8"))
@@ -1150,19 +1140,15 @@ def cmd_lab_generate(a):
     out = Path(a.out).resolve()
     seating = spec.get("category") == "seating" or spec.get("seat") is not None
     if seating:
-        sys.path.insert(0, str(HERE))
-        from prompts import SEAT_FAMILIES  # noqa: PLC0415
-        fam = seat_family(key)
+        # every seat is built from its spec on the seat framework (src/shared/art/seatCatalog.ts), never drawn
+        emit({"ok": False, "error": "seats are built from the seat framework (src/shared/art/seatCatalog.ts), not drawn: add a spec there and run scripts/seat-build.ts"}, 1)
     items = []
     for f in views:
         # each view is drawn on the tiles it covers facing that way (models.ts footprintFacing)
         vw, vd = (d_, w_) if f in ("se", "nw") else (w_, d_)
         it = {"key": key, "w": vw, "d": vd, "h": spec.get("height", 40), "fit": spec.get("fit", "stand"),
               "fill": spec.get("fill", 0.7), "colors": spec.get("colors", 28),
-              "prompt": " ".join(x for x in [spec.get("prompt", ""), (spec.get("prompts") or {}).get(f or "", ""),
-                                             SEAT_FAMILIES[fam] if seating else ""] if x)}
-        if seating and spec.get("seat") is not None:
-            it["seat"] = float(spec["seat"])
+              "prompt": " ".join(x for x in [spec.get("prompt", ""), (spec.get("prompts") or {}).get(f or "", "")] if x)}
         if spec.get("width"):
             it["width"] = spec["width"]
         if f:

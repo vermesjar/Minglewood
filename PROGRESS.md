@@ -45,10 +45,11 @@
     animations (espresso steam, koi, fireplace, clock, arcade screens…); seats per cushion with
     correct depth at every angle; furniture blocks walking; NPC staff (Juno the barista brews and
     hands over coffee; receptionist, arcade attendant, librarian).
-  - *Seating* (2026-09-29): one system — each seat kind's 3D model (`art/seat-models.json`) gives its layers
-    (near arm over you; from behind, the back) and your legs (thighs toward the camera to the front edge, shins to
-    the floor), with per-drawing overrides where the art needs them; `scripts/seat-layers.ts --check` in the gate,
-    `scripts/seat-shots.ts` to review every seat × facing (docs/furniture.md, "Seats").
+  - *Seating* (2026-09-30, rebuilt): one framework — nine seat kinds sized from the figure (`src/shared/world/seatSpec.ts`),
+    every catalog seat a spec (`src/shared/art/seatCatalog.ts`) built into a 3D model, drawn from it in all four facings
+    by a renderer that emits per-pixel depth (`seatRender.ts`), sitters composed against that depth pixel by pixel
+    (`seatCompose.ts`); the generated seat art, the fitter and every per-view override are gone. Graded offline
+    (`scripts/seat-grade.ts --check` in the gate) and live at every zoom (`tests/e2e/seat-grade.spec.ts`): docs/seating.md.
   - *Town*: 76×76 valley — generated exteriors on exact footprints, props with finished art, organic
     lake shore, plaza, park; one world clock for day/night on every client.
 

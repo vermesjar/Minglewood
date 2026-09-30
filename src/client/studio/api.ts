@@ -1,17 +1,5 @@
 /** The Design Lab's client for /api/dev/lab (localhost only; every write carries the lab header). */
 import type { ModelCategory, RoomKind, Theme } from '@shared/models';
-import type { SeatModel } from '@shared/world/seatModels';
-
-/**
- * A draft seat's model (the seat model standard, src/shared/world/seatModels.ts; ModelPanel.tsx): the 3D proxy with any
- * per-view nudges (`views`) and traced over layers (`over`), the day the reviewer passed it, and the drawings it was
- * made on (seatLab.ts drawingsSignature).
- */
-export interface DraftModel {
-  model: SeatModel;
-  reviewed?: string;
-  for: string;
-}
 
 export type Facing = 'se' | 'sw' | 'ne' | 'nw';
 export type Rotation = 'radial' | 'mirror' | 'full' | 'flat';
@@ -39,8 +27,6 @@ export interface FurnitureSpec {
   sitStyle: 'chair' | 'stool' | 'lounge' | 'floor';
   backrest: boolean;
   arms?: boolean;
-  /** How people sit in it: its 3D model (ModelPanel.tsx). A seat publishes with one that holds and is passed. */
-  seatModel?: DraftModel | null;
   surface: number | null;
   light: { x: number; y: number; r?: number } | null;
   wallV?: [number, number];
@@ -129,8 +115,6 @@ export interface LibraryPiece {
   seat: number | null;
   facings: string[];
   issues: string[];
-  /** A seat's model in art/seat-models.json: none, fitted but not passed, or passed by the reviewer. */
-  model?: 'none' | 'fitted' | 'reviewed';
 }
 
 const BASE = '/api/dev/lab';
