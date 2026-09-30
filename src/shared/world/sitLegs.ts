@@ -29,6 +29,10 @@ export interface SitLegs {
   toe: number;
   hang: number;
   hidden?: boolean;
+  /** Seen from behind, the shins and feet show (the seat model's `feetBehind`). */
+  feet?: boolean;
+  /** With `feet`: the seat's underside (world px): from behind, a shin shows below it, the seat hiding it above. */
+  under?: number;
 }
 
 /** The thigh's radius (world px): the hip joint and the thighs' centre line are this far above the cushion. */
@@ -76,7 +80,7 @@ function frontAt(m: Pick<SeatModel, 'parts'>, u: number, v: number, z0: number, 
 }
 
 /** The legs of someone sitting at `s` on a seat of this model, sat in with `style`. */
-export function legsFor(m: Pick<SeatModel, 'parts'>, s: SitPoint, style: SitStyle): SitLegs {
+export function legsFor(m: Pick<SeatModel, 'parts' | 'feetBehind'>, s: SitPoint, style: SitStyle): SitLegs {
   const [u, v, z] = s;
   const base = NATURAL_LEGS[style];
   const kneeZ = z + THIGH_R + base.rise;
@@ -84,7 +88,13 @@ export function legsFor(m: Pick<SeatModel, 'parts'>, s: SitPoint, style: SitStyl
   const knee = frontAt(m, u, v, kneeZ - drop, kneeZ) - KNEE_OUT;
   const reach = Math.max(REACH_MIN, Math.min(REACH_MAX, v - knee));
   const hidden = m.parts.some((p) => (p.part === 'back' || p.part === 'wrap') && u >= p.u[0] && u <= p.u[1] && p.z[1] - z >= BACK_HIDES);
-  return { reach: round(reach, 100), rise: base.rise, drop: round(drop, 2), toe: base.toe, hang: round(Math.max(0, kneeZ - drop), 2), ...(hidden ? { hidden } : {}) };
+  return { reach: round(reach, 100), rise: base.rise, drop: round(drop, 2), toe: base.toe, hang: round(Math.max(0, kneeZ - drop), 2), ...(hidden ? { hidden } : {}), ...(m.feetBehind ? { feet: true, under: round(seatUnder(m, u, z), 2) } : {}) };
+}
+
+/** The underside of the seat under a sitter at u (world px): the lowest of its cushion blocks there. */
+function seatUnder(m: Pick<SeatModel, 'parts'>, u: number, z: number): number {
+  const blocks = m.parts.filter((p) => p.part === 'seat' && u >= p.u[0] - 0.02 && u <= p.u[1] + 0.02);
+  return blocks.length ? Math.min(...blocks.map((p) => p.z[0])) : z;
 }
 
 /** Where the knees are in the seat's depth (local v) for someone sitting at `s` with these legs. */
@@ -93,4 +103,4 @@ export const kneeV = (s: SitPoint, legs: SitLegs) => s[1] - legs.reach;
 const round = (n: number, k: number) => Math.round(n * k) / k;
 
 /** A short stable key for caches. */
-export const legsKey = (l: SitLegs | undefined) => (l ? `${l.reach},${l.rise},${l.drop},${l.toe},${l.hang}${l.hidden ? ',h' : ''}` : '');
+export const legsKey = (l: SitLegs | undefined) => (l ? `${l.reach},${l.rise},${l.drop},${l.toe},${l.hang}${l.hidden ? ',h' : ''}${l.feet ? `,f${l.under}` : ''}` : '');

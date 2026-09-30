@@ -94,6 +94,12 @@ export interface SeatModel {
    * Without it the model's parts decide (sprites/seatLayers.ts).
    */
   over?: Partial<Record<Facing, Array<Array<[number, number]>>>>;
+  /**
+   * Seen from behind, its sitters' shins and feet show, down to the floor past the seat's front: an open chair where
+   * they'd be seen under and beside the seat (Lantern Hall's banquet chairs: Carter, "you can't see their feet on the
+   * ground"). Without it only the thighs show from behind (avatarFrame BackLegs).
+   */
+  feetBehind?: boolean;
   /** The day scripts/seat-model.ts --fit seeded it (a fit is never reviewed). */
   fitted?: string;
   /** The day the lead reviewer read its sheet and live screenshots and passed it (scripts/seat-model.ts --review). */
@@ -525,6 +531,7 @@ export function tidyModel(m: SeatModel): SeatModel {
     ...(m.views && Object.keys(m.views).length
       ? { views: Object.fromEntries(MODEL_FACINGS.filter((f) => m.views![f]).map((f) => [f, m.views![f]!.map(([u, v]) => [t(u), t(v)] as [number, number])])) }
       : {}),
+    ...(m.feetBehind ? { feetBehind: true } : {}),
     ...(m.fitted ? { fitted: m.fitted } : {}),
     ...(m.reviewed ? { reviewed: m.reviewed } : {}),
     ...(m.drawings && Object.keys(m.drawings).length ? { drawings: m.drawings } : {}),
