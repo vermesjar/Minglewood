@@ -210,7 +210,7 @@ function upper(view: View, dy: number, body: Body, dx = 0) {
 }
 
 /** Seen from behind, a seated figure's thighs are drawn at most this long (tiles): its natural thigh. */
-const BACK_REACH = 0.2;
+const BACK_REACH = 0.1;
 
 /** The sitting style of a sitting pose. */
 const STYLE_OF: Partial<Record<Pose, SitStyle>> = { sit: 'chair', 'sit-stool': 'stool', 'sit-lounge': 'lounge', 'sit-floor': 'floor' };

@@ -16,7 +16,11 @@
  *   wrap  what wraps round a sitter (a beanbag's rolled back)
  *   other anything else (a throne's crest)
  * `sits`: one sitting point per cushion, [u, v, z] — the middle of the underside of the sitter's pelvis, z the
- * cushion top under it. The figure's seat point (FIG seat row) is drawn exactly where it projects.
+ * cushion top under it — as the seat is seen from the FRONT. The figure's seat point (FIG seat row) is drawn exactly
+ * where it projects. `backV`: per cushion, the pelvis's depth seen from BEHIND. The figure is small for its furniture, so
+ * no one depth serves both views: from the front a sitter sits forward, knees at the front edge (the legs show); from
+ * behind, deep under the backrest (it hides their hips; their head and shoulders show) — each view composed on its
+ * own, as sprite games do (sitFor).
  *
  * LOCAL → WORLD. Placed facing f, the seat covers w × d tiles (placedSize) from its footprint's back vertex, its
  * front edge on the side it faces (FACING_VEC), u turning with it (a rotation, never a mirror):
@@ -76,8 +80,20 @@ export interface SeatModel {
   /** [W, D]: the footprint as the catalog gives it (width across the front, depth front to back), tiles. */
   size: [number, number];
   parts: ModelPart[];
-  /** One per cushion: [u, v, z]. */
+  /** One per cushion: [u, v, z], seen from the front. */
   sits: SitPoint[];
+  /**
+   * Where a view draws its sitters, when the drawing needs them somewhere the standard wouldn't put them: per facing,
+   * per cushion (seatSpots order), the pelvis's [u, v] (on the cushion's own height). Generated art isn't exact 3D:
+   * each drawing is composed on its own, and this is what its eye says (default: sitFor's standard).
+   */
+  views?: Partial<Record<Facing, Array<[number, number]>>>;
+  /**
+   * What of a view's drawing goes over its sitters, when the model's parts can't say it exactly: per facing, polygons in
+   * that facing's drawing px (as the game draws it, mirrored where it is) — traced by eye along the drawing's own edges.
+   * Without it the model's parts decide (sprites/seatLayers.ts).
+   */
+  over?: Partial<Record<Facing, Array<Array<[number, number]>>>>;
   /** The day scripts/seat-model.ts --fit seeded it (a fit is never reviewed). */
   fitted?: string;
   /** The day the lead reviewer read its sheet and live screenshots and passed it (scripts/seat-model.ts --review). */
@@ -291,6 +307,39 @@ export function sitsByCushion(m: Pick<SeatModel, 'size' | 'sits'>, f: Facing): A
   });
 }
 
+/**
+ * Where the standard puts a sitter's pelvis in depth seen from BEHIND, at u on a cushion at z: under the backrest
+ * (BACK_SINK past its front face), so it hides their hips; on a backless seat, a little behind its middle. Never past
+ * the back of the seat.
+ */
+export const BACK_SINK = 0.12;
+export function backSitV(m: Pick<SeatModel, 'parts'>, u: number, z: number): number | null {
+  const s = seatSpan(m, u);
+  if (!s) return null;
+  const back = backFace(m, u, z);
+  const v = back !== null ? back + BACK_SINK : (s.v0 + s.v1) / 2 + 0.1;
+  return Math.min(v, s.v1 - 0.05);
+}
+
+/** The sitting point a facing draws a cushion's sitter with, by the standard: its own from the front, deeper from behind. */
+export function sitFor(m: Pick<SeatModel, 'parts'>, s: SitPoint, f: Facing): SitPoint {
+  if (!behindView(f)) return s;
+  return [s[0], backSitV(m, s[0], s[2]) ?? s[1], s[2]];
+}
+
+/**
+ * The sitting points in seatSpots order for a facing, as that view draws them: the view's own (`views`), else the
+ * standard's (sitFor); null for a cushion without one.
+ */
+export function viewSits(m: Pick<SeatModel, 'parts' | 'size' | 'sits' | 'views'>, f: Facing): Array<SitPoint | null> {
+  const own = m.views?.[f];
+  return sitsByCushion(m, f).map((s, c) => {
+    if (!s) return null;
+    const p = own?.[c];
+    return p ? [p[0], p[1], s[2]] : sitFor(m, s, f);
+  });
+}
+
 /** Where a sitting point lies in the world (tiles from the back vertex) and how high (world px). */
 export function sitWorld(m: Pick<SeatModel, 'size'>, f: Facing, s: SitPoint): { x: number; y: number; z: number } {
   const p = localToWorld(m.size, f, s[0], s[1]);
@@ -451,6 +500,11 @@ export function modelShapeProblems(x: unknown, cushions?: number): string[] {
   if (Array.isArray(m.parts) && !m.parts.some((p) => p?.part === 'seat')) out.push('parts: no seat block');
   if (!Array.isArray(m.sits) || !m.sits.every((s) => Array.isArray(s) && s.length === 3 && s.every(num))) out.push('sits: a list of [u, v, z]');
   else if (cushions !== undefined && m.sits.length !== cushions) out.push(`sits: ${m.sits.length} for ${cushions} cushion(s)`);
+  if (m.views !== undefined) {
+    const pt = (p: unknown) => Array.isArray(p) && p.length === 2 && p.every(num);
+    for (const [f, list] of Object.entries(m.views ?? {}))
+      if (!MODEL_FACINGS.includes(f as Facing) || !Array.isArray(list) || !list.every(pt) || list.length !== m.sits?.length) out.push(`views.${f}: one [u, v] per cushion`);
+  }
   for (const k of ['fitted', 'reviewed'] as const) if (m[k] !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(String(m[k]))) out.push(`${k}: YYYY-MM-DD`);
   return out;
 }
@@ -463,6 +517,12 @@ export function tidyModel(m: SeatModel): SeatModel {
     size: [m.size[0], m.size[1]],
     parts: m.parts.map((p) => ({ part: p.part, u: [t(p.u[0]), t(p.u[1])], v: [t(p.v[0]), t(p.v[1])], z: [z(p.z[0]), z(p.z[1])] })),
     sits: m.sits.map(([u, v, h]) => [t(u), t(v), z(h)] as SitPoint),
+    ...(m.over && Object.keys(m.over).length
+      ? { over: Object.fromEntries(MODEL_FACINGS.filter((f) => m.over![f]).map((f) => [f, m.over![f]!.map((poly) => poly.map(([x, y]) => [Math.round(x * 2) / 2, Math.round(y * 2) / 2] as [number, number]))])) }
+      : {}),
+    ...(m.views && Object.keys(m.views).length
+      ? { views: Object.fromEntries(MODEL_FACINGS.filter((f) => m.views![f]).map((f) => [f, m.views![f]!.map(([u, v]) => [t(u), t(v)] as [number, number])])) }
+      : {}),
     ...(m.fitted ? { fitted: m.fitted } : {}),
     ...(m.reviewed ? { reviewed: m.reviewed } : {}),
     ...(m.drawings && Object.keys(m.drawings).length ? { drawings: m.drawings } : {}),

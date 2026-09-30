@@ -28,6 +28,8 @@ export function formatModels(r: SeatModels): string {
     const lines = [`    "size": [${m.size[0]}, ${m.size[1]}]`];
     lines.push(`    "parts": [\n${m.parts.map((p) => `      {"part": "${p.part}", "u": ${span(p.u)}, "v": ${span(p.v)}, "z": ${span(p.z)}}`).join(',\n')}\n    ]`);
     lines.push(`    "sits": [${m.sits.map((s) => `[${s.map(n).join(', ')}]`).join(', ')}]`);
+    if (m.views) lines.push(`    "views": ${JSON.stringify(m.views)}`);
+    if (m.over) lines.push(`    "over": ${JSON.stringify(m.over)}`);
     if (m.fitted) lines.push(`    "fitted": "${m.fitted}"`);
     if (m.reviewed) lines.push(`    "reviewed": "${m.reviewed}"`);
     if (m.drawings) lines.push(`    "drawings": ${JSON.stringify(m.drawings)}`);

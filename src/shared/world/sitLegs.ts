@@ -31,7 +31,7 @@ export const KNEE_OUT = 0.04;
 export const SHIN_MAX = 11;
 /** The shortest and longest a thigh is drawn (tiles, horizontal): a stool's knees still come forward. */
 export const REACH_MIN = 0.16;
-export const REACH_MAX = 0.46;
+export const REACH_MAX = 0.56;
 
 /**
  * Legs for a sitting style with no seat to read (a portrait, a wheelchair's frame, a seat without a model): the

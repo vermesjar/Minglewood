@@ -101,7 +101,8 @@ function problemsOf(key: string, model: SeatModel | undefined): string[] {
         return;
       }
       const top = cushionTop(model, s[0], s[1]);
-      if (top === null || Math.abs(top - s[2]) > 0.5) out.push(`${key} ${f}: cushion ${i}'s sitting point isn't on the cushion (z ${s[2]}, cushion ${top ?? 'none'})`);
+      // (from behind a sitter is drawn deeper, under the backrest: only the front view's point is on the cushion)
+      if (!(f === 'ne' || f === 'nw') && (top === null || Math.abs(top - s[2]) > 0.5)) out.push(`${key} ${f}: cushion ${i}'s sitting point isn't on the cushion (z ${s[2]}, cushion ${top ?? 'none'})`);
       const legs = L.legs[i]!;
       const kneeZ = s[2] + 1.5 + legs.rise;
       const sole = kneeZ - legs.drop;
@@ -110,7 +111,7 @@ function problemsOf(key: string, model: SeatModel | undefined): string[] {
       const kv = kneeV(s, legs);
       const cushion = model.parts.filter((p) => p.part === 'seat' && s[0] >= p.u[0] && s[0] <= p.u[1] && s[1] >= p.v[0] && s[1] <= p.v[1] && p.z[1] >= s[2] - 0.5);
       const front = Math.min(...cushion.map((p) => p.v[0]));
-      if (cushion.length && kv > front - 0.01) out.push(`${key} ${f}: cushion ${i}: the knees are inside the cushion (knees at v ${kv.toFixed(2)}, its front at ${front.toFixed(2)})`);
+      if (!(f === 'ne' || f === 'nw') && cushion.length && kv > front - 0.01) out.push(`${key} ${f}: cushion ${i}: the knees are inside the cushion (knees at v ${kv.toFixed(2)}, its front at ${front.toFixed(2)})`);
     });
     // from behind, a seat with a back hides some of its sitters (else its back isn't in the model)
     if ((f === 'ne' || f === 'nw') && model.parts.some((p) => p.part === 'back') && !L.over.some((x) => x)) out.push(`${key} ${f}: from behind, nothing of it goes over its sitters`);

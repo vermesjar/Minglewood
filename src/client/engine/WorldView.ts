@@ -10,9 +10,9 @@ import type { Facing, NpcDef, SceneDef, SceneObject } from '@shared/world/scene'
 import type { BoardNote, MomentKind, NpcState } from '@shared/protocol';
 import { carryMeta } from '@shared/carry';
 import { footprint, isSeat } from '@shared/world/scene';
-import { BACK_COVER_UP, SIT_DROP, SIT_POSE_OF, seatFacing, seatSpots, seenFromBehind, sitMotion, sitterLift, sitterPoint, type SeatProfile, type SeatSpot } from '@shared/world/seats';
-import { coveredPose, coverRow, FIG, frontLayers, rigFeet, type SeatRig } from '@shared/world/seatRigs';
-import { localToWorld, placedSize, sitsByCushion, type SitPoint } from '@shared/world/seatModels';
+import { SIT_POSE_OF, seatFacing, seatSpots, seenFromBehind, sitMotion, sitterLift, sitterPoint, type SeatProfile, type SeatSpot } from '@shared/world/seats';
+import { coveredPose, coverRow, FIG } from '@shared/world/seatFigure';
+import { localToWorld, placedSize, viewSits, type SitPoint } from '@shared/world/seatModels';
 import { legsFor, legsKey, type SitLegs } from '@shared/world/sitLegs';
 import { pathLength, positionAlong, WALK_SPEED, type Tile } from '@shared/world/pathfinding';
 import { Camera } from './camera';
@@ -22,10 +22,9 @@ import { renderOutdoorGround, WALL_H, type GroundLayer } from './ground';
 import { renderInteriorShell, wallPieceImage, wallPieceTransform, type InteriorLayer } from './interior';
 import { skyAt, windowView, type Sky } from './weather';
 import { drawSurroundings, skyColor } from './surroundings';
-import { artBody, artLight, artSeatModel, artSeatProfile, artSeatRig } from './sprites/art';
+import { artBody, artLight, artSeatModel, artSeatProfile } from './sprites/art';
 import { liftForSit, overlayFor, type ModelView } from './sprites/seatModel';
 import { seatLayers } from './sprites/seatLayers';
-import { backrestMask, mirrorLine } from './sprites/seatFit';
 import { ObjectAnimations } from './animations';
 import { INK_CSS, PAPER, UI_FONT, drawBubble, layoutBubbles, pill, roundRect, type BubbleSpec, type Rect } from './overlays';
 import { AVATAR_CROPS, avatarSprite, usesWheelchair, type Expression, type Pose } from './sprites/avatar';
@@ -177,35 +176,6 @@ const SIT_UNCONFIRMED_MS = 2200;
 /** Someone's walk that reaches us later than this after it began is caught up on, not jumped into. */
 const CATCH_UP_FROM_MS = 120;
 
-/**
- * Seen from behind, the part of a seat's drawing that covers its sitter — all of it but the cushion behind
- * them (seatFit.backrestMask) — worked out once per drawing.
- */
-const backrests = new WeakMap<Sprite, HTMLCanvasElement | null>();
-function backrestOverlay(sp: Sprite, o: SceneObject, facing: Facing, profile: SeatProfile): HTMLCanvasElement | null {
-  if (backrests.has(sp)) return backrests.get(sp)!;
-  let out: HTMLCanvasElement | null = null;
-  // the seat maths works in the art's own px (2× density); a classic sprite just keeps its sitter in front
-  if ((sp.scale ?? 1) === 2) {
-    const W = sp.canvas.width;
-    const H = sp.canvas.height;
-    const src = sp.canvas.getContext('2d')!.getImageData(0, 0, W, H);
-    // a backrest line is traced on the drawn back view; this drawing may be its mirror
-    const partner = facing === 'ne' ? 'nw' : 'ne';
-    const drawn = sp.mirrored ? profile.backLine?.[partner] : profile.backLine?.[facing as 'ne' | 'nw'];
-    const line = drawn && sp.mirrored ? mirrorLine(drawn, W) : drawn;
-    const mask = backrestMask({ px: { w: W, h: H, d: src.data }, ax: sp.ax, ay: sp.ay }, o.w ?? 1, o.d ?? 1, profile, facing as 'ne' | 'nw', line);
-    const img = new ImageData(W, H);
-    for (let i = 0; i < mask.length; i++) if (mask[i]) img.data.set(src.data.subarray(i * 4, i * 4 + 4), i * 4);
-    out = document.createElement('canvas');
-    out.width = W;
-    out.height = H;
-    out.getContext('2d')!.putImageData(img, 0, 0);
-  }
-  backrests.set(sp, out);
-  return out;
-}
-
 /** A figure's pixels above a row, as runs [row, from, to) (sprite px): where a seat's front layer may not go. */
 const figureRuns = new WeakMap<Sprite, Map<number, Array<[number, number, number]>>>();
 function runsAbove(sp: Sprite, row: number): Array<[number, number, number]> {
@@ -227,41 +197,6 @@ function runsAbove(sp: Sprite, row: number): Array<[number, number, number]> {
   return runs;
 }
 
-/**
- * A seat rig as the renderer uses it (src/shared/world/seatRigs.ts): the rig, in the drawing's px, and its front
- * layer — the drawing's pixels inside the rig's front polygons, drawn over the seat's sitters — worked out once
- * per drawing and facing.
- */
-interface RigDraw {
-  rig: SeatRig;
-  /** The front layer by cover (a region's own, else the rig's; undefined: no cap). */
-  layers: Array<{ cover: number | undefined; canvas: HTMLCanvasElement }>;
-}
-const rigDraws = new WeakMap<Sprite, Map<Facing, RigDraw | null>>();
-function rigDrawOf(sp: Sprite, o: SceneObject, facing: Facing): RigDraw | null {
-  let byFacing = rigDraws.get(sp);
-  if (!byFacing) rigDraws.set(sp, (byFacing = new Map()));
-  if (byFacing.has(facing)) return byFacing.get(facing)!;
-  const rig = artSeatRig(o, facing, sp);
-  let out: RigDraw | null = null;
-  if (rig) {
-    const W = sp.canvas.width;
-    const H = sp.canvas.height;
-    const src = sp.canvas.getContext('2d')!.getImageData(0, 0, W, H);
-    const layers = frontLayers(W, H, rig).map(({ cover, mask }) => {
-      const img = new ImageData(W, H);
-      for (let i = 0; i < mask.length; i++) if (mask[i]) img.data.set(src.data.subarray(i * 4, i * 4 + 4), i * 4);
-      const canvas = document.createElement('canvas');
-      canvas.width = W;
-      canvas.height = H;
-      canvas.getContext('2d')!.putImageData(img, 0, 0);
-      return { cover, canvas };
-    });
-    out = { rig, layers };
-  }
-  byFacing.set(facing, out);
-  return out;
-}
 /**
  * A seat model as the renderer uses it (src/shared/world/seatModels.ts): the seat's drawing in a facing, as its
  * pixels and anchor, with its 3D proxy — worked out once per drawing and facing. Null for a seat without a model
@@ -1037,7 +972,7 @@ export class WorldView {
     // the hip point: sitting down (or sliding along a couch), the cushion's under their feet and slides
     // with them; getting up to walk away, it stays on the seat while the feet go (else a walk that reaches
     // someone late would carry the seated figure along with it)
-    const hip = s.to > 0 ? this.hipUnder(a, obj, s.spot, foot, profile, lift, now) : this.hipOf(obj, s.spot, profile, lift);
+    const hip = s.to > 0 ? this.hipUnder(a, obj, s.spot, foot, profile, now) : this.hipOf(obj, s.spot, profile);
     // sitting down: up out of the crouch into the seat, a touch past it, and settling; getting up: lifted off
     // the cushion a touch, then down into the crouch (seats.ts sitMotion)
     const { inSeat, lift: seatLift } = sitMotion(k, s.to > s.from, lift);
@@ -1075,7 +1010,7 @@ export class WorldView {
     const mv = this.modelOf(obj, spot.facing);
     if (!mv) return null;
     const at = this.seatSpotAt(spot.x, spot.y);
-    const sit = at && at.seat.id === obj.id ? sitsByCushion(mv.model, spot.facing)[at.spot.index] : null;
+    const sit = at && at.seat.id === obj.id ? viewSits(mv.model, spot.facing)[at.spot.index] : null;
     if (!sit) return null;
     const f = footprint(obj);
     const p = localToWorld(mv.model.size, spot.facing, sit[0], sit[1]);
@@ -1087,18 +1022,10 @@ export class WorldView {
    * rig puts their hips where its drawing says (the seat rig standard): the floor point that, lifted, draws the
    * figure's seat point on the rig's hip. A seat without one: the seat standard's inferred hip point.
    */
-  private hipOf(obj: SceneObject, spot: { x: number; y: number; facing: Facing }, profile: SeatProfile, lift: number): { x: number; y: number } {
+  private hipOf(obj: SceneObject, spot: { x: number; y: number; facing: Facing }, profile: SeatProfile): { x: number; y: number } {
     // a seat with a model: its cushion's sitting point, the same place in the seat whichever way it faces
-    const ms = this.modelSit(obj, spot);
-    if (ms) return ms.hip;
-    const st = this.staticOf(obj.id);
-    const rd = st && rigDrawOf(st.sprite, st.obj, spot.facing);
-    const at = rd ? this.seatSpotAt(spot.x, spot.y) : null;
-    const hip = rd && at && at.seat.id === obj.id ? rd.rig.hips[at.spot.index] : undefined;
-    if (!st || !hip) return sitterPoint(spot, profile);
-    const k = st.sprite.scale ?? 1;
-    const [fx, fy] = rigFeet(hip, profile.sitStyle);
-    return screenToIso(st.dx + fx / k, st.dy + fy / k + lift);
+    // (a seat without one — art without a model yet; the gate allows none in the catalog — takes the profile's point)
+    return this.modelSit(obj, spot)?.hip ?? sitterPoint(spot, profile);
   }
 
   /**
@@ -1112,16 +1039,15 @@ export class WorldView {
     spot: { x: number; y: number; facing: Facing },
     foot: { x: number; y: number },
     profile: SeatProfile,
-    lift: number,
     now: number,
   ): { x: number; y: number } {
-    const to = this.hipOf(obj, spot, profile, lift);
+    const to = this.hipOf(obj, spot, profile);
     let dx = to.x - (spot.x + 0.5);
     let dy = to.y - (spot.y + 0.5);
     const g = a.glide;
     const was = g ? this.seatSpotAt(g.x, g.y) : null;
     if (g && was && was.seat.id === obj.id && (was.spot.x !== spot.x || was.spot.y !== spot.y)) {
-      const from = this.hipOf(obj, { x: was.spot.x, y: was.spot.y, facing: spot.facing }, profile, lift);
+      const from = this.hipOf(obj, { x: was.spot.x, y: was.spot.y, facing: spot.facing }, profile);
       const u = Math.min(1, Math.max(0, (now - g.start) / g.ms));
       const e = u * u * (3 - 2 * u);
       const fx = from.x - (was.spot.x + 0.5);
@@ -1153,11 +1079,8 @@ export class WorldView {
     const st = this.staticOf(on.id);
     if (!st) return;
     const mv = modelViewOf(st.sprite, st.obj, on.facing, artSeatProfile(st.obj));
-    const layers = mv ? modelLayers(st.sprite, mv) : rigDrawOf(st.sprite, st.obj, on.facing)?.layers;
-    if (!layers) {
-      this.drawInferredBackrest(a, st, on.facing);
-      return;
-    }
+    if (!mv) return;
+    const layers = modelLayers(st.sprite, mv);
     if (!layers.length) return;
     // seen from the front, someone still standing on the seat's tile (before they crouch to sit) isn't covered
     if (!seenFromBehind(on.facing) && !coveredPose(this.pose(a))) return;
@@ -1189,32 +1112,6 @@ export class WorldView {
   /** Who is drawn as the sitter of each seat this frame (buildDrawOrder). */
   private seatSitters = new Map<string, ActorView[]>();
 
-  /**
-   * A seat without a rig (the fallback, inferred from its drawing): seen from behind, all of it but the cushion
-   * behind them — the backrest, and the cushion's near lip their hips sink behind — up to a little above their
-   * hips (their head, shoulders and upper back show).
-   */
-  private drawInferredBackrest(a: ActorView, st: Static, facing: Facing) {
-    const on = { obj: st.obj, facing };
-    if (!seenFromBehind(on.facing)) return;
-    const profile = artSeatProfile(on.obj);
-    const over = backrestOverlay(st.sprite, st.obj, on.facing, profile);
-    if (!over) return;
-    const pose = this.pose(a);
-    const drop = pose === 'crouch' ? 3 : pose.startsWith('sit') ? SIT_DROP[profile.sitStyle] : 0;
-    const cut = (a.at?.y ?? a.sy) - (104 - (82 + drop)) / 2 - BACK_COVER_UP;
-    const c = this.ctx;
-    c.save();
-    c.beginPath();
-    c.rect(-1e5, -1e5, 2e5, 2e5);
-    c.rect(a.rect.l, cut - 200, a.rect.r - a.rect.l, 200);
-    c.clip('evenodd');
-    const k = st.sprite.scale ?? 1;
-    const [nx, ny] = this.anims.offset(st.obj.id, this.reducedMotion);
-    blit(c, st.sprite, st.dx + st.sprite.ax / k + nx, st.dy + st.sprite.ay / k + ny, over);
-    c.restore();
-  }
-
   hasActor(id: string) {
     return this.actors.has(id);
   }
@@ -1245,7 +1142,7 @@ export class WorldView {
     let best: { s: SeatSpot; d: number } | undefined;
     for (const s of spots) {
       const lift = this.modelSit(o, s)?.lift ?? sitterLift(profile, s.facing);
-      const hip = this.hipOf(o, s, profile, lift);
+      const hip = this.hipOf(o, s, profile);
       const p = isoToScreen(hip.x, hip.y, lift);
       const [x, y] = this.camera.toScreen(p.x, p.y, this.vw, this.vh);
       // across the screen only: a couch's cushions sit side by side on screen whichever way it faces, and a

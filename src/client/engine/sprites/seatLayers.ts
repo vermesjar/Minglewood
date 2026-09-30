@@ -1,7 +1,7 @@
 /**
  * SEAT LAYERS: how people are drawn into a seat — Habbo's way, the seat's drawing in two layers, one behind its
  * sitters and one over them — worked out from the seat's 3D model (src/shared/world/seatModels.ts), the same for
- * every facing, never traced by hand.
+ * every facing — unless a view's drawing needs its over layer traced by eye (the model's over).
  *
  * Every pixel of the drawing is labelled with the part of the model it shows (its view ray cast into the model's
  * boxes: seatModel.ts seatDepth). A WHOLE PART goes over the people sitting in it or behind them, by where it stands:
@@ -21,9 +21,9 @@
  * Pure (pixels in, masks and points out): the renderer (WorldView), the seat tools and the Design Lab share it.
  */
 import type { Facing } from '@shared/world/scene';
-import { behindView, cushionTiles, projectLocal, sitsByCushion, towardCamera, type PartKind, type SitPoint } from '@shared/world/seatModels';
+import { behindView, cushionTiles, projectLocal, towardCamera, viewSits, type PartKind, type SitPoint } from '@shared/world/seatModels';
 import { legsFor, type SitLegs } from '@shared/world/sitLegs';
-import { FIG } from '@shared/world/seatRigs';
+import { FIG, polyMask } from '@shared/world/seatFigure';
 import { seatDepth, type ModelView } from './seatModel';
 
 export type Pt = [number, number];
@@ -42,8 +42,13 @@ export interface SeatLayers {
   part: Int16Array;
   /** Which of the model's parts go over the sitters in this view. */
   overParts: boolean[];
-  /** How far above a sitter's seat point (figure px) the over layer reaches: above it the sitter shows. */
-  cover: number;
+  /**
+   * How far above a sitter's seat point (figure px) the over layer reaches: above it the sitter shows. Undefined: no
+   * cap (a view whose over layer was traced by eye: it covers exactly what it was traced to).
+   */
+  cover: number | undefined;
+  /** The over layer is the view's traced polygons (the model's over), not its parts. */
+  traced: boolean;
 }
 
 /** The figure's shoulder line sits this far above its seat point (figure px): the over layer stops there. */
@@ -72,10 +77,17 @@ export function seatLayers(v: ModelView): SeatLayers {
   const had = memo.get(key);
   if (had) return had;
   const D = seatDepth(v);
-  const over = new Uint8Array(D.w * D.h);
   const ov = overParts(v);
-  for (let i = 0; i < over.length; i++) if (D.part[i] >= 0 && ov[D.part[i]]) over[i] = 1;
-  const sits = sitsByCushion(v.model, v.facing);
+  const traced = v.model.over?.[v.facing];
+  let over: Uint8Array;
+  if (traced) over = polyMask(D.w, D.h, traced);
+  else {
+    over = new Uint8Array(D.w * D.h);
+    for (let i = 0; i < over.length; i++) if (D.part[i] >= 0 && ov[D.part[i]]) over[i] = 1;
+  }
+  // only the drawing's own pixels (a traced polygon may run past its edge)
+  for (let i = 0; i < over.length; i++) if (!v.art.px.d[i * 4 + 3]) over[i] = 0;
+  const sits = viewSits(v.model, v.facing);
   const anchor: Pt = [v.art.ax, v.art.ay];
   const out: SeatLayers = {
     facing: v.facing,
@@ -85,7 +97,8 @@ export function seatLayers(v: ModelView): SeatLayers {
     over,
     part: D.part,
     overParts: ov,
-    cover: COVER,
+    cover: traced ? undefined : COVER,
+    traced: !!traced,
   };
   memo.set(key, out);
   if (memo.size > 16) memo.delete(memo.keys().next().value!);
