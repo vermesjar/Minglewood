@@ -48,6 +48,8 @@ export interface DiscordUser {
 export interface DiscordGuildMember {
   user?: DiscordUser;
   nick?: string | null;
+  /** A server-specific profile picture, if they set one. */
+  avatar?: string | null;
   roles: string[];
 }
 export interface DiscordChannel {
@@ -85,6 +87,8 @@ export interface DiscordGuild {
   id: string;
   name: string;
   icon?: string | null;
+  /** The server's AFK voice channel: people there are connected but can't talk. */
+  afk_channel_id?: string | null;
 }
 
 export const ChannelType = { GUILD_TEXT: 0, GUILD_VOICE: 2, GUILD_CATEGORY: 4, GUILD_STAGE_VOICE: 13 } as const;
@@ -116,8 +120,8 @@ export const discordApi = {
   /** Post as a person (their name and avatar) through our webhook. */
   executeWebhook: (hook: { id: string; token: string }, body: { content: string; username: string; avatar_url?: string }) =>
     call<DiscordMessage>(`/webhooks/${hook.id}/${hook.token}?wait=true`, { method: 'POST', auth: '', ...json({ ...body, ...NO_PINGS }) }),
-  /** Move a member who is already connected to voice. Needs Move Members (and Connect on the target). */
-  moveMember: (token: string, guildId: string, userId: string, channelId: string) =>
+  /** Move a member who is already connected to voice (null disconnects them). Needs Move Members (and Connect on the target). */
+  moveMember: (token: string, guildId: string, userId: string, channelId: string | null) =>
     call<unknown>(`/guilds/${guildId}/members/${userId}`, { method: 'PATCH', auth: bot(token), ...json({ channel_id: channelId }) }),
   createChannel: (token: string, guildId: string, body: { name: string; type: number; parent_id?: string; topic?: string }) =>
     call<DiscordChannel>(`/guilds/${guildId}/channels`, { method: 'POST', auth: bot(token), ...json(body) }),

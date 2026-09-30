@@ -36,6 +36,8 @@ export interface Prefs {
   sidebarOpen: boolean;
   /** The space's conversation panel is folded down to its header. */
   chatCollapsed?: boolean;
+  /** Show when I'm talking in voice, from my mic level on this device (opt-in; no audio leaves the page). */
+  talkLight?: boolean;
 }
 
 export interface State {

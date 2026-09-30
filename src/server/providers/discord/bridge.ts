@@ -22,8 +22,14 @@ import { DiscordApiError, discordApi, type DiscordMessage } from './api';
 
 type Api = Pick<
   typeof discordApi,
-  'channelMessages' | 'channelWebhooks' | 'createWebhook' | 'executeWebhook' | 'sendMessage' | 'moveMember'
+  'channelMessages' | 'channelWebhooks' | 'createWebhook' | 'executeWebhook' | 'sendMessage' | 'moveMember' | 'guildMember' | 'guild'
 >;
+
+/** How someone appears in a server: their nickname there (else display name), and their picture there. */
+export interface DiscordLook {
+  name: string;
+  avatarUrl?: string;
+}
 
 export interface DiscordBridgeDeps {
   store: Store;
@@ -72,6 +78,10 @@ export class DiscordBridge {
   /** Moves we asked for, so the resulting voice update isn't mistaken for the person switching channels. */
   private expected = new Map<string, { channelId: string; until: number }>();
   private warned = new Set<string>();
+  /** Everyone's current Discord name and picture per server, refreshed every few minutes. */
+  private looks = new Map<string, { look: DiscordLook; until: number }>();
+  /** Each server's AFK channel (or none), refreshed every few minutes. */
+  private afk = new Map<string, { channelId: string | null; until: number }>();
   private attached = new WeakSet<OrgHub>();
   /** False when the bot doesn't have the Message Content intent: we see that messages happen, not what they say. */
   messageContent = true;
@@ -111,12 +121,37 @@ export class DiscordBridge {
     for (let i = log.length - 1; i >= 0 && !localId; i--) if (log[i].memberId === memberId && log[i].text === text) localId = log[i].id;
     try {
       const hook = await this.hookFor(binding.externalChannelId);
+      // Post looking exactly like them in this server: their nickname and picture there, fetched fresh.
+      const look = (await this.lookOf(hub.orgId, memberId, binding.externalGuildId)) ?? { name: member.displayName, avatarUrl: this.avatarFor(hub.orgId, memberId) };
       const posted = hook
-        ? await this.api.executeWebhook(hook, { content: text, username: webhookName(member.displayName), avatar_url: this.avatarFor(hub.orgId, memberId) })
-        : await this.api.sendMessage(this.deps.token(), binding.externalChannelId, `**${member.displayName}**: ${text}`);
+        ? await this.api.executeWebhook(hook, { content: text, username: webhookName(look.name), avatar_url: look.avatarUrl })
+        : await this.api.sendMessage(this.deps.token(), binding.externalChannelId, `**${look.name}**: ${text}`);
       if (posted?.id && localId) hub.relabelChat(sceneId, localId, posted.id);
     } catch (e) {
       this.warnOnce(hub, memberId, `post:${binding.externalChannelId}`, e, `Couldn’t post to ${binding.label} — ask an admin to check Minglewood’s Discord permissions.`);
+    }
+  }
+
+  /** Their nickname and picture in this server, from Discord (cached a few minutes). */
+  async lookOf(orgId: string, memberId: string, guildId: string | undefined): Promise<DiscordLook | undefined> {
+    const identity = this.deps.store.get(orgId).identities.find((i) => i.provider === 'discord' && i.memberId === memberId);
+    if (!identity || !guildId) return undefined;
+    const k = key(guildId, identity.externalId);
+    const hit = this.looks.get(k);
+    if (hit && hit.until > Date.now()) return hit.look;
+    try {
+      const gm = await this.api.guildMember(this.deps.token(), guildId, identity.externalId);
+      const u = gm.user;
+      const avatarUrl = gm.avatar
+        ? `https://cdn.discordapp.com/guilds/${guildId}/users/${identity.externalId}/avatars/${gm.avatar}.png?size=128`
+        : u?.avatar
+          ? `https://cdn.discordapp.com/avatars/${identity.externalId}/${u.avatar}.png?size=128`
+          : identity.avatarUrl;
+      const look = { name: gm.nick ?? u?.global_name ?? u?.username ?? identity.username ?? 'Minglewood member', avatarUrl };
+      this.looks.set(k, { look, until: Date.now() + 5 * 60_000 });
+      return look;
+    } catch {
+      return undefined; // fall back to their Minglewood name and saved picture
     }
   }
 
@@ -209,9 +244,15 @@ export class DiscordBridge {
   private async followInto(hub: OrgHub, memberId: string, sceneId: string) {
     const vb = this.discordBinding(hub.orgId, sceneId, 'voice');
     const member = hub.member(memberId);
-    if (!vb?.externalGuildId || !member || member.settings.voiceFollow === false) return;
-    const identity = this.deps.store.get(hub.orgId).identities.find((i) => i.provider === 'discord' && i.memberId === memberId);
+    if (!member || member.settings.voiceFollow === false) return;
+    const d = this.deps.store.get(hub.orgId);
+    const identity = d.identities.find((i) => i.provider === 'discord' && i.memberId === memberId);
     if (!identity) return;
+    if (!vb) {
+      await this.leaveVoice(hub, memberId, identity.externalId, sceneId);
+      return;
+    }
+    if (!vb.externalGuildId) return;
     const k = key(vb.externalGuildId, identity.externalId);
     const current = this.inVoice.get(k);
     if (!current || current === vb.externalChannelId) return;
@@ -224,13 +265,58 @@ export class DiscordBridge {
     }
   }
 
+  /**
+   * Walked into a space with no voice channel (the Quiet Grove, or a room nobody linked): you're no longer in
+   * the call you came from. If the server has an AFK channel we park you there — connected but silent — so the
+   * next space with a voice channel can move you straight back in; otherwise you're disconnected. People in a
+   * voice channel that isn't one of the spaces' (a gaming channel, a meeting) are left alone.
+   */
+  private async leaveVoice(hub: OrgHub, memberId: string, userId: string, sceneId: string) {
+    const d = this.deps.store.get(hub.orgId);
+    const guildId = d.connections.find((c) => c.provider === 'discord' && c.status === 'active')?.externalWorkspaceId;
+    if (!guildId) return;
+    const k = key(guildId, userId);
+    const current = this.inVoice.get(k);
+    const fromSpace = current && d.bindings.some((b) => b.provider === 'discord' && bindingSlot(b.kind) === 'voice' && b.externalChannelId === current);
+    if (!current || !fromSpace) return;
+    const park = await this.afkChannel(guildId);
+    const target = park && park !== current ? park : null;
+    this.expected.set(k, { channelId: target ?? '', until: Date.now() + 10_000 });
+    try {
+      await this.api.moveMember(this.deps.token(), guildId, userId, target);
+      const room = d.rooms.find((r) => r.id === sceneId);
+      hub.notify(
+        memberId,
+        target
+          ? `🤫 ${room?.name ?? 'This space'} has no voice channel — you’re parked in the AFK channel (silent) until you walk somewhere with one.`
+          : `🤫 ${room?.name ?? 'This space'} has no voice channel — you’ve left voice. Use “Join voice” when you head somewhere else.`,
+      );
+    } catch (e) {
+      this.expected.delete(k);
+      this.warnOnce(hub, memberId, `leave:${guildId}`, e, 'Couldn’t take you out of voice — Minglewood needs the “Move Members” permission in Discord.');
+    }
+  }
+
+  private async afkChannel(guildId: string): Promise<string | null> {
+    const hit = this.afk.get(guildId);
+    if (hit && hit.until > Date.now()) return hit.channelId;
+    try {
+      const g = await this.api.guild(this.deps.token(), guildId);
+      const channelId = g.afk_channel_id ?? null;
+      this.afk.set(guildId, { channelId, until: Date.now() + 5 * 60_000 });
+      return channelId;
+    } catch {
+      return null;
+    }
+  }
+
   /** A voice state change from the gateway (called alongside the presence sync). */
   onVoice(guildId: string, change: VoiceStateChange, orgId: string | undefined) {
     const k = key(guildId, change.externalUserId);
     if (change.channelId) this.inVoice.set(k, change.channelId);
     else this.inVoice.delete(k);
     const exp = this.expected.get(k);
-    if (exp && exp.until > Date.now() && exp.channelId === change.channelId) {
+    if (exp && exp.until > Date.now() && exp.channelId === (change.channelId ?? '')) {
       this.expected.delete(k);
       return; // the move we asked for
     }

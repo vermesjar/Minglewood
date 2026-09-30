@@ -148,6 +148,10 @@ export function ProfilePanel() {
               <input type="checkbox" checked={prefs.showAllNames} onChange={pref('showAllNames')} />
               <span>Always show everyone’s names</span>
             </label>
+            <label className="check">
+              <input type="checkbox" checked={!!prefs.talkLight} onChange={pref('talkLight')} />
+              <span>Light up my avatar when I talk in voice — uses my mic level on this device only; no audio is recorded or sent</span>
+            </label>
           </section>
         </div>
         <div className="row end">

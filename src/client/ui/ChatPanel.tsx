@@ -39,14 +39,32 @@ function VoiceLink() {
   const meId = useStore((s) => s.boot?.me.id);
   const myVoice = useStore((s) => (meId ? s.occupants[meId]?.voice : undefined));
   const follow = useStore((s) => s.boot?.me.settings.voiceFollow !== false);
+  const talkLight = useStore((s) => !!s.prefs.talkLight);
   const voice = bindings?.find((b) => b.roomId === sceneId && b.kind !== 'text');
   if (!voice) return null;
   const here = myVoice?.providerChannelId === voice.externalChannelId;
+  const mic = (
+    <button
+      className={`mic-toggle ${talkLight ? 'on' : ''}`}
+      aria-pressed={talkLight}
+      onClick={() => setState((s) => ({ prefs: { ...s.prefs, talkLight: !s.prefs.talkLight } }))}
+      title={
+        talkLight
+          ? 'Showing when you talk (from your mic level on this device — no audio leaves your computer). Click to stop.'
+          : 'Light up your avatar when you talk in voice. Uses your mic level on this device only; no audio is recorded or sent.'
+      }
+    >
+      {talkLight ? '🎙️ On' : '🎙️'}
+    </button>
+  );
   if (here) {
     return (
-      <span className="voice-link on" title="You're in this space's voice channel">
-        🔊 In voice · {voice.label.replace(/^🔊\s*/, '')}
-        {myVoice?.muted ? ' (muted)' : ''}
+      <span className="voice-wrap">
+        <span className="voice-link on" title="You're in this space's voice channel">
+          🔊 In voice · {voice.label.replace(/^🔊\s*/, '')}
+          {myVoice?.muted ? ' (muted)' : ''}
+        </span>
+        {mic}
       </span>
     );
   }
@@ -57,7 +75,7 @@ function VoiceLink() {
       </button>
     );
   }
-  return (
+  const join = (
     <button
       className="voice-link join"
       onClick={() => {
@@ -69,6 +87,15 @@ function VoiceLink() {
     >
       🎧 Join voice
     </button>
+  );
+  // The demo has no real voice: the talk light can still be tried there.
+  return voice.provider === 'demo' ? (
+    <span className="voice-wrap">
+      {join}
+      {mic}
+    </span>
+  ) : (
+    join
   );
 }
 

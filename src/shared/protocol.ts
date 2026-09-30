@@ -206,6 +206,8 @@ export const clientMsgSchema = z.discriminatedUnion('t', [
     targetId: idStr.optional(),
   }),
   z.object({ t: z.literal('say'), text: z.string().min(1).max(MAX_CHAT) }),
+  /** Talking right now (from the member's own mic level, measured in their browser; no audio is sent). */
+  z.object({ t: z.literal('speaking'), on: z.boolean() }),
   z.object({ t: z.literal('knock'), targetId: idStr, kind: z.enum(['chat', 'coffee']) }),
   z.object({ t: z.literal('knock-reply'), knockId: idStr, reply: z.enum(['join', 'soon', 'no']) }),
   z.object({ t: z.literal('avatar'), loadout: loadoutSchema }),

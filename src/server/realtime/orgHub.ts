@@ -742,9 +742,22 @@ export class OrgHub extends EventEmitter<HubEvents> {
     this.toScene(a.sceneId, { t: 'updated', memberId, patch: { speaking } });
   }
 
+  /**
+   * A member's own browser says they're talking (mic level only, opt-in). Shown only while they're really
+   * in voice and not muted there — otherwise a meeting in the room, or music, would light them up.
+   */
+  speakingFromMic(memberId: string, on: boolean) {
+    const a = this.actors.get(memberId);
+    if (!a || a.via !== 'live') return;
+    const voice = this.presenceOf(memberId).voice;
+    const demo = !this.data.connections.some((c) => c.status === 'active' && c.provider !== 'demo');
+    this.setSpeaking(memberId, on && (demo || (!!voice && !voice.muted)));
+  }
+
   setVoice(memberId: string, voice: PresenceState['voice']) {
     const p = this.presenceOf(memberId);
     p.voice = voice;
+    if (!voice || voice.muted) this.setSpeaking(memberId, false);
     const a = this.actors.get(memberId);
     if (a) this.toScene(a.sceneId, { t: 'updated', memberId, patch: { voice } });
     this.directoryDirty = true;

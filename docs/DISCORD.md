@@ -24,6 +24,16 @@ record: Minglewood mirrors and drives it, and stores no messages of its own.
   you if you're standing there. Mentions are shown by name and never ping anyone.
 - **Walk in → you see the channel's recent history** (the last 30 messages), loaded from Discord.
 - **Rename or delete a channel in Discord → the space follows** (label updated / link removed).
+- **Walk into a space with no voice channel (the Quiet Grove) → you leave the call.** If the server
+  has an AFK channel you're parked there, connected but silent, so the next space with a voice
+  channel moves you straight back in; otherwise you're disconnected. People in a voice channel that
+  isn't one of the spaces' are never touched.
+- **Messages look like you.** Posts use your current nickname and picture *in that server* (fetched
+  from Discord). Discord shows its small "APP" tag on them: no app may post *as* a person — that
+  would take your personal token, which Discord bans.
+- **Talk light (opt-in).** Discord doesn't tell apps who's speaking, so members can let their own
+  browser watch their mic *level* while in voice (🎙️ in the chat panel, or Profile). Only "talking
+  yes/no" leaves the page; no audio is recorded or sent. Hidden while muted in Discord.
 - Quiet rooms have no channels, on purpose.
 
 Code: `src/server/providers/discord/bridge.ts` (chat, history, voice follow, channel sync),

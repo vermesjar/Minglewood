@@ -2479,3 +2479,25 @@ body.rm *::after {
 .alist.perms li {
   padding: 2px 0;
 }
+
+.voice-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+}
+.mic-toggle {
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 2px solid var(--ink, #2a1f2d);
+  background: #fff;
+  cursor: pointer;
+}
+.mic-toggle.on {
+  background: #2fbf71;
+  border-color: #1c7a47;
+  color: #fff;
+}

@@ -16,7 +16,15 @@ const G = 'G1';
 function fakeApi() {
   return {
     posted: [] as Array<{ channel?: string; hook?: string; content: string; username?: string }>,
-    moves: [] as Array<{ user: string; channel: string }>,
+    moves: [] as Array<{ user: string; channel: string | null }>,
+    afk: null as string | null,
+    guildMember: vi.fn(async (_t: string, _g: string, user: string) => ({
+      roles: [],
+      nick: user === 'u-jay' ? 'Jay (café crew)' : null,
+      avatar: user === 'u-jay' ? 'guildpic' : null,
+      user: { id: user, username: 'jay', global_name: 'Jay', avatar: 'userpic' },
+    })),
+    guild: vi.fn(async (_t: string, g: string) => ({ id: g, name: 'Test', owner_id: 'owner', afk_channel_id: api.afk })),
     history: new Map<string, DiscordMessage[]>(),
     channelMessages: vi.fn(async function (this: unknown, _t: string, ch: string) {
       return [...(api.history.get(ch) ?? [])].reverse(); // Discord returns newest first
@@ -31,7 +39,7 @@ function fakeApi() {
       api.posted.push({ channel, content });
       return msg({ id: `m${api.posted.length}`, content });
     }),
-    moveMember: vi.fn(async (_t: string, _g: string, user: string, channel: string) => {
+    moveMember: vi.fn(async (_t: string, _g: string, user: string, channel: string | null) => {
       api.moves.push({ user, channel });
     }),
   };
@@ -90,6 +98,7 @@ describe('Discord bridge: spaces are their channels', () => {
     });
     memberId = m.id;
     store.linkIdentity(ORG_ID, { provider: 'discord', externalId: 'u-jay', memberId, avatarUrl: 'https://cdn/jay.png', linkedAt: new Date().toISOString() });
+    store.setConnection(ORG_ID, { id: 'conn', orgId: ORG_ID, provider: 'discord', externalWorkspaceId: G, displayName: 'Test', connectedAt: '', connectedBy: '', status: 'active' });
     store.setBinding(ORG_ID, bind('cafe', 'text', 'T-cafe', '#cafe'), 'cafe');
     store.setBinding(ORG_ID, bind('cafe', 'voice', 'V-cafe', '🔊 Café'), 'cafe');
     store.setBinding(ORG_ID, bind(TOWN_ID, 'text', 'T-general', '#general'), TOWN_ID);
@@ -114,8 +123,9 @@ describe('Discord bridge: spaces are their channels', () => {
     hub.say(memberId, 'anyone want a flat white?');
     await flush();
     await flush();
-    expect(api.posted).toEqual([{ hook: 'hook-T-cafe', content: 'anyone want a flat white?', username: 'Jay Tester' }]);
-    expect(api.executeWebhook.mock.calls[0][1]).toMatchObject({ avatar_url: 'https://cdn/jay.png' });
+    // posted as they look in this server: their nickname and server picture there
+    expect(api.posted).toEqual([{ hook: 'hook-T-cafe', content: 'anyone want a flat white?', username: 'Jay (café crew)' }]);
+    expect(api.executeWebhook.mock.calls[0][1]).toMatchObject({ avatar_url: 'https://cdn.discordapp.com/guilds/G1/users/u-jay/avatars/guildpic.png?size=128' });
     // the local line now carries Discord's id, so history won't show it twice
     expect(hub.chatLog('cafe').at(-1)?.id).toBe('m1');
   });
@@ -185,6 +195,56 @@ describe('Discord bridge: spaces are their channels', () => {
     hub.enter(memberId, 'cafe', 'live');
     await flush();
     expect(api.moves).toEqual([]);
+  });
+
+  it('takes you out of the call when you walk into a space with no voice channel', async () => {
+    hub.connect(client(memberId));
+    bridge.onVoice(G, { externalUserId: 'u-jay', channelId: 'V-cafe', muted: false, video: false }, ORG_ID);
+    hub.enter(memberId, 'focus', 'live'); // the Quiet Grove: no channels
+    await flush();
+    await flush();
+    expect(api.moves).toEqual([{ user: 'u-jay', channel: null }]);
+    bridge.onVoice(G, { externalUserId: 'u-jay', channelId: null, muted: false, video: false }, ORG_ID);
+    expect(hub.actor(memberId)?.sceneId).toBe('focus');
+  });
+
+  it('parks you in the AFK channel when there is one, and brings you back out', async () => {
+    api.afk = 'V-afk';
+    hub.connect(client(memberId));
+    bridge.onVoice(G, { externalUserId: 'u-jay', channelId: 'V-cafe', muted: false, video: false }, ORG_ID);
+    hub.enter(memberId, 'focus', 'live');
+    await flush();
+    await flush();
+    expect(api.moves).toEqual([{ user: 'u-jay', channel: 'V-afk' }]);
+    bridge.onVoice(G, { externalUserId: 'u-jay', channelId: 'V-afk', muted: false, video: false }, ORG_ID);
+    hub.enter(memberId, TOWN_ID, 'live');
+    await flush();
+    expect(api.moves.at(-1)).toEqual({ user: 'u-jay', channel: 'V-general' });
+  });
+
+  it('leaves people alone who are in a call that is not one of the spaces', async () => {
+    hub.connect(client(memberId));
+    bridge.onVoice(G, { externalUserId: 'u-jay', channelId: 'V-gaming', muted: false, video: false }, ORG_ID);
+    hub.enter(memberId, 'focus', 'live');
+    await flush();
+    await flush();
+    expect(api.moves).toEqual([]);
+  });
+
+  it('shows the talk light only while really in voice and not muted', () => {
+    const c = client(memberId);
+    hub.connect(c);
+    hub.enter(memberId, 'cafe', 'live');
+    hub.speakingFromMic(memberId, true);
+    expect(hub.actor(memberId)?.speaking).toBeFalsy(); // not in voice
+    hub.setVoice(memberId, { providerChannelId: 'V-cafe', muted: true, video: false });
+    hub.speakingFromMic(memberId, true);
+    expect(hub.actor(memberId)?.speaking).toBeFalsy(); // muted in Discord
+    hub.setVoice(memberId, { providerChannelId: 'V-cafe', muted: false, video: false });
+    hub.speakingFromMic(memberId, true);
+    expect(hub.actor(memberId)?.speaking).toBe(true);
+    hub.setVoice(memberId, undefined); // left voice: the light goes off
+    expect(hub.actor(memberId)?.speaking).toBe(false);
   });
 
   it('walks your avatar to the space whose voice channel you switched to in Discord', () => {
