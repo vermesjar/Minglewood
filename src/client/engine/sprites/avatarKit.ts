@@ -611,8 +611,8 @@ function drawGesture(P: Pix, F: Frame, [x, y]: [number, number], skin: RGB) {
 }
 
 /**
- * Seated and seen from behind, the legs are on the far side of the body: nothing below the hips shows (a
- * backless bench or stool must not show feet dangling toward the camera).
+ * Seated and seen from behind, the legs run away from us on the far side of the body: the thighs show, out along the
+ * seat, and nothing below the knee (a backless bench or stool must not show feet dangling toward the camera).
  */
 export const seatedFromBehind = (F: Frame) => F.sitting && F.view === 'back';
 
@@ -626,11 +626,15 @@ function drawLegs(P: Pix, F: Frame, L: FullLoadout) {
     [F.legFar, true],
     [F.legNear, false],
   ] as const) {
-    if (seatedFromBehind(F)) break;
     const shade = far ? 0.35 : 0;
     limb(P, leg.a, leg.m, leg.b, 2.7, 2.4, skin, shade);
     if (skirt) continue;
     const pm = M().capsule(leg.a[0], leg.a[1], leg.m[0], leg.m[1], r);
+    if (seatedFromBehind(F)) {
+      // the thigh only, out to the knee
+      paint(P, pm, pants, { shade });
+      continue;
+    }
     if (b === 'shorts') pm.band(0, Math.round(leg.a[1] + (leg.m[1] - leg.a[1]) * 0.8));
     else pm.capsule(leg.m[0], leg.m[1], leg.b[0], leg.b[1] - (b === 'joggers' ? 1 : 0), r - 0.3);
     paint(P, pm, pants, { shade });

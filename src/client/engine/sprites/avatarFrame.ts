@@ -352,10 +352,16 @@ export function frameFor(view: View, pose: Pose, body: Body = 'a', carry = false
     legFar = { a: [CX + 4, h], m: [CX + 6, h + 9], b: [CX + 8, 99] };
     heelNear = true;
   } else if (sitting && view === 'back') {
-    // seen from behind the thighs run away from us, staying inside the torso's silhouette (a low backrest
-    // must hide them); the kit leaves legs out of the back view altogether
-    legNear = { a: [CX - 4, h], m: [CX + 3, h + 1], b: [CX + 5, h + 6] };
-    legFar = { a: [CX + 4, h], m: [CX + 9, h], b: [CX + 10, h + 5] };
+    // seen from behind the thighs run straight out, away from us along the seat: up the screen at the floor's 2:1,
+    // the torso hiding their near end and the far one showing past it; the shins drop beyond the seat's front edge,
+    // out of sight, so a leg ends at the knee (m = b). A sofa sinks you and brings the knees up; a beanbag's legs
+    // stretch out further. (Carter: "I want to see the legs straight out"; hanging straight down, or none, read
+    // as someone standing.)
+    const reach = pose === 'sit-floor' ? 16 : pose === 'sit-lounge' ? 13 : 12;
+    const up = pose === 'sit-lounge' ? 1 : 0;
+    const knee = (x: number, y: number): Pt => [x + reach, y - reach / 2 - up];
+    legNear = { a: [CX - 4, h], m: knee(CX - 4, h), b: knee(CX - 4, h) };
+    legFar = { a: [CX + 4, h - 1], m: knee(CX + 4, h - 1), b: knee(CX + 4, h - 1) };
   } else if (pose === 'sit-stool') {
     // tall and shallow: thighs slope down off the seat, shins hang straight down to the rung
     legNear = { a: [CX - 4, h], m: [CX + 4, h + 4], b: [CX + 4, h + 12] };
