@@ -29,6 +29,8 @@ export interface SitLegs {
   toe: number;
   hang: number;
   hidden?: boolean;
+  /** The cushion runs LONG_SEAT or more across (a couch, a bench): seen from behind, a shoe shows past each knee. */
+  long?: boolean;
 }
 
 /** The thigh's radius (world px): the hip joint and the thighs' centre line are this far above the cushion. */
@@ -58,6 +60,21 @@ export const NATURAL_LEGS: Record<SitStyle, SitLegs> = {
  */
 export const BACK_HIDES = 19;
 
+/** A seat this wide across (tiles) or more is a long one (a couch, a bench). */
+export const LONG_SEAT = 1.2;
+
+/** Whether the cushion a sitter at u (on a cushion at z) sits on runs at least LONG_SEAT across. */
+function longSeat(m: Pick<SeatModel, 'parts'>, u: number, z: number): boolean {
+  let u0 = Infinity;
+  let u1 = -Infinity;
+  for (const p of m.parts)
+    if (p.part === 'seat' && p.z[1] >= z - 0.5 && u >= p.u[0] - 0.05 && u <= p.u[1] + 0.05) {
+      u0 = Math.min(u0, p.u[0]);
+      u1 = Math.max(u1, p.u[1]);
+    }
+  return u1 - u0 >= LONG_SEAT;
+}
+
 /** Half the width of a sitter's two legs together (tiles): what their shins take up across the seat. */
 export const LEGS_HALF = 0.1;
 
@@ -84,7 +101,7 @@ export function legsFor(m: Pick<SeatModel, 'parts'>, s: SitPoint, style: SitStyl
   const knee = frontAt(m, u, v, kneeZ - drop, kneeZ) - KNEE_OUT;
   const reach = Math.max(REACH_MIN, Math.min(REACH_MAX, v - knee));
   const hidden = m.parts.some((p) => (p.part === 'back' || p.part === 'wrap') && u >= p.u[0] && u <= p.u[1] && p.z[1] - z >= BACK_HIDES);
-  return { reach: round(reach, 100), rise: base.rise, drop: round(drop, 2), toe: base.toe, hang: round(Math.max(0, kneeZ - drop), 2), ...(hidden ? { hidden } : {}) };
+  return { reach: round(reach, 100), rise: base.rise, drop: round(drop, 2), toe: base.toe, hang: round(Math.max(0, kneeZ - drop), 2), ...(hidden ? { hidden } : {}), ...(longSeat(m, u, z) ? { long: true } : {}) };
 }
 
 /** Where the knees are in the seat's depth (local v) for someone sitting at `s` with these legs. */
@@ -93,4 +110,4 @@ export const kneeV = (s: SitPoint, legs: SitLegs) => s[1] - legs.reach;
 const round = (n: number, k: number) => Math.round(n * k) / k;
 
 /** A short stable key for caches. */
-export const legsKey = (l: SitLegs | undefined) => (l ? `${l.reach},${l.rise},${l.drop},${l.toe},${l.hang}${l.hidden ? ',h' : ''}` : '');
+export const legsKey = (l: SitLegs | undefined) => (l ? `${l.reach},${l.rise},${l.drop},${l.toe},${l.hang}${l.hidden ? ',h' : ''}${l.long ? ',l' : ''}` : '');

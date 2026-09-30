@@ -175,10 +175,17 @@ describe('where each view sits you (seat models)', () => {
     const legs = legsFor(m, [0.5, 0.66, 10], 'chair');
     expect(legs.hidden).toBeUndefined();
     const back = frameFor('back', 'sit', 'a', false, legs);
-    // the thigh runs away from us (up the screen) to the knee, and the shoe is past it
+    // a single seat: the thigh runs away from us (up the screen) to the knee, and no shoe (under the knee it read as
+    // a foot pointing down)
     expect(back.legNear.m[1]).toBeLessThan(back.legNear.a[1]);
-    expect(back.legNear.b).not.toEqual(back.legNear.m);
-    expect(back.feetHidden).toBeUndefined();
+    expect(back.feetHidden).toBe(true);
+    // a couch: the shoe shows just past the knee
+    const couch: SeatModel = { size: [2, 1], parts: [{ part: 'seat', u: [0, 2], v: [0.05, 0.95], z: [4, 10] }], sits: [[0.5, 0.5, 10]] };
+    const long = legsFor(couch, [0.5, 0.66, 10], 'lounge');
+    expect(long.long).toBe(true);
+    const onCouch = frameFor('back', 'sit-lounge', 'a', false, long);
+    expect(onCouch.legNear.b).not.toEqual(onCouch.legNear.m);
+    expect(onCouch.feetHidden).toBeUndefined();
     // on a stool the shins hang down to the feet
     const stool = frameFor('back', 'sit-stool', 'a', false, { reach: 0.3, rise: -1.5, drop: 11, toe: 0.02, hang: 9 });
     expect(stool.shinsBehind).toBe(true);

@@ -811,6 +811,9 @@ function drawShoes(P: Pix, F: Frame, L: FullLoadout) {
       continue;
     }
     paint(P, shoe, kind === 'slippers' ? lightOf(c) : c, { shade });
+    // seated and seen from behind, the shoe past the knee shows only below the thigh: a sole stripe or a toe stamp
+    // there read as the sole turned up (Carter: "shoes are still like upside down when sitting"), so it's plain
+    if (seatedFromBehind(F) && !F.shinsBehind) continue;
     const sole: RGB = kind === 'sneakers' || kind === 'hightops' || kind === 'skates' ? WHITE : [52, 38, 40];
     for (let x = x0 + 1; x < x1 - 1; x++) if (shoe.has(x, y0 + 3) && shoe.has(x, y0 + 4)) P.set(x, y0 + 3, sole);
     if (kind === 'sneakers' || kind === 'hightops') P.stamp(ax - 1, y0 + 1, ['ww'], { w: WHITE });
