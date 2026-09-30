@@ -9,6 +9,10 @@
  *   drop   from the knees' centre down to the soles (world px): to the floor when a shin can reach it (up to
  *          SHIN_MAX), else they hang
  *   toe    how far forward of the knees the feet are (tiles): the shins lean out a little
+ *   behind how far the thighs are drawn seen from behind (tiles): on a long seat (a couch, a bench) the whole thigh,
+ *          lying out along the cushion toward its front, as you'd see someone on a couch from behind; on a single
+ *          chair a stub, the body and the chair's back hiding the rest (drawn whole there, a thigh reads as a stick
+ *          poking out beside the chair)
  * The avatar kit projects these with the world's own projection (32 px across and 16 px down per tile, 2 px up per
  * world px), so a thigh pointing toward the camera reads foreshortened at the floor's 2:1, never as a leg stuck out
  * sideways.
@@ -21,6 +25,7 @@ export interface SitLegs {
   rise: number;
   drop: number;
   toe: number;
+  behind: number;
 }
 
 /** The thigh's radius (world px): the hip joint and the thighs' centre line are this far above the cushion. */
@@ -38,10 +43,10 @@ export const REACH_MAX = 0.56;
  * figure's own proportions on a seat of the style's usual height.
  */
 export const NATURAL_LEGS: Record<SitStyle, SitLegs> = {
-  chair: { reach: 0.24, rise: 0, drop: 8, toe: 0.03 },
-  lounge: { reach: 0.28, rise: 0.5, drop: 8, toe: 0.05 },
-  stool: { reach: 0.2, rise: -1.5, drop: 8, toe: 0.02 },
-  floor: { reach: 0.3, rise: 2.5, drop: 8, toe: 0.12 },
+  chair: { reach: 0.24, rise: 0, drop: 8, toe: 0.03, behind: 0.1 },
+  lounge: { reach: 0.28, rise: 0.5, drop: 8, toe: 0.05, behind: 0.1 },
+  stool: { reach: 0.2, rise: -1.5, drop: 8, toe: 0.02, behind: 0.1 },
+  floor: { reach: 0.3, rise: 2.5, drop: 8, toe: 0.12, behind: 0.1 },
 };
 
 /** Half the width of a sitter's two legs together (tiles): what their shins take up across the seat. */
@@ -61,6 +66,23 @@ function frontAt(m: Pick<SeatModel, 'parts'>, u: number, v: number, z0: number, 
   return Number.isFinite(front) ? front : v;
 }
 
+/** Seen from behind on a single seat, the thighs are drawn this long (tiles): the seat of the trousers. */
+export const STUB = 0.1;
+/** A seat this wide across (tiles) or more is a long one (a couch, a bench): from behind, the thighs show whole. */
+export const LONG_SEAT = 1.2;
+
+/** Whether the cushion a sitter at u (on a cushion at z) sits on runs at least LONG_SEAT across. */
+function longSeat(m: Pick<SeatModel, 'parts'>, u: number, z: number): boolean {
+  let u0 = Infinity;
+  let u1 = -Infinity;
+  for (const p of m.parts)
+    if (p.part === 'seat' && p.z[1] >= z - 0.5 && u >= p.u[0] - 0.05 && u <= p.u[1] + 0.05) {
+      u0 = Math.min(u0, p.u[0]);
+      u1 = Math.max(u1, p.u[1]);
+    }
+  return u1 - u0 >= LONG_SEAT;
+}
+
 /** The legs of someone sitting at `s` on a seat of this model, sat in with `style`. */
 export function legsFor(m: Pick<SeatModel, 'parts'>, s: SitPoint, style: SitStyle): SitLegs {
   const [u, v, z] = s;
@@ -69,7 +91,7 @@ export function legsFor(m: Pick<SeatModel, 'parts'>, s: SitPoint, style: SitStyl
   const drop = Math.max(2, Math.min(SHIN_MAX, kneeZ));
   const knee = frontAt(m, u, v, kneeZ - drop, kneeZ) - KNEE_OUT;
   const reach = Math.max(REACH_MIN, Math.min(REACH_MAX, v - knee));
-  return { reach: round(reach, 100), rise: base.rise, drop: round(drop, 2), toe: base.toe };
+  return { reach: round(reach, 100), rise: base.rise, drop: round(drop, 2), toe: base.toe, behind: round(longSeat(m, u, z) ? reach : STUB, 100) };
 }
 
 /** Where the knees are in the seat's depth (local v) for someone sitting at `s` with these legs. */
@@ -78,4 +100,4 @@ export const kneeV = (s: SitPoint, legs: SitLegs) => s[1] - legs.reach;
 const round = (n: number, k: number) => Math.round(n * k) / k;
 
 /** A short stable key for caches. */
-export const legsKey = (l: SitLegs | undefined) => (l ? `${l.reach},${l.rise},${l.drop},${l.toe}` : '');
+export const legsKey = (l: SitLegs | undefined) => (l ? `${l.reach},${l.rise},${l.drop},${l.toe},${l.behind}` : '');

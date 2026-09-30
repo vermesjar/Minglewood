@@ -209,9 +209,6 @@ function upper(view: View, dy: number, body: Body, dx = 0) {
   };
 }
 
-/** Seen from behind, a seated figure's thighs are drawn at most this long (tiles): its natural thigh. */
-const BACK_REACH = 0.1;
-
 /** The sitting style of a sitting pose. */
 const STYLE_OF: Partial<Record<Pose, SitStyle>> = { sit: 'chair', 'sit-stool': 'stool', 'sit-lounge': 'lounge', 'sit-floor': 'floor' };
 
@@ -223,9 +220,8 @@ const STYLE_OF: Partial<Record<Pose, SitStyle>> = { sit: 'chair', 'sit-stool': '
  */
 function seatedLegs(view: View, h: number, S: SitLegs): { near: Limb; far: Limb } {
   const back = view === 'back';
-  // seen from behind, the thighs run away from us behind the hips: however deep the seat, only their near part could
-  // show past the body, so they're drawn no longer than the figure's own (a longer one pokes out sideways)
-  const reach = back ? Math.min(S.reach, BACK_REACH) : S.reach;
+  // seen from behind, the thighs run away from us, as far as the seat shows them (sitLegs.ts `behind`)
+  const reach = back ? S.behind : S.reach;
   const kx = 32 * reach;
   const ky = (back ? -16 : 16) * reach - 2 * S.rise;
   const leg = (x: number, y: number): Limb => {

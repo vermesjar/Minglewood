@@ -712,7 +712,23 @@ function drawLowerGarment(P: Pix, F: Frame, L: FullLoadout) {
   const top = F.waistY - 1;
   let poly: Array<[number, number]>;
   let hem: number;
-  if (F.sitting) {
+  if (F.sitting && F.view === 'front') {
+    // seated, seen from the front: it drapes from the waist over the thighs to the knees (sitLegs lays them toward us),
+    // a longer one falling a little past them
+    const fall = long ? 5 : coat ? 3 : 1;
+    const [nx, ny] = F.legNear.m;
+    const [fx, fy] = F.legFar.m;
+    hem = Math.max(ny, fy) + 3 + fall;
+    poly = [
+      [F.hx - 9, top],
+      [F.hx + 10, top],
+      [Math.max(F.hx + 11, fx + 4), fy - 3],
+      [fx + 4, fy + 2 + fall],
+      [nx + 2, ny + 4 + fall],
+      [nx - 4, ny + 3 + fall],
+      [F.hx - 10, F.hipY + 3 + fall],
+    ];
+  } else if (F.sitting) {
     hem = F.hipY + (long ? 10 : coat ? 8 : 6);
     poly = [
       [F.hx - 9, top],
