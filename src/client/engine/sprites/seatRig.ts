@@ -459,7 +459,7 @@ export function rigFindings(v: RigView, rig: SeatRig, looks: AvatarLoadout[] = R
                 }
               }
           }
-          note(`${i} perched`, fig ? shown / fig : 0, false, (n) => n > 0.2, (n) => `cushion ${i}: their hips show above the backrest (${Math.round(n * 100)}%): they look perched on it, not sitting in the seat`);
+          note(`${i} perched`, fig ? shown / fig : 0, false, (n) => n > 0.1, (n) => `cushion ${i}: their hips show above the backrest (${Math.round(n * 100)}%): they look perched on it, not sitting in the seat`);
         }
       }
       // (c) seen from the front, the near thigh on the seat's surface
