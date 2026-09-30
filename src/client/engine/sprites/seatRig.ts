@@ -439,6 +439,28 @@ export function rigFindings(v: RigView, rig: SeatRig, looks: AvatarLoadout[] = R
           }
         }
         note(`${i} float`, cols && floating * 2 >= cols ? worstGap : 0, false, (n) => n > 3, (n) => `cushion ${i}: a floating bust: ${n} px of seat or nothing between their torso and the seat (from behind, only backrest frame may cover their hips)`);
+        // (d) in the seat, not on it: from behind, a backrest covers their hips (the band just above the seat). Hips
+        // showing over the back read as someone perched on its top edge (Carter, the café's redrawn chairs).
+        // Only what shows above the back's top edge counts: hips seen through a bentwood loop or between spindles are
+        // in the seat, behind the back; beside a narrow back they're beside it.
+        if (v.backrest) {
+          let fig = 0;
+          let shown = 0;
+          for (let x = hx - 8; x <= hx + 8; x++) {
+            let top = -1;
+            for (let y = hy - 40; y <= hy + 8 && top < 0; y++) if (who(x, y) === 2) top = y;
+            if (top < 0) continue;
+            for (let y = hy - 8; y <= hy; y++)
+              if (figAt(x, y)) {
+                fig++;
+                if (y < top && who(x, y) === 3 + i) {
+                  shown++;
+                  flag.add(`${x},${y}`);
+                }
+              }
+          }
+          note(`${i} perched`, fig ? shown / fig : 0, false, (n) => n > 0.2, (n) => `cushion ${i}: their hips show above the backrest (${Math.round(n * 100)}%): they look perched on it, not sitting in the seat`);
+        }
       }
       // (c) seen from the front, the near thigh on the seat's surface
       if (!behind) {
