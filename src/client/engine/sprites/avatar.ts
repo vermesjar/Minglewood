@@ -13,6 +13,7 @@ import { makeCanvas, type Sprite } from './painter';
 import { drawAvatarV2, type Expression } from './avatarKit';
 import type { Pose } from './avatarFrame';
 import { H, W } from './pixkit';
+import { legsKey, type SitLegs } from '@shared/world/sitLegs';
 
 export type { Pose } from './avatarFrame';
 
@@ -36,9 +37,9 @@ export const AVATAR_CROPS = {
 
 export type { Expression } from './avatarKit';
 
-export function drawAvatarCanvas(input: AvatarLoadout, facing: Facing, pose: Pose, expr?: Expression): HTMLCanvasElement {
+export function drawAvatarCanvas(input: AvatarLoadout, facing: Facing, pose: Pose, expr?: Expression, legs?: SitLegs): HTMLCanvasElement {
   const view = facing === 'se' || facing === 'sw' ? 'front' : 'back';
-  const P = drawAvatarV2(input, view, pose, expr);
+  const P = drawAvatarV2(input, view, pose, expr, legs);
   const c = makeCanvas(W, H);
   const ctx = c.getContext('2d', { willReadFrequently: true })!;
   const img = ctx.createImageData(W, H);
@@ -67,13 +68,14 @@ export function avatarKey(L: AvatarLoadout): string {
 
 /**
  * The sprite for a look, facing and pose. `expr` is a momentary expression the world can flash on top: a
- * blink every few seconds when idle, the mouth moving while a speech bubble is up.
+ * blink every few seconds when idle, the mouth moving while a speech bubble is up. `legs`: how a sitter's legs lie on
+ * their seat (sitLegs.ts).
  */
-export function avatarSprite(L: AvatarLoadout, facing: Facing, pose: Pose, expr?: Expression): Sprite {
-  const key = `${avatarKey(L)}|${facing}|${pose}|${expr ?? ''}`;
+export function avatarSprite(L: AvatarLoadout, facing: Facing, pose: Pose, expr?: Expression, legs?: SitLegs): Sprite {
+  const key = `${avatarKey(L)}|${facing}|${pose}|${expr ?? ''}|${legsKey(legs)}`;
   let s = cache.get(key);
   if (!s) {
-    const canvas = drawAvatarCanvas(L, facing, pose, expr);
+    const canvas = drawAvatarCanvas(L, facing, pose, expr, legs);
     const data = canvas.getContext('2d', { willReadFrequently: true })!.getImageData(0, 0, W, H).data;
     const mask = new Uint8Array(W * H);
     for (let i = 0; i < mask.length; i++) mask[i] = data[i * 4 + 3] ? 1 : 0;

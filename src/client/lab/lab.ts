@@ -18,6 +18,7 @@ import { blit } from '../engine/sprites/painter';
 import { setSkyOverride, type Sky } from '../engine/weather';
 import { AV_H, AV_W, drawAvatarV2, frameAnchors } from '../engine/sprites/avatarKit';
 import type { Pose as FPose, View as FView } from '../engine/sprites/avatarFrame';
+import { figureSheet, roomShot, seatDebug, seatShots, type SeatShotOpts } from './seatShots';
 
 const seed = buildSeed();
 const noop = () => undefined;
@@ -446,6 +447,22 @@ const lab = {
   catalog: async (o?: { name?: string; extra?: Array<{ key: string; footprint: [number, number] }> }) => {
     await ready;
     return catalog(o);
+  },
+  seatShots: async (o: SeatShotOpts) => {
+    await ready;
+    return seatShots(o);
+  },
+  roomShot: async (o: Parameters<typeof roomShot>[0]) => {
+    await ready;
+    return roomShot(o);
+  },
+  seatDebug: async (o: SeatShotOpts) => {
+    await ready;
+    return seatDebug(o);
+  },
+  figureSheet: async (o: Parameters<typeof figureSheet>[0]) => {
+    await ready;
+    return figureSheet(o);
   },
   reloadArt: async () => {
     await loadArt();

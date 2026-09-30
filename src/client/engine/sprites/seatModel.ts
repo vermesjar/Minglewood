@@ -6,8 +6,8 @@
  *   torso, head, hair, hat …  a billboard at the pelvis, a torso's half-depth nearer the camera (hair behind the
  *                             head: at the pelvis)
  *   thighs                    the plane of their tops, forward from the hips at the cushion's height
- *   shins and shoes           a plane parallel to the seat's front, just in front of it (seatModels kneeFace): across
- *                             their whole width they hang in front of it, whatever the figure's short thighs say
+ *   shins and shoes           a plane parallel to the seat's front at the knees, which the legs (sitLegs.ts) put just
+ *                             past its front edge: the same legs the figure is drawn with
  *   upper arms                billboards at the shoulders, either side of the torso
  *   forearms, hands, held     resting on the armrest on their side (just above its top) when the seat has one, else
  *                             on the lap — or nearer, where the arm is raised
@@ -52,6 +52,7 @@ import {
   type SitPoint,
 } from '@shared/world/seatModels';
 import { renderAvatarLayers } from './avatarQa';
+import { legsFor, legsKey, type SitLegs } from '@shared/world/sitLegs';
 import { LAYER, kitFrame } from './avatarKit';
 import { frameFor, type Frame, type Pose } from './avatarFrame';
 import type { Pixels } from './footing';
@@ -182,22 +183,16 @@ const TORSO_LAYERS = new Set<number>([LAYER.pet, LAYER.chairBack, LAYER.torso, L
 const partsCache = new Map<string, FigureParts>();
 
 /**
- * A figure's pixels and the body part of each (cached per look, facing, pose and feet drop). `drop`: its feet let down
- * that many px to the floor (feetDrop: a low seat), the shins stretched to reach.
+ * A figure's pixels and the body part of each (cached per look, facing, pose and legs). `legs`: how a sitter's legs
+ * lie on their seat (sitLegs.ts), exactly as the game draws them.
  */
-export function figureParts(look: AvatarLoadout, facing: Facing, pose: Pose, drop = 0): FigureParts {
-  const key = `${JSON.stringify(look)}|${facing}|${pose}|${drop}`;
+export function figureParts(look: AvatarLoadout, facing: Facing, pose: Pose, legs?: SitLegs): FigureParts {
+  const key = `${JSON.stringify(look)}|${facing}|${pose}|${legsKey(legs)}`;
   const had = partsCache.get(key);
   if (had) return had;
-  if (drop > 0) {
-    const base = figureParts(look, facing, pose, 0);
-    const out = { ...stretchFigure(base.px, base.part, base.frame, drop), frame: base.frame };
-    partsCache.set(key, out);
-    return out;
-  }
-  const r = renderAvatarLayers(look, facing, pose);
+  const r = renderAvatarLayers(look, facing, pose, legs);
   const view = facing === 'se' || facing === 'sw' ? 'front' : 'back';
-  const F = kitFrame(look, view, pose);
+  const F = kitFrame(look, view, pose, legs);
   const W = FIG.w;
   const H = FIG.h;
   const mirrored = facing === 'sw' || facing === 'nw';
@@ -285,56 +280,6 @@ export function figureParts(look: AvatarLoadout, facing: Facing, pose: Pose, dro
   return out;
 }
 
-/**
- * A figure with its feet let down `drop` px: every shin and shoe pixel from just under the knees moves down, and the
- * gap is filled by repeating the shins' top row there — the legs reach the floor. Pure (the game stretches its own
- * sprite, blink and all, with the part map from figureParts).
- */
-export function stretchFigure(px: ArrayLike<number>, part: Uint8Array, F: Frame, drop: number): { px: Uint8ClampedArray; part: Uint8Array } {
-  const W = FIG.w;
-  const H = FIG.h;
-  const out = new Uint8ClampedArray(W * H * 4);
-  const outPart = new Uint8Array(W * H);
-  const cut = Math.round(Math.max(F.legNear.m[1], F.legFar.m[1])) + 2;
-  const put = (x: number, y: number, i: number, keep: boolean) => {
-    if (y < 0 || y >= H) return;
-    const o = y * W + x;
-    if (keep && outPart[o] && outPart[o] !== BODY.shin) return;
-    for (let k = 0; k < 4; k++) out[o * 4 + k] = px[i * 4 + k];
-    outPart[o] = part[i];
-  };
-  // everything but the lower shins where it was
-  for (let y = 0; y < H; y++)
-    for (let x = 0; x < W; x++) {
-      const i = y * W + x;
-      if (!px[i * 4 + 3] || (part[i] === BODY.shin && y >= cut)) continue;
-      put(x, y, i, false);
-    }
-  // the lower shins and the feet, let down; the gap filled with the shins' top row
-  for (let y = cut; y < H; y++)
-    for (let x = 0; x < W; x++) {
-      const i = y * W + x;
-      if (px[i * 4 + 3] && part[i] === BODY.shin) put(x, y + drop, i, true);
-    }
-  for (let x = 0; x < W; x++) {
-    const i = cut * W + x;
-    if (!px[i * 4 + 3] || part[i] !== BODY.shin) continue;
-    for (let y = cut; y < cut + drop; y++) put(x, y, i, true);
-  }
-  return { px: out, part: outPart };
-}
-
-/**
- * How far a seated figure's feet are let down to the floor (px): on a low seat — sat in upright or lounging, seen from
- * the front, their feet no more than 4 world px off the floor — all the way down; else not at all (legs dangle from a
- * tall chair, rest on a stool's rung, stretch out from a beanbag).
- */
-export function feetDrop(style: SitStyle, facing: Facing, pose: string, lift: number): number {
-  if (behindView(facing) || !isSitPoseName(pose) || (style !== 'chair' && style !== 'lounge')) return 0;
-  const px = Math.round(lift * 2);
-  return px > 0 && px <= 8 ? px : 0;
-}
-
 /** A torso's half-depth (tiles): the billboard of the body is this much nearer the camera than the pelvis. */
 export const TORSO_HALF = 0.1;
 /** The shoulders' half-width (tiles): where the upper arms hang, either side of the pelvis. */
@@ -403,17 +348,17 @@ interface BodyPlanes {
   sitting: boolean;
 }
 
-function bodyPlanes(v: ModelView, b: BodyAt): BodyPlanes {
+function bodyPlanes(v: ModelView, b: BodyAt, legs?: SitLegs): BodyPlanes {
   const t = towardCamera(v.facing);
   const side = Math.sign(t.u);
   const torso: [number, number] = [b.u + TORSO_HALF * t.u, b.v + TORSO_HALF * t.v];
-  const thighZ = b.z + THIGH_TOP;
+  const thighZ = b.z + THIGH_TOP + Math.max(0, legs?.rise ?? 0);
   const lap = thighZ + 1.5;
   const armCam = armTop(v.model, b.u, side);
   const armFar = armTop(v.model, b.u, -side);
-  // the knees: at the seat's front (the standard: seatModels.kneeFace), so the shins and feet always hang in front of
-  // it, whatever the figure's own short thighs say; the thighs lie on the cushion between
-  const kneeV = kneeFace(v.model);
+  // the knees: where the legs put them (sitLegs.ts: just past the seat's front edge, so the shins hang in front of it);
+  // without legs (not sitting in this seat) the seat's front
+  const kneeV = legs ? b.v - legs.reach : kneeFace(v.model);
   return {
     torso,
     hair: [b.u, b.v],
@@ -479,10 +424,19 @@ export interface Overlay {
  * `feet`: their figure's anchor in the drawing's px; `lift`: how high it's lifted (world px). `free`: the person
  * isn't in or getting into this seat (any piece's proxy, depth by proxy): one billboard where they are.
  */
-export function overlayFor(v: ModelView, look: AvatarLoadout, facing: Facing, pose: Pose, feet: readonly [number, number], lift: number, opts: { free?: boolean } = {}): Overlay {
-  const parts = figureParts(look, facing, pose, opts.free ? 0 : feetDrop(v.style, facing, pose, lift));
+export function overlayFor(
+  v: ModelView,
+  look: AvatarLoadout,
+  facing: Facing,
+  pose: Pose,
+  feet: readonly [number, number],
+  lift: number,
+  opts: { free?: boolean; legs?: SitLegs } = {},
+): Overlay {
+  const legs = opts.free ? undefined : opts.legs;
+  const parts = figureParts(look, facing, pose, legs);
   const b = bodyAt(v, feet, pose, lift, !!opts.free);
-  const B = bodyPlanes(v, b);
+  const B = bodyPlanes(v, b, legs);
   const D = seatDepth(v);
   const x0 = Math.round(feet[0]) - figAx(facing);
   const y0 = Math.round(feet[1]) - FIG.feet;
@@ -573,6 +527,8 @@ export interface ModelSitter {
   lift: number;
   /** Back-to-front order (the game draws the farther sitter first). */
   depth: number;
+  /** How their legs lie on the seat (sitLegs.ts), as the game draws them. */
+  legs?: SitLegs;
 }
 
 /** Everyone seated in a view: look k + i on cushion i. */
@@ -582,7 +538,15 @@ export function modelSitters(v: ModelView, looks: AvatarLoadout[], k = 0): Model
   const out: ModelSitter[] = [];
   sits.forEach((s, i) => {
     if (!s) return;
-    out.push({ look: looks[(k + i) % looks.length], facing: v.facing, pose: SIT_POSE_OF[v.style] as Pose, feet: feetForSit(v, s, v.style), lift: liftForSit(s, v.style), depth: tiles[i].x + tiles[i].y });
+    out.push({
+      look: looks[(k + i) % looks.length],
+      facing: v.facing,
+      pose: SIT_POSE_OF[v.style] as Pose,
+      feet: feetForSit(v, s, v.style),
+      lift: liftForSit(s, v.style),
+      depth: tiles[i].x + tiles[i].y,
+      legs: legsFor(v.model, s, v.style),
+    });
   });
   return out;
 }
@@ -620,7 +584,8 @@ export function modelSitFrames(v: ModelView, look: AvatarLoadout): ModelSitter[]
     const px = anchor[0] + 32 * (x - y);
     const py = anchor[1] + 16 * (x + y) - 2 * m.lift;
     const pose: Pose = k <= 0 ? 'stand' : k < CROUCH_UNTIL ? 'crouch' : (SIT_POSE_OF[v.style] as Pose);
-    return { look, facing: v.facing, pose, feet: [Math.round(px), Math.round(py)] as [number, number], lift: m.lift, depth: c.x + c.y };
+    const sitting = pose !== 'stand' && pose !== 'crouch';
+    return { look, facing: v.facing, pose, feet: [Math.round(px), Math.round(py)] as [number, number], lift: m.lift, depth: c.x + c.y, ...(sitting ? { legs: legsFor(v.model, s, v.style) } : {}) };
   });
 }
 
@@ -683,7 +648,7 @@ export function composeModel(v: ModelView, sitters: ModelSitter[], opts: { size:
   const overlays: Overlay[] = new Array(sitters.length);
   const figures: Array<{ x0: number; y0: number }> = new Array(sitters.length);
   for (const { s, k } of order) {
-    const ov = overlayFor(v, s.look, s.facing, s.pose, s.feet, s.lift);
+    const ov = overlayFor(v, s.look, s.facing, s.pose, s.feet, s.lift, { legs: s.legs });
     overlays[k] = ov;
     figures[k] = { x0: ov.x0, y0: ov.y0 };
     const f = ov.parts;

@@ -73,11 +73,11 @@ export const RIG_MIRROR: Record<Facing, Facing> = { se: 'sw', sw: 'se', ne: 'nw'
 export const fromBehind = (f: Facing) => f === 'ne' || f === 'nw';
 
 /**
- * The seated figure (avatarFrame): 88 × 112 sprite px, its feet anchor at (45, 104) — (43, 104) mirrored, for
+ * The seated figure (avatarFrame): 88 × 128 sprite px, its feet anchor at (45, 104) — (43, 104) mirrored, for
  * a sitter facing sw or nw. Its seat point: the underside of the pelvis, centred between the hips, at
  * HIP_Y + the pose's drop + the thigh's radius.
  */
-export const FIG = { w: 88, h: 112, ax: 45, axMirrored: 43, feet: 104, hip: 82, thigh: 3 } as const;
+export const FIG = { w: 88, h: 128, ax: 45, axMirrored: 43, feet: 104, hip: 82, thigh: 3 } as const;
 
 /** How far a pose lowers the figure's body (avatarFrame's DROP): the sitting poses, and the crouch into a seat. */
 export function poseDrop(pose: string): number {

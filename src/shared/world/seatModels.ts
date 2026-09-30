@@ -350,12 +350,29 @@ export function seatSpan(m: Pick<SeatModel, 'parts'>, u: number): { v0: number; 
   return { v0: Math.min(...blocks.map((b) => b.v[0])), v1: Math.max(...blocks.map((b) => b.v[1])) };
 }
 
-/** Where the standard puts a sitter's pelvis in depth, at u on a cushion at z (see SIT_GAP). */
+/**
+ * A sitter's thighs reach this far (tiles) from the pelvis to the knees at most, when they're placed: the figure is small
+ * for its furniture, so on a seat deeper than that they sit forward, knees at the front, rather than back against the
+ * backrest with their legs lost in the cushion.
+ */
+export const SEAT_REACH = 0.36;
+/** The knees stand this far past the seat's front (tiles): the shins clear its front face (sitLegs.ts KNEE_OUT). */
+const KNEE_PAST = 0.04;
+
+/**
+ * Where the standard puts a sitter's pelvis in depth, at u on a cushion at z: back against the backrest (SIT_GAP in
+ * front of it) — or, on a backless seat, its middle — unless their thighs wouldn't reach the front from there; then as
+ * far back as they do (SEAT_REACH from the knees just past the front).
+ */
 export function standardSitV(m: Pick<SeatModel, 'parts'>, u: number, z: number): number | null {
   const back = backFace(m, u, z);
-  if (back !== null) return back - SIT_GAP;
   const s = seatSpan(m, u);
-  return s ? (s.v0 + s.v1) / 2 : null;
+  const ideal = back !== null ? back - SIT_GAP : s ? (s.v0 + s.v1) / 2 : null;
+  if (ideal === null || !s) return ideal;
+  // the front of the cushion they sit on (the seat blocks level with it)
+  const cushion = m.parts.filter((p) => p.part === 'seat' && u >= p.u[0] - 0.02 && u <= p.u[1] + 0.02 && p.z[1] >= z - 0.5);
+  const front = cushion.length ? Math.min(...cushion.map((p) => p.v[0])) : s.v0;
+  return Math.min(ideal, front - KNEE_PAST + SEAT_REACH);
 }
 
 /**

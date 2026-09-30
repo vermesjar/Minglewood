@@ -3,7 +3,8 @@
  * with the part line and two flat tones, and the selective outline around the whole figure.
  */
 export const W = 88;
-export const H = 112;
+/** The figure canvas: 16 rows below the standing feet line (104) leave room for a sitter's feet let down to the floor. */
+export const H = 128;
 
 /* ================================================================== color */
 

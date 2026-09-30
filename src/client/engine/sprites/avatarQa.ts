@@ -16,6 +16,7 @@
  */
 import type { AvatarLoadout } from '@shared/domain/types';
 import type { Facing } from '@shared/world/scene';
+import type { SitLegs } from '@shared/world/sitLegs';
 import { ITEM_BY_ID, normalizeLoadout } from '@shared/avatar';
 import { LAYER, bodyOf, drawAvatarV2, headMaskOf } from './avatarKit';
 import { LIFE_POSES, frameFor, type Frame, type Pose } from './avatarFrame';
@@ -32,9 +33,9 @@ export interface Rendered {
 }
 
 /** A look rendered as the game does it (kit + mirroring for sw/nw), with its layer map. */
-export function renderAvatarLayers(look: AvatarLoadout, facing: Facing, pose: Pose): Rendered {
+export function renderAvatarLayers(look: AvatarLoadout, facing: Facing, pose: Pose, legs?: SitLegs): Rendered {
   const view = facing === 'se' || facing === 'sw' ? 'front' : 'back';
-  const P = drawAvatarV2(look, view, pose);
+  const P = drawAvatarV2(look, view, pose, undefined, legs);
   if (facing === 'se' || facing === 'ne') return { px: P.d, owner: P.owner };
   const px = new Uint8ClampedArray(P.d.length);
   const owner = new Uint8Array(P.owner.length);

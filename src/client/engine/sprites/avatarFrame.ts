@@ -3,13 +3,14 @@
  * positioned any other way — eyes, brows, glasses, hats, hair, collars, sleeves, cups and shoes all read
  * their place from here, so they line up in every facing and pose by construction.
  *
- * Canvas: 88 × 112 px at 2× density (64 px per floor tile); the figure stands centred on x = 45 with its
+ * Canvas: 88 × 128 px at 2× density (64 px per floor tile); the figure stands centred on x = 45 with its
  * feet on y = 104. Proportions follow the classic social-game figure: a big round head sitting on the
  * shoulders (head skin 22 × 22), a short torso (~19 px), short legs (~16 px) and chunky shoes.
  * The two authored views face screen-right: "front" (3/4 front, facing se) and "back" (3/4 back, facing
  * ne); sw/nw are mirrors.
  */
 import { SIT_DROP, type SitStyle } from '@shared/world/seats';
+import { NATURAL_LEGS, type SitLegs } from '@shared/world/sitLegs';
 
 export type { SitStyle } from '@shared/world/seats';
 export type Pose =
@@ -208,11 +209,43 @@ function upper(view: View, dy: number, body: Body, dx = 0) {
   };
 }
 
+/** Seen from behind, a seated figure's thighs are drawn at most this long (tiles): its natural thigh. */
+const BACK_REACH = 0.2;
+
+/** The sitting style of a sitting pose. */
+const STYLE_OF: Partial<Record<Pose, SitStyle>> = { sit: 'chair', 'sit-stool': 'stool', 'sit-lounge': 'lounge', 'sit-floor': 'floor' };
+
+/**
+ * Seated legs from the seat (sitLegs.ts), in this frame's px: the thighs from the hip joints forward to the knees and
+ * the shins down to the soles, projected the way the world is (a tile forward is 32 px across and 16 px down from the
+ * front, 16 px up from behind; a world px of height is 2 px). Seen from behind the legs run away from us and end at
+ * the knee (the seat hides the rest).
+ */
+function seatedLegs(view: View, h: number, S: SitLegs): { near: Limb; far: Limb } {
+  const back = view === 'back';
+  // seen from behind, the thighs run away from us behind the hips: however deep the seat, only their near part could
+  // show past the body, so they're drawn no longer than the figure's own (a longer one pokes out sideways)
+  const reach = back ? Math.min(S.reach, BACK_REACH) : S.reach;
+  const kx = 32 * reach;
+  const ky = (back ? -16 : 16) * reach - 2 * S.rise;
+  const leg = (x: number, y: number): Limb => {
+    const m: Pt = [x + kx, y + ky];
+    if (back) return { a: [x, y], m, b: m };
+    // the ankle: the sole `drop` below the knee, `toe` further forward; the shoe is drawn 5 px tall above the sole
+    const sx = m[0] + 32 * S.toe;
+    const sy = m[1] + 16 * S.toe + 2 * S.drop;
+    return { a: [x, y], m, b: [sx, sy - 5] };
+  };
+  return { near: leg(CX - 4, h), far: leg(CX + 4, h - 1) };
+}
+
 /**
  * `carry`: holding something to show (a cup, a soda, popcorn, a plush): one arm is bent with the hand raised in
  * front of the chest (seen from the front) or held out at the side (seen from behind), and doesn't swing.
+ * `legs`: how a sitter's legs lie on their seat (sitLegs.ts); a sitting pose without it takes its style's natural
+ * legs, and 'legacy' keeps the side-on legs a wheelchair's footrest is drawn for.
  */
-export function frameFor(view: View, pose: Pose, body: Body = 'a', carry = false): Frame {
+export function frameFor(view: View, pose: Pose, body: Body = 'a', carry = false, legs?: SitLegs | 'legacy'): Frame {
   const sitting = isSitPose(pose);
   const dy = DROP[pose] ?? LIFE_DY[pose] ?? 0;
   const dx = LIFE_DX[pose] ?? 0;
@@ -351,6 +384,9 @@ export function frameFor(view: View, pose: Pose, body: Body = 'a', carry = false
     legNear = { a: [CX - 4, h], m: [CX - 6, h + 9], b: [CX - 8, 97] };
     legFar = { a: [CX + 4, h], m: [CX + 6, h + 9], b: [CX + 8, 99] };
     heelNear = true;
+  } else if (sitting && legs !== 'legacy') {
+    const S = legs ?? NATURAL_LEGS[STYLE_OF[pose] ?? 'chair'];
+    ({ near: legNear, far: legFar } = seatedLegs(view, h, S));
   } else if (sitting && view === 'back') {
     // seen from behind the thighs run straight out, away from us along the seat: up the screen at the floor's 2:1,
     // the torso hiding their near end and the far one showing past it; the shins drop beyond the seat's front edge,

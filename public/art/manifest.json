@@ -2182,7 +2182,7 @@
       "sitStyle": "chair",
       "backrest": true,
       "rotation": "mirror",
-      "name": "Café chair",
+      "name": "Caf\u00e9 chair",
       "category": "seating",
       "tags": [
         "chair",
@@ -2256,7 +2256,8 @@
           "sit"
         ]
       },
-      "backDepth": 0.09
+      "backDepth": 0.09,
+      "arms": true
     },
     "chair.red": {
       "footprint": [
@@ -4314,7 +4315,7 @@
       "sitStyle": "chair",
       "backrest": true,
       "rotation": "mirror",
-      "name": "Founders’ throne",
+      "name": "Founders\u2019 throne",
       "category": "seating",
       "tags": [
         "heirloom",

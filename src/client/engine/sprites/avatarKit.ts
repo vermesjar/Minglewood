@@ -9,6 +9,7 @@
 import type { AvatarLoadout } from '@shared/domain/types';
 import { ITEM_BY_ID, normalizeLoadout, type FullLoadout } from '@shared/avatar';
 import { frameFor, type Body, type Frame, type Pose, type View } from './avatarFrame';
+import type { SitLegs } from '@shared/world/sitLegs';
 import { GOLD, H, LINE, M, PINK, PLUM, Pix, W, WHITE, hx, lightOf, lineOf, lum, mix, outline, paint, shadowOf, type RGB } from './pixkit';
 import TOP_LIB from './topLib.json';
 import HAT_LIB from './hatLib.json';
@@ -1212,23 +1213,25 @@ export const LAYER = {
 export type Expression = 'blink' | 'talk';
 
 /** The frame the kit draws a look with in a view and pose (what drawAvatarV2 hangs every part off). */
-export function kitFrame(input: AvatarLoadout, view: View, requested: Pose): Frame {
+export function kitFrame(input: AvatarLoadout, view: View, requested: Pose, legs?: SitLegs): Frame {
   const L = normalizeLoadout(input);
   const wheelchair = L.mobility === 'mob.wheelchair';
   const pose: Pose = wheelchair && requested !== 'wave' ? 'sit' : requested;
   const body = bodyOf(L);
-  const F = frameFor(view, pose, body, CARRIED.has(L.held));
+  // a wheelchair is its own seat: it keeps the side-on legs its footrest is drawn for
+  const F = frameFor(view, pose, body, CARRIED.has(L.held), wheelchair ? 'legacy' : legs);
   if (wheelchair && pose === 'wave') {
-    const sit = frameFor(view, 'sit', body);
+    const sit = frameFor(view, 'sit', body, false, 'legacy');
     return { ...sit, pose: 'wave', armNear: F.armNear, handNear: F.handNear };
   }
   return F;
 }
 
-export function drawAvatarV2(input: AvatarLoadout, view: View, requested: Pose, expr?: Expression): Pix {
+/** `legs`: how a sitter's legs lie on their seat (sitLegs.ts); a sitting pose without it takes its style's own. */
+export function drawAvatarV2(input: AvatarLoadout, view: View, requested: Pose, expr?: Expression, legs?: SitLegs): Pix {
   const L = normalizeLoadout(input);
   const wheelchair = L.mobility === 'mob.wheelchair';
-  const F = kitFrame(input, view, requested);
+  const F = kitFrame(input, view, requested, legs);
   const coversHair = !!ITEM_BY_ID.get(L.headwear)?.coversHair;
   const P = new Pix();
   const on = (layer: number) => (P.layer = layer);

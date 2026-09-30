@@ -110,12 +110,12 @@ export function artSeatRig(o: SceneObject, facing: Facing, sp: Sprite): SeatRig 
 
 const MODELS = MODELS_JSON as unknown as SeatModels;
 /**
- * The game draws seats Habbo's way, with authored layers (the seat rig: the drawing's part behind a sitter, its
- * front layer over them, one hand-placed sitting point), not the 3D proxies: a flat figure given per-pixel depth
- * kept misplacing bodies (Carter, 2026-09-29). The models stay a tool (fitting, checks, the Lab) and can be turned
- * back on for comparison renders.
+ * The game draws seats Habbo's way, in layers — the seat's drawing behind its sitters and its parts between them and
+ * us over them — and those layers, the sitting points and the legs all come from the seat's 3D model
+ * (sprites/seatLayers.ts). (Per-pixel depth against a flat figure kept misplacing bodies, Carter 2026-09-29: the
+ * model no longer decides anything pixel by pixel against a body.) Off only for comparison renders.
  */
-let modelsOff = true;
+let modelsOff = false;
 export function setSeatModelsEnabled(on: boolean) {
   modelsOff = !on;
 }

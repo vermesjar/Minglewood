@@ -69,7 +69,7 @@ export interface SeatView {
 }
 
 const FIG_W = 88;
-const FIG_H = 112;
+const FIG_H = 128;
 const figures = new Map<string, Uint8ClampedArray>();
 function figure(look: AvatarLoadout, k: number, facing: Facing, pose: Pose): Uint8ClampedArray {
   const key = `${k}|${facing}|${pose}`;
