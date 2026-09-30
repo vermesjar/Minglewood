@@ -155,8 +155,9 @@ front of the backrest (`backSitV`). Each view is composed on its own, as sprite 
 **The legs** (`src/shared/world/sitLegs.ts`). The thighs run from the hip toward the camera, foreshortened at the
 floor's 2:1, to just past the front of whatever the shins would hang through; the shins drop to the floor when they
 can reach it (`SHIN_MAX`), else hang. Seen from behind the thighs lie out along the cushion in every seat, so a sitter
-faces the way the seat does, with a shoe just past each knee, or on a stool the shins hanging to the feet; a back that
-rises past the sitter's head (`BACK_HIDES`, a throne) hides the legs too. The avatar kit draws the figure with these
+faces the way the seat does, and nothing below the knees (every way of showing the feet from behind read wrong at play
+scale: a foot pointing down, a leg held out, someone standing beside the chair); a back that rises past the sitter's
+head (`BACK_HIDES`, a throne), or a chair tall enough that the feet hang, tucks the legs out of sight. The avatar kit draws the figure with these
 legs (`frameFor(…, legs)`), so every sitter's legs fit the seat they're in.
 
 **Per-drawing overrides.** Generated drawings aren't exact 3D, and a drawing sometimes needs its sitters or its over

@@ -613,8 +613,7 @@ function drawGesture(P: Pix, F: Frame, [x, y]: [number, number], skin: RGB) {
 
 /**
  * Seated and seen from behind, the legs run away from us on the far side of the body: the thighs show, out along the
- * seat, and past the knees a shoe, under the thigh; where the feet hang (a stool) the shins hang down to the shoes
- * (avatarFrame seatedLegs).
+ * seat, and nothing below the knee (avatarFrame BackLegs).
  */
 export const seatedFromBehind = (F: Frame) => F.sitting && F.view === 'back';
 
@@ -629,14 +628,11 @@ function drawLegs(P: Pix, F: Frame, L: FullLoadout) {
     [F.legNear, false],
   ] as const) {
     const shade = far ? 0.35 : 0;
-    // (from behind, a seated leg ends at the knee, its shoe past it under the thigh, unless the shins hang)
-    const thighOnly = seatedFromBehind(F) && !F.shinsBehind;
-    limb(P, leg.a, leg.m, thighOnly ? leg.m : leg.b, 2.7, 2.4, skin, shade);
+    limb(P, leg.a, leg.m, leg.b, 2.7, 2.4, skin, shade);
     if (skirt) continue;
     const pm = M().capsule(leg.a[0], leg.a[1], leg.m[0], leg.m[1], r);
     if (seatedFromBehind(F)) {
-      // the thigh out to the knee, and a hanging shin down to the shoe
-      if (!thighOnly && b !== 'shorts') pm.capsule(leg.m[0], leg.m[1], leg.b[0], leg.b[1], r - 0.3);
+      // the thigh only, out to the knee
       paint(P, pm, pants, { shade });
       continue;
     }
@@ -778,7 +774,7 @@ function drawLowerGarment(P: Pix, F: Frame, L: FullLoadout) {
 }
 
 function drawShoes(P: Pix, F: Frame, L: FullLoadout) {
-  if (F.feetHidden) return;
+  if (seatedFromBehind(F)) return;
   const kind = L.shoes.replace('shoes.', '');
   const c = hx(L.shoesColor);
   const front = F.view === 'front';
@@ -811,9 +807,6 @@ function drawShoes(P: Pix, F: Frame, L: FullLoadout) {
       continue;
     }
     paint(P, shoe, kind === 'slippers' ? lightOf(c) : c, { shade });
-    // seated and seen from behind, the shoe past the knee shows only below the thigh: a sole stripe or a toe stamp
-    // there read as the sole turned up (Carter: "shoes are still like upside down when sitting"), so it's plain
-    if (seatedFromBehind(F) && !F.shinsBehind) continue;
     const sole: RGB = kind === 'sneakers' || kind === 'hightops' || kind === 'skates' ? WHITE : [52, 38, 40];
     for (let x = x0 + 1; x < x1 - 1; x++) if (shoe.has(x, y0 + 3) && shoe.has(x, y0 + 4)) P.set(x, y0 + 3, sole);
     if (kind === 'sneakers' || kind === 'hightops') P.stamp(ax - 1, y0 + 1, ['ww'], { w: WHITE });
@@ -1271,14 +1264,10 @@ export function drawAvatarV2(input: AvatarLoadout, view: View, requested: Pose, 
   // (a balloon or umbrella still shows above it).
   on(LAYER.held);
   if (!F.holdInFront || L.held === 'held.balloon') drawHeld(P, F, L);
-  // seated and seen from behind, the feet are out past the knees: the thighs go over them (hanging, they're below them)
-  const feetUnder = seatedFromBehind(F) && !F.shinsBehind;
-  on(LAYER.shoes);
-  if (feetUnder) drawShoes(P, F, L);
   on(LAYER.legs);
   drawLegs(P, F, L);
   on(LAYER.shoes);
-  if (!feetUnder) drawShoes(P, F, L);
+  drawShoes(P, F, L);
   on(LAYER.torso);
   drawTorso(P, F, L);
   on(LAYER.head);

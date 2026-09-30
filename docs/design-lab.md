@@ -73,9 +73,9 @@ starts there, so a generated seat looks right out of Auto-fit):
   0.8 tile apart about its middle and clear of its arms, never against them (`placeSits`).
 - **How their legs lie** (`src/shared/world/sitLegs.ts`, drawn by the avatar kit). From the front: the thighs toward
   the camera to just past the seat's front, the shins down to the floor (or hanging, on a tall seat). From behind:
-  the thighs out along the cushion in every seat, so a sitter visibly faces the way the seat does, and a shoe just
-  past each knee; on a stool or a seat as tall as a café chair the shins hang down to the feet; a back that rises
-  past the sitter's head (a throne) hides the legs too.
+  the thighs out along the cushion in every seat, so a sitter visibly faces the way the seat does, and nothing below
+  the knees (feet shown from behind read as pointing down at the floor); on a chair as tall as a café chair, or
+  behind a back that rises past the sitter's head (a throne), the legs are tucked out of sight.
 - **Which way it faces.** Every facing's preview says which way its sitters face on screen (↘ ↙ ↗ ↖): the seat must
   face the same way. The generator flips a one-tile seat's front or back drawn facing its mirror's way
   (`studio.py orient_fronts`, `orient_backs`), and the gate checks every seat drawing's backrest against its facing
