@@ -326,10 +326,11 @@ export function wrapsSitter(backLine: ReadonlyArray<readonly [number, number]> |
  */
 /**
  * How much of a sitter's hip band may show above the back's top edge from behind before they read as perched on it:
- * Carter's approved seats show up to about a quarter (a low couch's far cushion); "perched" was two thirds and more.
+ * Carter's approved seats show up to about a tenth; a quarter already read as a leg going straight down beside them
+ * (the café couch's left seat), and "perched" was two thirds and more.
  * The hip fitter aims lower (hipFit.ts) so new seats start well inside it.
  */
-export const PERCHED_MAX = 0.3;
+export const PERCHED_MAX = 0.15;
 
 export function rigFindings(v: RigView, rig: SeatRig, looks: AvatarLoadout[] = RIG_LOOKS, opts: { perchedMax?: number } = {}): { problems: string[]; flagged: Array<[number, number]> } {
   const cushions = rigCushions(v.footprint, v.facing);
@@ -392,7 +393,10 @@ export function rigFindings(v: RigView, rig: SeatRig, looks: AvatarLoadout[] = R
       if (s.legs && rig.legs === 'show' && !behind) note(`${i} legs`, s.legsShown / s.legs, true, (n) => n < 0.5, (n) => `cushion ${i}: their legs are lost (${Math.round(n * 100)}% show)`);
       // from behind and above, some of the legs shows past a low seat's sides or between a back's spindles: hiding them
       // is right while under half would show (the same line "lost" draws for showing them, so one of the two holds)
-      if (s.legs && rig.legs === 'hide') note(`${i} legs`, s.legsShown / s.legs, false, (n) => n >= 0.5, (n) => `cushion ${i}: legs set to hide, but ${Math.round(n * 100)}% of them show`);
+      // (from behind, hiding them is always allowed: the figure's seated legs seen from behind hang straight down, which
+      // no seated person's legs do from there — they point away, behind the seat and the body; shown, they read as
+      // someone standing. Carter, the café couch's left seat.)
+      if (s.legs && rig.legs === 'hide' && !behind) note(`${i} legs`, s.legsShown / s.legs, false, (n) => n >= 0.5, (n) => `cushion ${i}: legs set to hide, but ${Math.round(n * 100)}% of them show`);
       note(`${i} holes`, s.holes, false, (n) => n > 0, (n) => `cushion ${i}: ${n} px of them see-through (the seat behind them or nothing shows)`);
       const fig = c.figures[i];
       const figAt = (x: number, y: number) => {
