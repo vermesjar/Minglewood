@@ -1,60 +1,20 @@
 /**
- * People in seats by Z-BUFFER (the seat model: src/shared/world/seatModels.ts). Every pixel of a seat's drawing
- * gets a depth — its view ray cast into the seat's proxy boxes, the nearest face it meets; a pixel outside every
- * box (a curl, a tuft) takes the face its nearest covered neighbour lies on, extended. Every pixel of a seated
- * person gets a depth from the body part that painted it (the avatar kit's layer map, avatarKit LAYER):
- *   torso, head, hair, hat …  a billboard at the pelvis, a torso's half-depth nearer the camera (hair behind the
- *                             head: at the pelvis)
- *   thighs                    the plane of their tops, forward from the hips at the cushion's height
- *   shins and shoes           a plane parallel to the seat's front at the knees, which the legs (sitLegs.ts) put just
- *                             past its front edge: the same legs the figure is drawn with
- *   upper arms                billboards at the shoulders, either side of the torso
- *   forearms, hands, held     resting on the armrest on their side (just above its top) when the seat has one, else
- *                             on the lap — or nearer, where the arm is raised
- * Standing, walking or crouching on a seat's tile, the whole figure is one billboard outside the seat's boxes, on
- * the side they're on (in front of it, or behind it). A seat pixel is drawn over a person's pixel only where the
- * seat's surface is nearer the camera: its ray meets the seat higher up than the person (the depth is the ray's
- * height, seatModels.ts). A person is always drawn whole: the seat hides what it hides by being drawn over them.
+ * A seat's model against its drawing, pixel by pixel (the model: src/shared/world/seatModels.ts). Every pixel of a
+ * seat's drawing gets the part of the model it shows and how deep it is — its view ray cast into the model's boxes,
+ * the nearest face it meets; a pixel outside every box (a curl, a tuft) takes the face its nearest covered neighbour
+ * lies on, extended (seatDepth). The seat layers are split by those parts (seatLayers.ts); the fitter and the checks
+ * measure how well the model's silhouette covers each drawing (silhouetteFit).
  *
- * Pure: pixels in, pixels and measurements out, for the renderer (WorldView), the model tools
- * (scripts/seat-model.ts: sheets, checks, the live probe) and the Design Lab. Cached per (seat drawing, look,
- * pose, placement), so a seated person costs one lookup a frame.
+ * Pure: pixels in, masks and measurements out, for the renderer, the seat tools and the Design Lab.
  */
 import type { AvatarLoadout } from '@shared/domain/types';
 import type { Facing } from '@shared/world/scene';
-import { CROUCH_UNTIL, SIT_POSE_OF, sitMotion, type SitStyle } from '@shared/world/seats';
-import { FIG, figAx, figSeatRow, isSitPoseName, poseDrop } from '@shared/world/seatRigs';
-import {
-  armTop,
-  backTop,
-  behindView,
-  bodyVolume,
-  boxHull,
-  cushionTiles,
-  cushionTop,
-  drawingAt,
-  backFace,
-  intrusions,
-  kneeFace,
-  localToWorld,
-  projectLocal,
-  rayBillboard,
-  rayBox,
-  rayPlane,
-  rayThrough,
-  seatSpan,
-  sitsByCushion,
-  towardCamera,
-  worldToLocal,
-  type Face,
-  type Ray,
-  type SeatModel,
-  type SitPoint,
-} from '@shared/world/seatModels';
+import { SIT_POSE_OF, type SitStyle } from '@shared/world/seats';
+import { FIG, figAx, figSeatRow, isSitPoseName, poseDrop } from '@shared/world/seatFigure';
+import { boxHull, drawingAt, rayBillboard, rayBox, rayPlane, rayThrough, towardCamera, worldToLocal, type Face, type Ray, type SeatModel, type SitPoint } from '@shared/world/seatModels';
+import type { SitLegs } from '@shared/world/sitLegs';
 import { renderAvatarLayers } from './avatarQa';
-import { legsFor, legsKey, type SitLegs } from '@shared/world/sitLegs';
-import { LAYER, kitFrame } from './avatarKit';
-import { frameFor, type Frame, type Pose } from './avatarFrame';
+import type { Pose } from './avatarFrame';
 import type { Pixels } from './footing';
 
 /** One view of a seat: the drawing the game uses in this facing (with its anchor) and its model. */
@@ -165,353 +125,52 @@ export function castDepth(v: ModelView, x: number, y: number): { z: number; part
   return best;
 }
 
-/* ------------------------------------------------------------------ the person's depth */
+/* ------------------------------------------------------------------ a person against a piece (depth by proxy) */
 
-/** The body parts a figure's pixels are sorted into (camera side: the arm nearer the camera). */
-export const BODY = { none: 0, torso: 1, hairBack: 2, thigh: 3, shin: 4, upperCam: 5, upperFar: 6, foreCam: 7, foreFar: 8 } as const;
-export const BODY_NAMES = ['none', 'torso', 'hair behind', 'thigh', 'shin', 'upper arm (near)', 'upper arm (far)', 'forearm (near)', 'forearm (far)'];
-
-export interface FigureParts {
-  px: Uint8ClampedArray;
-  /** Per figure pixel: its BODY part (0 where the figure is clear). */
-  part: Uint8Array;
-  frame: Frame;
-}
-
-const TORSO_LAYERS = new Set<number>([LAYER.pet, LAYER.chairBack, LAYER.torso, LAYER.neck, LAYER.head, LAYER.face, LAYER.hair, LAYER.hat, LAYER.glasses, LAYER.accessory, LAYER.chairFront, LAYER.cane]);
-
-const partsCache = new Map<string, FigureParts>();
-
-/**
- * A figure's pixels and the body part of each (cached per look, facing, pose and legs). `legs`: how a sitter's legs
- * lie on their seat (sitLegs.ts), exactly as the game draws them.
- */
-export function figureParts(look: AvatarLoadout, facing: Facing, pose: Pose, legs?: SitLegs): FigureParts {
-  const key = `${JSON.stringify(look)}|${facing}|${pose}|${legsKey(legs)}`;
-  const had = partsCache.get(key);
-  if (had) return had;
-  const r = renderAvatarLayers(look, facing, pose, legs);
-  const view = facing === 'se' || facing === 'sw' ? 'front' : 'back';
-  const F = kitFrame(look, view, pose, legs);
-  const W = FIG.w;
-  const H = FIG.h;
-  const mirrored = facing === 'sw' || facing === 'nw';
-  // the frame's points as drawn (mirrored with the figure)
-  const P = (p: readonly [number, number]): [number, number] => (mirrored ? [W - p[0], p[1]] : [p[0], p[1]]);
-  const seg = (x: number, y: number, a: readonly [number, number], b: readonly [number, number]) => {
-    const [ax, ay] = P(a);
-    const [bx, by] = P(b);
-    const dx = bx - ax;
-    const dy = by - ay;
-    const L = dx * dx + dy * dy;
-    const t = L ? Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / L)) : 0;
-    return Math.hypot(x - (ax + dx * t), y - (ay + dy * t));
-  };
-  // which arm is on the camera's side: seen from the front the near arm, from behind the far one
-  const camArm = view === 'front' ? F.armNear : F.armFar;
-  const farArm = view === 'front' ? F.armFar : F.armNear;
-  const camHand = view === 'front' ? F.handNear : F.handFar;
-  const farHand = view === 'front' ? F.handFar : F.handNear;
-  const part = new Uint8Array(W * H);
-  const outline: number[] = [];
-  for (let y = 0; y < H; y++)
-    for (let x = 0; x < W; x++) {
-      const i = y * W + x;
-      if (!r.px[i * 4 + 3]) continue;
-      const o = r.owner[i];
-      const cx = x + 0.5;
-      const cy = y + 0.5;
-      // (a pocket the kit seals in hair or hat colour below the hips — between the shins — is no hair: it goes with
-      // what's round it, like the outline)
-      if (o === LAYER.outline || o === LAYER.none || ((o === LAYER.hairBehind || o === LAYER.hat) && y > F.hipY + 2)) {
-        outline.push(i);
-        continue;
-      }
-      if (TORSO_LAYERS.has(o)) part[i] = BODY.torso;
-      else if (o === LAYER.hairBehind) part[i] = BODY.hairBack;
-      else if (o === LAYER.legs || o === LAYER.shoes) {
-        // seen from behind, what the kit draws of the legs is the seat of the trousers, resting on the cushion: all
-        // of it at one depth (the thighs'), so whatever of the seat is nearer cuts it along one clean line
-        if (view === 'back') {
-          part[i] = BODY.thigh;
-          continue;
-        }
-        const thigh = Math.min(seg(cx, cy, F.legNear.a, F.legNear.m), seg(cx, cy, F.legFar.a, F.legFar.m));
-        const shin = Math.min(seg(cx, cy, F.legNear.m, F.legNear.b), seg(cx, cy, F.legFar.m, F.legFar.b));
-        part[i] = o === LAYER.shoes || shin < thigh ? BODY.shin : BODY.thigh;
-      } else if (o === LAYER.armFront || o === LAYER.armBack || o === LAYER.held) {
-        const d = [
-          seg(cx, cy, camArm.a, camArm.m),
-          Math.min(seg(cx, cy, camArm.m, camArm.b), seg(cx, cy, camHand, camHand) - 1),
-          seg(cx, cy, farArm.a, farArm.m),
-          Math.min(seg(cx, cy, farArm.m, farArm.b), seg(cx, cy, farHand, farHand) - 1),
-        ];
-        // what's held goes with the hand holding it
-        if (o === LAYER.held) {
-          d[0] = Infinity;
-          d[2] = Infinity;
-        }
-        const k = d.indexOf(Math.min(...d));
-        part[i] = [BODY.upperCam, BODY.foreCam, BODY.upperFar, BODY.foreFar][k];
-      } else part[i] = BODY.torso;
-    }
-  // the outline goes with the part it outlines (the nearest painted pixel)
-  for (let pass = 0; pass < 4 && outline.length; pass++)
-    for (let k = outline.length - 1; k >= 0; k--) {
-      const i = outline[k];
-      const x = i % W;
-      // the most common part round it (so a pocket between the shins is shin, whatever its first neighbour)
-      const n = new Array<number>(9).fill(0);
-      for (const j of [i - 1, i + 1, i - W, i + W, i - W - 1, i - W + 1, i + W - 1, i + W + 1]) {
-        if (j < 0 || j >= W * H || Math.abs((j % W) - x) > 1) continue;
-        if (part[j]) n[part[j]]++;
-      }
-      let best = 0;
-      for (let k = 1; k < 9; k++) if (n[k] > n[best]) best = k;
-      if (best) {
-        part[i] = best;
-        outline.splice(k, 1);
-      }
-    }
-  for (const i of outline) part[i] = BODY.torso;
-  const out = { px: r.px, part, frame: F };
-  partsCache.set(key, out);
-  if (partsCache.size > 600) partsCache.delete(partsCache.keys().next().value!);
-  return out;
-}
-
-/** A torso's half-depth (tiles): the billboard of the body is this much nearer the camera than the pelvis. */
-export const TORSO_HALF = 0.1;
-/** The shoulders' half-width (tiles): where the upper arms hang, either side of the pelvis. */
-export const SHOULDER_HALF = 0.2;
-/** A thigh's thickness (world px): its top lies this far above the cushion. */
-export const THIGH_TOP = 3;
-/** How far a person on a seat's tile (not sitting) stands clear of its boxes (tiles). */
-export const STAND_CLEAR = 0.12;
-
-/** Where a person's body is, in the seat's local frame: their pelvis when sitting, else their feet. */
-export interface BodyAt {
-  u: number;
-  v: number;
-  z: number;
-  sitting: boolean;
-}
-
-/**
- * The body's position from where its figure is drawn: the figure's feet (its anchor) at `feet` in the drawing's
- * px, lifted `lift` world px (seats.ts sitMotion). Sitting, the pelvis is above the feet by the figure's own
- * geometry (at least on the cushion); standing or crouching on the seat's tile, the feet — kept out of the boxes,
- * on whichever side they are.
- */
-export function bodyAt(v: ModelView, feet: readonly [number, number], pose: string, lift: number, free = false): BodyAt {
-  const anchor: [number, number] = [v.art.ax, v.art.ay];
-  if (free) {
-    // against a piece that isn't their seat (depth by proxy, docs/furniture.md): one billboard where they are — at
-    // their pelvis when sitting, else at their feet — wherever that is
-    const up = isSitPoseName(pose) ? FIG.feet - figSeatRow(poseDrop(pose)) : 0;
-    const w = drawingAt(anchor, feet[0], feet[1] - up, lift + up / 2);
-    const l = worldToLocal(v.model.size, v.facing, w.x, w.y);
-    return { u: l.u, v: l.v, z: lift, sitting: false };
-  }
-  if (isSitPoseName(pose)) {
-    const up = FIG.feet - figSeatRow(poseDrop(pose));
-    const z = lift + up / 2;
-    const w = drawingAt(anchor, feet[0], feet[1] - up, z);
-    const l = worldToLocal(v.model.size, v.facing, w.x, w.y);
-    const top = cushionTop(v.model, l.u, l.v);
-    return { u: l.u, v: l.v, z: top !== null ? Math.max(z, top) : z, sitting: true };
-  }
-  const w = drawingAt(anchor, feet[0], feet[1], lift);
-  const l = worldToLocal(v.model.size, v.facing, w.x, w.y);
-  let vFront = Infinity;
-  let vBack = -Infinity;
-  for (const p of v.model.parts) {
-    vFront = Math.min(vFront, p.v[0]);
-    vBack = Math.max(vBack, p.v[1]);
-  }
-  // getting in or out, a person stands in front of the seat (they turn and sit down from there); only a step off
-  // over its back (out from a chair pulled up to a table) takes them behind it
-  const vv = l.v > vBack ? Math.max(l.v, vBack + STAND_CLEAR) : Math.min(l.v, vFront - STAND_CLEAR);
-  return { u: l.u, v: vv, z: lift, sitting: false };
-}
-
-/** Everything the per-pixel depth of one person needs, worked out once for their body and the seat. */
-interface BodyPlanes {
-  torso: [number, number];
-  hair: [number, number];
-  upperCam: [number, number];
-  upperFar: [number, number];
-  shin: [number, number];
-  thighZ: number;
-  foreCamZ: number;
-  foreFarZ: number;
-  sitting: boolean;
-}
-
-function bodyPlanes(v: ModelView, b: BodyAt, legs?: SitLegs): BodyPlanes {
-  const t = towardCamera(v.facing);
-  const side = Math.sign(t.u);
-  const torso: [number, number] = [b.u + TORSO_HALF * t.u, b.v + TORSO_HALF * t.v];
-  const thighZ = b.z + THIGH_TOP + Math.max(0, legs?.rise ?? 0);
-  const lap = thighZ + 1.5;
-  const armCam = armTop(v.model, b.u, side);
-  const armFar = armTop(v.model, b.u, -side);
-  // the knees: where the legs put them (sitLegs.ts: just past the seat's front edge, so the shins hang in front of it);
-  // without legs (not sitting in this seat) the seat's front
-  const kneeV = legs ? b.v - legs.reach : kneeFace(v.model);
-  return {
-    torso,
-    hair: [b.u, b.v],
-    upperCam: [torso[0] + SHOULDER_HALF * side, torso[1]],
-    upperFar: [torso[0] - SHOULDER_HALF * side, torso[1]],
-    shin: [b.u, kneeV],
-    thighZ,
-    foreCamZ: armCam !== null ? armCam + 1 : lap,
-    foreFarZ: armFar !== null ? armFar + 1 : lap,
-    sitting: b.sitting,
-  };
-}
-
-/** The height at which a person's pixel of body part `part` meets its ray (their depth there). */
-function personZ(r: Ray, part: number, B: BodyPlanes): number {
-  if (!B.sitting) return rayBillboard(r, B.torso[0], B.torso[1]);
-  switch (part) {
-    case BODY.hairBack:
-      return rayBillboard(r, B.hair[0], B.hair[1]);
-    case BODY.thigh:
-      return B.thighZ;
-    case BODY.shin:
-      // a vertical plane parallel to the seat's front, just in front of it (v = the knees' depth): not a billboard,
-      // which slants against that face and would let its near edge fall behind it
-      return (B.shin[1] - r.v0) / r.dv;
-    case BODY.upperCam:
-      return rayBillboard(r, B.upperCam[0], B.upperCam[1]);
-    case BODY.upperFar:
-      return rayBillboard(r, B.upperFar[0], B.upperFar[1]);
-    case BODY.foreCam:
-      return Math.max(rayBillboard(r, B.upperCam[0], B.upperCam[1]), B.foreCamZ);
-    case BODY.foreFar:
-      return Math.max(rayBillboard(r, B.upperFar[0], B.upperFar[1]), B.foreFarZ);
-    default:
-      return rayBillboard(r, B.torso[0], B.torso[1]);
-  }
-}
-
+/** A person's billboard stands this far (tiles) nearer the camera than their pelvis or feet: a torso's half-depth. */
+const TORSO_HALF = 0.1;
 /** Ties go to the person (world px). */
 const EPS = 0.25;
-const quant = (z: number) => Math.round(z * 64) / 64;
 
 export interface Overlay {
   /** The figure's top-left in the drawing's px. */
   x0: number;
   y0: number;
-  /** Per figure pixel (FIG.w × FIG.h): 1 where the seat is drawn over them. */
+  /** Per figure pixel (FIG.w × FIG.h): 1 where the piece is drawn over them. */
   mask: Uint8Array;
-  /** Per figure pixel: their depth (NaN where they're clear or off the drawing). */
-  z: Float64Array;
-  /** Per figure pixel: the seat's depth there (NaN: no seat pixel). */
-  seatZ: Float64Array;
-  /** Per figure pixel: the seat part in front of them (−1: none). */
-  by: Int16Array;
-  parts: FigureParts;
-  body: BodyAt;
-  /** Tiny islands of seat taken off them (single pixels of chair poking through a person read as holes). */
-  specks: number;
 }
 
 /**
- * What of a seat is drawn over one person: every pixel of theirs where the seat's surface is nearer the camera.
- * `feet`: their figure's anchor in the drawing's px; `lift`: how high it's lifted (world px). `free`: the person
- * isn't in or getting into this seat (any piece's proxy, depth by proxy): one billboard where they are.
+ * DEPTH BY PROXY (a prototype, off by default: WorldView proxyDepth, docs/furniture.md): what of a piece is drawn over
+ * a person who isn't sitting in it, the person one billboard where they are — at their pelvis when sitting, else at
+ * their feet: every pixel of theirs where the piece's surface meets the view ray nearer the camera (higher) than they
+ * do. `feet`: their figure's anchor in the drawing's px; `lift`: how high it's lifted (world px).
  */
-export function overlayFor(
-  v: ModelView,
-  look: AvatarLoadout,
-  facing: Facing,
-  pose: Pose,
-  feet: readonly [number, number],
-  lift: number,
-  opts: { free?: boolean; legs?: SitLegs } = {},
-): Overlay {
-  const legs = opts.free ? undefined : opts.legs;
-  const parts = figureParts(look, facing, pose, legs);
-  const b = bodyAt(v, feet, pose, lift, !!opts.free);
-  const B = bodyPlanes(v, b, legs);
+export function overlayFor(v: ModelView, look: AvatarLoadout, facing: Facing, pose: Pose, feet: readonly [number, number], lift: number, legs?: SitLegs): Overlay {
+  const px = renderAvatarLayers(look, facing, pose, legs).px;
+  const anchor: [number, number] = [v.art.ax, v.art.ay];
+  const up = isSitPoseName(pose) ? FIG.feet - figSeatRow(poseDrop(pose)) : 0;
+  const w = drawingAt(anchor, feet[0], feet[1] - up, lift + up / 2);
+  const at = worldToLocal(v.model.size, v.facing, w.x, w.y);
+  const t = towardCamera(v.facing);
+  const bu = at.u + TORSO_HALF * t.u;
+  const bv = at.v + TORSO_HALF * t.v;
   const D = seatDepth(v);
   const x0 = Math.round(feet[0]) - figAx(facing);
   const y0 = Math.round(feet[1]) - FIG.feet;
-  const W = FIG.w;
-  const H = FIG.h;
-  const mask = new Uint8Array(W * H);
-  const z = new Float64Array(W * H).fill(NaN);
-  const seatZ = new Float64Array(W * H).fill(NaN);
-  const by = new Int16Array(W * H).fill(-1);
-  const anchor: [number, number] = [v.art.ax, v.art.ay];
-  for (let y = 0; y < H; y++)
-    for (let x = 0; x < W; x++) {
-      const i = y * W + x;
-      if (!parts.px[i * 4 + 3]) continue;
+  const mask = new Uint8Array(FIG.w * FIG.h);
+  for (let y = 0; y < FIG.h; y++)
+    for (let x = 0; x < FIG.w; x++) {
+      if (!px[(y * FIG.w + x) * 4 + 3]) continue;
       const X = x0 + x;
       const Y = y0 + y;
       if (X < 0 || Y < 0 || X >= D.w || Y >= D.h) continue;
-      const j = Y * D.w + X;
-      const r = rayThrough(anchor, v.model.size, v.facing, X + 0.5, Y + 0.5);
-      // (both depths on a 1/64 px grid: a tie on a seam — a thigh just under an arm's top — goes the same way in the
-      // game and on the sheet, and to the person)
-      const pz = quant(personZ(r, parts.part[i], B));
-      z[i] = pz;
-      if (Number.isNaN(D.z[j])) continue;
-      const sz = quant(D.z[j]);
-      seatZ[i] = sz;
-      if (sz > pz + EPS) {
-        mask[i] = 1;
-        by[i] = D.part[j];
-      }
+      const sz = D.z[Y * D.w + X];
+      if (Number.isNaN(sz)) continue;
+      const pz = rayBillboard(rayThrough(anchor, v.model.size, v.facing, X + 0.5, Y + 0.5), bu, bv);
+      if (sz > pz + EPS) mask[y * FIG.w + x] = 1;
     }
-  // a speck of seat (1–2 px) with the person all round it reads as a hole in them: they show there instead
-  let specks = 0;
-  const seen = new Uint8Array(W * H);
-  for (let s = 0; s < W * H; s++) {
-    if (!mask[s] || seen[s]) continue;
-    const comp: number[] = [];
-    const q = [s];
-    seen[s] = 1;
-    let enclosed = true;
-    while (q.length) {
-      const i = q.pop()!;
-      comp.push(i);
-      const x = i % W;
-      for (const j of [x > 0 ? i - 1 : -1, x < W - 1 ? i + 1 : -1, i - W, i + W]) {
-        if (j < 0 || j >= W * H) {
-          enclosed = false;
-          continue;
-        }
-        if (mask[j]) {
-          if (!seen[j]) {
-            seen[j] = 1;
-            q.push(j);
-          }
-        } else if (!parts.px[j * 4 + 3]) enclosed = false;
-      }
-    }
-    if (enclosed && comp.length <= 2) {
-      for (const i of comp) {
-        mask[i] = 0;
-        by[i] = -1;
-      }
-      specks += comp.length;
-    }
-  }
-  return { x0, y0, mask, z, seatZ, by, parts, body: b, specks };
-}
-
-/* ------------------------------------------------------------------ placing sitters */
-
-/** The figure's anchor (feet) in the drawing for a sitting point: the pelvis drawn exactly where the point projects. */
-export function feetForSit(v: ModelView, s: SitPoint, style: SitStyle): [number, number] {
-  const [hx, hy] = projectLocal([v.art.ax, v.art.ay], v.model.size, v.facing, s[0], s[1], s[2]);
-  const pose = SIT_POSE_OF[style];
-  return [Math.round(hx), Math.round(hy) - figSeatRow(poseDrop(pose)) + FIG.feet];
+  return { x0, y0, mask };
 }
 
 /** How far a sitter's figure is lifted on a sitting point (world px): their feet this far under the pelvis. */
@@ -519,211 +178,7 @@ export function liftForSit(s: SitPoint, style: SitStyle): number {
   return s[2] - (FIG.feet - figSeatRow(poseDrop(SIT_POSE_OF[style]))) / 2;
 }
 
-export interface ModelSitter {
-  look: AvatarLoadout;
-  facing: Facing;
-  pose: Pose;
-  feet: readonly [number, number];
-  lift: number;
-  /** Back-to-front order (the game draws the farther sitter first). */
-  depth: number;
-  /** How their legs lie on the seat (sitLegs.ts), as the game draws them. */
-  legs?: SitLegs;
-}
-
-/** Everyone seated in a view: look k + i on cushion i. */
-export function modelSitters(v: ModelView, looks: AvatarLoadout[], k = 0): ModelSitter[] {
-  const sits = sitsByCushion(v.model, v.facing);
-  const tiles = cushionTiles(v.model.size, v.facing);
-  const out: ModelSitter[] = [];
-  sits.forEach((s, i) => {
-    if (!s) return;
-    out.push({
-      look: looks[(k + i) % looks.length],
-      facing: v.facing,
-      pose: SIT_POSE_OF[v.style] as Pose,
-      feet: feetForSit(v, s, v.style),
-      lift: liftForSit(s, v.style),
-      depth: tiles[i].x + tiles[i].y,
-      legs: legsFor(v.model, s, v.style),
-    });
-  });
-  return out;
-}
-
-/**
- * Sitting down → seated → standing up on cushion 0, frame by frame, the way WorldView moves a sitter: from their
- * feet on the cushion's tile, crouching, up into the seat (seats.ts sitMotion) and back.
- */
-export function modelSitFrames(v: ModelView, look: AvatarLoadout): ModelSitter[] {
-  const s = sitsByCushion(v.model, v.facing)[0];
-  const c = cushionTiles(v.model.size, v.facing)[0];
-  if (!s) return [];
-  const anchor: [number, number] = [v.art.ax, v.art.ay];
-  const L = liftForSit(s, v.style);
-  const hip = localToWorld(v.model.size, v.facing, s[0], s[1]);
-  const foot = { x: c.x + 0.5, y: c.y + 0.5 };
-  const ks: Array<[number, boolean]> = [
-    [0, true],
-    [0.2, true],
-    [0.34, true],
-    [0.45, true],
-    [0.6, true],
-    [0.8, true],
-    [1, true],
-    [0.8, false],
-    [0.55, false],
-    [0.36, false],
-    [0.2, false],
-    [0, false],
-  ];
-  return ks.map(([k, down]) => {
-    const m = sitMotion(k, down, L);
-    const x = foot.x + (hip.x - foot.x) * k;
-    const y = foot.y + (hip.y - foot.y) * k;
-    const px = anchor[0] + 32 * (x - y);
-    const py = anchor[1] + 16 * (x + y) - 2 * m.lift;
-    const pose: Pose = k <= 0 ? 'stand' : k < CROUCH_UNTIL ? 'crouch' : (SIT_POSE_OF[v.style] as Pose);
-    const sitting = pose !== 'stand' && pose !== 'crouch';
-    return { look, facing: v.facing, pose, feet: [Math.round(px), Math.round(py)] as [number, number], lift: m.lift, depth: c.x + c.y, ...(sitting ? { legs: legsFor(v.model, s, v.style) } : {}) };
-  });
-}
-
-/* ------------------------------------------------------------------ composing (sheets, checks, the probe) */
-
-export interface SitterStats {
-  /** Figure pixels by body part: how many, and how many the seat covers. */
-  count: number[];
-  covered: number[];
-  /** Head and shoulders (every figure row down to 3 px under the shoulder line), and how much of it shows. */
-  upper: number;
-  upperShown: number;
-  /** Forearm pixels over an armrest's box, and how many of them an arm covers. */
-  foreOnArm: number;
-  foreOnArmHidden: number;
-  /** Seat drawn over them where it's farther than they are (never, by construction: the z-buffer self-check). */
-  wrong: number;
-  /** Their pixels that end up see-through (nothing, or the seat behind them, shows). */
-  holes: number;
-  specks: number;
-  body: BodyAt;
-}
-
-export interface ModelComposition {
-  cell: Pixels;
-  /** Per cell pixel: 0 nothing, 1 the seat, 2 the seat drawn over a sitter, 3 + k sitter k (in the order given). */
-  who: Uint8Array;
-  figures: Array<{ x0: number; y0: number }>;
-  overlays: Overlay[];
-  sitters: SitterStats[];
-  /** Cell pixels the checks flag (for the sheets, in red). */
-  flagged: Array<[number, number]>;
-}
-
-/**
- * Compose a seat and its sitters into a cell (`size` [w, h]), the drawing's (0, 0) at `origin`: the seat; then each
- * sitter, back to front, followed by the seat's pixels nearer the camera than them (overlayFor) — as WorldView draws.
- */
-export function composeModel(v: ModelView, sitters: ModelSitter[], opts: { size: [number, number]; origin: [number, number] }): ModelComposition {
-  const [W, H] = opts.size;
-  const [OX, OY] = opts.origin;
-  const cell: Pixels = { w: W, h: H, d: new Uint8ClampedArray(W * H * 4) };
-  const who = new Uint8Array(W * H);
-  const { px } = v.art;
-  const put = (X: number, Y: number, src: ArrayLike<number>, i: number, tag: number) => {
-    if (X < 0 || Y < 0 || X >= W || Y >= H) return;
-    const o = (Y * W + X) * 4;
-    cell.d[o] = src[i];
-    cell.d[o + 1] = src[i + 1];
-    cell.d[o + 2] = src[i + 2];
-    cell.d[o + 3] = 255;
-    who[Y * W + X] = tag;
-  };
-  for (let y = 0; y < px.h; y++)
-    for (let x = 0; x < px.w; x++) {
-      const i = (y * px.w + x) * 4;
-      if (px.d[i + 3]) put(OX + x, OY + y, px.d, i, 1);
-    }
-  const order = sitters.map((s, k) => ({ s, k })).sort((a, b) => a.s.depth - b.s.depth);
-  const overlays: Overlay[] = new Array(sitters.length);
-  const figures: Array<{ x0: number; y0: number }> = new Array(sitters.length);
-  for (const { s, k } of order) {
-    const ov = overlayFor(v, s.look, s.facing, s.pose, s.feet, s.lift, { legs: s.legs });
-    overlays[k] = ov;
-    figures[k] = { x0: ov.x0, y0: ov.y0 };
-    const f = ov.parts;
-    for (let y = 0; y < FIG.h; y++)
-      for (let x = 0; x < FIG.w; x++) {
-        const i = y * FIG.w + x;
-        if (f.px[i * 4 + 3]) put(OX + ov.x0 + x, OY + ov.y0 + y, f.px, i * 4, 3 + k);
-      }
-    for (let y = 0; y < FIG.h; y++)
-      for (let x = 0; x < FIG.w; x++) {
-        const i = y * FIG.w + x;
-        if (!ov.mask[i]) continue;
-        const X = ov.x0 + x;
-        const Y = ov.y0 + y;
-        put(OX + X, OY + Y, px.d, (Y * px.w + X) * 4, 2);
-      }
-  }
-  // what of each sitter shows, and the checks' measures
-  const flagged: Array<[number, number]> = [];
-  const stats: SitterStats[] = sitters.map((s, k) => {
-    const ov = overlays[k];
-    const f = ov.parts;
-    const drop = poseDrop(s.pose);
-    const upperEnd = 58 + drop + 3;
-    const st: SitterStats = { count: new Array(9).fill(0), covered: new Array(9).fill(0), upper: 0, upperShown: 0, foreOnArm: 0, foreOnArmHidden: 0, wrong: 0, holes: 0, specks: ov.specks, body: ov.body };
-    const armIdx = v.model.parts.map((p, i) => (p.part === 'arm' ? i : -1)).filter((i) => i >= 0);
-    for (let y = 0; y < FIG.h; y++)
-      for (let x = 0; x < FIG.w; x++) {
-        const i = y * FIG.w + x;
-        if (!f.px[i * 4 + 3]) continue;
-        const X = ov.x0 + x;
-        const Y = ov.y0 + y;
-        const cx = OX + X;
-        const cy = OY + Y;
-        if (cx < 0 || cy < 0 || cx >= W || cy >= H) continue;
-        const w = who[cy * W + cx];
-        const p = f.part[i];
-        st.count[p]++;
-        const coveredHere = w === 2;
-        if (coveredHere) st.covered[p]++;
-        if (w < 2) {
-          st.holes++;
-          flagged.push([cx, cy]);
-        }
-        if (y < upperEnd) {
-          st.upper++;
-          if (!coveredHere) st.upperShown++;
-        }
-        // the z-buffer self-check: a seat pixel over them is nearer than they are — cast afresh where a box is met
-        if (ov.mask[i]) {
-          const c = castDepth(v, X, Y);
-          const sz = c ? quant(c.z) : ov.seatZ[i];
-          if (!(sz > ov.z[i])) {
-            st.wrong++;
-            flagged.push([cx, cy]);
-          }
-        }
-        // a forearm resting over an armrest
-        if (p === BODY.foreCam || p === BODY.foreFar) {
-          const r = rayThrough([v.art.ax, v.art.ay], v.model.size, v.facing, X + 0.5, Y + 0.5);
-          if (armIdx.some((a) => rayBox(r, v.model.parts[a]))) {
-            st.foreOnArm++;
-            if (ov.mask[i] && armIdx.includes(ov.by[i])) {
-              st.foreOnArmHidden++;
-              flagged.push([cx, cy]);
-            }
-          }
-        }
-      }
-    return st;
-  });
-  return { cell, who, figures, overlays, sitters: stats, flagged };
-}
-
-/* ------------------------------------------------------------------ the checks */
+/* ------------------------------------------------------------------ fitting the drawings */
 
 /** The drawing's silhouette with its enclosed gaps filled (the loop of a bentwood back, the gap under an arm). */
 export function filledSilhouette(px: Pixels): Uint8Array {
@@ -840,93 +295,3 @@ export function silhouetteFit(v: ModelView): SilhouetteFit {
   return { iou: uni ? inter / uni : 0, tops };
 }
 
-/** The proxy's fit standard: IoU per view, and the share of a back's or arm's top-edge columns within 2 px. */
-export const FIT_IOU = 0.85;
-export const FIT_TOPS = 0.8;
-
-/**
- * What's wrong with a model in a view, by the standard (empty = it holds). See scripts/seat-model.ts for the list:
- *   (a) the proxy's silhouette matches the drawing (IoU ≥ 0.85; backs' and arms' top edges within 2 px)
- *   (b) each sitting point on its cushion's top, the pelvis 0–0.12 tile in front of the back's front face (bottom back
- *       against the backrest), or within 0.1 of the middle of a backless seat
- *   (c) the seat is never drawn over a person where it's behind them (the z-buffer self-check)
- *   (d) a seat with arms: forearms resting on an armrest show
- *   (e) seen from behind, head and shoulders show over a back lower than the shoulders
- *   (f) no see-through pixels in a seated person
- *   (h) no part but the cushion under them intrudes into a sitter's body (bodyVolume: torso to the shoulders, thighs
- *       to the knees; an armrest may run a little under a forearm)
- *   and what an artist would call wrong: from the front, the head and shoulders show and the legs come off the seat
- */
-export function modelFindings(v: ModelView, looks: AvatarLoadout[]): { problems: string[]; fit: SilhouetteFit; flagged: Array<[number, number]> } {
-  const out: string[] = [];
-  const flagged: Array<[number, number]> = [];
-  const cushions = cushionTiles(v.model.size, v.facing).length;
-  const fit = silhouetteFit(v);
-  if (fit.iou < FIT_IOU) out.push(`(a) the proxy's silhouette misses the drawing: IoU ${fit.iou.toFixed(2)} < ${FIT_IOU}`);
-  for (const t of fit.tops)
-    if (t.within < FIT_TOPS) out.push(`(a) the ${t.kind} (part ${t.part}) top edge is off the drawing's: ${Math.round(t.within * 100)}% of ${t.cols} columns within 2 px (worst ${t.worst} px)`);
-  const sits = sitsByCushion(v.model, v.facing);
-  if (v.model.sits.length !== cushions) out.push(`(b) ${v.model.sits.length} sitting point(s) for ${cushions} cushion(s)`);
-  sits.forEach((s, i) => {
-    if (!s) {
-      out.push(`(b) cushion ${i}: no sitting point over its tile`);
-      return;
-    }
-    const top = cushionTop(v.model, s[0], s[1]);
-    if (top === null || Math.abs(top - s[2]) > 0.5) out.push(`(b) cushion ${i}: the sitting point isn't on the cushion top (z ${s[2]}, cushion ${top ?? 'none'})`);
-    // bottom back against the backrest; on a backless seat, in the middle of it (seatModels.ts SIT_GAP)
-    const back = backFace(v.model, s[0], s[2]);
-    if (back !== null) {
-      const gap = back - s[1];
-      if (gap < 0 || gap > 0.12) out.push(`(b) cushion ${i}: the pelvis is ${gap.toFixed(2)} tile in front of the back's front face (0–0.12: sit back against it; --sit KEY auto)`);
-    } else {
-      const span = seatSpan(v.model, s[0]);
-      if (span && Math.abs(s[1] - (span.v0 + span.v1) / 2) > 0.1) out.push(`(b) cushion ${i}: on a backless seat the pelvis is ${Math.abs(s[1] - (span.v0 + span.v1) / 2).toFixed(2)} tile off its middle (0.1 at most; --sit KEY auto)`);
-    }
-  });
-  // (h) the sitter's body is theirs: nothing of the seat but the cushion under them stands inside it
-  const F = frameFor('front', SIT_POSE_OF[v.style] as Pose);
-  const thighLen = Math.abs(F.legNear.m[0] - F.legNear.a[0]) / 32;
-  const shoulder = (figSeatRow(poseDrop(SIT_POSE_OF[v.style])) - F.shoulderY) / 2;
-  sits.forEach((s, i) => {
-    if (!s) return;
-    for (const x of intrusions(v.model, bodyVolume(s, thighLen, shoulder, THIGH_TOP))) {
-      const p = v.model.parts[x.part];
-      out.push(`(h) cushion ${i}: part ${x.part} (${p.part}) stands inside the sitter's ${x.into} (by ${x.by[0].toFixed(2)} × ${x.by[1].toFixed(2)} tile × ${x.by[2].toFixed(1)} px): only the cushion under them may be there`);
-    }
-  });
-  if (out.some((p) => p.startsWith('(b)'))) return { problems: out, fit, flagged };
-  const behind = behindView(v.facing);
-  const worst = new Map<string, { n: number; lo: boolean; bad: (n: number) => boolean; text: (n: number) => string }>();
-  const note = (key: string, n: number, lo: boolean, bad: (n: number) => boolean, text: (n: number) => string) => {
-    const w = worst.get(key);
-    if (!w) worst.set(key, { n, lo, bad, text });
-    else w.n = lo ? Math.min(w.n, n) : Math.max(w.n, n);
-  };
-  const OX = 100;
-  const OY = 100;
-  for (let k = 0; k < looks.length; k++) {
-    const sitters = modelSitters(v, looks, k);
-    const c = composeModel(v, sitters, { size: [v.art.px.w + 200, v.art.px.h + 200], origin: [OX, OY] });
-    for (const [x, y] of c.flagged) flagged.push([x - OX, y - OY]);
-    c.sitters.forEach((s, i) => {
-      note(`${i} wrong`, s.wrong, false, (n) => n > 0, (n) => `(c) cushion ${i}: the seat is drawn over them where it's behind them (${n} px)`);
-      if (s.foreOnArm >= 4) note(`${i} fore`, s.foreOnArmHidden / s.foreOnArm, false, (n) => n > 0.1, (n) => `(d) cushion ${i}: a forearm resting on the armrest is hidden (${Math.round(n * 100)}%)`);
-      if (behind) {
-        const bt = backTop(v.model, s.body.u, s.body.v);
-        const shoulder = s.body.z + (figSeatRow(poseDrop(sitters[i].pose)) - (58 + poseDrop(sitters[i].pose))) / 2;
-        if (bt !== null && bt < shoulder) note(`${i} upper`, s.upper ? s.upperShown / s.upper : 1, true, (n) => n < 0.9, (n) => `(e) cushion ${i}: from behind, the back is lower than their shoulders, yet ${Math.round((1 - n) * 100)}% of their head and shoulders is hidden`);
-      } else {
-        note(`${i} upper`, s.upper ? s.upperShown / s.upper : 1, true, (n) => n < 0.95, (n) => `cushion ${i}: from the front, the seat hides their head or shoulders (${Math.round(n * 100)}% show)`);
-        const legs = s.count[BODY.thigh] + s.count[BODY.shin];
-        const legsShown = legs - s.covered[BODY.thigh] - s.covered[BODY.shin];
-        if (legs) note(`${i} legs`, legsShown / legs, true, (n) => n < 0.6, (n) => `cushion ${i}: from the front, their legs are lost in the seat (${Math.round(n * 100)}% show)`);
-        // the shins and feet hang in front of the seat: not a pixel of them behind it
-        note(`${i} shins`, s.covered[BODY.shin], false, (n) => n > 0, (n) => `cushion ${i}: from the front, the seat covers ${n} px of their shins or feet (they hang in front of it)`);
-      }
-      note(`${i} holes`, s.holes, false, (n) => n > 0, (n) => `(f) cushion ${i}: ${n} px of them see-through`);
-    });
-  }
-  for (const w of worst.values()) if (w.bad(w.n)) out.push(w.text(w.n));
-  return { problems: [...new Set(out)], fit, flagged };
-}

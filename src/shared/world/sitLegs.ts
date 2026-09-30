@@ -1,6 +1,6 @@
 /**
  * HOW A SITTER'S LEGS LIE, worked out from the seat itself (its model: seatModels.ts) in 3D, so the figure is drawn
- * the way the seat is built in every facing and the z-buffer (seatModel.ts) reads the same legs it draws.
+ * the way the seat is built in every facing.
  *
  * From the hip joint (the thigh's centre line, THIGH_R above the cushion under the pelvis):
  *   reach  the thighs run forward, level (or tilted by `rise`), to the knees just past the seat's front edge — so
@@ -10,9 +10,9 @@
  *          SHIN_MAX), else they hang
  *   toe    how far forward of the knees the feet are (tiles): the shins lean out a little
  *   behind how far the thighs are drawn seen from behind (tiles): on a long seat (a couch, a bench) the whole thigh,
- *          lying out along the cushion toward its front, as you'd see someone on a couch from behind; on a single
- *          chair a stub, the body and the chair's back hiding the rest (drawn whole there, a thigh reads as a stick
- *          poking out beside the chair)
+ *          lying out along the cushion toward its front with the shoes just past the knees, as you'd see someone on a
+ *          couch from behind; on a single chair a stub, the body and the chair's back hiding the rest (drawn whole
+ *          there, a thigh reads as a stick poking out beside the chair)
  * The avatar kit projects these with the world's own projection (32 px across and 16 px down per tile, 2 px up per
  * world px), so a thigh pointing toward the camera reads foreshortened at the floor's 2:1, never as a leg stuck out
  * sideways.

@@ -9,8 +9,6 @@ The dev server (src/server/routes/devLab.ts, localhost only) runs these; each pr
   uv run designlab.py furniture-publish <draft-dir> [--overwrite]
   uv run designlab.py part-generate <draft-dir> --view front|back [--quality high]
   uv run designlab.py part-publish <draft-dir>
-  uv run designlab.py rig-vision <draft-dir> --view se
-  uv run designlab.py propose-parts <draft-dir> <facing> [--model M] [--effort E] [--max-usd X]
   uv run designlab.py usage
 
 A draft lives in art/drafts/<id>/: draft.json (the spec and the state of every view), refs/ (reference images),
@@ -163,12 +161,6 @@ def model_decl(draft: dict) -> dict:
         e["walk"] = "seat" if seating else "open" if e["layer"] == "floor" else "blocked"
         if seating:
             e.update(seat=f.get("seat") or 12, sitStyle=f.get("sitStyle") or "chair", backrest=bool(f.get("backrest", True)))
-            # a catalog seat opened as a draft keeps its own profile until it's calibrated here (seat_fit replaces it)
-            cp = f.get("catalogProfile") or {}
-            if cp and not (f.get("seatCalibration") or {}).get("cushion"):
-                e.update(seatDepth=cp["seatDepth"], backDepth=cp["backDepth"])
-                if cp.get("backLine"):
-                    e["backLine"] = cp["backLine"]
             if f.get("arms"):
                 e["arms"] = True
         if f.get("surface") is not None:
@@ -326,71 +318,18 @@ def wall_standard(e: dict, img: Image.Image):
     e["height"] = h
 
 
-SEAT_CALIBRATION = HERE / "seat-calibration.json"
-
-
-def seat_fit(d: Path, draft: dict, e: dict) -> list[str]:
-    """A seat's profile (its height and hip depth), fitted on its staged drawings from the cushion centre clicked in
-    the lab (scripts/lab-seat.ts: seat-fit.ts's own maths) and written into the staged entry; without a click, the
-    height set by hand stands. How people sit in each facing is the seat rig's to say (rig_check); returns what's
-    wrong with the fit itself."""
-    f = draft["furniture"]
-    if e.get("walk") != "seat":
-        return []
-    cal = f.get("seatCalibration")
-    if not cal or not cal.get("cushion"):
-        return []
-    args = ["node", *studio.TSX, "scripts/lab-seat.ts", "--entries", str(d / "stage" / "entries.json"),
-            "--sprites", str(d / "stage" / "sprites"), "--key", draft["key"],
-            "--cushion", f"{cal['cushion'][0]},{cal['cushion'][1]}"]
-    if cal.get("cover"):
-        args.append("--cover")
-    r = subprocess.run(args, cwd=HERE.parent, capture_output=True, text=True, encoding="utf-8")
-    lines = [ln for ln in r.stdout.splitlines() if ln.startswith("{")]
-    res = json.loads(lines[-1]) if lines else {"error": (r.stderr or "seat fit failed").strip()[-400:]}
-    if res.get("error"):
-        return [f"seat fit: {res['error']}"]
-    for k in ("seat", "seatDepth", "backDepth", "sitStyle", "backrest"):
-        e[k] = res["profile"][k]
-    e.pop("backLine", None)
-    if res["profile"].get("backLine"):
-        e["backLine"] = res["profile"]["backLine"]
-    studio.write_atomic(d / "stage" / "entries.json", json.dumps({draft["key"]: e}, indent=2))
-    return []
-
-
-def rig_check(d: Path, draft: dict, e: dict, write: bool = False) -> list[str]:
-    """The seat rig (scripts/lab-rig.ts): every facing rigged, ticked "looks right" and holding to the standard on
-    the staged drawings; with `write`, stored in art/seat-rigs.json (after the piece is published)."""
-    if e.get("walk") != "seat":
-        return []
-    rig = draft["furniture"].get("seatRig")
-    if not rig or not rig.get("views"):
-        return ["rig the seat: press Propose in How people sit in it, fix it and tick every facing"]
-    (d / "stage" / "rig.json").write_text(json.dumps(rig), encoding="utf-8")
-    args = ["node", *studio.TSX, "scripts/lab-rig.ts", "--entries", str(d / "stage" / "entries.json"),
-            "--sprites", str(d / "stage" / "sprites"), "--key", draft["key"], "--rig", str(d / "stage" / "rig.json")]
-    if write:
-        args.append("--write")
-    r = subprocess.run(args, cwd=HERE.parent, capture_output=True, text=True, encoding="utf-8")
-    lines = [ln for ln in r.stdout.splitlines() if ln.startswith("{")]
-    res = json.loads(lines[-1]) if lines else {"error": (r.stderr or "rig check failed").strip()[-400:]}
-    if res.get("error"):
-        return [f"seat rig: {res['error']}"]
-    return [f"seat rig, {p_}" for p_ in res.get("problems", [])]
-
-
 def model_check(d: Path, draft: dict, e: dict, write: bool = False) -> list[str]:
-    """The seat model (scripts/lab-model.ts): its 3D proxy holding to the standard in every facing on the staged
-    drawings, and passed by the reviewer; with `write`, stored in art/seat-models.json (after the piece is published).
-    A seat is published with its model: that's how people are drawn sitting in it."""
+    """THE SEAT CHECK (scripts/lab-model.ts: seatLayers.ts seatProblems, the gate's): the seat's model holding in every
+    facing on the staged drawings, and passed by the reviewer; with `write`, stored in art/seat-models.json (after the
+    piece is published). A seat is published with its model: that's how people are drawn sitting in it."""
     if e.get("walk") != "seat":
         return []
     model = draft["furniture"].get("seatModel")
     if not model or not model.get("model"):
         return ["give the seat its model: Auto-fit in How people sit in it, tune it and pass it"]
     (d / "stage" / "model.json").write_text(json.dumps(model), encoding="utf-8")
-    args = ["node", *studio.TSX, "scripts/lab-model.ts", "--entries", str(d / "stage" / "entries.json"),
+    # (--no-maglev: Node 24.12's Maglev JIT crashes node on this machine)
+    args = ["node", "--no-maglev", *studio.TSX, "scripts/lab-model.ts", "--entries", str(d / "stage" / "entries.json"),
             "--sprites", str(d / "stage" / "sprites"), "--key", draft["key"], "--model", str(d / "stage" / "model.json")]
     if write:
         args.append("--write")
@@ -402,52 +341,13 @@ def model_check(d: Path, draft: dict, e: dict, write: bool = False) -> list[str]
     return [f"seat model, {p_}" for p_ in res.get("problems", [])]
 
 
-def parts_check(d: Path, draft: dict, e: dict, write: bool = False) -> list[str]:
-    """The seat's PARTS (scripts/lab-parts.ts; src/client/engine/sprites/seatParts.ts): a part map for every own view of
-    the staged drawings, and each view's rig exactly what it compiles to; with `write`, the part maps are stored in
-    art/seat-parts (after the piece is published)."""
-    if e.get("walk") != "seat":
-        return []
-    parts = draft["furniture"].get("seatParts")
-    if not parts or not parts.get("views"):
-        return ["give the seat its parts: Propose (AI) or copy them in How people sit in it, fix them and tick every facing"]
-    (d / "stage" / "parts.json").write_text(json.dumps(parts), encoding="utf-8")
-    (d / "stage" / "rig.json").write_text(json.dumps(draft["furniture"].get("seatRig") or {}), encoding="utf-8")
-    args = ["node", *studio.TSX, "scripts/lab-parts.ts", "--entries", str(d / "stage" / "entries.json"),
-            "--sprites", str(d / "stage" / "sprites"), "--key", draft["key"], "--parts", str(d / "stage" / "parts.json"),
-            "--rig", str(d / "stage" / "rig.json")]
-    if write:
-        args.append("--write")
-    r = subprocess.run(args, cwd=HERE.parent, capture_output=True, text=True, encoding="utf-8")
-    lines = [ln for ln in r.stdout.splitlines() if ln.startswith("{")]
-    res = json.loads(lines[-1]) if lines else {"error": (r.stderr or "parts check failed").strip()[-400:]}
-    if res.get("error"):
-        return [f"seat parts: {res['error']}"]
-    return [f"seat parts, {p_}" for p_ in res.get("problems", [])]
-
-
 def has_model(draft: dict) -> bool:
     return bool((draft["furniture"].get("seatModel") or {}).get("model"))
 
 
 def seat_checks(d: Path, draft: dict, e: dict) -> list[str]:
-    """What a seat must pass to publish: its fit, its parts compiled into its rig, the rig holding in every facing and
-    ticked "looks right" in each; its 3D model only if it has one (optional: the game draws seats by their rigs)."""
-    out = seat_fit(d, draft, e) + parts_check(d, draft, e) + rig_check(d, draft, e)
-    if has_model(draft):
-        out += model_check(d, draft, e)
-    return out
-
-
-def remember_seat(draft: dict, e: dict):
-    """The calibration, where scripts/seat-fit.ts (in the gate) finds it for a seat the lab published."""
-    cal = (draft["furniture"].get("seatCalibration") or {})
-    if e.get("walk") != "seat" or not cal.get("cushion"):
-        return
-    table = json.loads(SEAT_CALIBRATION.read_text(encoding="utf-8")) if SEAT_CALIBRATION.exists() else {}
-    table[draft["key"]] = {"cushion": cal["cushion"], "sitStyle": e["sitStyle"], "backrest": e["backrest"],
-                           **({"backLine": e["backLine"]} if e.get("backLine") else {})}
-    studio.write_atomic(SEAT_CALIBRATION, json.dumps(dict(sorted(table.items())), indent=2) + "\n")
+    """What a seat must pass to publish: its model, holding in every facing and passed by the reviewer."""
+    return model_check(d, draft, e)
 
 
 def cmd_furniture_check(a):
@@ -476,7 +376,7 @@ def cmd_furniture_publish(a):
     e, sprites = stage(d, draft)
     seat = seat_checks(d, draft, e)
     if seat:
-        out({"error": "the seat isn't ready: its parts, rig or model don't hold yet", "problems": seat}, 1)
+        out({"error": "the seat isn't ready: its model doesn't hold yet", "problems": seat}, 1)
     # a key already in the catalog is only replaced by its own draft: opened from the library, or published from here
     args = ["lab-publish", "--entries", str(d / "stage" / "entries.json"), "--sprites", str(sprites)]
     if draft.get("origin") == key or draft.get("published"):
@@ -485,18 +385,10 @@ def cmd_furniture_publish(a):
     if not res.get("ok"):
         problems = [p_ for ps in (res.get("problems") or {}).values() for p_ in ps]
         out({"error": res.get("error") or "the model check refuses it", "problems": problems}, 1)
-    remember_seat(draft, e)
     if has_model(draft):
         model = model_check(d, draft, e, write=True)
         if model:
             out({"error": "published, but its model couldn't be stored in art/seat-models.json", "problems": model}, 1)
-    if e.get("walk") == "seat":
-        rig = rig_check(d, draft, e, write=True)
-        if rig:
-            out({"error": "published, but its rig couldn't be stored in art/seat-rigs.json", "problems": rig}, 1)
-        parts = parts_check(d, draft, e, write=True)
-        if parts:
-            out({"error": "published, but its part maps couldn't be stored in art/seat-parts", "problems": parts}, 1)
     draft["published"] = time.strftime("%Y-%m-%dT%H:%M:%S")
     save(d, draft)
     history(d, "publish", key=key)
@@ -588,65 +480,6 @@ def cmd_part_publish(a):
     out({"published": f"{kind}.{final}", "catalogLine": draft["catalogLine"]})
 
 
-# ─────────────────────────────── seat rigs ───────────────────────────────
-
-def cmd_rig_vision(a):
-    """A seat rig proposed by the vision model for one view (studio.py vision-rig): the Lab left the picture of the
-    drawing's numbered pieces and the view's facts in <draft>/rig/<view>.png|json."""
-    d = draft_dir(a.draft)
-    img, meta = d / "rig" / f"{a.view}.png", d / "rig" / f"{a.view}.json"
-    if not img.exists() or not meta.exists():
-        out({"error": f"no picture of the {a.view} view to ask about"}, 2)
-    _code, res = studio_json(["vision-rig", "--image", str(img), "--meta", str(meta)], "the rig proposal")
-    if not res.get("ok"):
-        out({"error": res.get("error") or "the model gave no answer"}, 1)
-    history(d, "rig-vision", view=a.view, usd=res.get("usd"), model=res.get("model"))
-    out({"front": res["front"], "hips": res["hips"], "notes": res.get("notes", ""), "usd": res.get("usd", 0), "model": res.get("model")})
-
-
-def cmd_propose_parts(a):
-    """A seat's PARTS for one own view proposed by a vision model: its staged drawing split into numbered regions
-    (scripts/lab-parts.ts --sheet), the regions labelled back / seat / arm / leg / other (studio.py vision-parts: the
-    key stays here), and the labels applied (--apply). Leaves <draft>/parts/<facing>.* for a look; the Lab takes the
-    part map it returns."""
-    d = draft_dir(a.draft)
-    draft = load(d)
-    f = draft.get("furniture") or {}
-    if draft.get("kind") != "furniture" or f.get("category") != "seating":
-        out({"error": "only a seat has parts"}, 2)
-    e, sprites = stage(d, draft)
-    parts_dir = d / "parts"
-    base = ["node", *studio.TSX, "scripts/lab-parts.ts", "--entries", str(d / "stage" / "entries.json"),
-            "--sprites", str(sprites), "--key", draft["key"], "--facing", a.facing]
-
-    def tool(args: list, what: str) -> dict:
-        r = subprocess.run(base + args, cwd=HERE.parent, capture_output=True, text=True, encoding="utf-8")
-        lines = [ln for ln in r.stdout.splitlines() if ln.startswith("{")]
-        res = json.loads(lines[-1]) if lines else {"error": (r.stderr or f"{what} failed").strip()[-400:]}
-        if not res.get("ok"):
-            out({"error": f"{what}: {res.get('error')}"}, 1)
-        return res
-
-    sheet = tool(["--sheet", str(parts_dir)], "the regions")
-    args = ["vision-parts", "--image", sheet["image"], "--plain", sheet["plain"], "--meta", sheet["meta"]]
-    if a.model:
-        args += ["--model", a.model]
-    if a.effort:
-        args += ["--effort", a.effort]
-    if a.max_usd is not None:
-        args += ["--max-usd", str(a.max_usd)]
-    _code, res = studio_json(args, "the parts proposal")
-    if not res.get("ok"):
-        out({"error": res.get("error") or "the model gave no answer", "usd": res.get("usd", 0)}, 1)
-    labels_file = parts_dir / f"{a.facing}.labels.json"
-    labels_file.write_text(json.dumps(res["labels"], indent=2), encoding="utf-8")
-    applied = tool(["--apply", str(labels_file), "--out", str(parts_dir / f"{a.facing}.proposed.png")], "applying the labels")
-    history(d, "propose-parts", view=a.facing, usd=res.get("usd"), model=res.get("model"))
-    out({"facing": a.facing, "labels": res["labels"], "missing": res.get("missing", []), "parts": applied["parts"],
-         "w": applied["w"], "h": applied["h"], "regions": sheet["regions"], "notes": res.get("notes", ""),
-         "usd": res.get("usd", 0), "model": res.get("model"), "effort": res.get("effort")})
-
-
 # ─────────────────────────────── spend ───────────────────────────────
 
 def cmd_usage(_a):
@@ -660,13 +493,8 @@ def cmd_usage(_a):
         k = f"{r.get('kind')}|{r.get('quality')}|{r.get('size')}"
         by.setdefault(k, []).append(usd(r))
     est = {k: round(sum(v) / len(v), 4) for k, v in by.items() if v}
-    # a parts proposal (one view): the mean of the default model's recent calls, and the cap no call may pass
-    mine = [usd(r) for r in rows if r.get("size") == "parts" and r.get("model") == studio.PARTS_MODEL
-            and r.get("quality") == studio.PARTS_EFFORT][-20:]
-    parts = {"model": studio.PARTS_MODEL, "effort": studio.PARTS_EFFORT, "cap": studio.PARTS_MAX_USD,
-             "estimate": round(sum(mine) / len(mine), 4) if mine else None}
     out({"total": round(studio.spent(), 2), "cap": studio.cap(), "today": round(sum(usd(r) for r in rows if str(r.get("t", "")).startswith(today)), 2),
-         "callsToday": sum(1 for r in rows if str(r.get("t", "")).startswith(today)), "estimates": est, "parts": parts})
+         "callsToday": sum(1 for r in rows if str(r.get("t", "")).startswith(today)), "estimates": est})
 
 
 def main():
@@ -694,17 +522,6 @@ def main():
     pp.add_argument("draft")
     pp.add_argument("--overwrite", action="store_true")
     pp.set_defaults(fn=cmd_part_publish)
-    rv = sub.add_parser("rig-vision")
-    rv.add_argument("draft")
-    rv.add_argument("--view", required=True, choices=["se", "sw", "ne", "nw"])
-    rv.set_defaults(fn=cmd_rig_vision)
-    pp_ = sub.add_parser("propose-parts")
-    pp_.add_argument("draft")
-    pp_.add_argument("facing", choices=["se", "sw", "ne", "nw"])
-    pp_.add_argument("--model")
-    pp_.add_argument("--effort", choices=["minimal", "low", "medium", "high"])
-    pp_.add_argument("--max-usd", type=float)
-    pp_.set_defaults(fn=cmd_propose_parts)
     u = sub.add_parser("usage")
     u.set_defaults(fn=cmd_usage)
     a = ap.parse_args()

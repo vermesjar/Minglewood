@@ -1,6 +1,6 @@
 /**
  * Seat models (src/shared/world/seatModels.ts, art/seat-models.json): every seat's 3D proxy, fitted to its drawings,
- * shown and checked. People are drawn into seats by z-buffer against it (src/client/engine/sprites/seatModel.ts).
+ * shown and checked. People are drawn into seats in layers worked out from it (src/client/engine/sprites/seatLayers.ts).
  * How to fit one: docs/furniture.md, "Seat models: how to fit one". Every KEY argument takes a comma list.
  *
  *   --fit KEY|all [--refine] [--force]
@@ -18,25 +18,17 @@
  *        silhouette fit; the depth map as a heatmap; the result at play scale (2×) and 4× for three looks, every
  *        cushion taken; and sit-down → seated → stand-up
  *   --check [KEY]
- *        the gate (exit 1 on any problem): (a) the proxy's silhouette matches each drawing (IoU ≥ 0.85; the tops of
- *        backs and arms within 2 px); (b) sitting points on the cushion top, the pelvis 0–0.12 tile in front of the back's front face
- *        (centred ±0.1 on a backless seat);
- *        (c) no seat pixel drawn over a person where it's behind them (z-buffer self-check); (d) forearms resting on an
- *        armrest show; (e) from behind, head and shoulders show over a back lower than the shoulders; (f) no
- *        see-through pixels in a seated person; (g) every seat kind used anywhere has a model, reviewed on the
- *        drawings it has now; (h) no part but the cushion under a sitter stands inside their body (torso to the
- *        shoulders, thighs to the knees). Plus, from the front: head and shoulders show, legs come off the seat.
- *   --probe [KEY]
- *        live == sheet: every capture the in-game spec took (tests/e2e/seat-models.spec.ts →
- *        art/review/models-live/raw/*.png + .json) against the same seat, look and cushion composed here
+ *        the seat check (sprites/seatLayers.ts seatProblems, the gate's: scripts/seat-layers.ts --check): the model's
+ *        silhouette fits every drawing (IoU ≥ 0.8), every cushion has a sitting point, on its cushion seen from the
+ *        front, the legs stay above the floor and come off the cushion's front, and from behind a seat with a back hides
+ *        something of its sitters.
  *   --review KEY          the lead reviewer passes a model (stamps the day and its drawings' fingerprints)
  *   --list                every seat kind and its model's state
  *
  * All writes go through art/seat-models.json's lock, one key at a time (scripts/lib/models.ts withModels): agents
  * working on different seats never clobber each other.
  */
-import { existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs';
-import type { AvatarLoadout } from '../src/shared/domain/types';
+import { existsSync, mkdirSync } from 'node:fs';
 import type { Facing } from '../src/shared/world/scene';
 import {
   boxEdges,
@@ -56,15 +48,15 @@ import {
   type SeatModels,
   type SitPoint,
 } from '../src/shared/world/seatModels';
-import { FIG, figAx, rigForView } from '../src/shared/world/seatRigs';
-import { composeModel, filledSilhouette, modelFindings, modelSitFrames, modelSitters, proxySilhouette, seatDepth, type ModelSitter } from '../src/client/engine/sprites/seatModel';
+import { filledSilhouette, proxySilhouette, seatDepth, silhouetteFit } from '../src/client/engine/sprites/seatModel';
+import { composeSeat, seatLayers, seatProblems } from '../src/client/engine/sprites/seatLayers';
 import { familyOf, fitModel, placeSits } from '../src/client/engine/sprites/seatModelFit';
 import { loadManifest } from './lib/manifest';
-import { blank, readPng, writePng, type Img } from './lib/png';
+import { blank, writePng, type Img } from './lib/png';
 import { text } from './lib/font';
 import { line, paste, plot, rect, row, stack, type RGB } from './lib/draw';
 import { modelView, readModels, withModels } from './lib/models';
-import { profileOf, readRigs, rigView, seatKeys, type Sprites } from './lib/rigs';
+import { profileOf, seatKeys, viewArt, type Sprites } from './lib/seats';
 
 const M = loadManifest().sprites as unknown as Sprites;
 const KEYS = seatKeys(M);
@@ -102,13 +94,9 @@ const PART_COLOUR: Record<PartKind, RGB> = {
 function fitInput(key: string) {
   const e = M[key];
   const p = profileOf(M, key);
-  const views = MODEL_FACINGS.map((f) => ({ facing: f, art: rigView(M, key, f).art }));
-  // the old rigs' hips (seen from behind, facing ne: u = x), as hints for where along a long seat each cushion is
-  // (their depth is what was wrong, and a one-cushion seat's is its middle)
-  const hintU: number[] = [];
-  const v = rigView(M, key, 'ne');
-  const r = rigForView(readRigs(), key, 'ne', { mirrored: v.mirrored, width: v.art.px.w })?.rig;
-  if (r) for (const [hx, hy] of r.hips) hintU.push(drawingAt([v.art.ax, v.art.ay], hx, hy, p.seat).x);
+  const views = MODEL_FACINGS.map((f) => ({ facing: f, art: viewArt(M, key, f).art }));
+  // the model's own sitting points, as hints for where along a long seat each cushion is
+  const hintU = (readModels()[key]?.sits ?? []).map((s) => s[0]);
   return {
     key,
     size: [e.footprint[0], e.footprint[1]] as [number, number],
@@ -125,29 +113,16 @@ function fitInput(key: string) {
 
 type View = ReturnType<typeof modelView>;
 
-/** The bounds (drawing px) of a view with everyone seated. */
-function bounds(v: View, sitters: ModelSitter[]) {
-  let l = 0;
-  let t = 0;
-  let r = v.art.px.w;
-  let b = v.art.px.h;
-  for (const s of sitters) {
-    const x0 = s.feet[0] - figAx(s.facing);
-    l = Math.min(l, x0 + 16);
-    r = Math.max(r, x0 + FIG.w - 16);
-    t = Math.min(t, s.feet[1] - FIG.feet + 22);
-    b = Math.max(b, s.feet[1] - FIG.feet + FIG.h - 4);
-  }
-  return { l: l - 4, t: t - 4, r: r + 4, b: b + 4 };
-}
-
-function cellOf(v: View, sitters: ModelSitter[], box: ReturnType<typeof bounds>, flag = false): Img {
-  const W = box.r - box.l;
-  const H = box.b - box.t;
-  const c = composeModel(v, sitters, { size: [W, H], origin: [-box.l, -box.t] });
-  const img = blank(W, H, FLOOR, 255);
-  paste(img, c.cell, 0, 0);
-  if (flag) for (const [x, y] of c.flagged) plot(img, x, y, [255, 30, 30], 0.85);
+/** A view with look k, k + 1, … on its cushions, composed as the game draws it (seatLayers.ts composeSeat), on the floor. */
+function cellOf(v: View, k: number): Img {
+  const cushions = seatLayers(v).sits.length;
+  const c = composeSeat(
+    v,
+    Array.from({ length: cushions }, (_, i) => ({ look: SEAT_LOOKS[(k + i) % SEAT_LOOKS.length], cushion: i })),
+    40,
+  );
+  const img = blank(c.px.w, c.px.h, FLOOR, 255);
+  paste(img, { w: c.px.w, h: c.px.h, d: c.px.d }, 0, 0);
   return img;
 }
 
@@ -275,26 +250,18 @@ function sheetFor(key: string, models: SeatModels, perView?: (f: Facing, img: Im
   for (const f of MODEL_FACINGS) {
     const v = modelView(M, key, f, m);
     const first = blocks.length;
-    const found = modelFindings(v, SEAT_LOOKS);
+    const fit = silhouetteFit(v);
+    const problems = seatProblems(v);
     const head = blank(1600, 30, BG, 255);
-    const tops = found.fit.tops.map((t) => `${t.kind}${t.part} ${Math.round(t.within * 100)}%`).join(' ') || '-';
-    text(head, 8, 8, `${f}${f === 'ne' || f === 'nw' ? ' (from behind)' : ' (from the front)'}${v.mirrored ? '  (drawing mirrored)' : ''}   IoU ${found.fit.iou.toFixed(3)}   tops ${tops}   ${found.problems.length ? `${found.problems.length} problem(s)` : 'holds'}`, found.problems.length ? [255, 200, 90] : GOOD, 2);
+    const tops = fit.tops.map((t) => `${t.kind}${t.part} ${Math.round(t.within * 100)}%`).join(' ') || '-';
+    text(head, 8, 8, `${f}${f === 'ne' || f === 'nw' ? ' (from behind)' : ' (from the front)'}${v.mirrored ? '  (drawing mirrored)' : ''}   IoU ${fit.iou.toFixed(3)}   tops ${tops}   ${problems.length ? `${problems.length} problem(s)` : 'holds'}`, problems.length ? [255, 200, 90] : GOOD, 2);
     blocks.push(head);
-    if (found.problems.length) {
-      const pb = blank(1600, 14 * found.problems.length + 4, BG, 255);
-      found.problems.forEach((q, i) => text(pb, 16, 2 + i * 14, q, BAD, 2));
+    if (problems.length) {
+      const pb = blank(1600, 14 * problems.length + 4, BG, 255);
+      problems.forEach((q, i) => text(pb, 16, 2 + i * 14, q, BAD, 2));
       blocks.push(pb);
     }
-    const cells1 = SEAT_LOOKS.map((_, k) => modelSitters(v, SEAT_LOOKS, k));
-    const moves = modelSitFrames(v, SEAT_LOOKS[0]);
-    const box = [...cells1, moves].reduce(
-      (b, s) => {
-        const q = bounds(v, s);
-        return { l: Math.min(b.l, q.l), t: Math.min(b.t, q.t), r: Math.max(b.r, q.r), b: Math.max(b.b, q.b) };
-      },
-      bounds(v, []),
-    );
-    const cells = cells1.map((s) => cellOf(v, s, box, true));
+    const cells = SEAT_LOOKS.map((_, k) => cellOf(v, k));
     const side = stack([labelled('SILHOUETTE: both / drawing only (red) / proxy only (blue)', fitPanel(v)), labelled('DEPTH: far (blue) to near (red); hatched = outside the boxes', depthPanel(v))], BG, 8);
     const results = blank(cells.reduce((s, c) => s + c.w * 2 + 12, 0) + 12, cells[0].h * 3 + 44, BG, 255);
     text(results, 0, 2, 'PLAY SCALE (2X)', MUTED, 2);
@@ -310,15 +277,6 @@ function sheetFor(key: string, models: SeatModels, perView?: (f: Facing, img: Im
       x += 2 * c.w + 12;
     }
     blocks.push(row([proxyPanel(v), side, results]));
-    const others = modelSitters(v, SEAT_LOOKS, 1).slice(1);
-    const film = moves.map((s) => cellOf(v, [s, ...others], box));
-    const cw = film[0]?.w ?? 1;
-    const ch = film[0]?.h ?? 1;
-    const strip = blank(Math.max(1600, film.length * (2 * cw + 4)), 3 * ch + 26, BG, 255);
-    text(strip, 4, 2, 'SIT DOWN > SEATED > STAND UP', MUTED, 2);
-    film.forEach((c, i) => paste(strip, c, 4 + i * (cw + 4), 16));
-    film.forEach((c, i) => paste(strip, c, 4 + i * (2 * cw + 4), 20 + ch, 2));
-    blocks.push(strip);
     perView?.(f, stack(blocks.slice(first)));
   }
   return stack(blocks);
@@ -344,78 +302,9 @@ function check(models: SeatModels, keys = KEYS): string[] {
       continue;
     }
     if (m.size[0] !== e.footprint[0] || m.size[1] !== e.footprint[1]) out.push(`${key}: the model is ${m.size.join('×')}, the catalog's footprint ${e.footprint.join('×')}`);
-    if (!m.reviewed) out.push(`${key}: (g) not reviewed (read art/review/models/${key}.png and art/review/models-live/${key}-*.png)`);
-    for (const f of MODEL_FACINGS) {
-      const v = modelView(M, key, f, m);
-      if (m.reviewed && m.drawings?.[f] !== v.print) out.push(`${key} ${f}: (g) the drawing changed since the model was reviewed`);
-      for (const p of modelFindings(v, SEAT_LOOKS).problems) out.push(`${key} ${f}: ${p}`);
-    }
+    for (const f of MODEL_FACINGS) for (const p of seatProblems(modelView(M, key, f, m))) out.push(`${key} ${f}: ${p}`);
   }
   return [...new Set(out)];
-}
-
-/* ------------------------------------------------------------------ the live probe */
-
-/**
- * Every capture the in-game spec took, against the same composition here. A capture is the live canvas at play
- * scale around a seat, on the seat drawing's own pixel grid: raw/<key>-<facing>-L<look>-C<cushion>.png and .json
- * { key, facing, look, cushion, origin: [x, y] (the drawing's (0, 0) in the capture) }. The room's light is read off
- * the seat's own pixels (a gain per channel, from pixels only the seat covers), then every pixel the composition
- * has — the seat's, the person's, the seat's drawn over them — is compared: within 6 of 255 per channel is the same.
- */
-function probe(keys: string[]): { lines: string[]; bad: number; seen: number } {
-  const dir = 'art/review/models-live/raw';
-  const lines: string[] = [];
-  let bad = 0;
-  let seen = 0;
-  if (!existsSync(dir)) return { lines: [`no captures in ${dir}: run the in-game spec first (tests/e2e/seat-models.spec.ts)`], bad: 1, seen };
-  const models = readModels();
-  for (const name of readdirSync(dir)
-    .filter((n) => n.endsWith('.json'))
-    .sort()) {
-    const meta = JSON.parse(readFileSync(`${dir}/${name}`, 'utf8')) as { key: string; facing: Facing; look: number; cushion: number; origin: [number, number]; loadout?: AvatarLoadout };
-    if (!keys.includes(meta.key)) continue;
-    seen++;
-    const live = readPng(`${dir}/${name.replace(/\.json$/, '.png')}`);
-    const m = models[meta.key];
-    if (!m) {
-      lines.push(`${name}: no model for ${meta.key}`);
-      bad++;
-      continue;
-    }
-    const v = modelView(M, meta.key, meta.facing, m);
-    const s = modelSitters(v, SEAT_LOOKS, 0)[meta.cushion];
-    if (!s) continue;
-    // the look as the bot wore it (the server swaps out what a bot hasn't unlocked)
-    const c = composeModel(v, [{ ...s, look: meta.loadout ?? SEAT_LOOKS[meta.look] }], { size: [live.w, live.h], origin: meta.origin });
-    // the room's light: the median ratio live / drawn over the seat's own pixels, per channel
-    const ratios: number[][] = [[], [], []];
-    for (let i = 0; i < live.w * live.h; i++) if (c.who[i] === 1) for (let k = 0; k < 3; k++) if (c.cell.d[i * 4 + k] > 24) ratios[k].push(live.d[i * 4 + k] / c.cell.d[i * 4 + k]);
-    const lit = ratios.map((r) => (r.length ? r.sort((a, b) => a - b)[r.length >> 1] : 1));
-    let n = 0;
-    let diff = 0;
-    let person = 0;
-    let personDiff = 0;
-    const mask = blank(live.w, live.h, [0, 0, 0], 255);
-    for (let i = 0; i < live.w * live.h; i++) {
-      if (!c.who[i]) continue;
-      n++;
-      let e = 0;
-      for (let k = 0; k < 3; k++) e = Math.max(e, Math.abs(live.d[i * 4 + k] - Math.min(255, Math.round(c.cell.d[i * 4 + k] * lit[k]))));
-      const off = e > 6;
-      if (off) diff++;
-      if (c.who[i] >= 2) {
-        person++;
-        if (off) personDiff++;
-      }
-      mask.d.set(off ? [255, 40, 40, 255] : [c.cell.d[i * 4] >> 1, c.cell.d[i * 4 + 1] >> 1, c.cell.d[i * 4 + 2] >> 1, 255], i * 4);
-    }
-    const ok = n > 0 && personDiff <= Math.max(2, person * 0.005) && diff / n <= 0.01;
-    if (!ok) bad++;
-    writePng(`${dir}/${name.replace(/\.json$/, '.diff.png')}`, mask);
-    lines.push(`${ok ? 'same   ' : 'DIFFERS'}  ${name.replace(/\.json$/, '')}: ${personDiff}/${person} px of the person (and the seat over them) differ, ${diff}/${n} in all  (light ${lit.map((q) => q.toFixed(2)).join(' ')})`);
-  }
-  return { lines, bad, seen };
 }
 
 /* ------------------------------------------------------------------ editing (one key at a time, under the lock) */
@@ -447,10 +336,11 @@ function show(key: string) {
   m.parts.forEach((p, i) => console.log(`  ${String(i).padStart(2)} ${p.part.padEnd(5)} u [${p.u.join(', ')}]  v [${p.v.join(', ')}]  z [${p.z.join(', ')}]`));
   m.sits.forEach((s, i) => console.log(`  sit ${i}: [${s.join(', ')}]`));
   for (const f of MODEL_FACINGS) {
-    const found = modelFindings(modelView(M, key, f, m), SEAT_LOOKS);
-    const tops = found.fit.tops.map((t) => `${t.kind}${t.part} ${Math.round(t.within * 100)}% (worst ${t.worst})`).join(', ') || '-';
-    console.log(`  ${f}  IoU ${found.fit.iou.toFixed(3)}  tops ${tops}`);
-    for (const q of found.problems) console.log(`      ! ${q}`);
+    const v = modelView(M, key, f, m);
+    const fit = silhouetteFit(v);
+    const tops = fit.tops.map((t) => `${t.kind}${t.part} ${Math.round(t.within * 100)}% (worst ${t.worst})`).join(', ') || '-';
+    console.log(`  ${f}  IoU ${fit.iou.toFixed(3)}  tops ${tops}${m.views?.[f] ? `  own sitting points ${JSON.stringify(m.views[f])}` : ''}${m.over?.[f] ? '  traced over layer' : ''}`);
+    for (const q of seatProblems(v)) console.log(`      ! ${q}`);
   }
 }
 
@@ -491,6 +381,8 @@ if (cmd('--fit')) {
     if (patch.size) m.size = patch.size;
     if (patch.parts) m.parts = patch.parts;
     if (patch.sits) m.sits = patch.sits;
+    if (patch.views !== undefined) m.views = patch.views ?? undefined;
+    if (patch.over !== undefined) m.over = patch.over ?? undefined;
     if (patch.note !== undefined) m.note = patch.note || undefined;
   });
   show(key);
@@ -551,17 +443,12 @@ if (cmd('--fit')) {
     const probs = m ? check(models, [key]).filter((p) => !p.includes('(g) not reviewed')) : [];
     console.log(key.padEnd(20), !m ? 'no model' : `${m.reviewed ? `reviewed ${m.reviewed}` : 'not reviewed'}  ${probs.length ? `${probs.length} problem(s)` : 'holds'}`);
   }
-} else if (cmd('--probe')) {
-  const { lines, bad, seen } = probe(pick(arg('--probe')));
-  for (const l of lines) console.log(l);
-  console.log(!seen ? 'no captures for these seats' : bad ? `${bad} capture(s) differ from their sheet` : `every live capture (${seen}) matches its sheet`);
-  process.exit(bad || !seen ? 1 : 0);
 } else {
   const i = process.argv.indexOf('--check');
   const only = (i >= 0 ? process.argv.slice(i + 1) : []).filter((a) => !a.startsWith('--')).flatMap((a) => a.split(','));
   const keys = only.length ? only.filter((k) => KEYS.includes(k) || (console.error(`no seat ${k}`), false)) : KEYS;
   const problems = check(readModels(), keys);
   for (const p of problems) console.log('  !', p);
-  console.log(`${keys.length} seat kind(s) × 4 facings: ${problems.length ? `${problems.length} problem(s)` : 'every seat modelled, reviewed and holding'}`);
+  console.log(`${keys.length} seat kind(s) × 4 facings: ${problems.length ? `${problems.length} problem(s)` : 'every seat modelled and holding'}`);
   process.exit(problems.length ? 1 : 0);
 }

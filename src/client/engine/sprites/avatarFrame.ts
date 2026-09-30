@@ -10,7 +10,7 @@
  * ne); sw/nw are mirrors.
  */
 import { SIT_DROP, type SitStyle } from '@shared/world/seats';
-import { NATURAL_LEGS, type SitLegs } from '@shared/world/sitLegs';
+import { NATURAL_LEGS, STUB, type SitLegs } from '@shared/world/sitLegs';
 
 export type { SitStyle } from '@shared/world/seats';
 export type Pose =
@@ -226,7 +226,10 @@ function seatedLegs(view: View, h: number, S: SitLegs): { near: Limb; far: Limb 
   const ky = (back ? -16 : 16) * reach - 2 * S.rise;
   const leg = (x: number, y: number): Limb => {
     const m: Pt = [x + kx, y + ky];
-    if (back) return { a: [x, y], m, b: m };
+    // from behind, a whole thigh ends in a shoe just past and below the knee, the kit drawing the thigh over it: the
+    // knee bends and the foot is down beyond it (Carter: "you should probably see their shoes"; level with the knee
+    // it read as a leg held straight out). A stub stops at the knee (b = m): no feet.
+    if (back) return { a: [x, y], m, b: S.behind > STUB ? [m[0] + 1, m[1] + 3] : m };
     // the ankle: the sole `drop` below the knee, `toe` further forward; the shoe is drawn 5 px tall above the sole
     const sx = m[0] + 32 * S.toe;
     const sy = m[1] + 16 * S.toe + 2 * S.drop;

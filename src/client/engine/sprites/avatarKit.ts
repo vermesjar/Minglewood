@@ -613,7 +613,8 @@ function drawGesture(P: Pix, F: Frame, [x, y]: [number, number], skin: RGB) {
 
 /**
  * Seated and seen from behind, the legs run away from us on the far side of the body: the thighs show, out along the
- * seat, and nothing below the knee (a backless bench or stool must not show feet dangling toward the camera).
+ * seat, no shin (a backless bench or stool must not show feet dangling toward the camera), and on a long seat a shoe
+ * just past each knee, under the thigh (avatarFrame seatedLegs).
  */
 export const seatedFromBehind = (F: Frame) => F.sitting && F.view === 'back';
 
@@ -628,7 +629,8 @@ function drawLegs(P: Pix, F: Frame, L: FullLoadout) {
     [F.legNear, false],
   ] as const) {
     const shade = far ? 0.35 : 0;
-    limb(P, leg.a, leg.m, leg.b, 2.7, 2.4, skin, shade);
+    // (from behind, a seated leg ends at the knee; its shoe is past it, under the thigh)
+    limb(P, leg.a, leg.m, seatedFromBehind(F) ? leg.m : leg.b, 2.7, 2.4, skin, shade);
     if (skirt) continue;
     const pm = M().capsule(leg.a[0], leg.a[1], leg.m[0], leg.m[1], r);
     if (seatedFromBehind(F)) {
@@ -774,7 +776,8 @@ function drawLowerGarment(P: Pix, F: Frame, L: FullLoadout) {
 }
 
 function drawShoes(P: Pix, F: Frame, L: FullLoadout) {
-  if (seatedFromBehind(F)) return;
+  // seated and seen from behind, only a whole thigh has feet past it (a stub stops at the knee: avatarFrame seatedLegs)
+  if (seatedFromBehind(F) && F.legNear.b[0] === F.legNear.m[0] && F.legNear.b[1] === F.legNear.m[1]) return;
   const kind = L.shoes.replace('shoes.', '');
   const c = hx(L.shoesColor);
   const front = F.view === 'front';
@@ -1264,10 +1267,14 @@ export function drawAvatarV2(input: AvatarLoadout, view: View, requested: Pose, 
   // (a balloon or umbrella still shows above it).
   on(LAYER.held);
   if (!F.holdInFront || L.held === 'held.balloon') drawHeld(P, F, L);
+  // seated and seen from behind, the feet are out past the knees: the thighs go over them
+  const feetUnder = seatedFromBehind(F);
+  on(LAYER.shoes);
+  if (feetUnder) drawShoes(P, F, L);
   on(LAYER.legs);
   drawLegs(P, F, L);
   on(LAYER.shoes);
-  drawShoes(P, F, L);
+  if (!feetUnder) drawShoes(P, F, L);
   on(LAYER.torso);
   drawTorso(P, F, L);
   on(LAYER.head);

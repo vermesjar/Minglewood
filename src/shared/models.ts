@@ -261,9 +261,9 @@ export function wallFit(
 /* ─────────────────────────── the spec ─────────────────────────── */
 
 /**
- * The seat section is the seat standard's own SeatProfile (src/shared/world/seats.ts: seat, seatDepth, backDepth,
- * sitStyle, backrest), fitted against the drawing by scripts/seat-fit.ts. A colour variant without its own
- * borrows its family's.
+ * The seat section is the seat standard's own SeatProfile (src/shared/world/seats.ts: seat, sitStyle, backrest,
+ * arms); how people sit in it is its model's (art/seat-models.json). A colour variant without its own borrows its
+ * family's.
  */
 export interface ModelSpec extends Partial<SeatProfile> {
   // identity & catalog

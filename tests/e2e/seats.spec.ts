@@ -122,10 +122,20 @@ async function sitOn(
       what: `${name(seat)} cushion ${spot.index}: seated facing ${m.facing}, the seat faces ${spot.facing}`,
       shot,
     });
-  // clicking the seat you're on again must not move you (a fresh point: in town the camera has followed you)
+  // clicking the seat you're on again must not move you: beside you, where you're drawn (a sitter sits where the
+  // seat's drawing puts them in that facing, not always over the middle of their tile, and from behind their legs
+  // cover the cushion; a fresh point: in town the camera has followed you)
   await player.settle();
+  const drawn = await player.ev((id) => {
+    const g = (window as any).__mw;
+    const w = g.world as any;
+    const a = w.actors.get(g.meId);
+    const o = w.buildDrawOrder().find((e: any) => e.obj?.id === id)?.obj;
+    const hip = o && a?.seat ? w.hipOf(o, a.seat.spot) : null;
+    return hip ? { x: hip.x - 0.5, y: hip.y - 0.5, z: 10 } : null;
+  }, seat.id);
   await player.click(
-    (await player.objectPoint(seat.id, { x: spot.x, y: spot.y, z: 10 })) ?? target,
+    (await player.objectPoint(seat.id, drawn ?? { x: spot.x, y: spot.y, z: 10 })) ?? target,
   );
   await player.page.waitForTimeout(1500);
   const again = await player.me();

@@ -458,7 +458,7 @@ export function checkModel(
   if (e.walk === 'seat') {
     const base = key.split('.')[0];
     const profiled = e.seat !== undefined || Object.entries(family).some(([k, s]) => (k === base || k.startsWith(`${base}.`)) && s.seat !== undefined);
-    if (!profiled) out.push('a seat without a seat profile (seat height: scripts/seat-fit.ts)');
+    if (!profiled) out.push('a seat without a seat profile (seat height, sitStyle: src/shared/world/seats.ts)');
   }
 
   // the projection check: drawn in 2:1 isometric, and its views agree

@@ -148,8 +148,7 @@ export async function createApp(opts: AppOptions): Promise<App> {
   if (!config.isProd) {
     // Dev only: the Design Lab (src/client/studio.html), localhost only (routes/devLab.ts labGuard). Loaded on
     // first use and never in production; ahead of the API rate limit because its sandbox loads every sprite, and
-    // ahead of the JSON parser because its routes parse their own bodies (a seat rig's picture for the vision
-    // model is a few hundred kB).
+    // ahead of the JSON parser because its routes parse their own bodies (a reference image is a few hundred kB).
     let lab: Promise<{ guard: express.RequestHandler; router: express.Router }> | null = null;
     app.use('/api/dev/lab', (req, res, next) => {
       lab ??= import('./routes/devLab').then((m) => ({ guard: m.labGuard, router: m.devLabRoutes() }));

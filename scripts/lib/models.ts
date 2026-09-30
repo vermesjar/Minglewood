@@ -1,14 +1,14 @@
 /**
  * The seat models from Node (src/shared/world/seatModels.ts): art/seat-models.json read and written under its own
  * lock in a compact, diffable layout (one line per part), and each seat's drawings resolved exactly as the game
- * resolves them (scripts/lib/rigs.ts viewArt: its own drawing for a facing, else its partner's mirrored; small
+ * resolves them (scripts/lib/seats.ts viewArt: its own drawing for a facing, else its partner's mirrored; small
  * seats centred).
  */
 import { closeSync, existsSync, openSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import type { Facing } from '../../src/shared/world/scene';
 import { tidyModel, type SeatModel, type SeatModels } from '../../src/shared/world/seatModels';
 import type { ModelView } from '../../src/client/engine/sprites/seatModel';
-import { profileOf, viewArt, type Sprites } from './rigs';
+import { profileOf, viewArt, type Sprites } from './seats';
 
 export const MODELS_FILE = 'art/seat-models.json';
 const LOCK = 'art/.seat-models.lock';

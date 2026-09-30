@@ -253,17 +253,17 @@ function modelLayers(sp: Sprite, mv: ModelView): Array<{ cover: number | undefin
 }
 
 /**
- * What of a seat is drawn over one person (seatModel.ts overlayFor: its pixels nearer the camera than theirs), as a
- * figure-sized canvas, cached per seat view, look, facing, pose and placement — a seated person costs a lookup.
+ * Depth by proxy (the prototype): what of a piece is drawn over a person passing it (seatModel.ts overlayFor: its pixels
+ * nearer the camera than theirs), as a figure-sized canvas, cached per piece view, look, facing, pose and placement.
  */
 const overlays = new WeakMap<ModelView, Map<string, { canvas: HTMLCanvasElement | null; x0: number; y0: number }>>();
-function overlayCanvas(mv: ModelView, look: AvatarLoadout, facing: Facing, pose: Pose, feet: [number, number], lift: number, free = false, legs?: SitLegs) {
+function overlayCanvas(mv: ModelView, look: AvatarLoadout, facing: Facing, pose: Pose, feet: [number, number], lift: number, legs?: SitLegs) {
   let memo = overlays.get(mv);
   if (!memo) overlays.set(mv, (memo = new Map()));
-  const key = `${JSON.stringify(look)}|${facing}|${pose}|${feet[0]},${feet[1]}|${lift.toFixed(2)}|${free ? 1 : 0}|${legsKey(legs)}`;
+  const key = `${JSON.stringify(look)}|${facing}|${pose}|${feet[0]},${feet[1]}|${lift.toFixed(2)}|${legsKey(legs)}`;
   let hit = memo.get(key);
   if (hit) return hit;
-  const ov = overlayFor(mv, look, facing, pose, feet, lift, { free, legs });
+  const ov = overlayFor(mv, look, facing, pose, feet, lift, legs);
   let any = false;
   const img = new ImageData(FIG.w, FIG.h);
   const { px } = mv.art;
@@ -968,11 +968,11 @@ export class WorldView {
     const profile = artSeatProfile(obj);
     // (getting up to step off, the feet stay on the seat's tile until the step starts)
     const foot = this.footPoint(a, now);
-    const lift = this.modelSit(obj, s.spot)?.lift ?? sitterLift(profile, s.spot.facing);
+    const lift = this.modelSit(obj, s.spot)?.lift ?? sitterLift(profile);
     // the hip point: sitting down (or sliding along a couch), the cushion's under their feet and slides
     // with them; getting up to walk away, it stays on the seat while the feet go (else a walk that reaches
     // someone late would carry the seated figure along with it)
-    const hip = s.to > 0 ? this.hipUnder(a, obj, s.spot, foot, profile, now) : this.hipOf(obj, s.spot, profile);
+    const hip = s.to > 0 ? this.hipUnder(a, obj, s.spot, foot, now) : this.hipOf(obj, s.spot);
     // sitting down: up out of the crouch into the seat, a touch past it, and settling; getting up: lifted off
     // the cushion a touch, then down into the crouch (seats.ts sitMotion)
     const { inSeat, lift: seatLift } = sitMotion(k, s.to > s.from, lift);
@@ -1018,14 +1018,13 @@ export class WorldView {
   }
 
   /**
-   * Where a sitter's figure stands on a cushion (world tiles; the figure lifted `lift` onto it). A seat with a
-   * rig puts their hips where its drawing says (the seat rig standard): the floor point that, lifted, draws the
-   * figure's seat point on the rig's hip. A seat without one: the seat standard's inferred hip point.
+   * Where a sitter's figure stands on a cushion (world tiles; the figure lifted `lift` onto it): its model's sitting
+   * point for the facing it's drawn in (seatModels.ts viewSits: the view's own, else the standard's).
    */
-  private hipOf(obj: SceneObject, spot: { x: number; y: number; facing: Facing }, profile: SeatProfile): { x: number; y: number } {
+  private hipOf(obj: SceneObject, spot: { x: number; y: number; facing: Facing }): { x: number; y: number } {
     // a seat with a model: its cushion's sitting point, the same place in the seat whichever way it faces
     // (a seat without one — art without a model yet; the gate allows none in the catalog — takes the profile's point)
-    return this.modelSit(obj, spot)?.hip ?? sitterPoint(spot, profile);
+    return this.modelSit(obj, spot)?.hip ?? sitterPoint(spot);
   }
 
   /**
@@ -1038,16 +1037,15 @@ export class WorldView {
     obj: SceneObject,
     spot: { x: number; y: number; facing: Facing },
     foot: { x: number; y: number },
-    profile: SeatProfile,
     now: number,
   ): { x: number; y: number } {
-    const to = this.hipOf(obj, spot, profile);
+    const to = this.hipOf(obj, spot);
     let dx = to.x - (spot.x + 0.5);
     let dy = to.y - (spot.y + 0.5);
     const g = a.glide;
     const was = g ? this.seatSpotAt(g.x, g.y) : null;
     if (g && was && was.seat.id === obj.id && (was.spot.x !== spot.x || was.spot.y !== spot.y)) {
-      const from = this.hipOf(obj, { x: was.spot.x, y: was.spot.y, facing: spot.facing }, profile);
+      const from = this.hipOf(obj, { x: was.spot.x, y: was.spot.y, facing: spot.facing });
       const u = Math.min(1, Math.max(0, (now - g.start) / g.ms));
       const e = u * u * (3 - 2 * u);
       const fx = from.x - (was.spot.x + 0.5);
@@ -1090,7 +1088,7 @@ export class WorldView {
     const sitters = this.seatSitters.get(on.id) ?? [a];
     for (const layer of layers) {
       c.save();
-      // above a layer's cover, every sitter's own pixels show over it (seatRigs.ts): kept off each one's
+      // above a layer's cover, every sitter's own pixels show over it (seatLayers.ts COVER): kept off each one's
       // silhouette up there
       if (layer.cover !== undefined)
         for (const b of sitters) {
@@ -1141,8 +1139,8 @@ export class WorldView {
     if (me && mine && this.nearFigure(me, sx, sy, 2)) return mine;
     let best: { s: SeatSpot; d: number } | undefined;
     for (const s of spots) {
-      const lift = this.modelSit(o, s)?.lift ?? sitterLift(profile, s.facing);
-      const hip = this.hipOf(o, s, profile);
+      const lift = this.modelSit(o, s)?.lift ?? sitterLift(profile);
+      const hip = this.hipOf(o, s);
       const p = isoToScreen(hip.x, hip.y, lift);
       const [x, y] = this.camera.toScreen(p.x, p.y, this.vw, this.vh);
       // across the screen only: a couch's cushions sit side by side on screen whichever way it faces, and a
@@ -1865,7 +1863,7 @@ export class WorldView {
       const x0 = st.dx + nx;
       const y0 = st.dy + ny;
       const feet: [number, number] = [Math.round(((a.at?.x ?? Math.round(a.sx)) - x0) * 2), Math.round(((a.at?.y ?? Math.round(a.sy)) - y0) * 2)];
-      const o = overlayCanvas(mv, this.look(a), this.viewFacing(a), this.pose(a), feet, (a.lift ?? 0) - (st.obj.z ?? 0), true);
+      const o = overlayCanvas(mv, this.look(a), this.viewFacing(a), this.pose(a), feet, (a.lift ?? 0) - (st.obj.z ?? 0), this.legsOf(a));
       if (o.canvas) c.drawImage(o.canvas, x0 + o.x0 / 2, y0 + o.y0 / 2, FIG.w / 2, FIG.h / 2);
     }
   }

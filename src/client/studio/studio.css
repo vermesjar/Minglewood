@@ -925,54 +925,12 @@ button.ref.add {
   color: #fff;
 }
 
-/* seat calibration */
-.seat-body {
-  display: grid;
-  grid-template-columns: minmax(0, auto) minmax(0, 1fr);
-  gap: 16px;
-  align-items: start;
-}
-.seat-front canvas {
-  max-width: 100%;
-  border-radius: 8px;
-  border: 2px solid var(--ink);
-}
+/* canvases you click on */
 canvas.clickable {
   cursor: crosshair;
 }
-.seat-front p {
-  margin: 6px 0;
-  min-height: 1.2em;
-}
-.seat-views {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-.seat-views figure {
-  margin: 0;
-  padding: 6px;
-  border-radius: 8px;
-  background: var(--paper-2);
-}
-.seat-views figure canvas {
-  max-width: 100%;
-  border-radius: 6px;
-}
-.seat-views figcaption {
-  font-size: 11px;
-  margin-top: 4px;
-}
-.seat-views figure.bad figcaption {
-  color: var(--coral);
-}
-@media (max-width: 1400px) {
-  .seat-body {
-    grid-template-columns: 1fr;
-  }
-}
 
-/* the seat rig (RigPanel.tsx) */
+/* how people sit in it: the seat model (ModelPanel.tsx) */
 .rig-actions {
   display: flex;
   flex-wrap: wrap;
@@ -1008,13 +966,6 @@ canvas.clickable {
 .rig-knobs input[type='number'] {
   width: 64px;
 }
-.rig-region-cover {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 2px 6px;
-  border-left: 3px solid rgba(255, 150, 40, 0.9);
-}
 .rig-facings {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
@@ -1033,6 +984,9 @@ canvas.clickable {
 .rig-facing.bad {
   border-color: var(--coral);
 }
+.rig-facing.on {
+  box-shadow: 0 0 0 2px var(--teal);
+}
 .rig-facing figcaption {
   display: flex;
   align-items: center;
@@ -1045,86 +999,15 @@ canvas.clickable {
 }
 .rig-preview {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-end;
-  gap: 12px;
+  gap: 8px;
+  margin-bottom: 8px;
   overflow-x: auto;
 }
 .rig-preview canvas {
   border-radius: 6px;
   flex: none;
-}
-.rig-loop {
-  outline: 2px dashed var(--muted);
-}
-.rig-facing .issues {
-  margin: 4px 0 0;
-  padding-left: 16px;
-  color: var(--coral);
-  font-size: 11px;
-}
-
-/* the seat parts (PartsPanel.tsx): regions tinted by part, the palette, the previews one facing a row */
-.parts-bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 6px;
-}
-.parts-bar .seg {
-  margin-bottom: 0;
-}
-.parts-bar .dot {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  margin-left: 3px;
-  vertical-align: middle;
-}
-.parts-palette {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 4px;
-}
-.part-swatch {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 8px;
-  border: 2px solid var(--ink);
-  border-radius: 8px;
-  background: var(--paper);
-  font: inherit;
-  font-size: 12px;
-  cursor: pointer;
-}
-.part-swatch.on {
-  background: var(--sun);
-  box-shadow: var(--shadow);
-}
-.part-swatch i {
-  display: inline-block;
-  width: 12px;
-  height: 12px;
-  border-radius: 3px;
-  border: 1px solid var(--ink);
-}
-.parts-canvas:focus {
-  outline: 3px solid var(--teal);
-  outline-offset: 1px;
-}
-.copy-from {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-.copy-from select {
-  width: auto;
-}
-.parts-panel .rig-facings {
-  grid-template-columns: minmax(0, 1fr);
 }
 .rig-checks {
   list-style: none;

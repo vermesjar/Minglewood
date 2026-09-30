@@ -7,15 +7,12 @@ import type { Facing, SceneObject } from '@shared/world/scene';
 import { makeCanvas, type Sprite } from './painter';
 import { centredAnchor } from './footing';
 import { seatProfile, type SeatProfile } from '@shared/world/seats';
-import { rigForView, type SeatRig, type SeatRigs } from '@shared/world/seatRigs';
 import type { SeatModel, SeatModels } from '@shared/world/seatModels';
 import type { Drawing, ModelSpec, Rotation } from '@shared/models';
 import { WALL_PX_PER_TILE, wallFit, type Manifest as WallManifest } from '@shared/models';
 import { registerWallArt } from '@shared/world/decor';
 import type { Pixels } from '@shared/art/footing';
 import type { ArtSource } from '@shared/art/source';
-// the seat rigs, authored and audited per drawn view (src/shared/world/seatRigs.ts; scripts/seat-rig.ts)
-import RIGS_JSON from '../../../../art/seat-rigs.json';
 // the seat models: every seat's 3D proxy, shared by its four facings (src/shared/world/seatModels.ts; scripts/seat-model.ts)
 import MODELS_JSON from '../../../../art/seat-models.json';
 
@@ -86,26 +83,6 @@ function keyFor(o: SceneObject): string | null {
   if (!manifest) return null;
   if (o.variant && manifest.sprites[`${o.sprite}.${o.variant}`]) return `${o.sprite}.${o.variant}`;
   return manifest.sprites[o.sprite] ? o.sprite : null;
-}
-
-const RIGS = RIGS_JSON as unknown as SeatRigs;
-/** Review renders only (the furniture lab's before/after): draw every seat the old, inferred way. */
-let rigsOff = false;
-export function setSeatRigsEnabled(on: boolean) {
-  rigsOff = !on;
-}
-
-/**
- * How a person sits in this seat's drawing, seen facing `facing` (the seat rig standard): in the pixels of the
- * sprite the game draws for it (`sp`: mirrored with it when it's its partner's drawing mirrored), or null for a
- * seat without a rig (the renderer then falls back to inferring it). A Design Lab draft carries its own rig in
- * its sandbox manifest entry (`seatRig`).
- */
-export function artSeatRig(o: SceneObject, facing: Facing, sp: Sprite): SeatRig | null {
-  const key = keyFor(o);
-  if (rigsOff || !key || !manifest || (sp.scale ?? 1) !== 2) return null;
-  const own = (manifest.sprites[key] as ArtEntry & { seatRig?: SeatRigs[string] }).seatRig;
-  return rigForView(own ? { [key]: own } : RIGS, key, facing, { mirrored: !!sp.mirrored, width: sp.canvas.width })?.rig ?? null;
 }
 
 const MODELS = MODELS_JSON as unknown as SeatModels;
@@ -225,7 +202,7 @@ function seatProfileOf(o: SceneObject): SeatProfile {
       ? Object.entries(manifest.sprites).find(([k, e]) => (k === o.sprite || k.startsWith(`${o.sprite}.`)) && e.seat !== undefined)?.[1]
       : undefined;
   const e = own?.seat !== undefined ? own : (sibling ?? own);
-  return seatProfile(o.sprite, { seat: e?.seat, seatDepth: e?.seatDepth, backDepth: e?.backDepth, sitStyle: e?.sitStyle, backrest: e?.backrest, backLine: e?.backLine, arms: e?.arms });
+  return seatProfile(o.sprite, { seat: e?.seat, sitStyle: e?.sitStyle, backrest: e?.backrest, arms: e?.arms });
 }
 
 /** Where a lamp's light comes from, relative to the sprite's anchor, in art px (follows mirroring). */

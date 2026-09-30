@@ -1,64 +1,74 @@
 /**
- * The seat model, in the Design Lab (the seat model standard, src/shared/world/seatModels.ts): the seat's 3D proxy —
- * a few boxes and a sitting point per cushion, shared by all four facings — fitted to its drawings and tuned by eye.
- * Auto-fit seeds it (the same fitter as scripts/seat-model.ts --fit); then every box is drawn over the drawing, and
- * the selected one is tuned by its sliders or dragged on the drawing (drag moves it across the seat, shift-drag raises
- * or lowers its top), the sitting points dragged along the cushion. Every facing previews live by z-buffer, exactly as
- * the game draws it — play scale and 4×, three looks, every cushion taken, the sit-down loop — with the standard's
- * checks. The reviewer passes it once it holds in every facing; publishing waits for that (scripts/lab-model.ts), and
- * the model goes into art/seat-models.json with the piece.
+ * How people sit in it, in the Design Lab: the seat's MODEL (the seat model standard, src/shared/world/seatModels.ts)
+ * — a few 3D boxes and a sitting point per cushion, one model for all four facings — from which the game draws
+ * people in the seat (sprites/seatLayers.ts): what of it goes over them, where each one sits, how their legs lie.
+ *
+ * Auto-fit seeds it from the drawings (seatModelFit.ts fitModel: the fitter scripts/seat-model.ts --fit runs). Per
+ * facing, the drawing is shown with the model's boxes over it and what goes over its sitters tinted red: a box is
+ * tuned by its sliders or dragged on the drawing (drag moves it across the seat, shift-drag raises or lowers its top);
+ * dragging a sitting point nudges it in that view only (the model's `views`), and its sliders move the shared point
+ * in every view. Every facing previews exactly as the game draws it (seatLayers.ts composeSeat: play scale and 4×,
+ * three looks, every cushion taken) with THE check (seatLayers.ts seatProblems, the gate's). The reviewer passes it
+ * once every facing holds; publishing waits for that (scripts/lab-model.ts checks it again on the staged drawings),
+ * and the model goes into art/seat-models.json with the piece.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Facing } from '@shared/world/scene';
-import { FIG, figAx } from '@shared/world/seatRigs';
+import type { SitStyle } from '@shared/world/seats';
 import {
   behindView,
   boxEdges,
   cushionTop,
   drawingAt,
   MODEL_FACINGS,
+  modelShapeProblems,
   PART_KINDS,
   projectLocal,
   SEAT_LOOKS,
-  sitsByCushion,
   tidyModel,
+  viewSits,
   worldToLocal,
   type ModelPart,
   type PartKind,
   type SeatModel,
   type SitPoint,
 } from '@shared/world/seatModels';
-import { composeModel, modelFindings, modelSitFrames, modelSitters, type ModelSitter, type ModelView } from '../engine/sprites/seatModel';
+import { kneeV, THIGH_R } from '@shared/world/sitLegs';
+import { composeSeat, layerTiles, seatLayers, seatProblems } from '../engine/sprites/seatLayers';
+import { silhouetteFit, type ModelView } from '../engine/sprites/seatModel';
 import { fitModel, placeSits } from '../engine/sprites/seatModelFit';
-import type { Pixels } from '../engine/sprites/footing';
-import { lab, type Draft, type DraftModel, type FurnitureSpec } from './api';
-import { checker, loadImg } from './pixels';
-import { seatArt, type Drawings } from './seatLab';
-import { labProfile } from './rigLab';
-import { rigSignature } from './rigPreview';
+import type { Draft, DraftModel, FurnitureSpec } from './api';
+import { checker } from './pixels';
+import { drawingsSignature, loadDrawings, seatArt, type Drawings, type SeatArt } from './seatLab';
 
 export type ModelStatus = 'loading' | 'none' | 'stale' | 'bad' | 'unreviewed' | 'ok';
 
-const today = () => new Date().toISOString().slice(0, 10);
-const COLOUR: Record<PartKind, string> = { seat: '#5aeb78', back: '#ff50dc', arm: '#ffaa28', leg: '#5ad2ff', base: '#7882ff', wrap: '#c878ff', other: '#fff05a' };
-
-async function pixelsOf(url: string): Promise<Pixels> {
-  const img = await loadImg(url);
-  const c = document.createElement('canvas');
-  c.width = img.width;
-  c.height = img.height;
-  const g = c.getContext('2d', { willReadFrequently: true })!;
-  g.drawImage(img, 0, 0);
-  return { w: img.width, h: img.height, d: g.getImageData(0, 0, img.width, img.height).data };
+type Pt = [number, number];
+type LabView = ModelView & { mirrored: boolean };
+type Arts = Partial<Record<Facing, { art: SeatArt; mirrored: boolean }>>;
+interface FacingCheck {
+  problems: string[];
+  iou: number;
 }
 
-/** Every facing of a draft seat as the game will draw it, with a model. */
-function modelViews(drawings: Drawings, footprint: readonly [number, number], model: SeatModel, style: ModelView['style']): Partial<Record<Facing, ModelView & { mirrored: boolean }>> {
-  const out: Partial<Record<Facing, ModelView & { mirrored: boolean }>> = {};
+const today = () => new Date().toISOString().slice(0, 10);
+const COLOUR: Record<PartKind, string> = { seat: '#5aeb78', back: '#ff50dc', arm: '#ffaa28', leg: '#5ad2ff', base: '#7882ff', wrap: '#c878ff', other: '#fff05a' };
+const FLOOR = '#c9a47e';
+
+/** Every facing of a draft seat with a model, as the game will draw it. */
+function viewsOf(arts: Arts, model: SeatModel, style: SitStyle): Partial<Record<Facing, LabView>> {
+  const out: Partial<Record<Facing, LabView>> = {};
   for (const f of MODEL_FACINGS) {
-    const r = seatArt(drawings, footprint, f);
-    if (r) out[f] = { art: r.art, facing: f, model, style, mirrored: r.mirrored };
+    const a = arts[f];
+    if (a) out[f] = { art: a.art, facing: f, model, style, mirrored: a.mirrored };
   }
+  return out;
+}
+
+/** What's wrong with a model as a whole, before any facing: its shape, and its size against the piece's. */
+function modelIssues(m: SeatModel, footprint: readonly [number, number]): string[] {
+  const out = modelShapeProblems(m, Math.round(footprint[0] * footprint[1]));
+  if (m.size[0] !== footprint[0] || m.size[1] !== footprint[1]) out.push(`the model is ${m.size.join('×')}, the piece ${footprint.join('×')}: Auto-fit again`);
   return out;
 }
 
@@ -70,103 +80,122 @@ function twinOf(parts: ModelPart[], i: number, W: number): number {
   return parts.findIndex((q, k) => k !== i && q.part === p.part && near(q.u[0], W - p.u[1]) && near(q.u[1], W - p.u[0]) && near(q.v[0], p.v[0]) && near(q.v[1], p.v[1]) && near(q.z[0], p.z[0]) && near(q.z[1], p.z[1]));
 }
 
+/** A facing's own sitting points as its `views` list (one [u, v] per cushion), from what it draws now. */
+function viewList(m: SeatModel, f: Facing): Pt[] {
+  return m.views?.[f]?.map((q) => [q[0], q[1]] as Pt) ?? viewSits(m, f).map((s, i): Pt => (s ? [s[0], s[1]] : [m.sits[i]?.[0] ?? 0.5, m.sits[i]?.[1] ?? 0.5]));
+}
+
+/** A model without a facing's own sitting points (`views`) or traced over layer (`over`). */
+function withoutView(m: SeatModel, f: Facing, field: 'views' | 'over'): SeatModel {
+  const out: SeatModel = { ...m };
+  if (field === 'views') {
+    const rest = { ...m.views };
+    delete rest[f];
+    if (Object.keys(rest).length) out.views = rest;
+    else delete out.views;
+  } else {
+    const rest = { ...m.over };
+    delete rest[f];
+    if (Object.keys(rest).length) out.over = rest;
+    else delete out.over;
+  }
+  return out;
+}
+
 /* ------------------------------------------------------------------ preview */
 
-function boundsOf(v: ModelView, sets: ModelSitter[][]) {
-  let l = 0;
-  let t = 0;
-  let r = v.art.px.w;
-  let b = v.art.px.h;
-  for (const s of sets.flat()) {
-    const x0 = s.feet[0] - figAx(s.facing);
-    l = Math.min(l, x0 + 16);
-    r = Math.max(r, x0 + FIG.w - 16);
-    t = Math.min(t, s.feet[1] - FIG.feet + 22);
-    b = Math.max(b, s.feet[1] - FIG.feet + FIG.h - 4);
-  }
-  return { l: l - 4, t: t - 4, r: r + 4, b: b + 4 };
+/**
+ * A seat with someone on every cushion, as the game draws it (composeSeat), once per look: the three pictures cropped
+ * alike (to what any of them covers) on the floor's colour, one drawing px per canvas px.
+ */
+function seatCells(v: ModelView): HTMLCanvasElement[] {
+  const n = layerTiles(v).length;
+  const comps = SEAT_LOOKS.map((_, k) => composeSeat(v, Array.from({ length: n }, (_, c) => ({ look: SEAT_LOOKS[(k + c) % SEAT_LOOKS.length], cushion: c }))).px);
+  const { w, h } = comps[0];
+  let l = w;
+  let t = h;
+  let r = -1;
+  let b = -1;
+  for (const p of comps)
+    for (let y = 0; y < h; y++)
+      for (let x = 0; x < w; x++)
+        if (p.d[(y * w + x) * 4 + 3]) {
+          l = Math.min(l, x);
+          r = Math.max(r, x);
+          t = Math.min(t, y);
+          b = Math.max(b, y);
+        }
+  if (r < 0) return [];
+  l = Math.max(0, l - 4);
+  t = Math.max(0, t - 4);
+  r = Math.min(w - 1, r + 4);
+  b = Math.min(h - 1, b + 4);
+  return comps.map((p) => {
+    const tmp = document.createElement('canvas');
+    tmp.width = w;
+    tmp.height = h;
+    tmp.getContext('2d')!.putImageData(new ImageData(new Uint8ClampedArray(p.d), w, h), 0, 0);
+    const c = document.createElement('canvas');
+    c.width = r - l + 1;
+    c.height = b - t + 1;
+    const g = c.getContext('2d')!;
+    g.fillStyle = FLOOR;
+    g.fillRect(0, 0, c.width, c.height);
+    g.drawImage(tmp, l, t, c.width, c.height, 0, 0, c.width, c.height);
+    return c;
+  });
 }
 
-function cellCanvas(v: ModelView, sitters: ModelSitter[], box: ReturnType<typeof boundsOf>): HTMLCanvasElement {
-  const W = box.r - box.l;
-  const H = box.b - box.t;
-  const comp = composeModel(v, sitters, { size: [W, H], origin: [-box.l, -box.t] });
-  const c = document.createElement('canvas');
-  c.width = W;
-  c.height = H;
-  const g = c.getContext('2d')!;
-  g.fillStyle = '#c9a47e';
-  g.fillRect(0, 0, W, H);
-  const tmp = document.createElement('canvas');
-  tmp.width = W;
-  tmp.height = H;
-  tmp.getContext('2d')!.putImageData(new ImageData(new Uint8ClampedArray(comp.cell.d), W, H), 0, 0);
-  g.drawImage(tmp, 0, 0);
-  return c;
+/** A picture at a whole-pixel scale, crisp. */
+function Pix({ src, scale }: { src: HTMLCanvasElement; scale: number }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const c = ref.current;
+    if (!c) return;
+    c.width = src.width * scale;
+    c.height = src.height * scale;
+    const g = c.getContext('2d')!;
+    g.imageSmoothingEnabled = false;
+    g.drawImage(src, 0, 0, c.width, c.height);
+  }, [src, scale]);
+  return <canvas ref={ref} />;
 }
 
-/** One facing, by z-buffer as the game draws it: three looks at play scale and 4×, and the sit-down loop. */
-function FacingPreview({ v, problems, iou, mirrored }: { v: ModelView; problems: string[]; iou: number; mirrored: boolean }) {
-  const still = useRef<HTMLCanvasElement>(null);
-  const loop = useRef<HTMLCanvasElement>(null);
-  const frames = useMemo(() => {
-    const sets = SEAT_LOOKS.map((_, k) => modelSitters(v, SEAT_LOOKS, k));
-    const moves = modelSitFrames(v, SEAT_LOOKS[0]);
-    const box = boundsOf(v, [...sets, moves]);
-    const others = modelSitters(v, SEAT_LOOKS, 1).slice(1);
-    return { cells: sets.map((s) => cellCanvas(v, s, box)), film: moves.map((m) => cellCanvas(v, [m, ...others], box)) };
-  }, [v]);
-  useEffect(() => {
-    const c = still.current;
-    if (!c || !frames.cells.length) return;
-    const { cells } = frames;
-    const cw = cells[0].width;
-    const ch = cells[0].height;
-    c.width = cw * 2 * 3 + 8 * 2;
-    c.height = ch + 8 + ch * 2;
-    const g = c.getContext('2d')!;
-    g.imageSmoothingEnabled = false;
-    g.clearRect(0, 0, c.width, c.height);
-    cells.forEach((cell, i) => g.drawImage(cell, i * (cw + 8), 0));
-    cells.forEach((cell, i) => g.drawImage(cell, i * (cw * 2 + 8), ch + 8, cw * 2, ch * 2));
-  }, [frames]);
-  useEffect(() => {
-    const c = loop.current;
-    const { film } = frames;
-    if (!c || !film.length) return;
-    c.width = film[0].width * 2;
-    c.height = film[0].height * 2;
-    const g = c.getContext('2d')!;
-    g.imageSmoothingEnabled = false;
-    let i = 0;
-    let t: ReturnType<typeof setTimeout>;
-    const draw = () => {
-      const k = i % film.length;
-      g.drawImage(film[k], 0, 0, c.width, c.height);
-      i++;
-      t = setTimeout(draw, k === 6 ? 900 : k === 0 || k === film.length - 1 ? 500 : 160);
-    };
-    draw();
-    return () => clearTimeout(t);
-  }, [frames]);
+/** One facing as the game draws it: three looks, every cushion taken, at play scale and 4×, and its check. */
+function FacingPreview({ v, check, on, onPick }: { v: LabView; check: FacingCheck; on: boolean; onPick: () => void }) {
+  const cells = useMemo(() => seatCells(v), [v]);
+  const { problems } = check;
   return (
-    <figure className={`rig-facing ${problems.length ? 'bad' : 'good'}`}>
+    <figure className={`rig-facing ${problems.length ? 'bad' : 'good'} ${on ? 'on' : ''}`} data-facing={v.facing}>
       <figcaption>
         <b>{v.facing}</b> {behindView(v.facing) ? 'from behind' : 'from the front'}
-        {mirrored && <span className="muted"> · drawing mirrored</span>}
-        <span className="muted"> · IoU {iou.toFixed(3)}</span>
+        {v.mirrored && <span className="muted"> · drawing mirrored</span>}
+        {v.model.views?.[v.facing] && <span className="muted"> · sitting points nudged here</span>}
+        {v.model.over?.[v.facing] && <span className="muted"> · over layer traced</span>}
+        <button className="btn ghost small tick" disabled={on} onClick={onPick}>
+          {on ? 'editing' : 'edit this view'}
+        </button>
       </figcaption>
-      <div className="rig-preview">
-        <canvas ref={still} />
-        <canvas ref={loop} className="rig-loop" title="sit down, sit, stand up" />
+      {/* play scale (one drawing px per screen px: the game at zoom 2), then 4× */}
+      <div className="rig-preview" title="play scale">
+        {cells.map((c, i) => (
+          <Pix key={i} src={c} scale={1} />
+        ))}
       </div>
-      {problems.length > 0 && (
-        <ul className="issues">
-          {problems.slice(0, 6).map((p) => (
-            <li key={p}>{p}</li>
-          ))}
-        </ul>
-      )}
+      <div className="rig-preview" title="4×">
+        {cells.map((c, i) => (
+          <Pix key={i} src={c} scale={2} />
+        ))}
+      </div>
+      <ul className="rig-checks">
+        {problems.slice(0, 6).map((p) => (
+          <li key={p} className="bad">
+            {p}
+          </li>
+        ))}
+        {problems.length > 6 && <li className="bad">…and {problems.length - 6} more</li>}
+        {!problems.length && <li className="good">holds: fits the drawing (IoU {check.iou.toFixed(3)}), a sitting point on every cushion, the legs clear of the seat and the floor</li>}
+      </ul>
     </figure>
   );
 }
@@ -184,54 +213,78 @@ function Knob({ label, value, min, max, step, onChange }: { label: string; value
 
 /* ------------------------------------------------------------------ the panel */
 
+interface Drag {
+  kind: 'box' | 'sit';
+  /** The part, or the cushion (seatSpots order). */
+  i: number;
+  from: Pt;
+  start: SeatModel;
+  shift: boolean;
+  /** A sitting point: from the pointer to the point as grabbed (drawing px), and the height it's dragged at. */
+  grab?: Pt;
+  z?: number;
+}
+
 export function ModelPanel({ draft, onPatch, onStatus }: { draft: Draft; onPatch: (p: Partial<FurnitureSpec>) => void; onStatus: (s: ModelStatus) => void }) {
   const f = draft.furniture!;
-  const sig = rigSignature(draft);
-  const [drawings, setDrawings] = useState<Drawings | null>(null);
+  const sig = drawingsSignature(draft);
+  const style = f.sitStyle as SitStyle;
+  const [loaded, setLoaded] = useState<{ sig: string; drawings: Drawings } | null>(null);
   const [sel, setSel] = useState<Facing>('se');
   const [part, setPart] = useState(0);
   const [symmetric, setSymmetric] = useState(true);
+  const [showOver, setShowOver] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
-  const [drag, setDrag] = useState<{ kind: 'box' | 'sit'; i: number; from: [number, number]; start: SeatModel; shift: boolean } | null>(null);
+  const [drag, setDrag] = useState<Drag | null>(null);
   const [live, setLive] = useState<SeatModel | null>(null);
   const editor = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     let on = true;
-    setDrawings(null);
-    void (async () => {
-      const out: Drawings = {};
-      for (const [name, v] of Object.entries(draft.views)) {
-        if (!v.file) continue;
-        const px = await pixelsOf(lab.fileUrl(draft.id, v.file, String(v.take)));
-        out[name as keyof Drawings] = { px, anchor: [(v.anchor?.[0] ?? 0) + (v.nudge?.[0] ?? 0), (v.anchor?.[1] ?? 0) + (v.nudge?.[1] ?? 0)] };
-      }
-      if (on) setDrawings(out);
-    })();
+    void loadDrawings(draft).then((drawings) => on && setLoaded({ sig, drawings }));
     return () => {
       on = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft.id, sig]);
+  const drawings = loaded?.sig === sig ? loaded.drawings : null;
 
-  const profile = labProfile(draft.key, f);
-  const stale = !!f.seatModel && f.seatModel.for !== sig;
-  const stored: DraftModel | null = f.seatModel && !stale ? f.seatModel : null;
+  // each facing's drawing as the game places it (stable while the drawings are: the layers are cached on its pixels)
+  const arts = useMemo(() => {
+    const out: Arts = {};
+    if (drawings) for (const g of MODEL_FACINGS) out[g] = seatArt(drawings, f.footprint, g) ?? undefined;
+    return out;
+  }, [drawings, f.footprint]);
+
+  const stored: DraftModel | null = f.seatModel ?? null;
+  const stale = !!stored && stored.for !== sig;
   // while dragging, the model being dragged; else the stored one
   const model = live ?? stored?.model ?? null;
   const W = f.footprint[0];
-  const views = useMemo(() => (drawings && model ? modelViews(drawings, f.footprint, model, profile.sitStyle) : {}), [drawings, model, f.footprint, profile.sitStyle]);
-  const findings = useMemo(() => {
-    const out: Partial<Record<Facing, ReturnType<typeof modelFindings>>> = {};
-    if (!live) for (const g of MODEL_FACINGS) if (views[g]) out[g] = modelFindings(views[g]!, SEAT_LOOKS);
+  const issues = useMemo(() => (stored ? modelIssues(stored.model, f.footprint) : []), [stored, f.footprint]);
+  // what's checked and previewed: the stored model (a drag checks once it's dropped)
+  const settled = useMemo(() => (stored && !issues.length ? viewsOf(arts, stored.model, style) : {}), [arts, stored, issues, style]);
+  const checks = useMemo(() => {
+    const out: Partial<Record<Facing, FacingCheck>> = {};
+    for (const g of MODEL_FACINGS) {
+      const v = settled[g];
+      if (v) out[g] = { problems: seatProblems(v), iou: silhouetteFit(v).iou };
+    }
     return out;
-  }, [views, live]);
-  const anyBad = MODEL_FACINGS.some((g) => (findings[g]?.problems.length ?? 0) > 0);
-  const status: ModelStatus = !drawings ? 'loading' : stale ? 'stale' : !stored ? 'none' : anyBad ? 'bad' : !stored.reviewed ? 'unreviewed' : 'ok';
+  }, [settled]);
+  const badFacings = MODEL_FACINGS.filter((g) => (checks[g]?.problems.length ?? 0) > 0);
+  const anyBad = issues.length > 0 || badFacings.length > 0;
+  const status: ModelStatus = !drawings ? 'loading' : !stored ? 'none' : stale ? 'stale' : anyBad ? 'bad' : !stored.reviewed ? 'unreviewed' : 'ok';
   useEffect(() => onStatus(status), [status, onStatus]);
 
-  /** Store a model: a changed model is no longer passed. */
+  /** Store a model, made on these drawings: a changed model is no longer passed. */
   const save = (m: SeatModel, reviewed?: string) => onPatch({ seatModel: { model: tidyModel(m), for: sig, ...(reviewed ? { reviewed } : {}) } });
+
+  // the drawings changed (a redraw, a nudge): the model is checked on the new ones, and passed again
+  useEffect(() => {
+    if (drawings && stored && stale) save(stored.model);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drawings, stale]);
 
   /** Change a part (and, keeping the model symmetric, its twin mirrored; a centred part stays centred). */
   function changed(m: SeatModel, i: number, next: ModelPart): SeatModel {
@@ -248,13 +301,13 @@ export function ModelPanel({ draft, onPatch, onStatus }: { draft: Draft; onPatch
   }
 
   async function autoFit() {
-    if (!drawings) return;
-    setBusy('Fitting the proxy to every facing…');
+    setBusy('Fitting the model to every facing…');
     await new Promise((r) => setTimeout(r, 30));
     try {
-      const fitViews = MODEL_FACINGS.map((g) => ({ facing: g, art: seatArt(drawings, f.footprint, g)?.art })).filter((v): v is { facing: Facing; art: NonNullable<typeof v.art> } => !!v.art);
-      const r = fitModel({ key: draft.key, size: [f.footprint[0], f.footprint[1]], seat: profile.seat, style: profile.sitStyle, backrest: profile.backrest, arms: !!profile.arms, views: fitViews }, undefined, { shakes: 24 });
-      save(r.model);
+      const views = MODEL_FACINGS.flatMap((g) => (arts[g] ? [{ facing: g, art: arts[g]!.art }] : []));
+      if (!views.length) return;
+      const r = fitModel({ key: draft.key, size: [f.footprint[0], f.footprint[1]], seat: f.seat ?? 12, style, backrest: f.backrest, arms: !!f.arms, views }, undefined, { shakes: 24 });
+      save({ ...r.model, fitted: today() });
       setPart(0);
     } finally {
       setBusy(null);
@@ -263,28 +316,39 @@ export function ModelPanel({ draft, onPatch, onStatus }: { draft: Draft; onPatch
 
   /* -------------------------------------------------------------- the editor canvas */
 
-  const cur = views[sel];
+  const cur = useMemo(() => (model && !modelIssues(model, f.footprint).length ? (viewsOf(arts, model, style)[sel] ?? null) : null), [arts, model, style, sel, f.footprint]);
+  const layers = useMemo(() => (cur ? seatLayers(cur) : null), [cur]);
   const Z = cur ? Math.max(4, Math.min(8, Math.floor(Math.min(560 / cur.art.px.w, 520 / cur.art.px.h)))) : 6;
   const PAD = 12;
   useEffect(() => {
     const c = editor.current;
-    if (!c || !cur || !model) return;
+    if (!c || !cur || !layers) return;
+    const m = cur.model;
     const { px, ax, ay } = cur.art;
     c.width = px.w * Z + 2 * PAD;
     c.height = px.h * Z + 2 * PAD;
     const g = c.getContext('2d')!;
     g.imageSmoothingEnabled = false;
     checker(g, c.width, c.height, Z);
+    // the drawing, what goes over its sitters tinted red (the gate's sheet: scripts/seat-layers.ts)
+    const d = new Uint8ClampedArray(px.d);
+    if (showOver)
+      for (let i = 0; i < layers.over.length; i++)
+        if (layers.over[i]) {
+          d[i * 4] = Math.round(d[i * 4] * 0.45 + 255 * 0.55);
+          d[i * 4 + 1] = Math.round(d[i * 4 + 1] * 0.45 + 40 * 0.55);
+          d[i * 4 + 2] = Math.round(d[i * 4 + 2] * 0.45 + 60 * 0.55);
+        }
     const tmp = document.createElement('canvas');
     tmp.width = px.w;
     tmp.height = px.h;
-    tmp.getContext('2d')!.putImageData(new ImageData(new Uint8ClampedArray(px.d), px.w, px.h), 0, 0);
+    tmp.getContext('2d')!.putImageData(new ImageData(d, px.w, px.h), 0, 0);
     g.drawImage(tmp, PAD, PAD, px.w * Z, px.h * Z);
     const X = (x: number) => PAD + x * Z;
     const Y = (y: number) => PAD + y * Z;
-    model.parts.forEach((p, k) => {
+    m.parts.forEach((p, k) => {
       g.strokeStyle = COLOUR[p.part];
-      for (const e of boxEdges([ax, ay], model.size, sel, p)) {
+      for (const e of boxEdges([ax, ay], m.size, sel, p)) {
         g.lineWidth = k === part ? 3 : e.hidden ? 1 : 2;
         g.setLineDash(e.hidden ? [4, 4] : []);
         g.beginPath();
@@ -294,45 +358,68 @@ export function ModelPanel({ draft, onPatch, onStatus }: { draft: Draft; onPatch
       }
       g.setLineDash([]);
       // the handle: the middle of its top face
-      const [hx, hy] = projectLocal([ax, ay], model.size, sel, (p.u[0] + p.u[1]) / 2, (p.v[0] + p.v[1]) / 2, p.z[1]);
+      const [hx, hy] = projectLocal([ax, ay], m.size, sel, (p.u[0] + p.u[1]) / 2, (p.v[0] + p.v[1]) / 2, p.z[1]);
+      const s = k === part ? 6 : 4;
       g.fillStyle = COLOUR[p.part];
-      g.fillRect(X(hx) - (k === part ? 6 : 4), Y(hy) - (k === part ? 6 : 4), k === part ? 12 : 8, k === part ? 12 : 8);
+      g.fillRect(X(hx) - s, Y(hy) - s, s * 2, s * 2);
       g.fillStyle = '#000';
       g.font = '11px sans-serif';
       g.fillText(String(k), X(hx) - 3, Y(hy) + 4);
     });
-    sitsByCushion(model, sel).forEach((s, i) => {
-      if (!s) return;
-      const [hx, hy] = projectLocal([ax, ay], model.size, sel, s[0], s[1], s[2]);
-      g.strokeStyle = '#ffe628';
+    // each cushion's sitter as this view draws them: the hips (the sitting point: yellow, orange when nudged in this
+    // view), the knees and the feet
+    const nudged = !!m.views?.[sel];
+    const dot = ([x, y]: Pt, colour: string) => {
+      g.fillStyle = '#14101c';
+      g.fillRect(X(x) - 4, Y(y) - 4, 9, 9);
+      g.fillStyle = colour;
+      g.fillRect(X(x) - 3, Y(y) - 3, 7, 7);
+    };
+    layers.sits.forEach((s, i) => {
+      const hip = layers.hips[i];
+      const legs = layers.legs[i];
+      if (!s || !hip) return;
+      if (legs) {
+        const kv = kneeV(s, legs);
+        const kz = s[2] + THIGH_R + legs.rise;
+        dot(projectLocal([ax, ay], m.size, sel, s[0], kv, kz), '#fadc3c');
+        dot(projectLocal([ax, ay], m.size, sel, s[0], kv - legs.toe, kz - legs.drop), '#46dcfa');
+      }
+      const colour = nudged ? '#ff9a3c' : '#ffe628';
+      g.strokeStyle = '#14101c';
+      g.lineWidth = 5;
+      const cross = () => {
+        g.beginPath();
+        g.moveTo(X(hip[0]) - 12, Y(hip[1]));
+        g.lineTo(X(hip[0]) + 12, Y(hip[1]));
+        g.moveTo(X(hip[0]), Y(hip[1]) - 12);
+        g.lineTo(X(hip[0]), Y(hip[1]) + 12);
+        g.stroke();
+      };
+      cross();
+      g.strokeStyle = colour;
       g.lineWidth = 3;
-      g.beginPath();
-      g.moveTo(X(hx) - 12, Y(hy));
-      g.lineTo(X(hx) + 12, Y(hy));
-      g.moveTo(X(hx), Y(hy) - 12);
-      g.lineTo(X(hx), Y(hy) + 12);
-      g.stroke();
-      g.fillStyle = '#ffe628';
-      g.fillText(`S${i}`, X(hx) + 6, Y(hy) + 14);
+      cross();
+      g.fillStyle = colour;
+      g.font = 'bold 12px sans-serif';
+      g.fillText(`S${i}`, X(hip[0]) + 6, Y(hip[1]) + 16);
     });
-  }, [cur, model, sel, part, Z]);
+  }, [cur, layers, sel, part, Z, showOver]);
 
-  const at = (e: React.MouseEvent<HTMLCanvasElement>): [number, number] => {
+  const at = (e: React.MouseEvent<HTMLCanvasElement>): Pt => {
     const r = e.currentTarget.getBoundingClientRect();
     const k = e.currentTarget.width / r.width;
     return [((e.clientX - r.left) * k - PAD) / Z, ((e.clientY - r.top) * k - PAD) / Z];
   };
   function down(e: React.MouseEvent<HTMLCanvasElement>) {
-    if (!cur || !model) return;
+    if (!cur || !layers || !model) return;
     const p = at(e);
     const { ax, ay } = cur.art;
-    // the nearest handle within 8 drawing px: a sitting point, else a box's top
+    // the nearest handle within 8 drawing px: a sitting point as this view draws it, else a box's top
     let best: { kind: 'box' | 'sit'; i: number; d: number } | null = null;
-    sitsByCushion(model, sel).forEach((s) => {
-      if (!s) return;
-      const [hx, hy] = projectLocal([ax, ay], model.size, sel, s[0], s[1], s[2]);
-      const d = Math.hypot(hx - p[0], hy - p[1]);
-      const i = model.sits.indexOf(s);
+    layers.hips.forEach((h, i) => {
+      if (!h) return;
+      const d = Math.hypot(h[0] - p[0], h[1] - p[1]);
       if (d < 8 && (!best || d < best.d)) best = { kind: 'sit', i, d };
     });
     model.parts.forEach((q, i) => {
@@ -342,8 +429,13 @@ export function ModelPanel({ draft, onPatch, onStatus }: { draft: Draft; onPatch
     });
     const b = best as { kind: 'box' | 'sit'; i: number; d: number } | null;
     if (!b) return;
-    if (b.kind === 'box') setPart(b.i);
-    setDrag({ kind: b.kind, i: b.i, from: p, start: model, shift: e.shiftKey });
+    if (b.kind === 'box') {
+      setPart(b.i);
+      setDrag({ kind: 'box', i: b.i, from: p, start: model, shift: e.shiftKey });
+      return;
+    }
+    const h = layers.hips[b.i]!;
+    setDrag({ kind: 'sit', i: b.i, from: p, start: model, shift: false, grab: [h[0] - p[0], h[1] - p[1]], z: layers.sits[b.i]![2] });
   }
   function move(e: React.MouseEvent<HTMLCanvasElement>) {
     if (!drag || !cur) return;
@@ -351,13 +443,12 @@ export function ModelPanel({ draft, onPatch, onStatus }: { draft: Draft; onPatch
     const { ax, ay } = cur.art;
     const m = drag.start;
     if (drag.kind === 'sit') {
-      // along the cushion: the point under the pointer at the cushion's height
-      const s = m.sits[drag.i];
-      const w = drawingAt([ax, ay], p[0], p[1], s[2]);
+      // a nudge in this view only: the point under the pointer at the cushion's height becomes this view's own
+      const w = drawingAt([ax, ay], p[0] + drag.grab![0], p[1] + drag.grab![1], drag.z!);
       const l = worldToLocal(m.size, sel, w.x, w.y);
-      const z = cushionTop(m, l.u, l.v) ?? s[2];
-      const sits = m.sits.map((q, k) => (k === drag.i ? ([l.u, l.v, z] as SitPoint) : q));
-      setLive({ ...m, sits });
+      const list = viewList(m, sel);
+      list[drag.i] = [l.u, l.v];
+      setLive({ ...m, views: { ...(m.views ?? {}), [sel]: list } });
       return;
     }
     const q = m.parts[drag.i];
@@ -368,8 +459,10 @@ export function ModelPanel({ draft, onPatch, onStatus }: { draft: Draft; onPatch
       return;
     }
     // across the seat: on the plane of its top
-    const a = worldToLocal(m.size, sel, drawingAt([ax, ay], drag.from[0], drag.from[1], q.z[1]).x, drawingAt([ax, ay], drag.from[0], drag.from[1], q.z[1]).y);
-    const b = worldToLocal(m.size, sel, drawingAt([ax, ay], p[0], p[1], q.z[1]).x, drawingAt([ax, ay], p[0], p[1], q.z[1]).y);
+    const A = drawingAt([ax, ay], drag.from[0], drag.from[1], q.z[1]);
+    const B = drawingAt([ax, ay], p[0], p[1], q.z[1]);
+    const a = worldToLocal(m.size, sel, A.x, A.y);
+    const b = worldToLocal(m.size, sel, B.x, B.y);
     const du = b.u - a.u;
     const dv = b.v - a.v;
     setLive(changed(m, drag.i, { ...q, u: [q.u[0] + du, q.u[1] + du], v: [q.v[0] + dv, q.v[1] + dv] }));
@@ -386,54 +479,87 @@ export function ModelPanel({ draft, onPatch, onStatus }: { draft: Draft; onPatch
       : status === 'loading'
         ? ['', 'loading…']
         : status === 'stale'
-          ? ['bad', 'the drawings changed: fit again']
+          ? ['soft', 'the drawings changed: checking it on the new ones']
           : status === 'none'
             ? ['bad', 'no model: press Auto-fit']
             : status === 'bad'
-              ? ['bad', `${MODEL_FACINGS.filter((g) => (findings[g]?.problems.length ?? 0) > 0).length} facing(s) break the standard`]
+              ? ['bad', issues.length ? 'the model doesn’t fit the piece' : `${badFacings.length} facing(s) don’t hold`]
               : ['soft', 'holds in every facing: the reviewer passes it'];
   const cp = model?.parts[part];
+  const facings = MODEL_FACINGS.filter((g) => arts[g]);
 
   return (
     <section className="lab-card rig-panel">
       <header className="card-head">
         <h3>How people sit in it</h3>
         <span className={`chip ${chip[0]}`}>{chip[1]}</span>
-        <span className="muted">the seat model: its shape in 3D, one for all four facings, and where each cushion is sat on</span>
+        <span className="muted">its 3D model: a few boxes and a sitting point per cushion, one for all four facings. The game draws people in the seat from it</span>
       </header>
       <div className="rig-actions">
-        <button className="btn primary small" disabled={!drawings || !!busy} onClick={() => void autoFit()}>
+        <button className="btn primary small" disabled={!drawings || !!busy} onClick={() => void autoFit()} title="the fitter: the family's boxes fitted to every facing's silhouette, the cushion at the seat height set in the spec; a fresh fit drops every view's nudges and traced layers">
           {busy ? 'Fitting…' : stored ? 'Auto-fit again' : 'Auto-fit'}
         </button>
-        <button className="btn ghost small" disabled={!stored || anyBad || !!stored.reviewed} onClick={() => stored && save(stored.model, today())} title="the reviewer: every facing read at play scale and 4×, and it reads right">
-          {stored?.reviewed ? `Passed ${stored.reviewed}` : 'Pass it (reviewer)'}
+        <button
+          className="btn ghost small"
+          disabled={status !== 'unreviewed'}
+          onClick={() => stored && save(stored.model, today())}
+          title="the reviewer: every facing read at play scale and 4×, and tried in the room below (sit down, sit, stand up), and it reads right"
+        >
+          {stored?.reviewed && !stale ? `Passed ${stored.reviewed}` : 'Pass it (reviewer)'}
         </button>
         <label className="check small">
           <input type="checkbox" checked={symmetric} onChange={(e) => setSymmetric(e.target.checked)} /> keep it mirror-symmetric
+        </label>
+        <label className="check small">
+          <input type="checkbox" checked={showOver} onChange={(e) => setShowOver(e.target.checked)} /> tint what goes over the sitters
         </label>
         {busy && <span className="muted small">{busy}</span>}
       </div>
       {!drawings ? (
         <div className="lab-empty small">loading the drawings…</div>
       ) : !model ? (
-        <div className="lab-empty small">{stale ? 'The drawings changed since the model was fitted: Auto-fit again.' : 'No model yet: press Auto-fit to seed one from the drawings.'}</div>
+        <div className="lab-empty small">No model yet: press Auto-fit to seed one from the drawings (it starts from the seat height, how it’s sat in, the backrest and the arms set in the spec).</div>
       ) : (
         <div className="rig-body">
+          {issues.length > 0 && (
+            <ul className="rig-checks">
+              {issues.map((p) => (
+                <li key={p} className="bad">
+                  {p}
+                </li>
+              ))}
+            </ul>
+          )}
           <div className="rig-edit">
             <div className="seg">
-              {MODEL_FACINGS.filter((g) => views[g]).map((g) => (
+              {facings.map((g) => (
                 <button key={g} className={g === sel ? 'on' : ''} onClick={() => setSel(g)}>
                   {g} {behindView(g) ? '(behind)' : '(front)'}
+                  {checks[g] ? (checks[g]!.problems.length ? ' ✗' : ' ✓') : ''}
                 </button>
               ))}
             </div>
             <canvas ref={editor} className="clickable rig-canvas" onMouseDown={down} onMouseMove={move} onMouseUp={up} onMouseLeave={up} />
             <p className="small muted">
-              Drag a box&apos;s square to move it across the seat; shift-drag to raise or lower its top. Drag a yellow sitting point along the cushion. Colours: seat green, back magenta, arm orange, leg blue, base violet, wrap purple; dashed
-              edges are hidden.
+              Red: what of the seat is drawn over the people in it. Drag a box&apos;s square to move it across the seat; shift-drag to raise or lower its top. Drag a sitting point (the cross) to nudge where people sit in this view only;
+              its sliders below move it in every view. Yellow and blue squares: the knees and the feet. Box colours: seat green, back magenta, arm orange, leg blue, base violet, wrap purple; dashed edges are hidden.
             </p>
+            <div className="rig-actions">
+              {model.views?.[sel] ? (
+                <button className="btn ghost small" onClick={() => save(withoutView(model, sel, 'views'))} title="this view draws its sitters where the model's sitting points put them again">
+                  Clear this view&apos;s nudge
+                </button>
+              ) : (
+                <span className="muted small">{sel}: sitting points as the model puts them (no nudge)</span>
+              )}
+              {model.over?.[sel] && (
+                <button className="btn ghost small" onClick={() => save(withoutView(model, sel, 'over'))} title="its over layer was traced by eye; without it the model's parts decide what goes over the sitters">
+                  Use the parts for what goes over them ({model.over[sel]!.length} traced shape{model.over[sel]!.length > 1 ? 's' : ''})
+                </button>
+              )}
+            </div>
             <div className="rig-knobs" style={{ display: 'grid', gap: 4 }}>
-              <div className="seg">
+              <div className="seg" style={{ flexWrap: 'wrap' }}>
                 {model.parts.map((p, k) => (
                   <button key={k} className={k === part ? 'on' : ''} onClick={() => setPart(k)} style={{ borderColor: COLOUR[p.part] }} title={`${p.part}: u ${p.u.join('–')}, v ${p.v.join('–')}, z ${p.z.join('–')}`}>
                     {k} {p.part}
@@ -482,14 +608,14 @@ export function ModelPanel({ draft, onPatch, onStatus }: { draft: Draft; onPatch
               )}
               <button
                 className="btn ghost small"
-                title="the standard: bottom back against the backrest (the middle of a backless seat), on the cushion top"
+                title="the standard: bottom back against the backrest (the middle of a backless seat), on the cushion top — in every view without a nudge of its own"
                 onClick={() => save({ ...model, sits: placeSits(model.parts, model.size, model.sits.length > 1 ? model.sits.map((q) => q[0]) : undefined) })}
               >
                 Sit them back against the backrest (the standard)
               </button>
               {model.sits.map((s, i) => (
                 <div key={i}>
-                  <b className="small">sitting point S{i}</b>
+                  <b className="small">sitting point S{i} (every view without a nudge)</b>
                   {[0, 1, 2].map((j) => (
                     <Knob
                       key={j}
@@ -509,9 +635,9 @@ export function ModelPanel({ draft, onPatch, onStatus }: { draft: Draft; onPatch
             </div>
           </div>
           <div className="rig-facings">
-            {MODEL_FACINGS.filter((g) => views[g]).map((g) => (
-              <FacingPreview key={g} v={views[g]!} problems={findings[g]?.problems ?? []} iou={findings[g]?.fit.iou ?? 0} mirrored={views[g]!.mirrored} />
-            ))}
+            {facings.map((g) =>
+              settled[g] && checks[g] ? <FacingPreview key={g} v={settled[g]!} check={checks[g]!} on={g === sel} onPick={() => setSel(g)} /> : null,
+            )}
           </div>
         </div>
       )}

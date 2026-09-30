@@ -18,7 +18,7 @@ import { seatLayers } from '../src/client/engine/sprites/seatLayers';
 import { silhouetteFit } from '../src/client/engine/sprites/seatModel';
 import { loadManifest } from './lib/manifest';
 import { modelView, readModels } from './lib/models';
-import { seatKeys, type Sprites } from './lib/rigs';
+import { seatKeys, type Sprites } from './lib/seats';
 import { blank, writePng, type Img } from './lib/png';
 import { plot, rect, row, stack, type RGB } from './lib/draw';
 import { text } from './lib/font';

@@ -1,7 +1,7 @@
 /**
  * THE SEAT MODEL: every seat's 3D shape as a few boxes (a proxy), one per catalog seat key, shared by all four
- * facings — so a person sits at the same place in the seat whichever way it's turned, and whatever of the seat is
- * nearer the camera than them is drawn over them, pixel by pixel (a z-buffer), never by hand-drawn "front" layers.
+ * facings: it says where each cushion is, what of the seat stands between a sitter and the camera in each view (the
+ * seat layers: src/client/engine/sprites/seatLayers.ts) and how a sitter's legs lie on it (sitLegs.ts).
  *
  * art/seat-models.json: { [catalog key]: SeatModel }.
  *
@@ -26,7 +26,7 @@
  * front edge on the side it faces (FACING_VEC), u turning with it (a rotation, never a mirror):
  *   se (+x): x = w − v, y = u        sw (+y): x = w − u, y = d − v
  *   ne (−y): x = u,     y = v        nw (−x): x = v,     y = d − u
- * WORLD → DRAWING (seatRigs.worldToDrawing): (ax + 32 (x − y), ay + 16 (x + y) − 2 z), the drawing's anchor being
+ * WORLD → DRAWING (projectLocal): (ax + 32 (x − y), ay + 16 (x + y) − 2 z), the drawing's anchor being
  * the footprint's back vertex on the floor.
  *
  * CAMERA DEPTH. The projection sends (x, y, z) and (x + t, y + t, z + 16 t) to the same pixel, so the view ray through
@@ -98,7 +98,7 @@ export interface SeatModel {
   fitted?: string;
   /** The day the lead reviewer read its sheet and live screenshots and passed it (scripts/seat-model.ts --review). */
   reviewed?: string;
-  /** Fingerprints (seatRigs.drawingPrint) of the drawings it was reviewed on, by facing: a redrawn seat needs review. */
+  /** Fingerprints (seatFigure.drawingPrint) of the drawings it was reviewed on, by facing: a redrawn seat needs review. */
   drawings?: Partial<Record<Facing, string>>;
   /** A word from whoever tuned it. */
   note?: string;

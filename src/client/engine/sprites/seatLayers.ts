@@ -21,10 +21,15 @@
  * Pure (pixels in, masks and points out): the renderer (WorldView), the seat tools and the Design Lab share it.
  */
 import type { Facing } from '@shared/world/scene';
-import { behindView, cushionTiles, projectLocal, towardCamera, viewSits, type PartKind, type SitPoint } from '@shared/world/seatModels';
-import { legsFor, type SitLegs } from '@shared/world/sitLegs';
-import { FIG, polyMask } from '@shared/world/seatFigure';
-import { seatDepth, type ModelView } from './seatModel';
+import type { AvatarLoadout } from '@shared/domain/types';
+import { behindView, cushionTiles, cushionTop, projectLocal, towardCamera, viewSits, type PartKind, type SitPoint } from '@shared/world/seatModels';
+import { SIT_POSE_OF } from '@shared/world/seats';
+import { kneeV, legsFor, THIGH_R, type SitLegs } from '@shared/world/sitLegs';
+import { coverRow, FIG, figAx, hipFeet, polyMask } from '@shared/world/seatFigure';
+import { seatDepth, silhouetteFit, type ModelView } from './seatModel';
+import { renderAvatarLayers } from './avatarQa';
+import type { Pose } from './avatarFrame';
+import type { Pixels } from './footing';
 
 export type Pt = [number, number];
 
@@ -107,3 +112,103 @@ export function seatLayers(v: ModelView): SeatLayers {
 
 /** The cushion tiles of a model placed in a facing (seatSpots order), for callers that index by tile. */
 export const layerTiles = (v: Pick<ModelView, 'model' | 'facing'>) => cushionTiles(v.model.size, v.facing);
+
+/* ------------------------------------------------------------------ the check */
+
+/** A model's silhouette must cover each drawing at least this well (IoU against the drawing with its gaps filled). */
+export const FIT_MIN = 0.8;
+
+/**
+ * What's wrong with a seat in one view (empty: it holds) — the one check the gate (scripts/seat-layers.ts --check),
+ * the Design Lab and its publish step all run: the model fits the drawing; every cushion has a sitting point, on its
+ * cushion seen from the front; the legs stay above the floor and come off the cushion's front; from behind, a seat
+ * with a back hides something of its sitters.
+ */
+export function seatProblems(v: ModelView): string[] {
+  const out: string[] = [];
+  const m = v.model;
+  const behind = behindView(v.facing);
+  const fit = silhouetteFit(v);
+  if (fit.iou < FIT_MIN) out.push(`the model's silhouette misses the drawing (IoU ${fit.iou.toFixed(2)} < ${FIT_MIN}): refit it`);
+  const L = seatLayers(v);
+  L.sits.forEach((s, i) => {
+    if (!s) {
+      out.push(`cushion ${i} has no sitting point over its tile`);
+      return;
+    }
+    const legs = L.legs[i]!;
+    const kneeZ = s[2] + THIGH_R + legs.rise;
+    if (kneeZ - legs.drop < -0.01) out.push(`cushion ${i}: the feet go through the floor`);
+    // (from behind a sitter is drawn deeper, under the backrest: the cushion and knee rules are the front's)
+    if (behind) return;
+    const top = cushionTop(m, s[0], s[1]);
+    if (top === null || Math.abs(top - s[2]) > 0.5) out.push(`cushion ${i}: the sitting point isn't on the cushion (z ${s[2]}, cushion ${top ?? 'none'})`);
+    const cushion = m.parts.filter((p) => p.part === 'seat' && s[0] >= p.u[0] && s[0] <= p.u[1] && s[1] >= p.v[0] && s[1] <= p.v[1] && p.z[1] >= s[2] - 0.5);
+    const front = Math.min(...cushion.map((p) => p.v[0]));
+    const kv = kneeV(s, legs);
+    if (cushion.length && kv > front - 0.01) out.push(`cushion ${i}: the knees are inside the cushion (at v ${kv.toFixed(2)}, its front ${front.toFixed(2)}): sit them further forward`);
+  });
+  if (behind && m.parts.some((p) => p.part === 'back') && !L.over.some((x) => x)) out.push('from behind, nothing of it goes over its sitters');
+  return out;
+}
+
+/* ------------------------------------------------------------------ composing (sheets, the Design Lab) */
+
+export interface SeatSitter {
+  look: AvatarLoadout;
+  /** Which cushion (seatSpots order). */
+  cushion: number;
+}
+
+/**
+ * A seat and its sitters composed the way the game draws them (WorldView): the seat's drawing, each sitter's figure
+ * (their legs laid on it) with its seat point on their cushion's hip, back to front, then the over layer — kept off
+ * every sitter above its cover. `pad`: drawing px of room round the drawing (heads rise above it). Pure.
+ */
+export function composeSeat(v: ModelView, sitters: SeatSitter[], pad = 48): { px: Pixels; origin: Pt } {
+  const { px: art } = v.art;
+  const W = art.w + pad * 2;
+  const H = art.h + pad * 2;
+  const d = new Uint8ClampedArray(W * H * 4);
+  const who = new Int16Array(W * H).fill(-1);
+  const put = (x: number, y: number, src: ArrayLike<number>, i: number, k: number) => {
+    if (x < 0 || y < 0 || x >= W || y >= H || !src[i + 3]) return;
+    const o = (y * W + x) * 4;
+    d[o] = src[i];
+    d[o + 1] = src[i + 1];
+    d[o + 2] = src[i + 2];
+    d[o + 3] = 255;
+    who[y * W + x] = k;
+  };
+  for (let y = 0; y < art.h; y++) for (let x = 0; x < art.w; x++) put(x + pad, y + pad, art.d, (y * art.w + x) * 4, -1);
+  const L = seatLayers(v);
+  const tiles = layerTiles(v);
+  const pose = SIT_POSE_OF[v.style] as Pose;
+  const placed = sitters
+    .map((s, k) => ({ s, k }))
+    .filter(({ s }) => L.hips[s.cushion])
+    .sort((a, b) => tiles[a.s.cushion].x + tiles[a.s.cushion].y - (tiles[b.s.cushion].x + tiles[b.s.cushion].y));
+  const figs: Array<{ x0: number; y0: number; px: ArrayLike<number> }> = [];
+  for (const { s, k } of placed) {
+    const [fx, fy] = hipFeet(L.hips[s.cushion]!, v.style);
+    const x0 = fx - figAx(v.facing) + pad;
+    const y0 = fy - FIG.feet + pad;
+    const fig = renderAvatarLayers(s.look, v.facing, pose, L.legs[s.cushion] ?? undefined).px;
+    for (let y = 0; y < FIG.h; y++) for (let x = 0; x < FIG.w; x++) put(x0 + x, y0 + y, fig, (y * FIG.w + x) * 4, k);
+    figs[k] = { x0, y0, px: fig };
+  }
+  const capRow = L.cover === undefined ? -Infinity : coverRow(pose, L.cover);
+  for (let y = 0; y < art.h; y++)
+    for (let x = 0; x < art.w; x++) {
+      const i = y * art.w + x;
+      if (!L.over[i]) continue;
+      const X = x + pad;
+      const Y = y + pad;
+      // above the cover, a sitter's own pixels show over the seat
+      const k = who[Y * W + X];
+      const f = k >= 0 ? figs[k] : undefined;
+      if (f && Y - f.y0 < capRow) continue;
+      put(X, Y, art.d, i * 4, -1);
+    }
+  return { px: { w: W, h: H, d }, origin: [pad, pad] };
+}

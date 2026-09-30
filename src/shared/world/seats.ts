@@ -10,60 +10,43 @@
 import { footprint, isSeat, isSolid, type Facing, type SceneDef, type SceneObject } from './scene';
 
 /**
- * The seat profile — how a piece of seat art is sat in. Every seat's art carries one (public/art/manifest.json,
- * fitted against the drawing by scripts/seat-fit.ts); these family defaults cover art that doesn't yet.
- *   seat       height of the cushion surface where the hips rest, world px above the floor
- *   seatDepth  seen from the front (se / sw): where along the seat's facing the hips rest, in tiles from the
- *              tile centre (+ = forward) — the cushion's centre, so the thighs lie along it to the front edge
- *   backDepth  seen from behind (ne / nw), for a seat with a backrest: the hips against the backrest (the
- *              crease between the backrest and the cushion, plus half a pelvis), so it hides the seat of their
- *              pants; defaults to seatDepth. The figure's legs are short for its furniture, so no one depth
- *              gives both views their contact — each view is composed on its own, as sprite games do.
- *   sitStyle   chair | stool | lounge | floor: which sitting pose the legs take (avatarFrame SIT_POSE)
- *   backrest   whether something stands between a sitter who faces away and us (a backrest, a beanbag's
- *              rolled back): the part of the drawing that isn't cushion is drawn over them (seatFit.ts)
- *   backLine   only where colour can't tell backrest from cushion: the backrest's top edge traced in each
- *              drawn back view (ne / nw, that drawing's own px, left to right); a mirrored view mirrors it
- *   arms       whether it has arms: seen from the front, its near arm stands between its sitter and us (the
- *              seat rig must draw it over them: src/shared/world/seatRigs.ts)
+ * The seat profile — what a seat's manifest entry says about sitting in it (the model spec's seat section); how people
+ * are placed and drawn in it is its model's (art/seat-models.json, src/client/engine/sprites/seatLayers.ts).
+ *   seat       height of the cushion surface where the hips rest, world px above the floor (it seeds the model's fit)
+ *   sitStyle   chair | stool | lounge | floor: which sitting pose the figure takes (avatarFrame SIT_POSE) and how its
+ *              legs lie (sitLegs.ts)
+ *   backrest   whether it has a back (the fit gives its model one)
+ *   arms       whether it has arms (the fit gives its model a pair)
  */
 export type SitStyle = 'chair' | 'stool' | 'lounge' | 'floor';
 
 export interface SeatProfile {
   seat: number;
-  seatDepth: number;
-  backDepth: number;
   sitStyle: SitStyle;
   backrest: boolean;
-  backLine?: Partial<Record<'ne' | 'nw', Array<[number, number]>>>;
   arms?: boolean;
 }
 
 /** The manifest fields that make up a seat profile (the model spec's seat section). */
-export const SEAT_FIELDS = ['seat', 'seatDepth', 'backDepth', 'sitStyle', 'backrest', 'backLine', 'arms'] as const;
+export const SEAT_FIELDS = ['seat', 'sitStyle', 'backrest', 'arms'] as const;
 
-type FamilyProfile = Omit<SeatProfile, 'backDepth' | 'backLine'>;
-const FAMILY: Array<[RegExp, FamilyProfile]> = [
-  [/^stool/, { seat: 16, seatDepth: 0, sitStyle: 'stool', backrest: false }],
-  [/^beanbag/, { seat: 9, seatDepth: 0, sitStyle: 'floor', backrest: true }],
-  [/^ottoman/, { seat: 8, seatDepth: 0, sitStyle: 'chair', backrest: false }],
-  [/^(couch|armchair)/, { seat: 10, seatDepth: 0.1, sitStyle: 'lounge', backrest: true, arms: true }],
-  [/^bench/, { seat: 10, seatDepth: 0, sitStyle: 'chair', backrest: false }],
-  [/^heirloom-throne/, { seat: 13, seatDepth: 0.15, sitStyle: 'chair', backrest: true, arms: true }],
+const FAMILY: Array<[RegExp, SeatProfile]> = [
+  [/^stool/, { seat: 16, sitStyle: 'stool', backrest: false }],
+  [/^beanbag/, { seat: 9, sitStyle: 'floor', backrest: true }],
+  [/^ottoman/, { seat: 8, sitStyle: 'chair', backrest: false }],
+  [/^(couch|armchair)/, { seat: 10, sitStyle: 'lounge', backrest: true, arms: true }],
+  [/^bench/, { seat: 10, sitStyle: 'chair', backrest: false }],
+  [/^heirloom-throne/, { seat: 13, sitStyle: 'chair', backrest: true, arms: true }],
 ];
-const DEFAULT_PROFILE: FamilyProfile = { seat: 12, seatDepth: 0, sitStyle: 'chair', backrest: true };
+const DEFAULT_PROFILE: SeatProfile = { seat: 12, sitStyle: 'chair', backrest: true };
 
 /** A seat's profile: its art's own values over its family's defaults. */
 export function seatProfile(sprite: string, own: Partial<SeatProfile> = {}): SeatProfile {
   const base = FAMILY.find(([re]) => re.test(sprite))?.[1] ?? DEFAULT_PROFILE;
-  const seatDepth = own.seatDepth ?? base.seatDepth;
   return {
     seat: own.seat ?? base.seat,
-    seatDepth,
-    backDepth: own.backDepth ?? seatDepth,
     sitStyle: own.sitStyle ?? base.sitStyle,
     backrest: own.backrest ?? base.backrest,
-    ...(own.backLine ? { backLine: own.backLine } : {}),
     ...((own.arms ?? base.arms) ? { arms: true } : {}),
   };
 }
@@ -87,22 +70,9 @@ export function sitThigh(style: SitStyle): number {
   return (FEET_Y - (HIP_Y + SIT_DROP[style] + THIGH_R)) / 2;
 }
 
-/**
- * Seen from behind, a sitter sinks this far into the seat (world px): the cushion's near edge — drawn back
- * over them — takes the bottom of their hips, as a body weighs into a seat, instead of a flat-bottomed
- * figure perched on top.
- */
-export const BACK_SINK = 1.5;
-/**
- * Seen from behind, a seat covers its sitter only up to this far above their hips (world px): however tall
- * the back, their head, shoulders and upper back show above it, the way a seated person reads from behind
- * (the figure is small for its furniture, so a tall back would otherwise leave only a head).
- */
-export const BACK_COVER_UP = 6;
-
 /** How far a sitter's figure is lifted off the floor so their thighs rest on the cushion (world px). */
-export function sitterLift(p: SeatProfile, facing?: Facing): number {
-  return p.seat - sitThigh(p.sitStyle) - (facing && seenFromBehind(facing) ? BACK_SINK : 0);
+export function sitterLift(p: SeatProfile): number {
+  return p.seat - sitThigh(p.sitStyle);
 }
 
 /**
@@ -130,11 +100,12 @@ export function sitMotion(k: number, sittingDown: boolean, lift: number): { inSe
 /** Whether a sitter facing this way is seen from behind (the camera looks from the south: +x +y is toward us). */
 export const seenFromBehind = (f: Facing) => f === 'ne' || f === 'nw';
 
-/** Where a sitter's hips are, in fractional tile coordinates (the figure stands on this point, lifted). */
-export function sitterPoint(spot: { x: number; y: number; facing: Facing }, p: SeatProfile): { x: number; y: number } {
-  const [dx, dy] = FACING_VEC[spot.facing];
-  const depth = seenFromBehind(spot.facing) ? p.backDepth : p.seatDepth;
-  return { x: spot.x + 0.5 + dx * depth, y: spot.y + 0.5 + dy * depth };
+/**
+ * Where a sitter's hips are on a seat without a model (fractional tile coordinates: the figure stands on this point,
+ * lifted): the middle of its tile. Every catalog seat has a model (the gate); this is only for art that has none yet.
+ */
+export function sitterPoint(spot: { x: number; y: number }): { x: number; y: number } {
+  return { x: spot.x + 0.5, y: spot.y + 0.5 };
 }
 
 export interface SeatSpot {

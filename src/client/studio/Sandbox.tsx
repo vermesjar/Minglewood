@@ -1,7 +1,11 @@
 /**
  * Try it in game: the draft piece in a small room, drawn by the real renderer (WorldView) from the draft's own
- * sprites (a virtual art root that swaps the draft into the published catalog). Turn it (R), walk around it,
- * sit on every cushion, use it, flip day and night, zoom, and fill the room with people.
+ * sprites (a virtual art root that swaps the draft into the published catalog: devLab.ts /art/:id). Turn it (R), walk
+ * around it, sit on every cushion, use it, flip day and night, zoom, and fill the room with people.
+ *
+ * A seat's people are drawn the game's one way, from its model (sprites/seatLayers.ts): the draft's own model rides in
+ * its sandbox manifest entry (`seatModel`, read by art.ts artSeatModel), so every change in How people sit in it shows
+ * here as it will in the game once the draft is saved (the room is rebuilt on every save).
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Occupant } from '@shared/protocol';
@@ -265,6 +269,11 @@ export function Sandbox({ draft, version, onNote }: { draft: Draft; version: str
       <header className="card-head">
         <h3>Try it in game</h3>
         <span className="muted">Click the floor to walk · click the piece to use or sit · R turns it</span>
+        {draft.furniture?.category === 'seating' && !draft.furniture.seatModel && (
+          <span className="chip bad" title="without a model the game can't draw people in this seat properly">
+            no seat model yet: Auto-fit it in How people sit in it
+          </span>
+        )}
       </header>
       <div className="sandbox-stage">
         <canvas ref={holder} className="sandbox-canvas" />

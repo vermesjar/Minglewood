@@ -13,8 +13,7 @@ import type { IncomingHttpHeaders } from 'node:http';
 import { CATEGORIES, ROOM_KINDS, THEMES, wallSpanFor, type ModelCategory, type RoomKind, type Theme } from '@shared/models';
 import { humanizeKey, NAME_MAX } from '@shared/catalogName';
 import { seatProfile } from '@shared/world/seats';
-import { ownRigFacings, regionPts, rigShapeProblems, RIG_FACINGS, rigStatus, tidyRig, type SeatRig, type SeatRigs } from '@shared/world/seatRigs';
-import { modelShapeProblems, tidyModel, type SeatModel } from '@shared/world/seatModels';
+import { MODEL_FACINGS, modelShapeProblems, tidyModel, type SeatModel, type SeatModels } from '@shared/world/seatModels';
 
 /* ------------------------------------------------------------------ the guard */
 
@@ -257,28 +256,19 @@ export interface FurnitureSpec {
   useFace: 'front' | 'any';
   /** A mirror piece whose back honestly looks like its front: one drawing serves both. */
   sameFromBehind: boolean;
-  /** The seat standard (seats.ts SeatProfile): cushion height, how it's sat in, whether it has a back. */
+  /**
+   * The seat standard (seats.ts SeatProfile): the cushion's height, how it's sat in, whether it has a back and arms.
+   * What the Lab's Auto-fit seeds the seat's model from.
+   */
   seat: number | null;
   sitStyle: 'chair' | 'stool' | 'lounge' | 'floor';
   backrest: boolean;
-  /**
-   * The seat standard's calibration (src/client/studio/seatLab.ts): the cushion centre clicked in the front
-   * drawing as the game resolves it facing se, which drawing that was (`for`), and the profile it gave.
-   */
-  seatCalibration: SeatCalibration | null;
-  /**
-   * A catalog seat's own profile (hip depths, and the back line that says the whole seat wraps its sitter from behind),
-   * kept when it's opened as a draft: judged and republished as the catalog has it until the seat is calibrated here.
-   */
-  catalogProfile?: CatalogProfile | null;
-  /** Has arms: seen from the front, its near arm is drawn over its sitter (the seat rig standard). */
   arms: boolean;
-  /** How people sit in it, per drawn view (the seat rig standard; the Lab's RigPanel). */
-  seatRig: SeatRigDraft | null;
-  /** How people sit in it: its 3D proxy (the seat model standard; the Lab's ModelPanel), and the day it was passed. */
+  /**
+   * How people sit in it: its 3D model (the seat model standard, src/shared/world/seatModels.ts; the Lab's
+   * ModelPanel), the day the reviewer passed it and the drawings it was made on. A seat publishes with one.
+   */
   seatModel?: SeatModelDraft | null;
-  /** Which of each own view's pixels are back, seat, arm or leg (the seat parts: the Lab's PartsPanel), compiled into seatRig. */
-  seatParts?: SeatPartsDraft | null;
   surface: number | null;
   light: { x: number; y: number; r?: number } | null;
   wallV?: [number, number];
@@ -335,11 +325,8 @@ function defaultFurniture(): FurnitureSpec {
     seat: null,
     sitStyle: 'chair',
     backrest: true,
-    seatCalibration: null,
     arms: false,
-    seatRig: null,
     seatModel: null,
-    seatParts: null,
     surface: null,
     light: null,
     actions: [],
@@ -391,12 +378,8 @@ export function cleanFurniture(f: Partial<FurnitureSpec>): FurnitureSpec {
     seat: category !== 'seating' ? null : f.seat === null || f.seat === undefined || (f.seat as unknown) === '' ? 12 : num(f.seat, 0, 60, 12),
     sitStyle: (['chair', 'stool', 'lounge', 'floor'] as const).includes(f.sitStyle as never) ? (f.sitStyle as FurnitureSpec['sitStyle']) : 'chair',
     backrest: f.backrest === undefined ? true : !!f.backrest,
-    seatCalibration: category === 'seating' ? cleanSeatCalibration(f.seatCalibration) : null,
-    catalogProfile: category === 'seating' ? cleanCatalogProfile(f.catalogProfile) : null,
     arms: category === 'seating' && !!f.arms,
-    seatRig: category === 'seating' ? cleanSeatRig(f.seatRig) : null,
     seatModel: category === 'seating' ? cleanSeatModel(f.seatModel) : null,
-    seatParts: category === 'seating' ? cleanSeatParts(f.seatParts) : null,
     surface: f.surface === null || f.surface === undefined || (f.surface as unknown) === '' ? null : num(f.surface, 0, 80, 20),
     light,
     wallV: rotation === 'flat' ? [num(f.wallV?.[0], 0, 60, 18), num(f.wallV?.[1], 1, 62, 47)] : undefined,
@@ -413,132 +396,50 @@ export function cleanFurniture(f: Partial<FurnitureSpec>): FurnitureSpec {
   };
 }
 
-type RigFacing = (typeof RIG_FACINGS)[number];
-/** A draft's seat rig (src/client/studio/rigLab.ts DraftRig): own views' rigs, ticks, proposals, cuts. */
-export interface SeatRigDraft {
-  views: Partial<Record<RigFacing, SeatRig>>;
-  ok: Partial<Record<RigFacing, string>>;
-  proposal?: Partial<Record<RigFacing, { by: 'model' | 'inference'; at: string; disagree?: string[]; usd?: number; notes?: string }>>;
-  cuts?: Partial<Record<RigFacing, Array<[number, number, 'h' | 'v']>>>;
-  for: string;
-}
-
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+const finite = (x: unknown): x is number => typeof x === 'number' && Number.isFinite(x);
 
 /**
- * A draft's seat parts (src/client/studio/PartsPanel.tsx; src/client/engine/sprites/seatParts.ts): each own view's part
- * map as run-length text, where each came from, and the drawings they were made on.
+ * A draft's seat model (src/client/studio/ModelPanel.tsx DraftModel): the model (its boxes, its sitting points, each
+ * view's own sitting points `views` and traced over layer `over`, the day it was fitted, a note), the day the
+ * reviewer passed it, and the drawings it was made on.
  */
-export interface SeatPartsDraft {
-  views: Partial<Record<RigFacing, string>>;
-  proposal?: Partial<Record<RigFacing, { by: 'ai' | 'copy'; at: string; usd?: number; model?: string; from?: string; notes?: string }>>;
-  for: string;
-}
-/** partsToString's text: runs "part*count" or "part", comma-separated. */
-const PARTS_RE = /^[0-5](\*\d{1,7})?(,[0-5](\*\d{1,7})?)*$/;
-
-function cleanSeatParts(v: unknown): SeatPartsDraft | null {
-  const r = v as Partial<SeatPartsDraft> | null | undefined;
-  if (!r || typeof r !== 'object' || !r.views || typeof r.views !== 'object') return null;
-  const out: SeatPartsDraft = { views: {}, for: str(r.for, 4000) };
-  for (const f of RIG_FACINGS) {
-    const t = (r.views as Record<string, unknown>)[f];
-    if (typeof t === 'string' && t.length <= 400_000 && PARTS_RE.test(t)) out.views[f] = t;
-    const p = (r.proposal as Record<string, Record<string, unknown>> | undefined)?.[f];
-    if (p && (p.by === 'ai' || p.by === 'copy'))
-      (out.proposal ??= {})[f] = {
-        by: p.by,
-        at: str(p.at, 20),
-        ...(typeof p.usd === 'number' && Number.isFinite(p.usd) ? { usd: p.usd } : {}),
-        ...(typeof p.model === 'string' ? { model: str(p.model, 40) } : {}),
-        ...(typeof p.from === 'string' ? { from: str(p.from, 60) } : {}),
-        ...(typeof p.notes === 'string' ? { notes: str(p.notes, 400) } : {}),
-      };
-  }
-  return out;
-}
-
-/** A draft's seat model (src/client/studio/ModelPanel.tsx DraftModel): the proxy, when the reviewer passed it, and the drawings it was made on. */
 export interface SeatModelDraft {
   model: SeatModel;
   reviewed?: string;
   for: string;
 }
 
-function cleanSeatModel(v: unknown): SeatModelDraft | null {
+/** A seat model as a draft may keep it: well-formed and in range, or null (anything malformed in a view is dropped). */
+export function cleanSeatModel(v: unknown): SeatModelDraft | null {
   const r = v as Partial<SeatModelDraft> | null | undefined;
-  if (!r || typeof r !== 'object' || !r.model || modelShapeProblems(r.model).length) return null;
+  if (!r || typeof r !== 'object' || !r.model || typeof r.model !== 'object') return null;
   const m = r.model;
-  if (m.parts.length > 48 || m.sits.length > 8) return null;
-  const model = tidyModel({ size: m.size, parts: m.parts, sits: m.sits, ...(typeof m.note === 'string' ? { note: str(m.note, 200) } : {}) });
-  return { model, ...(typeof r.reviewed === 'string' && DAY_RE.test(r.reviewed) ? { reviewed: r.reviewed } : {}), for: str(r.for, 4000) };
-}
-function cleanSeatRig(v: unknown): SeatRigDraft | null {
-  const r = v as Partial<SeatRigDraft> | null | undefined;
-  if (!r || typeof r !== 'object' || !r.views || typeof r.views !== 'object') return null;
-  const out: SeatRigDraft = { views: {}, ok: {}, for: str(r.for, 4000) };
-  for (const f of RIG_FACINGS) {
-    const g = (r.views as Record<string, unknown>)[f];
-    if (g && !rigShapeProblems(g).length) {
-      const t = tidyRig(g as SeatRig);
-      if (t.front.length <= 64 && t.front.every((p) => regionPts(p).length <= 4000) && t.hips.length <= 8) out.views[f] = t;
-    }
-    const ok = (r.ok as Record<string, unknown> | undefined)?.[f];
-    if (typeof ok === 'string' && DAY_RE.test(ok)) out.ok[f] = ok;
-    const p = (r.proposal as Record<string, Record<string, unknown>> | undefined)?.[f];
-    if (p && (p.by === 'model' || p.by === 'inference'))
-      (out.proposal ??= {})[f] = {
-        by: p.by,
-        at: str(p.at, 20),
-        ...(Array.isArray(p.disagree) ? { disagree: p.disagree.slice(0, 12).map((x) => str(x, 200)) } : {}),
-        ...(typeof p.usd === 'number' && Number.isFinite(p.usd) ? { usd: p.usd } : {}),
-        ...(typeof p.notes === 'string' ? { notes: str(p.notes, 400) } : {}),
-      };
-    const c = (r.cuts as Record<string, unknown> | undefined)?.[f];
-    if (Array.isArray(c))
-      (out.cuts ??= {})[f] = c
-        .slice(0, 64)
-        .filter((q): q is [number, number, 'h' | 'v'] => Array.isArray(q) && (q[2] === 'h' || q[2] === 'v'))
-        .map((q) => [num(q[0], 0, 4000, 0), num(q[1], 0, 4000, 0), q[2]]);
+  const base: SeatModel = { size: m.size, parts: m.parts, sits: m.sits };
+  if (modelShapeProblems(base).length || m.parts.length > 48 || m.sits.length > 8) return null;
+  const views: NonNullable<SeatModel['views']> = {};
+  const over: NonNullable<SeatModel['over']> = {};
+  for (const f of MODEL_FACINGS) {
+    const list = (m.views as Record<string, unknown> | undefined)?.[f];
+    if (Array.isArray(list) && list.length === m.sits.length && list.every((q) => Array.isArray(q) && q.length === 2 && q.every(finite)))
+      views[f] = (list as number[][]).map((q): [number, number] => [num(q[0], -4, 8, 0), num(q[1], -4, 8, 0)]);
+    const polys = (m.over as Record<string, unknown> | undefined)?.[f];
+    if (!Array.isArray(polys)) continue;
+    const kept = polys
+      .slice(0, 32)
+      .filter((poly): poly is unknown[] => Array.isArray(poly) && poly.length <= 4000)
+      .map((poly) => poly.filter((q): q is number[] => Array.isArray(q) && q.length === 2 && q.every(finite)).map((q): [number, number] => [num(q[0], -4000, 4000, 0), num(q[1], -4000, 4000, 0)]))
+      .filter((poly) => poly.length >= 3);
+    if (kept.length) over[f] = kept;
   }
-  return out;
-}
-
-export interface SeatCalibration {
-  cushion: [number, number];
-  cover: boolean;
-  for: string;
-  profile?: { seat: number; seatDepth: number; backDepth: number; backLine?: Record<string, Array<[number, number]>> };
-}
-
-export interface CatalogProfile {
-  seatDepth: number;
-  backDepth: number;
-  backLine?: Record<string, Array<[number, number]>>;
-}
-
-function cleanCatalogProfile(c: unknown): CatalogProfile | null {
-  const v = c as Partial<CatalogProfile> | null | undefined;
-  if (!v || typeof v !== 'object') return null;
-  const n = (x: unknown) => Math.round(num(x, -4000, 4000, 0) * 100) / 100;
-  const line = (l: unknown) => (Array.isArray(l) ? l.slice(0, 64).map((pt) => [n((pt as number[])[0]), n((pt as number[])[1])] as [number, number]) : []);
-  const backLine = v.backLine && typeof v.backLine === 'object' ? Object.fromEntries(Object.entries(v.backLine).filter(([k]) => k === 'ne' || k === 'nw').map(([k, l]) => [k, line(l)])) : undefined;
-  return { seatDepth: n(v.seatDepth), backDepth: n(v.backDepth), ...(backLine && Object.keys(backLine).length ? { backLine } : {}) };
-}
-
-function cleanSeatCalibration(c: unknown): SeatCalibration | null {
-  const v = c as Partial<SeatCalibration> | null | undefined;
-  if (!v || !Array.isArray(v.cushion)) return null;
-  const n = (x: unknown) => Math.round(num(x, -4000, 4000, 0) * 100) / 100;
-  const p = v.profile;
-  const line = (l: unknown) => (Array.isArray(l) ? l.slice(0, 64).map((pt) => [n((pt as number[])[0]), n((pt as number[])[1])] as [number, number]) : undefined);
-  const backLine = p?.backLine && typeof p.backLine === 'object' ? Object.fromEntries(Object.entries(p.backLine).filter(([k]) => k === 'ne' || k === 'nw').map(([k, l]) => [k, line(l) ?? []])) : undefined;
-  return {
-    cushion: [n(v.cushion[0]), n(v.cushion[1])],
-    cover: !!v.cover,
-    for: str(v.for, 400),
-    ...(p ? { profile: { seat: n(p.seat), seatDepth: n(p.seatDepth), backDepth: n(p.backDepth), ...(backLine && Object.keys(backLine).length ? { backLine } : {}) } } : {}),
-  };
+  const model = tidyModel({
+    ...base,
+    ...(Object.keys(views).length ? { views } : {}),
+    ...(Object.keys(over).length ? { over } : {}),
+    ...(typeof m.fitted === 'string' && DAY_RE.test(m.fitted) ? { fitted: m.fitted } : {}),
+    ...(typeof m.note === 'string' ? { note: str(m.note, 200) } : {}),
+  });
+  return { model, ...(typeof r.reviewed === 'string' && DAY_RE.test(r.reviewed) ? { reviewed: r.reviewed } : {}), for: str(r.for, 4000) };
 }
 
 export function cleanPart(p: Partial<PartSpec>): PartSpec {
@@ -746,8 +647,8 @@ export function devLabRoutes(root = resolve(ART, 'drafts'), opts: { run?: typeof
   const r = Router();
   const PUBLIC_ART = resolve(process.cwd(), 'public', 'art');
   const readManifest = () => JSON.parse(readFileSync(resolve(PUBLIC_ART, 'manifest.json'), 'utf8')) as { scale: number; sprites: Record<string, Record<string, unknown>> };
-  const RIGS_FILE = resolve(ART, 'seat-rigs.json');
-  const readRigs = (): SeatRigs => (existsSync(RIGS_FILE) ? (JSON.parse(readFileSync(RIGS_FILE, 'utf8')) as SeatRigs) : {});
+  const MODELS_FILE = resolve(ART, 'seat-models.json');
+  const readModels = (): SeatModels => (existsSync(MODELS_FILE) ? (JSON.parse(readFileSync(MODELS_FILE, 'utf8')) as SeatModels) : {});
   const wrap = (fn: (req: Request, res: Response) => Promise<unknown> | unknown) => async (req: Request, res: Response) => {
     try {
       const v = await fn(req, res);
@@ -894,69 +795,6 @@ export function devLabRoutes(root = resolve(ART, 'drafts'), opts: { run?: typeof
       return queued;
     }),
   );
-  /**
-   * A seat rig proposed by a vision model for one drawn view (RigPanel "Propose"): the Lab's picture of the
-   * drawing with its pieces numbered and a coordinate grid goes to art/designlab.py rig-vision (studio.py
-   * vision-rig: the key stays in the Python tools), which answers which pieces sit in front of a seated person and
-   * where each cushion's hips go.
-   */
-  r.post(
-    '/drafts/:id/rig-vision',
-    json({ limit: '6mb' }),
-    wrap(async (req) => {
-      const d = store.read(req.params.id);
-      if (d.kind !== 'furniture' || d.furniture?.category !== 'seating') throw new LabError(400, 'only a seat has a rig');
-      const b = req.body as Record<string, unknown>;
-      const facing = String(b.facing);
-      if (!(RIG_FACINGS as readonly string[]).includes(facing)) throw new LabError(400, 'facing is se, sw, ne or nw');
-      const m = /^data:image\/png;base64,([A-Za-z0-9+/=]+)$/.exec(String(b.image ?? ''));
-      if (!m) throw new LabError(400, 'image: a PNG data URL');
-      const png = Buffer.from(m[1], 'base64');
-      if (png.length > 4_000_000 || png.subarray(0, 4).toString('hex') !== '89504e47') throw new LabError(400, 'image: a PNG under 4 MB');
-      const dir = resolve(store.dir(d.id), 'rig');
-      mkdirSync(dir, { recursive: true });
-      writeFileSync(resolve(dir, `${facing}.png`), png);
-      const pieces = Array.isArray(b.pieces) ? (b.pieces as Array<Record<string, unknown>>).slice(0, 400) : [];
-      const meta = {
-        facing,
-        name: str(b.name, 60),
-        width: num(b.width, 1, 2000, 1),
-        height: num(b.height, 1, 2000, 1),
-        zoom: num(b.zoom, 1, 20, 6),
-        cushions: num(b.cushions, 1, 8, 1),
-        sitStyle: str(b.sitStyle, 12),
-        backrest: !!b.backrest,
-        arms: !!b.arms,
-        pieces: pieces.map((p) => ({ id: num(p.id, 1, 400, 1), at: Array.isArray(p.at) ? [num(p.at[0], 0, 2000, 0), num(p.at[1], 0, 2000, 0)] : [0, 0], size: num(p.size, 0, 1e6, 0) })),
-        inferred: b.inferred && typeof b.inferred === 'object' ? b.inferred : null,
-      };
-      writeFileSync(resolve(dir, `${facing}.json`), JSON.stringify(meta, null, 2));
-      const { code, result } = await runLab(['rig-vision', draftPath(d.id), '--view', facing], 180_000);
-      if (code !== 0 || result.error) throw new LabError(502, String(result.error ?? 'the model gave no answer'));
-      const front = Array.isArray(result.front) ? (result.front as unknown[]).map((k) => Math.round(Number(k))).filter((k) => Number.isFinite(k)) : [];
-      const hips = Array.isArray(result.hips) ? (result.hips as unknown[]).filter((h): h is [number, number] => Array.isArray(h) && h.length === 2).map((h) => [num(h[0], 0, 2000, 0), num(h[1], 0, 2000, 0)]) : [];
-      return { front, hips, notes: str(result.notes, 400), usd: typeof result.usd === 'number' ? result.usd : undefined };
-    }),
-  );
-  /**
-   * A seat's parts for one own view proposed by a vision model (PartsPanel "Propose (AI)"): art/designlab.py
-   * propose-parts stages the draft, splits the view's drawing into numbered regions (scripts/lab-parts.ts) and asks
-   * studio.py vision-parts which are the back, the seat, an arm or a leg (the key stays in the Python tools; each call
-   * capped). Serial with the draft's other art-tool runs: it rebuilds <draft>/stage.
-   */
-  r.post(
-    '/drafts/:id/propose-parts',
-    json({ limit: '4kb' }),
-    wrap(async (req) => {
-      const d = store.read(req.params.id);
-      if (d.kind !== 'furniture' || d.furniture?.category !== 'seating') throw new LabError(400, 'only a seat has parts');
-      const facing = String((req.body as { facing?: unknown }).facing);
-      if (!(RIG_FACINGS as readonly string[]).includes(facing)) throw new LabError(400, 'facing is se, sw, ne or nw');
-      const { code, result } = await serial(d.id, () => runLab(['propose-parts', draftPath(d.id), facing], 300_000));
-      if (code !== 0 || result.error) throw new LabError(502, String(result.error ?? 'the model gave no answer'));
-      return result;
-    }),
-  );
   r.post(
     '/drafts/:id/publish',
     json({ limit: '4kb' }),
@@ -1029,27 +867,19 @@ export function devLabRoutes(root = resolve(ART, 'drafts'), opts: { run?: typeof
       const measured = e as { height?: number; base?: string };
       if (measured.height !== undefined || measured.base !== undefined)
         (d as Draft & { measured?: Record<string, unknown> }).measured = { ...(measured.height !== undefined ? { height: measured.height } : {}), ...(measured.base !== undefined ? { base: measured.base } : {}) };
-      // a seat comes with its rig (art/seat-rigs.json): re-rig it here, a tick per facing for every audited view
+      // a seat comes with its model (art/seat-models.json), passed as the catalog has it: tune it here
       if (d.furniture && e.seat !== undefined) {
-        // …and its profile, so the Lab judges it (and republishes it) as the catalog has it
-        const cp = e as { seatDepth?: number; backDepth?: number; backLine?: Record<string, Array<[number, number]>> };
-        if (cp.seatDepth !== undefined || cp.backLine) d.furniture.catalogProfile = cleanCatalogProfile({ seatDepth: cp.seatDepth ?? 0, backDepth: cp.backDepth ?? cp.seatDepth ?? 0, backLine: cp.backLine });
-        const own = readRigs()[key];
         d.furniture.arms = !!seatProfile(key.split('.')[0], { arms: (e as { arms?: boolean }).arms }).arms;
+        const own = readModels()[key];
         if (own) {
-          const entry = { footprint: (e.footprint ?? [1, 1]) as [number, number], file: e.file, facings: e.facings as Partial<Record<RigFacing, unknown>> | undefined };
-          const ok: Partial<Record<RigFacing, string>> = {};
-          for (const f of RIG_FACINGS) {
-            const mine = own[f] ?? (ownRigFacings(entry).includes(f) ? undefined : own[({ se: 'sw', sw: 'se', ne: 'nw', nw: 'ne' } as const)[f]]);
-            if (mine?.audited) ok[f] = mine.audited;
-          }
+          // the drawings it's on (the Lab's seatLab.ts drawingsSignature): the catalog's, as this draft has them
           const sig = JSON.stringify(
             Object.entries(d.views)
               .filter(([, v]) => v.file)
               .sort(([a], [b]) => a.localeCompare(b))
               .map(([k, v]) => [k, v.file, v.anchor, v.nudge ?? [0, 0]]),
           );
-          d.furniture.seatRig = cleanSeatRig({ views: own, ok, for: sig });
+          d.furniture.seatModel = cleanSeatModel({ model: own, reviewed: own.reviewed, for: sig });
         }
       }
       store.write(d);
@@ -1069,10 +899,9 @@ export function devLabRoutes(root = resolve(ART, 'drafts'), opts: { run?: typeof
       if (d.kind === 'furniture' && d.furniture) {
         const f = d.furniture;
         const e: Record<string, unknown> = { name: f.name, category: f.category, footprint: f.footprint, height: f.height, fit: 'anchor', rotation: f.rotation };
-        if (f.seat !== null) Object.assign(e, { seat: f.seat, sitStyle: f.sitStyle, backrest: f.backrest, arms: f.arms, ...(f.seatCalibration?.profile ?? f.catalogProfile ?? {}) });
-        // the renderer takes a draft's own rig from its sandbox entry (art.ts artSeatRig)
-        if (f.seatRig) e.seatRig = f.seatRig.views;
-        // …and its model (art.ts artSeatModel): people sit in the sandbox as they will in the game
+        if (f.seat !== null) Object.assign(e, { seat: f.seat, sitStyle: f.sitStyle, backrest: f.backrest, arms: f.arms });
+        // the renderer takes a draft's own model from its sandbox entry (art.ts artSeatModel): people sit in the
+        // sandbox as they will in the game (sprites/seatLayers.ts)
         if (f.seatModel) e.seatModel = f.seatModel.model;
         if (f.surface !== null) e.surface = f.surface;
         if (f.light) e.light = f.light;
@@ -1126,7 +955,7 @@ export function devLabRoutes(root = resolve(ART, 'drafts'), opts: { run?: typeof
     '/library',
     wrap(async () => {
       const m = readManifest();
-      const rigs = readRigs();
+      const models = readModels();
       const [fr, model] = await Promise.all([review(), modelCheckCatalog()]);
       const out = [];
       for (const [key, e] of Object.entries(m.sprites)) {
@@ -1145,39 +974,13 @@ export function devLabRoutes(root = resolve(ART, 'drafts'), opts: { run?: typeof
           footprint: e.footprint,
           seat: e.seat ?? null,
           facings: Object.keys((e.facings as object) ?? {}),
-          ...(e.seat !== undefined ? { rig: rigStatus({ footprint: (e.footprint ?? [1, 1]) as [number, number], file: e.file as string | undefined, facings: e.facings as Partial<Record<RigFacing, unknown>> | undefined }, rigs[key]) } : {}),
+          ...(e.seat !== undefined ? { model: models[key] ? (models[key].reviewed ? 'reviewed' : 'fitted') : 'none' } : {}),
           issues,
         });
       }
       return { scale: m.scale, pieces: out };
     }),
   );
-
-  /** The catalog's part maps (art/seat-parts/KEY.FACING.png): which seats have them, per facing (PartsPanel "Copy parts from…"). */
-  const PARTS_DIR = resolve(ART, 'seat-parts');
-  const PART_MAP_RE = /^([a-z0-9][a-z0-9.-]{0,48})\.(se|sw|ne|nw)\.png$/;
-  r.get(
-    '/seat-parts',
-    wrap(() => {
-      const out: Record<string, string[]> = {};
-      for (const n of existsSync(PARTS_DIR) ? readdirSync(PARTS_DIR) : []) {
-        const m = PART_MAP_RE.exec(n);
-        if (m) (out[m[1]] ??= []).push(m[2]);
-      }
-      return out;
-    }),
-  );
-  r.get('/seat-parts/:name', (req, res) => {
-    const m = PART_MAP_RE.exec(req.params.name);
-    const p = m ? resolve(PARTS_DIR, req.params.name) : '';
-    if (!m || !p.startsWith(PARTS_DIR + sep) || !existsSync(p)) {
-      res.status(404).json({ error: 'no such part map' });
-      return;
-    }
-    res.type('image/png');
-    res.setHeader('Cache-Control', 'no-store');
-    res.send(readFileSync(p));
-  });
 
   /** Character parts in the libraries (for the library and "open as draft"). */
   r.get(

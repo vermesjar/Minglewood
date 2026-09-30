@@ -1,20 +1,22 @@
 /**
  * A Design Lab seat's model (the seat model standard: src/shared/world/seatModels.ts), checked on its staged drawings
- * before it's published and written into art/seat-models.json after — the same check scripts/seat-model.ts --check
- * runs on the catalog, so what the Lab publishes passes the gate.
+ * before it's published and written into art/seat-models.json after: the gate's own check (sprites/seatLayers.ts
+ * seatProblems, as scripts/seat-layers.ts --check runs it on the catalog) in every facing, so what the Lab publishes
+ * passes the gate.
  *
- *   npx tsx scripts/lab-model.ts --entries <draft>/stage/entries.json --sprites <draft>/stage/sprites --key KEY \
- *       --model <draft>/stage/model.json [--write]
+ *   node --no-maglev --import tsx scripts/lab-model.ts --entries <draft>/stage/entries.json \
+ *       --sprites <draft>/stage/sprites --key KEY --model <draft>/stage/model.json [--write]
  *
- * model.json is the draft's seatModel (ModelPanel.tsx DraftModel: { model, reviewed? }). Every facing must hold and
- * the model must be reviewed ("Passed" in the Lab, by the reviewer); --write then stores it with the day it was
- * reviewed and its drawings' fingerprints. Prints one JSON object: {"ok", "problems": [...], "written"?}.
+ * model.json is the draft's seatModel (ModelPanel.tsx DraftModel: { model, reviewed? }, the model with any per-view
+ * sitting points and traced over layers). Every facing must hold and the model must be reviewed ("Passed" in the
+ * Lab, by the reviewer); --write then stores it with the day it was reviewed and its drawings' fingerprints. Prints
+ * one JSON object: {"ok", "problems": [...], "written"?}.
  */
 import { readFileSync } from 'node:fs';
-import { MODEL_FACINGS, modelShapeProblems, SEAT_LOOKS, tidyModel, type SeatModel } from '../src/shared/world/seatModels';
-import { modelFindings } from '../src/client/engine/sprites/seatModel';
+import { MODEL_FACINGS, modelShapeProblems, tidyModel, type SeatModel } from '../src/shared/world/seatModels';
+import { seatProblems } from '../src/client/engine/sprites/seatLayers';
 import { modelView, withModels } from './lib/models';
-import type { Sprites } from './lib/rigs';
+import type { Sprites } from './lib/seats';
 
 const arg = (name: string) => {
   const i = process.argv.indexOf(name);
@@ -35,7 +37,7 @@ try {
     const shape = modelShapeProblems(m, Math.round(e.footprint[0] * e.footprint[1]));
     for (const p of shape) problems.push(p);
     if (m.size[0] !== e.footprint[0] || m.size[1] !== e.footprint[1]) problems.push(`the model is ${m.size.join('×')}, the piece ${e.footprint.join('×')}`);
-    if (!shape.length) for (const f of MODEL_FACINGS) for (const p of modelFindings(modelView(M, key, f, m, sprites), SEAT_LOOKS).problems) problems.push(`${f}: ${p}`);
+    if (!problems.length) for (const f of MODEL_FACINGS) for (const p of seatProblems(modelView(M, key, f, m, sprites))) problems.push(`${f}: ${p}`);
     if (!draft.reviewed || !/^\d{4}-\d{2}-\d{2}$/.test(draft.reviewed)) problems.push('not reviewed: the reviewer passes it in How people sit in it');
   }
   let written: string | undefined;
