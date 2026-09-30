@@ -7,6 +7,7 @@
  * and a `PostgresPersistence` can implement `Persistence` without touching callers.
  */
 import { randomUUID } from 'node:crypto';
+import { bindingSlot, type BindingSlot } from '@shared/domain/types';
 import type {
   AuditEntry,
   AvatarLoadout,
@@ -256,11 +257,30 @@ export class Store {
     this.scheduleSave();
   }
 
-  setBinding(orgId: string, binding: RoomBinding | null, roomId: string): void {
+  /**
+   * Set (or clear) one of a space's bindings. A space keeps one voice and one text binding: setting a
+   * text channel leaves its voice channel alone and vice versa. `slot` limits a removal; without it,
+   * removing clears the whole space.
+   */
+  setBinding(orgId: string, binding: RoomBinding | null, roomId: string, slot?: BindingSlot): void {
     const d = this.get(orgId);
-    d.bindings = d.bindings.filter((b) => b.roomId !== roomId);
+    const which = binding ? bindingSlot(binding.kind) : slot;
+    d.bindings = d.bindings.filter((b) => b.roomId !== roomId || (which !== undefined && bindingSlot(b.kind) !== which));
     if (binding) d.bindings.push(binding);
     this.scheduleSave();
+  }
+
+  /** The provider renamed a bound channel: keep the space's label in step with it. */
+  relabelBinding(orgId: string, bindingId: string, label: string): void {
+    const b = this.get(orgId).bindings.find((x) => x.id === bindingId);
+    if (b && b.label !== label) {
+      b.label = label;
+      this.scheduleSave();
+    }
+  }
+
+  bindingFor(orgId: string, roomId: string, slot: BindingSlot): RoomBinding | undefined {
+    return this.get(orgId).bindings.find((b) => b.roomId === roomId && bindingSlot(b.kind) === slot);
   }
 
   updateRoom(orgId: string, roomId: string, patch: Partial<Pick<Room, 'name' | 'description' | 'ownerTeamId'>>): Room {

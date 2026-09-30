@@ -1,7 +1,11 @@
 import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { discordBotConfigured, discordConfigured } from '../config';
+import { config, discordBotConfigured, discordConfigured } from '../config';
+import { TOWN_ID } from '@shared/world';
+import { discordApi } from '../providers/discord/api';
+import { DISCORD_BOT_PERMISSION_BITS } from '../providers/discord/provider';
+import { effectivePermissions, runSetup } from '../providers/discord/setup';
 import { requireAdmin, requireMember, type AppContext, authed } from '../context';
 import { bindingView } from './api';
 import { DiscordApiError } from '../providers/discord/api';
@@ -67,7 +71,7 @@ export function adminRoutes(ctx: AppContext, onDiscordConnected: (orgId: string)
   });
 
   const bindingSchema = z.union([
-    z.object({ remove: z.literal(true) }),
+    z.object({ remove: z.literal(true), slot: z.enum(['voice', 'text']).optional() }),
     z.object({
       provider: z.enum(['discord', 'slack', 'demo']),
       kind: z.enum(['voice', 'text', 'stage', 'activity']),
@@ -80,12 +84,13 @@ export function adminRoutes(ctx: AppContext, onDiscordConnected: (orgId: string)
     const { orgId, member } = authed(req);
     const d = ctx.store.get(orgId);
     const roomId = req.params.roomId;
-    if (!d.rooms.some((x) => x.id === roomId)) return res.status(404).json({ error: 'room not found' });
+    // The town is a space too: its channels are the company's "general".
+    if (roomId !== TOWN_ID && !d.rooms.some((x) => x.id === roomId)) return res.status(404).json({ error: 'room not found' });
     const body = bindingSchema.safeParse(req.body);
     if (!body.success) return res.status(400).json({ error: 'invalid input' });
     if ('remove' in body.data) {
-      ctx.store.setBinding(orgId, null, roomId);
-      ctx.store.audit(orgId, member.id, 'binding.removed', roomId);
+      ctx.store.setBinding(orgId, null, roomId, body.data.slot);
+      ctx.store.audit(orgId, member.id, 'binding.removed', roomId, body.data.slot);
       return res.json({ ok: true });
     }
     const guild = d.connections.find((c) => c.provider === 'discord' && c.status === 'active');
@@ -101,6 +106,7 @@ export function adminRoutes(ctx: AppContext, onDiscordConnected: (orgId: string)
     };
     ctx.store.setBinding(orgId, binding, roomId);
     ctx.store.audit(orgId, member.id, 'binding.set', roomId, `${binding.provider}:${binding.externalChannelId}`);
+    ctx.hubs.get(orgId)?.bindingsChanged();
     res.json({ binding: bindingView(ctx, binding) });
   });
 
@@ -119,6 +125,61 @@ export function adminRoutes(ctx: AppContext, onDiscordConnected: (orgId: string)
       res.json({ channels: await ctx.discord.listChannels(conn.externalWorkspaceId) });
     } catch (e) {
       res.status(502).json({ error: e instanceof DiscordApiError ? `Discord said ${e.status}` : 'failed' });
+    }
+  });
+
+  /** Can the bot do everything the bridge needs in this server? (Server-wide; channel overrides can still deny.) */
+  r.get('/discord/permissions', async (req, res) => {
+    const { orgId } = authed(req);
+    const conn = ctx.store.get(orgId).connections.find((c) => c.provider === 'discord' && c.status === 'active');
+    if (!conn || !discordBotConfigured()) return res.json({ connected: false, items: [], installUrl: config.discord.clientId ? ctx.discord.botInstallUrl() : null });
+    try {
+      const token = config.discord.botToken;
+      const [guild, roles, me] = await Promise.all([
+        discordApi.guild(token, conn.externalWorkspaceId),
+        discordApi.guildRoles(token, conn.externalWorkspaceId),
+        discordApi.botUser(token),
+      ]);
+      const botMember = await discordApi.guildMember(token, conn.externalWorkspaceId, me.id);
+      const perms = effectivePermissions({ guildId: guild.id, ownerId: guild.owner_id, botId: me.id, roles, botRoleIds: botMember.roles });
+      const why: Record<string, string> = {
+        'View Channels': 'See the server’s channels and who’s in voice',
+        'Read Message History': 'Load a space’s recent conversation when you walk in',
+        'Send Messages': 'Post what’s said in the world to the space’s channel',
+        'Embed Links': 'Post links from the world with previews',
+        'Manage Webhooks': 'Post under each person’s own name and picture',
+        Connect: 'Needed alongside Move Members for voice follow',
+        'Move Members': 'Move you between voice channels as you walk between spaces',
+        'Manage Channels': 'One-click “set up channels for every space”',
+      };
+      const items = Object.entries(DISCORD_BOT_PERMISSION_BITS).map(([name, bit]) => ({ name, ok: (perms & bit) !== 0n, neededFor: why[name] ?? '' }));
+      res.json({
+        connected: true,
+        guild: { id: guild.id, name: guild.name },
+        items,
+        messageContent: ctx.discordBridge?.messageContent ?? true,
+        installUrl: ctx.discord.botInstallUrl(),
+      });
+    } catch (e) {
+      res.status(502).json({ error: e instanceof DiscordApiError ? `Discord said ${e.status}` : 'failed' });
+    }
+  });
+
+  /** Match (and optionally create) a text and a voice channel for the town and every room. */
+  r.post('/discord/setup', async (req, res) => {
+    const { orgId, member } = authed(req);
+    const body = z.object({ create: z.boolean() }).safeParse(req.body);
+    if (!body.success) return res.status(400).json({ error: 'invalid input' });
+    const conn = ctx.store.get(orgId).connections.find((c) => c.provider === 'discord' && c.status === 'active');
+    if (!conn || !discordBotConfigured()) return res.status(400).json({ error: 'connect a Discord server first' });
+    try {
+      const result = await runSetup({ store: ctx.store, orgId, guildId: conn.externalWorkspaceId, token: config.discord.botToken, create: body.data.create });
+      const done = result.plan.filter((p) => p.action === 'matched' || p.action === 'create').length - result.failed.length;
+      ctx.store.audit(orgId, member.id, 'discord.setup', conn.externalWorkspaceId, `${done} channels bound${result.failed.length ? `, ${result.failed.length} failed` : ''}`);
+      ctx.hubs.get(orgId)?.bindingsChanged();
+      res.json(result);
+    } catch (e) {
+      res.status(502).json({ error: e instanceof DiscordApiError ? `Discord said ${e.status}` : (e as Error).message });
     }
   });
 

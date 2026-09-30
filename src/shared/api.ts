@@ -29,6 +29,10 @@ export interface ProviderCapabilities {
   deepLinkJoin: boolean;
   /** Run Minglewood embedded inside the provider (e.g. a Discord Activity). */
   embeddedApp: boolean;
+  /** What's said in a space goes to its text channel, and the channel's messages show in the space. */
+  chatBridge: boolean;
+  /** Walking between spaces moves you between their voice channels (once you're connected to voice). */
+  voiceFollow: boolean;
 }
 
 export interface JoinInstruction {

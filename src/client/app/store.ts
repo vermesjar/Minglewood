@@ -4,7 +4,7 @@
  */
 import { useSyncExternalStore } from 'react';
 import type { Bootstrap, PublicConfig, PublicMember } from '@shared/api';
-import type { OrgEvent } from '@shared/domain/types';
+import type { ChatEntry, OrgEvent } from '@shared/domain/types';
 import type { BoardNote, DirectoryEntry, KnockKind, Occupant } from '@shared/protocol';
 
 export interface Toast {
@@ -34,6 +34,8 @@ export interface Prefs {
   highContrast: boolean;
   showAllNames: boolean;
   sidebarOpen: boolean;
+  /** The space's conversation panel is folded down to its header. */
+  chatCollapsed?: boolean;
 }
 
 export interface State {
@@ -69,6 +71,8 @@ export interface State {
    */
   decorate: { itemId: string | null; move?: boolean; moving?: string } | null;
   authError: string | null;
+  /** The conversation of the space you're in; `channel` is its linked text channel, if any. */
+  chat: { sceneId: string | null; entries: ChatEntry[]; channel?: { name: string; provider: string } };
 }
 
 const reducedDefault = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -113,6 +117,7 @@ let state: State = {
   announce: '',
   decorate: null,
   authError: null,
+  chat: { sceneId: null, entries: [] },
 };
 
 const listeners = new Set<() => void>();

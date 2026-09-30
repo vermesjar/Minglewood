@@ -34,6 +34,7 @@ const profileSchema = z.object({
     .object({
       locationVisibility: z.enum(['everyone', 'team', 'nobody']),
       knocksWhileFocused: z.boolean(),
+      voiceFollow: z.boolean().optional(),
       reducedMotion: z.boolean().optional(),
     })
     .partial()

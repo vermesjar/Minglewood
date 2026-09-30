@@ -5,6 +5,7 @@ import { TopBar } from './TopBar';
 import { Sidebar } from './Sidebar';
 import { RoomPanel } from './RoomPanel';
 import { ActionBar } from './ActionBar';
+import { ChatPanel } from './ChatPanel';
 import { SelectionLayer } from './SelectionLayer';
 import { Toasts } from './Toasts';
 import { SearchPalette } from './SearchPalette';
@@ -45,6 +46,7 @@ export function WorldScreen() {
       <TopBar />
       <Sidebar />
       <RoomPanel />
+      <ChatPanel />
       <ActionBar />
       <DecoratePalette />
       <SelectionLayer />

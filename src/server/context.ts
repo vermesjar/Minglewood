@@ -6,6 +6,7 @@ import type { OrgHub } from './realtime/orgHub';
 import type { DiscordProvider } from './providers/discord/provider';
 import type { DemoProvider } from './providers/demo';
 import type { SlackService } from './slack/service';
+import type { DiscordBridge } from './providers/discord/bridge';
 
 export interface AppContext {
   store: Store;
@@ -16,6 +17,8 @@ export interface AppContext {
   slack: SlackService;
   /** Which org a Discord server belongs to (installed tenants, or the legacy single-guild setup). */
   resolveGuild(guildId: string): Promise<string | undefined>;
+  /** Chat, history and voice-follow between spaces and Discord channels (present when a bot token is set). */
+  discordBridge?: DiscordBridge;
 }
 
 export interface AuthedRequest extends Request {

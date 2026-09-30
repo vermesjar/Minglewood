@@ -1,18 +1,30 @@
 /**
- * Minimal Discord Gateway client used ONLY for voice presence.
+ * Minimal Discord Gateway client: voice presence, the messages of bound text channels, and channel
+ * renames/deletions (Discord is the book of record for a space's channels).
  *
- * Intents: GUILDS (1<<0) + GUILD_VOICE_STATES (1<<7). Both are non-privileged. We deliberately do
- * not request GUILD_PRESENCES (online/idle status) — it's privileged, and "is this person online"
- * is exactly the kind of signal Minglewood leaves to the member to share.
- *
- * GUILD_CREATE carries the initial `voice_states`; VOICE_STATE_UPDATE carries changes.
+ * Intents: GUILDS (1<<0), GUILD_VOICE_STATES (1<<7), GUILD_MESSAGES (1<<9) and MESSAGE_CONTENT (1<<15).
+ * Message Content is privileged: it must be switched on for the bot in the Developer Portal. Without it
+ * Discord refuses the connection (close 4014); we then reconnect without it and report the chat bridge as
+ * one-way instead of losing voice presence. We deliberately never request GUILD_PRESENCES (online/idle):
+ * "is this person online" is the member's to share.
  */
 import { EventEmitter } from 'node:events';
 import WebSocket from 'ws';
 import type { VoiceStateChange } from '../types';
+import type { DiscordMessage } from './api';
 
 const GATEWAY = 'wss://gateway.discord.gg/?v=10&encoding=json';
-const INTENTS = (1 << 0) | (1 << 7);
+const GUILDS = 1 << 0;
+const GUILD_VOICE_STATES = 1 << 7;
+const GUILD_MESSAGES = 1 << 9;
+const MESSAGE_CONTENT = 1 << 15;
+const FULL_INTENTS = GUILDS | GUILD_VOICE_STATES | GUILD_MESSAGES | MESSAGE_CONTENT;
+
+/** A message posted in a server text channel. `content` is empty without the Message Content intent. */
+export interface GatewayMessage {
+  guildId: string;
+  message: DiscordMessage;
+}
 
 interface RawVoiceState {
   guild_id?: string;
@@ -25,9 +37,16 @@ interface RawVoiceState {
 
 export class DiscordVoiceGateway extends EventEmitter<{
   voice: [guildId: string, change: VoiceStateChange];
+  message: [msg: GatewayMessage];
+  channel: [guildId: string, channel: { id: string; name?: string; deleted: boolean }];
   ready: [];
+  degraded: [reason: 'message-content' | 'messages'];
   error: [err: Error];
 }> {
+  private intents = FULL_INTENTS;
+  /** False when Discord refused the Message Content intent: we still hear messages but not their text. */
+  messageContent = true;
+  botUserId: string | null = null;
   private ws: WebSocket | null = null;
   private heartbeat: NodeJS.Timeout | null = null;
   private seq: number | null = null;
@@ -62,6 +81,20 @@ export class DiscordVoiceGateway extends EventEmitter<{
     ws.on('close', (code) => {
       if (this.heartbeat) clearInterval(this.heartbeat);
       if (this.stopped) return;
+      if (code === 4014 && this.intents & MESSAGE_CONTENT) {
+        // Message Content isn't enabled for this bot: keep everything else working.
+        this.intents &= ~MESSAGE_CONTENT;
+        this.messageContent = false;
+        this.emit('degraded', 'message-content');
+        setTimeout(() => this.connect(), 500);
+        return;
+      }
+      if (code === 4014 && this.intents & GUILD_MESSAGES) {
+        this.intents &= ~GUILD_MESSAGES;
+        this.emit('degraded', 'messages');
+        setTimeout(() => this.connect(), 500);
+        return;
+      }
       if (code === 4004 || code === 4014) {
         this.emit('error', new Error(`Gateway closed with ${code} (bad token or disallowed intents); not reconnecting.`));
         return;
@@ -87,7 +120,7 @@ export class DiscordVoiceGateway extends EventEmitter<{
           this.acked = false;
           this.send(1, this.seq);
         }, interval);
-        this.send(2, { token: this.token, intents: INTENTS, properties: { os: process.platform, browser: 'minglewood', device: 'minglewood' } });
+        this.send(2, { token: this.token, intents: this.intents, properties: { os: process.platform, browser: 'minglewood', device: 'minglewood' } });
         break;
       }
       case 11:
@@ -110,6 +143,7 @@ export class DiscordVoiceGateway extends EventEmitter<{
     const watched = new Set(this.guildIds());
     if (t === 'READY') {
       this.backoff = 1000;
+      this.botUserId = (d as { user?: { id: string } }).user?.id ?? null;
       this.emit('ready');
     } else if (t === 'GUILD_CREATE') {
       const g = d as { id: string; voice_states?: RawVoiceState[] };
@@ -119,6 +153,12 @@ export class DiscordVoiceGateway extends EventEmitter<{
     } else if (t === 'VOICE_STATE_UPDATE') {
       const vs = d as RawVoiceState;
       if (vs.guild_id && (watched.has(vs.guild_id) || this.acceptUnknown)) this.emit('voice', vs.guild_id, toChange(vs));
+    } else if (t === 'MESSAGE_CREATE') {
+      const m = d as DiscordMessage & { guild_id?: string };
+      if (m.guild_id && (watched.has(m.guild_id) || this.acceptUnknown)) this.emit('message', { guildId: m.guild_id, message: m });
+    } else if (t === 'CHANNEL_UPDATE' || t === 'CHANNEL_DELETE') {
+      const c = d as { id: string; guild_id?: string; name?: string };
+      if (c.guild_id && (watched.has(c.guild_id) || this.acceptUnknown)) this.emit('channel', c.guild_id, { id: c.id, name: c.name, deleted: t === 'CHANNEL_DELETE' });
     }
   }
 }

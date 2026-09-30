@@ -41,6 +41,7 @@ export function upsertDiscordMember(ctx: AppContext, orgId: string, p: ExternalI
   const known = existing && ctx.store.member(orgId, existing.memberId);
   if (known) {
     if (admin && known.role === 'member') ctx.store.updateMember(orgId, known.id, { role: 'admin' });
+    if (p.avatarUrl !== existing.avatarUrl) ctx.store.linkIdentity(orgId, { ...existing, avatarUrl: p.avatarUrl });
     return known;
   }
   const demoOrg = orgId === ORG_ID;
@@ -67,6 +68,7 @@ export function upsertDiscordMember(ctx: AppContext, orgId: string, p: ExternalI
     externalId: p.externalId,
     memberId: member.id,
     username: p.username,
+    avatarUrl: p.avatarUrl,
     linkedAt: new Date().toISOString(),
   });
   ctx.store.audit(orgId, member.id, 'member.joined', member.id, 'via Discord');

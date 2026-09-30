@@ -5,7 +5,7 @@
 import { carryMeta } from '@shared/carry';
 import type { Bootstrap, PublicConfig } from '@shared/api';
 import type { AvatarLoadout, PresenceStatus, SavedOutfit } from '@shared/domain/types';
-import { NOTE_MAX_CHARS, fromWirePatch, type KnockKind, type KnockReply, type NpcState, type Occupant, type ServerMsg, type WirePatch } from '@shared/protocol';
+import { MAX_CHAT, NOTE_MAX_CHARS, fromWirePatch, type KnockKind, type KnockReply, type NpcState, type Occupant, type ServerMsg, type WirePatch } from '@shared/protocol';
 import type { EmoteId } from '@shared/presence';
 import { EMOTE_IDS } from '@shared/presence';
 import { getScene, TOWN_ID, buildingForRoom } from '@shared/world';
@@ -323,6 +323,19 @@ class Game {
       }
       case 'emote':
         w?.emote(m.memberId, m.emote);
+        break;
+      case 'chat-history':
+        setState({ chat: { sceneId: m.sceneId, entries: m.entries, channel: m.channel } });
+        break;
+      case 'chat':
+        setState((s) =>
+          s.chat.sceneId !== m.entry.sceneId || s.chat.entries.some((e) => e.id === m.entry.id)
+            ? {}
+            : { chat: { ...s.chat, entries: [...s.chat.entries, m.entry].slice(-80) } },
+        );
+        break;
+      case 'bindings-changed':
+        void this.refreshBoot();
         break;
       case 'said':
         w?.say(m.memberId, m.text);
@@ -942,7 +955,7 @@ class Game {
 
   say(text: string) {
     const t = text.trim();
-    if (t) this.rt?.send({ t: 'say', text: t.slice(0, 120) });
+    if (t) this.rt?.send({ t: 'say', text: t.slice(0, MAX_CHAT) });
   }
 
   setStatus(status: Exclude<PresenceStatus, 'offline'>, note?: string) {

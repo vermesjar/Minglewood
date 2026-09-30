@@ -74,6 +74,9 @@ export class SlackProvider implements CommunicationProvider {
       directVoiceJoin: false,
       deepLinkJoin: true,
       embeddedApp: false,
+      // not yet: Slack messages stay in Slack; huddles can't be joined or switched by an app
+      chatBridge: false,
+      voiceFollow: false,
     };
   }
 

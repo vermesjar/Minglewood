@@ -7,7 +7,7 @@
  * coarse, throttled `directory` message (status + which room), never positions.
  */
 import { z } from 'zod';
-import type { AvatarLoadout, HistoricalArtifact, Member, OrgEvent, PresenceState, PresenceStatus } from './domain/types';
+import type { AvatarLoadout, ChatEntry, HistoricalArtifact, Member, OrgEvent, PresenceState, PresenceStatus } from './domain/types';
 import type { Facing, UseKind } from './world/scene';
 import type { Decoration } from './world/decor';
 import type { Tile } from './world/pathfinding';
@@ -121,6 +121,12 @@ export type ServerMsg =
   | { t: 'updated'; memberId: string; patch: Partial<Occupant> }
   | { t: 'emote'; memberId: string; emote: EmoteId; targetId?: string }
   | { t: 'said'; memberId: string; text: string }
+  /** A line in a space's conversation (typed in the world, or posted in the bound channel). */
+  | { t: 'chat'; entry: ChatEntry }
+  /** An admin changed which channels the spaces are linked to: re-read the org config. */
+  | { t: 'bindings-changed' }
+  /** Recent conversation when you arrive in a space; `channel` names the bound text channel, if any. */
+  | { t: 'chat-history'; sceneId: string; entries: ChatEntry[]; channel?: { name: string; provider: string } }
   | { t: 'directory'; entries: DirectoryEntry[] }
   | { t: 'knock'; knockId: string; fromId: string; kind: KnockKind; sceneId?: string }
   | { t: 'knock-result'; knockId: string; targetId: string; reply: KnockReply; message?: string; sceneId?: string }
@@ -131,6 +137,9 @@ export type ServerMsg =
   | { t: 'member'; memberId: string; avatar: AvatarLoadout; unlockedItems: string[] }
   | { t: 'profile'; member: Omit<Member, 'settings'> }
   | { t: 'error'; message: string };
+
+/** Longest chat line: fits comfortably in a bubble and well under Discord's 2000-character limit. */
+export const MAX_CHAT = 500;
 
 const tile = z.tuple([z.number().int().min(0).max(512), z.number().int().min(0).max(512)]);
 const hex = z.string().regex(/^#[0-9a-fA-F]{6}$/);
@@ -196,7 +205,7 @@ export const clientMsgSchema = z.discriminatedUnion('t', [
     emote: z.enum(EMOTE_IDS as [EmoteId, ...EmoteId[]]),
     targetId: idStr.optional(),
   }),
-  z.object({ t: z.literal('say'), text: z.string().min(1).max(120) }),
+  z.object({ t: z.literal('say'), text: z.string().min(1).max(MAX_CHAT) }),
   z.object({ t: z.literal('knock'), targetId: idStr, kind: z.enum(['chat', 'coffee']) }),
   z.object({ t: z.literal('knock-reply'), knockId: idStr, reply: z.enum(['join', 'soon', 'no']) }),
   z.object({ t: z.literal('avatar'), loadout: loadoutSchema }),

@@ -72,6 +72,8 @@ export interface MemberSettings {
   reducedMotion?: boolean;
   /** When I'm not in the world, deliver knocks as a Slack DM from the Minglewood bot. Opt-in. */
   slackKnockDms?: boolean;
+  /** While I'm in a Discord voice channel, move me to the voice channel of whatever space I walk into. Default on. */
+  voiceFollow?: boolean;
 }
 
 export interface ExternalIdentity {
@@ -81,6 +83,8 @@ export interface ExternalIdentity {
   username?: string;
   /** Verified email from the provider (Slack), used to recognise the same person across sign-in methods. */
   email?: string;
+  /** Their picture on the provider, so what they say in the world shows up in the channel as them. */
+  avatarUrl?: string;
   linkedAt: string;
 }
 
@@ -195,9 +199,15 @@ export interface Room {
 }
 
 /** Binds a Minglewood room to a context on a communication provider. */
+/**
+ * A space's link to a real channel. Every space (the town, and each room) can have one *voice* binding
+ * (voice/stage/activity) and one *text* binding. The provider is the book of record: names come from it,
+ * messages live in it; Minglewood only mirrors and drives.
+ */
 export interface RoomBinding {
   id: Id;
   orgId: Id;
+  /** A room id, or the town (`TOWN_ID`) for the open world. */
   roomId: Id;
   provider: ProviderKind;
   kind: 'voice' | 'text' | 'stage' | 'activity';
@@ -207,6 +217,22 @@ export interface RoomBinding {
 }
 
 export type ProviderKind = 'discord' | 'slack' | 'demo';
+
+export type BindingSlot = 'voice' | 'text';
+export const bindingSlot = (kind: RoomBinding['kind']): BindingSlot => (kind === 'text' ? 'text' : 'voice');
+
+/** One line of a space's conversation, from the world or from the bound channel. Never persisted here. */
+export interface ChatEntry {
+  id: string;
+  sceneId: string;
+  /** The Minglewood member who said it, when we know them. */
+  memberId?: string;
+  name: string;
+  avatarUrl?: string;
+  text: string;
+  at: string;
+  source: 'world' | ProviderKind;
+}
 
 export interface ProviderConnection {
   id: Id;

@@ -12,10 +12,12 @@ type Tab = 'overview' | 'rooms' | 'memory' | 'slack' | 'discord' | 'events' | 'a
 /** [capability, label, how, possible on Discord at all] — verified against current Discord docs. */
 const CAPS: Array<[keyof ProviderCapabilities, string, string, boolean]> = [
   ['identity', 'Sign in with Discord', 'OAuth2 with identify + guilds.members.read; membership of the connected server is verified.', true],
-  ['channelListing', 'List channels for binding', 'Bot token, GET /guilds/{id}/channels (View Channels permission only).', true],
+  ['channelListing', 'List channels for binding', 'Bot token, GET /guilds/{id}/channels (View Channels).', true],
   ['voicePresence', 'See who’s in voice', 'Gateway GUILD_VOICE_STATES intent (non-privileged). People in a bound voice channel appear in the room.', true],
   ['speakingIndicators', 'Live speaking indicators', 'Needs rpc.voice.read, which Discord grants only to approved partners. Shown as unavailable.', false],
-  ['directVoiceJoin', 'Move people into voice automatically', 'Not possible: no API moves a user into voice unless already connected, and the SDK has no join command. We deep-link instead.', false],
+  ['directVoiceJoin', 'Pull people into voice from nothing', 'Not possible: no API connects someone to voice who isn’t already connected, and the SDK has no join command. We deep-link for the first join.', false],
+  ['voiceFollow', 'Voice follows you between spaces', 'Once you’re connected to any voice channel, the bot moves you (Move Members) into each space’s voice channel as you walk in; switching in Discord walks your avatar over.', true],
+  ['chatBridge', 'Each space’s chat is its text channel', 'What’s said in a space is posted to its channel under your name (webhook); the channel’s messages appear in the space (GUILD_MESSAGES + Message Content intent). History loads when you walk in.', true],
   ['deepLinkJoin', 'Open the channel in Discord', 'discord.com/channels/{guild}/{channel} — one click in Discord to join voice.', true],
   ['embeddedApp', 'Run inside Discord as an Activity', 'Embedded App SDK; Activity launch in a bound voice channel drops people into that room.', true],
 ];
@@ -61,7 +63,7 @@ export function AdminConsole() {
         {(
           [
             ['overview', 'Organization'],
-            ['rooms', 'Rooms & channels'],
+            ['rooms', 'Spaces & channels'],
             ['memory', 'Company memory'],
             ['slack', 'Slack'],
             ['discord', 'Discord'],
@@ -176,29 +178,65 @@ type Provider = 'demo' | 'discord' | 'slack';
 /** Slack bindings are channels whose huddle is the room's voice; Discord's are voice channels. */
 const channelMark = (provider: Provider, c: ExternalChannel) => (c.kind === 'text' ? '#' : provider === 'slack' ? '🎧 #' : '🔊 ');
 
-function RoomRow({ room, data, channels, reload }: { room: Room; data: AdminOverview; channels: Record<string, ExternalChannel[]>; reload: () => void }) {
-  const binding = data.bindings.find((b) => b.roomId === room.id);
-  const [provider, setProvider] = useState<Provider>(binding?.provider ?? 'demo');
-  const [channelId, setChannelId] = useState(binding?.externalChannelId ?? '');
-  const [desc, setDesc] = useState(room.description);
+/** A place in the world that can have channels: the town (the company's "general") and every room. */
+interface SpaceRow {
+  id: string;
+  name: string;
+  emoji: string;
+  purpose: string;
+  room?: Room;
+}
+
+function ChannelSelect({ list, provider, value, onChange, slot }: { list: ExternalChannel[]; provider: Provider; value: string; onChange: (v: string) => void; slot: 'voice' | 'text' }) {
+  // Slack: any channel can be a space's text (its messages) or voice (its huddle). Discord: by type.
+  const options = provider === 'slack' ? list : list.filter((c) => (slot === 'text' ? c.kind === 'text' : c.kind === 'voice' || c.kind === 'stage'));
+  return (
+    <select value={value} onChange={(e) => onChange(e.target.value)} aria-label={`${slot} channel`}>
+      <option value="">— none —</option>
+      {options.map((c) => (
+        <option key={c.id} value={c.id}>
+          {c.parentName ? `${c.parentName} / ` : ''}
+          {slot === 'voice' && provider === 'slack' ? '🎧 #' : channelMark(provider, c)}
+          {c.name}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+function SpaceRowView({ space, data, channels, reload }: { space: SpaceRow; data: AdminOverview; channels: Record<string, ExternalChannel[]>; reload: () => void }) {
+  const voice = data.bindings.find((b) => b.roomId === space.id && b.kind !== 'text');
+  const text = data.bindings.find((b) => b.roomId === space.id && b.kind === 'text');
+  const [provider, setProvider] = useState<Provider>(voice?.provider ?? text?.provider ?? (data.connections.some((c) => c.provider === 'discord') ? 'discord' : 'demo'));
+  const [voiceId, setVoiceId] = useState(voice?.externalChannelId ?? '');
+  const [textId, setTextId] = useState(text?.externalChannelId ?? '');
+  const [desc, setDesc] = useState(space.room?.description ?? '');
   const [status, setStatus] = useState('');
   const list = channels[provider] ?? [];
+  const quiet = !!space.room?.quiet;
+
+  const saveSlot = async (slot: 'voice' | 'text', id: string, current?: { externalChannelId: string; provider: string }) => {
+    if (current?.externalChannelId === id && current.provider === provider) return;
+    if (!id) {
+      if (current) await api(`/admin/bindings/${space.id}`, { method: 'PUT', json: { remove: true, slot } });
+      return;
+    }
+    const ch = list.find((c) => c.id === id);
+    await api(`/admin/bindings/${space.id}`, {
+      method: 'PUT',
+      json: {
+        provider,
+        kind: slot === 'text' ? 'text' : ch?.kind === 'stage' ? 'stage' : 'voice',
+        externalChannelId: id,
+        label: ch ? `${slot === 'voice' && provider === 'slack' ? '🎧 #' : channelMark(provider, ch)}${ch.name}` : id,
+      },
+    });
+  };
   const save = async () => {
     try {
-      if (!channelId) await api(`/admin/bindings/${room.id}`, { method: 'PUT', json: { remove: true } });
-      else {
-        const ch = list.find((c) => c.id === channelId);
-        await api(`/admin/bindings/${room.id}`, {
-          method: 'PUT',
-          json: {
-            provider,
-            kind: ch?.kind === 'stage' ? 'stage' : ch?.kind === 'text' ? 'text' : 'voice',
-            externalChannelId: channelId,
-            label: ch ? `${channelMark(provider, ch)}${ch.name}` : channelId,
-          },
-        });
-      }
-      if (desc !== room.description) await api(`/admin/rooms/${room.id}`, { method: 'PUT', json: { description: desc } });
+      await saveSlot('voice', voiceId, voice);
+      await saveSlot('text', textId, text);
+      if (space.room && desc !== space.room.description) await api(`/admin/rooms/${space.id}`, { method: 'PUT', json: { description: desc } });
       setStatus('Saved');
       reload();
     } catch (e) {
@@ -209,15 +247,12 @@ function RoomRow({ room, data, channels, reload }: { room: Room; data: AdminOver
     <tr>
       <td>
         <strong>
-          {room.emoji} {room.name}
+          {space.emoji} {space.name}
         </strong>
-        <div className="amuted">{room.purpose}</div>
+        <div className="amuted">{space.purpose}</div>
       </td>
       <td>
-        <textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={2} />
-      </td>
-      <td>
-        <select value={provider} onChange={(e) => (setProvider(e.target.value as Provider), setChannelId(''))}>
+        <select value={provider} onChange={(e) => (setProvider(e.target.value as Provider), setVoiceId(''), setTextId(''))} disabled={quiet}>
           <option value="demo">Demo</option>
           <option value="slack" disabled={!data.slack.team}>
             Slack
@@ -227,19 +262,23 @@ function RoomRow({ room, data, channels, reload }: { room: Room; data: AdminOver
           </option>
         </select>
       </td>
-      <td>
-        <select value={channelId} onChange={(e) => setChannelId(e.target.value)}>
-          <option value="">— none —</option>
-          {list.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.parentName ? `${c.parentName} / ` : ''}
-              {channelMark(provider, c)}
-              {c.name}
-            </option>
-          ))}
-        </select>
-        {binding && <div className="amuted">now: {binding.label}</div>}
-      </td>
+      {quiet ? (
+        <td colSpan={2} className="amuted">
+          Quiet room — no channels, on purpose.
+        </td>
+      ) : (
+        <>
+          <td>
+            <ChannelSelect list={list} provider={provider} value={voiceId} onChange={setVoiceId} slot="voice" />
+            {voice && <div className="amuted">now: {voice.label}</div>}
+          </td>
+          <td>
+            <ChannelSelect list={list} provider={provider} value={textId} onChange={setTextId} slot="text" />
+            {text && <div className="amuted">now: {text.label}</div>}
+          </td>
+        </>
+      )}
+      <td>{space.room ? <textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={2} /> : <span className="amuted">The open world</span>}</td>
       <td>
         <button className="abtn" onClick={save}>
           Save
@@ -250,11 +289,123 @@ function RoomRow({ room, data, channels, reload }: { room: Room; data: AdminOver
   );
 }
 
+interface PermissionReport {
+  connected: boolean;
+  guild?: { id: string; name: string };
+  items: Array<{ name: string; ok: boolean; neededFor: string }>;
+  messageContent?: boolean;
+  installUrl: string | null;
+}
+
+interface SetupItem {
+  spaceName: string;
+  slot: 'voice' | 'text';
+  action: 'kept' | 'matched' | 'create' | 'skip';
+  channelName: string;
+}
+
+/** One click: a text and a voice channel for every space, matched by name or created, plus a permissions check. */
+function DiscordSetup({ reload }: { reload: () => void }) {
+  const [perms, setPerms] = useState<PermissionReport | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<{ plan: SetupItem[]; failed: Array<SetupItem & { error: string }> } | null>(null);
+  const [err, setErr] = useState('');
+  const check = useCallback(() => {
+    void api<PermissionReport>('/admin/discord/permissions')
+      .then(setPerms)
+      .catch((e) => setErr((e as Error).message));
+  }, []);
+  useEffect(check, [check]);
+  const run = async (create: boolean) => {
+    setBusy(true);
+    setErr('');
+    try {
+      setResult(await api('/admin/discord/setup', { method: 'POST', json: { create } }));
+      reload();
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const missing = perms?.items.filter((i) => !i.ok) ?? [];
+  const verb: Record<SetupItem['action'], string> = { kept: 'kept', matched: 'linked', create: 'created', skip: 'no match' };
+  return (
+    <section className="apanel wide">
+      <h2>Discord: channels for every space</h2>
+      <p className="amuted">
+        Each space is its channels. Walk into the café and you’re in the café’s voice channel (once you’ve joined voice in
+        Discord); what you say there is posted in its text channel, and what’s posted there shows up in the world. The town
+        is your server’s <strong>#general</strong>. Discord stays the record: renames and deletions there are followed here.
+      </p>
+      <div className="arow">
+        <button className="abtn" disabled={busy} onClick={() => void run(false)}>
+          Link matching channels
+        </button>
+        <button className="abtn primary" disabled={busy} onClick={() => void run(true)}>
+          Link, and create what’s missing
+        </button>
+        <span className="amuted">Creates a “Minglewood” category with a #text and a voice channel per space. Existing links are kept.</span>
+      </div>
+      {result && (
+        <ul className="alist">
+          {result.plan
+            .filter((p) => p.action !== 'kept')
+            .map((p, i) => (
+              <li key={i}>
+                {p.spaceName} · {p.slot}: {verb[p.action]} {p.action !== 'skip' ? p.channelName : ''}
+              </li>
+            ))}
+          {result.failed.map((f, i) => (
+            <li key={`f${i}`} className="aerror">
+              {f.spaceName} · {f.slot}: failed — {f.error}
+            </li>
+          ))}
+          {result.plan.every((p) => p.action === 'kept') && <li>Every space already has its channels.</li>}
+        </ul>
+      )}
+      {err && <p className="aerror">{err}</p>}
+      <h3>Bot permissions{perms?.guild ? ` in ${perms.guild.name}` : ''}</h3>
+      {!perms ? (
+        <p className="amuted">Checking…</p>
+      ) : !perms.connected ? (
+        <p className="amuted">Connect a Discord server (Discord tab) to check.</p>
+      ) : (
+        <>
+          <ul className="alist perms">
+            {perms.items.map((i) => (
+              <li key={i.name}>
+                {i.ok ? '✅' : '❌'} <strong>{i.name}</strong> <span className="amuted">— {i.neededFor}</span>
+              </li>
+            ))}
+            <li>
+              {perms.messageContent ? '✅' : '❌'} <strong>Message Content intent</strong>{' '}
+              <span className="amuted">— read what people post in Discord (Developer Portal → Bot → Privileged Gateway Intents)</span>
+            </li>
+          </ul>
+          {missing.length > 0 && perms.installUrl && (
+            <p>
+              <a className="abtn" href={perms.installUrl} target="_blank" rel="noreferrer">
+                Grant the missing permissions
+              </a>{' '}
+              <span className="amuted">Re-adding the bot updates its permissions; nothing else changes.</span>
+            </p>
+          )}
+          <button className="abtn" onClick={check}>
+            Check again
+          </button>
+        </>
+      )}
+    </section>
+  );
+}
+
 function RoomsTab({ data, reload }: TabProps) {
   const [channels, setChannels] = useState<Record<string, ExternalChannel[]>>({});
+  const discord = data.connections.some((c) => c.provider === 'discord');
   useEffect(() => {
     void api<{ channels: ExternalChannel[] }>('/admin/channels?provider=demo').then((r) => setChannels((c) => ({ ...c, demo: r.channels })));
-    if (data.connections.some((c) => c.provider === 'discord'))
+    if (discord)
       void api<{ channels: ExternalChannel[] }>('/admin/channels?provider=discord')
         .then((r) => setChannels((c) => ({ ...c, discord: r.channels })))
         .catch(() => undefined);
@@ -262,31 +413,40 @@ function RoomsTab({ data, reload }: TabProps) {
       void api<{ channels: ExternalChannel[] }>('/admin/channels?provider=slack')
         .then((r) => setChannels((c) => ({ ...c, slack: r.channels })))
         .catch(() => undefined);
-  }, [data.connections, data.slack.team]);
+  }, [discord, data.slack.team, data.bindings.length]);
+  const spaces: SpaceRow[] = [
+    { id: 'town', name: 'Town', emoji: '🏘️', purpose: 'The open world — your “general”' },
+    ...data.rooms.map((r) => ({ id: r.id, name: r.name, emoji: r.emoji, purpose: r.purpose, room: r })),
+  ];
   return (
-    <section className="apanel wide">
-      <h2>Rooms & conversation bindings</h2>
-      <p className="amuted">
-        Each room in the world can point at a conversation on your communication platform. Entering the room offers a
-        one-click way into that channel. The world model never depends on the provider — bindings are the only link.
-      </p>
-      <table className="atable">
-        <thead>
-          <tr>
-            <th>Room</th>
-            <th>Description</th>
-            <th>Provider</th>
-            <th>Channel</th>
-            <th />
-          </tr>
-        </thead>
-        <tbody>
-          {data.rooms.map((r) => (
-            <RoomRow key={r.id} room={r} data={data} channels={channels} reload={reload} />
-          ))}
-        </tbody>
-      </table>
-    </section>
+    <>
+      {discord && <DiscordSetup reload={reload} />}
+      <section className="apanel wide">
+        <h2>Spaces & channels</h2>
+        <p className="amuted">
+          Every space can have a <strong>voice</strong> channel (where you are when you’re there) and a <strong>text</strong>{' '}
+          channel (its conversation, both ways). The world never depends on the platform — these links are the only
+          connection, and the platform stays the record.
+        </p>
+        <table className="atable">
+          <thead>
+            <tr>
+              <th>Space</th>
+              <th>Platform</th>
+              <th>Voice</th>
+              <th>Text</th>
+              <th>Description</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {spaces.map((sp) => (
+              <SpaceRowView key={`${sp.id}:${data.bindings.filter((b) => b.roomId === sp.id).map((b) => b.externalChannelId).join(',')}`} space={sp} data={data} channels={channels} reload={reload} />
+            ))}
+          </tbody>
+        </table>
+      </section>
+    </>
   );
 }
 
