@@ -11,8 +11,9 @@
  * The split follows the drawing's own pixels, so its edges are the artist's. Nothing is decided pixel by pixel
  * against a body, so a box a little off the drawing never cuts into a person: it can only move an edge between parts.
  *
- * Over them, a seat never hides a sitter's head: the over layer stops at their shoulders (COVER), so a wingback or a
- * throne seen from behind shows who's in it.
+ * Over them, a seat never hides a sitter's head: the over layer stops at their shoulders (COVER), so a wingback seen
+ * from behind shows who's in it — unless its back rises past the head anyway (sitLegs `hidden`: a throne), when it
+ * covers exactly what it covers and the head shows over its top on its own.
  *
  * Each cushion's sitter sits on its sitting point (the model's `sits`), drawn with its figure's seat point exactly
  * where the point projects, and their legs laid on the seat by sitLegs.ts: thighs to just past the front edge,
@@ -94,15 +95,18 @@ export function seatLayers(v: ModelView): SeatLayers {
   for (let i = 0; i < over.length; i++) if (!v.art.px.d[i * 4 + 3]) over[i] = 0;
   const sits = viewSits(v.model, v.facing);
   const anchor: Pt = [v.art.ax, v.art.ay];
+  const legs = sits.map((s) => (s ? legsFor(v.model, s, v.style) : null));
+  // a back that rises past the sitters' heads hides them whole: no cap (capped, their shoulders showed over its top)
+  const tall = legs.length > 0 && legs.every((l) => l?.hidden);
   const out: SeatLayers = {
     facing: v.facing,
     sits,
     hips: sits.map((s) => (s ? (projectLocal(anchor, v.model.size, v.facing, s[0], s[1], s[2]) as Pt) : null)),
-    legs: sits.map((s) => (s ? legsFor(v.model, s, v.style) : null)),
+    legs,
     over,
     part: D.part,
     overParts: ov,
-    cover: traced ? undefined : COVER,
+    cover: traced || tall ? undefined : COVER,
     traced: !!traced,
   };
   memo.set(key, out);

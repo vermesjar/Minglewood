@@ -434,9 +434,13 @@ FACING_TEXT = {
     "se": "Its front faces along the red arrow, toward the LOWER RIGHT of the image; its back is toward the upper left.",
     "sw": "Its front faces along the red arrow, toward the LOWER LEFT of the image; its back is toward the upper right.",
     "nw": "Seen from BEHIND: its front faces away from us along the red arrow toward the UPPER LEFT; its back faces the "
-          "viewer on the lower-right side.",
+          "viewer on the lower-right side. Keep the SAME three-quarter 2:1 isometric angle as a front view (the piece "
+          "simply turned round on its diamond), never a straight-on rear view: a seat's cushion stays fully visible "
+          "beyond its backrest.",
     "ne": "Seen from BEHIND: its front faces away from us along the red arrow toward the UPPER RIGHT; its back faces "
-          "the viewer on the lower-left side.",
+          "the viewer on the lower-left side. Keep the SAME three-quarter 2:1 isometric angle as a front view (the "
+          "piece simply turned round on its diamond), never a straight-on rear view: a seat's cushion stays fully "
+          "visible beyond its backrest.",
 }
 
 GUIDE_TEXT = (
