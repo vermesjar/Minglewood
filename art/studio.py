@@ -323,6 +323,11 @@ def draw_guide(cells: list[dict], cols: int, rows: int, W: int, H: int, tile: in
             d.polygon(top, outline=col, width=2)
             for b, t in zip(base, top):
                 d.line([b, t], fill=col, width=2)
+        # a seat: the top of its cushion, the surface a person sits on (THE SEATING TYPES, prompts.py)
+        if cdef.get("seat"):
+            spx = cdef["seat"] * tile / 32
+            plane = [P(0, 0, spx), P(w, 0, spx), P(w, dp, spx), P(0, dp, spx)]
+            d.polygon(plane, outline=(60, 170, 90, 255), width=3)
         face = cdef.get("facing")
         if face:
             vx, vy = FACE_VEC[face]
@@ -447,8 +452,10 @@ GUIDE_TEXT = (
     "CONSTRUCTION GUIDES: the reference image is a construction drawing, not art. In each cell it shows the exact "
     "isometric floor diamond the object stands on and a wireframe box it must fill, in the precise 2:1 projection to "
     "use. Red arrows show which way an object's front faces. Draw each object standing on its diamond and filling its "
-    "box, with every horizontal edge following the diamond's angles. The output must contain ONLY the objects on a "
-    "transparent background: no guide lines, no arrows, no diamonds, no boxes, no floor, no shadows."
+    "box, with every horizontal edge following the diamond's angles. Where a cell has a thin GREEN rectangle inside "
+    "the box, that is the top of a seat's cushion: draw the cushion's top surface exactly at that height. The output "
+    "must contain ONLY the objects on a transparent background: no guide lines, no arrows, no diamonds, no boxes, no "
+    "floor, no shadows."
 )
 
 GAME_TILE = 64  # sprite px per floor tile at 2x density
@@ -1118,6 +1125,16 @@ VIEWS = {"radial": [None], "flat": [None], "fixed": [None], "mirror": ["se", "nw
 DRAW_FIELDS = ("key", "prompt", "prompts", "width", "fill", "fit", "colors", "quality", "nudge")
 
 
+def seat_family(key: str) -> str:
+    """The seat family a key belongs to (seatModelFit.ts familyOf): which SEATING TYPE it is drawn and fitted as."""
+    if key.startswith("heirloom-throne"):
+        return "throne"
+    for fam in ("armchair", "couch", "sofa", "stool", "bench", "beanbag", "ottoman", "pouf"):
+        if key.startswith(fam):
+            return {"sofa": "couch", "pouf": "ottoman"}.get(fam, fam)
+    return "chair"
+
+
 def cmd_lab_generate(a):
     try:
         spec = json.loads(Path(a.spec).read_text(encoding="utf-8"))
@@ -1131,13 +1148,21 @@ def cmd_lab_generate(a):
             emit({"ok": False, "error": f"{a.view} isn't a view of a '{rot}' model"}, 2)
         views = [None if a.view == "one" else a.view]
     out = Path(a.out).resolve()
+    seating = spec.get("category") == "seating" or spec.get("seat") is not None
+    if seating:
+        sys.path.insert(0, str(HERE))
+        from prompts import SEAT_FAMILIES  # noqa: PLC0415
+        fam = seat_family(key)
     items = []
     for f in views:
         # each view is drawn on the tiles it covers facing that way (models.ts footprintFacing)
         vw, vd = (d_, w_) if f in ("se", "nw") else (w_, d_)
         it = {"key": key, "w": vw, "d": vd, "h": spec.get("height", 40), "fit": spec.get("fit", "stand"),
               "fill": spec.get("fill", 0.7), "colors": spec.get("colors", 28),
-              "prompt": " ".join(x for x in [spec.get("prompt", ""), (spec.get("prompts") or {}).get(f or "", "")] if x)}
+              "prompt": " ".join(x for x in [spec.get("prompt", ""), (spec.get("prompts") or {}).get(f or "", ""),
+                                             SEAT_FAMILIES[fam] if seating else ""] if x)}
+        if seating and spec.get("seat") is not None:
+            it["seat"] = float(spec["seat"])
         if spec.get("width"):
             it["width"] = spec["width"]
         if f:
