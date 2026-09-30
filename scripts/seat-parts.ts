@@ -54,6 +54,8 @@ import {
   type PartLabels,
 } from '../src/client/engine/sprites/seatParts';
 import type { Facing } from '../src/shared/world/scene';
+import { RIG_MIRROR } from '../src/shared/world/seatRigs';
+import { fitHips, seatSpan } from '../src/client/engine/sprites/hipFit';
 
 const M = loadManifest().sprites as unknown as Sprites;
 const KEYS = seatKeys(M);
@@ -181,6 +183,33 @@ if (process.argv.includes('--regions')) {
       return c.unchanged;
     }, RIGS);
     console.log(`${key} ${f}: compiled (${front.reduce((a, b) => a + b, 0)} px in front)${same ? ', unchanged' : ''}`);
+  }
+} else if (process.argv.includes('--fit-hips')) {
+  // where each cushion's sitter goes, fitted (src/client/engine/sprites/hipFit.ts): across, the middle of their share
+  // of the seat; in depth, from behind the most forward point that keeps their hips under the back, from the front
+  // the passing point nearest where they were. --write stores the hips, the compiled layer and the legs (unaudited).
+  for (const [key, f] of views(arg('--fit-hips')!)) {
+    const parts = readParts(key, f);
+    const base = readRigs(RIGS)[key]?.[f];
+    if (!parts || !base?.hips?.length) {
+      console.log(`${key} ${f}: needs a part map and hips to start from`);
+      continue;
+    }
+    const v = rigView(M, key, f);
+    const g = RIG_MIRROR[f];
+    const vm = rigView(M, key, g);
+    // the seat's span along its length, from a front view that shows the cushions (the same couch in every view)
+    let span: number | null = null;
+    for (const g2 of ownFacings(M, key)) {
+      const pf = readParts(key, g2);
+      if (!pf || g2 === 'ne' || g2 === 'nw') continue;
+      span = seatSpan(rigView(M, key, g2) as never, pf);
+    }
+    const fit = fitHips(v as never, vm.mirrored ? (vm as never) : null, key, base, parts, { span: span ?? undefined });
+    if (span !== null) console.log(`${key}: seat span ${span.toFixed(2)} of ${Math.max(...(v.footprint as number[]))} tiles`);
+    const moved = base.hips.map((q, i) => `${JSON.stringify(q)}→${JSON.stringify(fit.rig.hips[i])} (${fit.steps[i] >= 0 ? '+' : ''}${fit.steps[i]})`).join('  ');
+    console.log(`${key} ${f}: ${moved}  legs ${fit.rig.legs}  ${fit.problems.length ? 'LEFT: ' + fit.problems.join(' | ') : 'holds'}`);
+    if (process.argv.includes('--write')) withRigs((rigs) => void (rigs[key]![f] = fit.rig), RIGS);
   }
 } else if (process.argv.includes('--show')) {
   const [key, f] = arg('--show')!.split(':') as [string, Facing];

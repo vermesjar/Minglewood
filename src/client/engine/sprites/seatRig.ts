@@ -324,7 +324,14 @@ export function wrapsSitter(backLine: ReadonlyArray<readonly [number, number]> |
  *   (c) seen from the front, a sitter's thighs lie on the seat's surface: the underside of the near thigh, from the
  *       hip halfway to the knee, runs over the surface — not above its far edge, not below its near edge.
  */
-export function rigFindings(v: RigView, rig: SeatRig, looks: AvatarLoadout[] = RIG_LOOKS): { problems: string[]; flagged: Array<[number, number]> } {
+/**
+ * How much of a sitter's hip band may show above the back's top edge from behind before they read as perched on it:
+ * Carter's approved seats show up to about a quarter (a low couch's far cushion); "perched" was two thirds and more.
+ * The hip fitter aims lower (hipFit.ts) so new seats start well inside it.
+ */
+export const PERCHED_MAX = 0.3;
+
+export function rigFindings(v: RigView, rig: SeatRig, looks: AvatarLoadout[] = RIG_LOOKS, opts: { perchedMax?: number } = {}): { problems: string[]; flagged: Array<[number, number]> } {
   const cushions = rigCushions(v.footprint, v.facing);
   const out = rigShapeProblems(rig, cushions.length);
   const flagged: Array<[number, number]> = [];
@@ -459,7 +466,7 @@ export function rigFindings(v: RigView, rig: SeatRig, looks: AvatarLoadout[] = R
                 }
               }
           }
-          note(`${i} perched`, fig ? shown / fig : 0, false, (n) => n > 0.1, (n) => `cushion ${i}: their hips show above the backrest (${Math.round(n * 100)}%): they look perched on it, not sitting in the seat`);
+          note(`${i} perched`, fig ? shown / fig : 0, false, (n) => n > (opts.perchedMax ?? PERCHED_MAX), (n) => `cushion ${i}: their hips show above the backrest (${Math.round(n * 100)}%): they look perched on it, not sitting in the seat`);
         }
       }
       // (c) seen from the front, the near thigh on the seat's surface
