@@ -14,9 +14,10 @@ import { seatSpots } from '@shared/world/seats';
 import { buildSeed } from '@shared/seed/northstar';
 import { isoToScreen } from '@shared/iso';
 import { WorldView } from '../engine/WorldView';
-import { loadArt } from '../engine/sprites/art';
+import { loadArt, setSeatRigsEnabled } from '../engine/sprites/art';
 import { clearSpriteCache } from '../engine/sprites/registry';
 import { setSkyOverride } from '../engine/weather';
+import { RIG_LOOKS } from '../engine/sprites/seatRig';
 
 const seed = buildSeed();
 const noop = () => undefined;
@@ -430,6 +431,69 @@ async function sitFilm(
   return snap(sheet, o.name ?? `sitfilm-${sprite}${variant ? '.' + variant : ''}-${facing}${o.from && o.from !== 'front' ? '-' + o.from : ''}`);
 }
 
+/**
+ * The seat rig, as the game draws it: one seat facing `facing` in an empty room at zoom 2 (one drawing px per
+ * device px), every cushion taken by the rig looks, day light, no motion. Saves the render and returns where the
+ * seat drawing's (0, 0) lands in it, so scripts/seat-rig.ts --probe can diff the renderer against the rig sheet's
+ * compositor pixel for pixel.
+ */
+async function rigProbe(sprite: string, variant: string | undefined, facing: Facing, o: { long?: boolean; name?: string; lookShift?: number } = {}) {
+  const across = facing === 'ne' || facing === 'sw';
+  const seat: SceneObject = { id: 'seat', sprite, variant, facing, x: 3, y: 3, w: o.long && across ? 2 : 1, d: o.long && !across ? 2 : 1, actions: [{ kind: 'sit' }] };
+  const scene: SceneDef = {
+    id: 'probe',
+    kind: 'interior',
+    name: 'probe',
+    width: 8,
+    height: 8,
+    tiles: Array.from({ length: 8 }, () => '........'),
+    spawn: { x: 0, y: 0 },
+    objects: [seat],
+    interior: { floor: '#c9a47e', floorAlt: '#bf9872', floorPattern: 'planks', wall: '#f3dcb8', wallTop: '#8a5a3b', trim: '#6b3f2a', doorY: 0, ambient: 'bright' },
+  };
+  const shift = o.lookShift ?? 0;
+  const occ: Occupant[] = seatSpots(seat, scene).map((spot, k) => ({
+    memberId: `m${k}`,
+    x: spot.x,
+    y: spot.y,
+    facing: spot.facing,
+    sittingOn: seat.id,
+    status: 'available',
+    avatar: RIG_LOOKS[(k + shift) % RIG_LOOKS.length],
+    via: 'sim',
+  }));
+  setSkyOverride({ phase: 'day', weather: 'clear', sun: 0, lamp: 0 });
+  const canvas = freshCanvas(800, 600);
+  const view = new WorldView(canvas, { onGroundClick: noop, onActorClick: noop, onObjectClick: noop, onObjectActivate: noop, nameOf: () => '' });
+  view.reducedMotion = true;
+  view.loadScene(scene, occ, { meId: '', activeDecor: new Set(), festiveRooms: new Set(), party: false });
+  const v = view as unknown as {
+    camera: { zoom: number; tzoom: number; x: number; y: number; tx: number; ty: number };
+    update(dt: number): void;
+    draw(): void;
+    drawActorOverlays(): void;
+    statics: Array<{ obj: SceneObject; dx: number; dy: number }>;
+    dpr: number;
+    vw: number;
+    vh: number;
+  };
+  v.drawActorOverlays = noop;
+  const c = isoToScreen(3 + (seat.w ?? 1) / 2, 3 + (seat.d ?? 1) / 2);
+  v.update(0);
+  v.camera.zoom = v.camera.tzoom = 2;
+  v.camera.x = v.camera.tx = c.x;
+  v.camera.y = v.camera.ty = c.y - 20;
+  v.draw();
+  const st = v.statics.find((x) => x.obj.id === 'seat')!;
+  const s = v.camera.zoom * v.dpr;
+  const ox = Math.round(v.dpr * (v.vw / 2 - v.camera.x * v.camera.zoom)) + st.dx * s;
+  const oy = Math.round(v.dpr * (v.vh / 2 - v.camera.y * v.camera.zoom)) + st.dy * s;
+  const r = await snap(canvas, o.name ?? `rigprobe-${sprite}${variant ? '.' + variant : ''}-${facing}`);
+  view.destroy();
+  setSkyOverride(null);
+  return { path: r.path, origin: [ox, oy], scale: s };
+}
+
 const ready = loadArt().then(clearSpriteCache);
 const flab = {
   ready,
@@ -451,6 +515,11 @@ const flab = {
     await ready;
     return sitFilm(sprite, variant, facing, o);
   },
+  /** One seat with its rig looks on every cushion, at zoom 2, for diffing against the rig compositor. */
+  rigProbe: async (sprite: string, variant: string | undefined, facing: Facing, o?: Parameters<typeof rigProbe>[3]) => {
+    await ready;
+    return rigProbe(sprite, variant, facing, o);
+  },
   /** Film strip of an object's animation in a room. */
   film: async (sceneId: string, objectId: string, o?: Parameters<typeof film>[2]) => {
     await ready;
@@ -469,6 +538,11 @@ const flab = {
     return render(scene, occupants, o, scene.id);
   },
   getScene,
+  /** Seat rigs on (the game) or off (seats drawn the old, inferred way: before/after renders). */
+  rigs: (on: boolean) => {
+    setSeatRigsEnabled(on);
+    clearSpriteCache();
+  },
   reloadArt: async () => {
     await loadArt();
     clearSpriteCache();

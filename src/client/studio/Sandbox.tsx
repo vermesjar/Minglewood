@@ -12,7 +12,7 @@ import { findPath, type Tile } from '@shared/world/pathfinding';
 import { WalkGrid } from '@shared/world/walkGrid';
 import { buildSeed } from '@shared/seed/northstar';
 import { WorldView } from '../engine/WorldView';
-import { loadArt } from '../engine/sprites/art';
+import { artCatalog, loadArt } from '../engine/sprites/art';
 import { clearSpriteCache } from '../engine/sprites/registry';
 import { setSkyOverride } from '../engine/weather';
 import { lab, type Draft, type Facing } from './api';
@@ -43,7 +43,9 @@ export function sandboxScene(d: Draft, facing: Facing): SceneDef {
   const left = facing === 'se' || facing === 'nw';
   const piece: SceneObject =
     f.rotation === 'flat'
-      ? { id: 'draft', sprite: d.key, wall: left ? 'left' : 'right', x: left ? 0 : 3, y: left ? 3 : 0, w: f.footprint[0], label, actions: actionsOf(d) }
+      ? // on a wall, turned (R) from one to the other, over the span the lab's manifest gives it: wide enough for its
+        // drawing at 2:1 (the wall art standard grows a span, never squeezes a drawing)
+        { id: 'draft', sprite: d.key, wall: left ? 'left' : 'right', x: left ? 0 : 3, y: left ? 3 : 0, w: artCatalog().find((a) => a.key === d.key)?.footprint[0] ?? f.footprint[0], label, actions: actionsOf(d) }
       : { id: 'draft', sprite: d.key, x: 4, y: 4, w, d: dd, facing, label, actions: actionsOf(d) };
   // a counter-top piece stands on a counter, as it would in a room
   const counter: SceneObject[] = [];

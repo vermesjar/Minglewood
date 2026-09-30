@@ -121,6 +121,11 @@ export function Library({ onOpen }: { onOpen: (draftId: string) => void }) {
                 <b>{p.name ?? p.key}</b>
                 <span className="mono small muted">{p.key}</span>
                 <span className={`chip ${p.issues.length ? 'bad' : 'good'}`}>{p.issues.length ? `${p.issues.length} issue${p.issues.length > 1 ? 's' : ''}` : 'meets the standard'}</span>
+                {p.rig && (
+                  <span className={`chip ${p.rig === 'audited' ? 'good' : p.rig === 'proposed' ? 'soft' : 'bad'}`} title="how people sit in it: art/seat-rigs.json (the seat rig standard)">
+                    rig: {p.rig}
+                  </span>
+                )}
               </header>
               <div className="piece-meta muted small">
                 {p.category ?? 'no category'} · {p.wall ? 'wall art' : (p.rotation ?? 'no rotation set')} · {p.footprint.join('×')}
@@ -142,7 +147,7 @@ export function Library({ onOpen }: { onOpen: (draftId: string) => void }) {
                 </ul>
               )}
               <button className="btn ghost small" disabled={opening === p.key} onClick={() => void open(p.key)}>
-                {opening === p.key ? 'Opening…' : 'Open as draft'}
+                {opening === p.key ? 'Opening…' : p.rig ? 'Open to re-rig' : 'Open as draft'}
               </button>
             </article>
           ))}

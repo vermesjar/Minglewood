@@ -596,8 +596,7 @@
         "v": [
           28,
           50
-        ],
-        "margin": 0.06
+        ]
       },
       "rotation": "flat",
       "name": "Back bar shelves",
@@ -757,8 +756,7 @@
         "v": [
           36,
           54
-        ],
-        "margin": 0.03
+        ]
       },
       "rotation": "flat",
       "name": "Banner",
@@ -1277,7 +1275,8 @@
       "height": 24,
       "base": "centred",
       "walk": "blocked",
-      "layer": "object"
+      "layer": "object",
+      "animated": true
     },
     "blanket.blue": {
       "footprint": [
@@ -1362,7 +1361,8 @@
             21
           ]
         }
-      }
+      },
+      "animated": true
     },
     "boat.yellow": {
       "footprint": [
@@ -1393,7 +1393,8 @@
             21
           ]
         }
-      }
+      },
+      "animated": true
     },
     "book-stack": {
       "footprint": [
@@ -1677,7 +1678,8 @@
         "actions": [
           "enter"
         ]
-      }
+      },
+      "animated": true
     },
     "building.cafe": {
       "footprint": [
@@ -1717,7 +1719,8 @@
         "actions": [
           "enter"
         ]
-      }
+      },
+      "animated": true
     },
     "building.design": {
       "footprint": [
@@ -1750,7 +1753,8 @@
         "actions": [
           "enter"
         ]
-      }
+      },
+      "animated": true
     },
     "building.eng": {
       "footprint": [
@@ -1823,7 +1827,8 @@
         "actions": [
           "enter"
         ]
-      }
+      },
+      "animated": true
     },
     "building.focus": {
       "footprint": [
@@ -1863,7 +1868,8 @@
         "actions": [
           "enter"
         ]
-      }
+      },
+      "animated": true
     },
     "building.hq": {
       "footprint": [
@@ -1896,7 +1902,8 @@
         "actions": [
           "enter"
         ]
-      }
+      },
+      "animated": true
     },
     "building.launch": {
       "footprint": [
@@ -1953,8 +1960,7 @@
         "v": [
           18,
           46
-        ],
-        "margin": 0.1
+        ]
       },
       "rotation": "flat",
       "name": "Bulletin",
@@ -2210,15 +2216,15 @@
         "se": {
           "file": "chair.office.se.png",
           "anchor": [
-            22,
-            46
+            20,
+            44
           ]
         },
         "nw": {
           "file": "chair.office.nw.png",
           "anchor": [
-            22,
-            42
+            20,
+            34
           ]
         }
       },
@@ -2473,8 +2479,7 @@
         "v": [
           28,
           46
-        ],
-        "margin": 0.16
+        ]
       },
       "rotation": "flat",
       "name": "Wall clock",
@@ -2566,7 +2571,8 @@
       "base": "centred",
       "sameFromBehind": true,
       "walk": "blocked",
-      "layer": "object"
+      "layer": "object",
+      "animated": true
     },
     "couch.blue": {
       "footprint": [
@@ -2773,8 +2779,7 @@
         "v": [
           22,
           46
-        ],
-        "margin": 0.06
+        ]
       },
       "rotation": "flat",
       "name": "Build dashboard",
@@ -3051,7 +3056,7 @@
           0,
           46
         ],
-        "margin": 0.08
+        "floor": true
       },
       "rotation": "flat",
       "name": "Elevator doors",
@@ -3464,7 +3469,8 @@
         "actions": [
           "use"
         ]
-      }
+      },
+      "animated": true
     },
     "frame.customer": {
       "footprint": [
@@ -3481,8 +3487,7 @@
         "v": [
           14,
           50
-        ],
-        "margin": 0.04
+        ]
       },
       "rotation": "flat",
       "name": "Framed photo: customer",
@@ -3520,8 +3525,7 @@
         "v": [
           14,
           50
-        ],
-        "margin": 0.04
+        ]
       },
       "rotation": "flat",
       "name": "Framed photo: garage",
@@ -3559,8 +3563,7 @@
         "v": [
           22,
           44
-        ],
-        "margin": 0.14
+        ]
       },
       "rotation": "flat",
       "name": "Framed photo: hackathon",
@@ -3598,8 +3601,7 @@
         "v": [
           22,
           45
-        ],
-        "margin": 0.14
+        ]
       },
       "rotation": "flat",
       "name": "Framed painting: lake",
@@ -3631,8 +3633,7 @@
         "v": [
           14,
           50
-        ],
-        "margin": 0.04
+        ]
       },
       "rotation": "flat",
       "name": "Framed photo: Lisbon",
@@ -3670,8 +3671,7 @@
         "v": [
           14,
           50
-        ],
-        "margin": 0.04
+        ]
       },
       "rotation": "flat",
       "name": "Framed photo: team",
@@ -3911,7 +3911,8 @@
       "height": 107,
       "base": "filled",
       "walk": "blocked",
-      "layer": "object"
+      "layer": "object",
+      "animated": true
     },
     "globe-stand": {
       "footprint": [
@@ -4468,8 +4469,7 @@
         "v": [
           16,
           48
-        ],
-        "margin": 0.08
+        ]
       },
       "rotation": "flat",
       "name": "Kanban board",
@@ -4838,8 +4838,7 @@
         "v": [
           40,
           56
-        ],
-        "margin": 0.02
+        ]
       },
       "rotation": "flat",
       "name": "String of lanterns",
@@ -4901,7 +4900,8 @@
         "actions": [
           "artifact"
         ]
-      }
+      },
+      "animated": true
     },
     "logo-wall": {
       "footprint": [
@@ -4918,8 +4918,7 @@
         "v": [
           28,
           57
-        ],
-        "margin": 0.06
+        ]
       },
       "rotation": "flat",
       "name": "Logo wall",
@@ -5024,10 +5023,9 @@
       ],
       "wall": {
         "v": [
-          38,
-          61
-        ],
-        "margin": 0.3
+          28,
+          57
+        ]
       },
       "rotation": "flat",
       "name": "Menu board",
@@ -5059,8 +5057,7 @@
         "v": [
           26,
           50
-        ],
-        "margin": 0.12
+        ]
       },
       "rotation": "flat",
       "name": "Mission patches",
@@ -5092,8 +5089,7 @@
         "v": [
           16,
           48
-        ],
-        "margin": 0.06
+        ]
       },
       "rotation": "flat",
       "name": "Moodboard",
@@ -5331,8 +5327,7 @@
         "v": [
           28,
           46
-        ],
-        "margin": 0.2
+        ]
       },
       "rotation": "flat",
       "name": "Pennant: Mobile",
@@ -5364,8 +5359,7 @@
         "v": [
           28,
           46
-        ],
-        "margin": 0.2
+        ]
       },
       "rotation": "flat",
       "name": "Pennant: Platform",
@@ -5424,8 +5418,7 @@
         "v": [
           16,
           48
-        ],
-        "margin": 0.05
+        ]
       },
       "rotation": "flat",
       "name": "Pin-up wall",
@@ -5991,8 +5984,7 @@
         "v": [
           20,
           46
-        ],
-        "margin": 0.14
+        ]
       },
       "rotation": "flat",
       "name": "Poster: Ship it",
@@ -6024,8 +6016,7 @@
         "v": [
           20,
           46
-        ],
-        "margin": 0.14
+        ]
       },
       "rotation": "flat",
       "name": "Art print",
@@ -6098,7 +6089,8 @@
         "actions": [
           "vend"
         ]
-      }
+      },
+      "animated": true
     },
     "reception": {
       "footprint": [
@@ -6161,7 +6153,8 @@
       "height": 23,
       "base": "centred",
       "walk": "open",
-      "layer": "object"
+      "layer": "object",
+      "animated": true
     },
     "register": {
       "footprint": [
@@ -6257,7 +6250,8 @@
           "use",
           "artifact"
         ]
-      }
+      },
+      "animated": true
     },
     "rocket-statue": {
       "footprint": [
@@ -6327,7 +6321,8 @@
       "height": 29,
       "base": "centred",
       "walk": "blocked",
-      "layer": "object"
+      "layer": "object",
+      "animated": true
     },
     "screen.countdown": {
       "footprint": [
@@ -6344,8 +6339,7 @@
         "v": [
           28,
           44
-        ],
-        "margin": 0.06
+        ]
       },
       "rotation": "flat",
       "name": "Countdown screen",
@@ -6519,7 +6513,8 @@
         "actions": [
           "toggle"
         ]
-      }
+      },
+      "animated": true
     },
     "sign-quiet": {
       "footprint": [
@@ -6536,8 +6531,7 @@
         "v": [
           26,
           40
-        ],
-        "margin": 0.18
+        ]
       },
       "rotation": "flat",
       "name": "Quiet sign",
@@ -6721,8 +6715,7 @@
         "v": [
           16,
           48
-        ],
-        "margin": 0.06
+        ]
       },
       "rotation": "flat",
       "name": "Star map",
@@ -6823,7 +6816,8 @@
             "r": 40
           }
         }
-      }
+      },
+      "animated": true
     },
     "stool": {
       "footprint": [
@@ -6997,8 +6991,7 @@
         "v": [
           20,
           46
-        ],
-        "margin": 0.08
+        ]
       },
       "rotation": "flat",
       "name": "Colour swatches",
@@ -7054,7 +7047,8 @@
       "base": "centred",
       "sameFromBehind": true,
       "walk": "blocked",
-      "layer": "object"
+      "layer": "object",
+      "animated": true
     },
     "table-long": {
       "footprint": [
@@ -7303,7 +7297,8 @@
             53
           ]
         }
-      }
+      },
+      "animated": true
     },
     "tree/apple.a": {
       "footprint": [
@@ -7624,7 +7619,8 @@
       "height": 70,
       "base": "centred",
       "walk": "blocked",
-      "layer": "object"
+      "layer": "object",
+      "animated": true
     },
     "umbrella-table.teal": {
       "footprint": [
@@ -7651,7 +7647,8 @@
       "height": 70,
       "base": "centred",
       "walk": "blocked",
-      "layer": "object"
+      "layer": "object",
+      "animated": true
     },
     "vending-machine": {
       "footprint": [
@@ -7791,7 +7788,8 @@
       "height": 33,
       "base": "centred",
       "walk": "blocked",
-      "layer": "object"
+      "layer": "object",
+      "animated": true
     },
     "whiteboard": {
       "footprint": [
@@ -7808,8 +7806,7 @@
         "v": [
           16,
           48
-        ],
-        "margin": 0.08
+        ]
       },
       "rotation": "flat",
       "name": "Whiteboard",
@@ -7956,7 +7953,8 @@
       "height": 30,
       "base": "filled",
       "walk": "blocked",
-      "layer": "object"
+      "layer": "object",
+      "animated": true
     }
   }
 }

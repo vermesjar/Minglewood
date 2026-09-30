@@ -1207,17 +1207,24 @@ export const LAYER = {
 /** A momentary expression layered on the look: a blink, or the mouth open mid-sentence. */
 export type Expression = 'blink' | 'talk';
 
-export function drawAvatarV2(input: AvatarLoadout, view: View, requested: Pose, expr?: Expression): Pix {
+/** The frame the kit draws a look with in a view and pose (what drawAvatarV2 hangs every part off). */
+export function kitFrame(input: AvatarLoadout, view: View, requested: Pose): Frame {
   const L = normalizeLoadout(input);
   const wheelchair = L.mobility === 'mob.wheelchair';
   const pose: Pose = wheelchair && requested !== 'wave' ? 'sit' : requested;
   const body = bodyOf(L);
-  const carry = CARRIED.has(L.held);
-  let F = frameFor(view, pose, body, carry);
+  const F = frameFor(view, pose, body, CARRIED.has(L.held));
   if (wheelchair && pose === 'wave') {
     const sit = frameFor(view, 'sit', body);
-    F = { ...sit, pose: 'wave', armNear: F.armNear, handNear: F.handNear };
+    return { ...sit, pose: 'wave', armNear: F.armNear, handNear: F.handNear };
   }
+  return F;
+}
+
+export function drawAvatarV2(input: AvatarLoadout, view: View, requested: Pose, expr?: Expression): Pix {
+  const L = normalizeLoadout(input);
+  const wheelchair = L.mobility === 'mob.wheelchair';
+  const F = kitFrame(input, view, requested);
   const coversHair = !!ITEM_BY_ID.get(L.headwear)?.coversHair;
   const P = new Pix();
   const on = (layer: number) => (P.layer = layer);

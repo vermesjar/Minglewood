@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { WebSocketServer, type WebSocket } from 'ws';
 import { clientMsgSchema, toWirePatch, type ServerMsg } from '@shared/protocol';
 import { getScene } from '@shared/world';
+import { isSeatLab } from '@shared/world/seatLab';
 import { sessionFromRequest, verifyToken } from '../auth/session';
 import { config } from '../config';
 import type { Store } from '../store/store';
@@ -89,7 +90,8 @@ export function attachSockets(server: Server, store: Store, hubs: Map<string, Or
       const msg = res.data;
       switch (msg.t) {
         case 'enter':
-          if (getScene(msg.sceneId)) hub.enter(memberId, msg.sceneId, 'live', msg.at ?? hub.spotNear(msg.sceneId, msg.near));
+          // (the seat lab rooms are for development only)
+          if (getScene(msg.sceneId) && !(config.isProd && isSeatLab(msg.sceneId))) hub.enter(memberId, msg.sceneId, 'live', msg.at ?? hub.spotNear(msg.sceneId, msg.near));
           break;
         case 'move':
           if (!hub.move(memberId, msg.path, msg.startedAt)) {

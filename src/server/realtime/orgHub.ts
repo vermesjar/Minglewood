@@ -16,6 +16,7 @@ import type { EmoteId } from '@shared/presence';
 import { STATUS_META } from '@shared/presence';
 import { allScenes, buildingForRoom, getScene, TOWN_ID } from '@shared/world';
 import { livedScene } from '@shared/world/lived';
+import { isSeatLab } from '@shared/world/seatLab';
 import type { Facing, SceneDef, SceneObject } from '@shared/world/scene';
 import { footprint, isSeat, terrainAt } from '@shared/world/scene';
 import { seatSpotAt, seatSpots, stepOffTiles } from '@shared/world/seats';
@@ -151,6 +152,13 @@ export class OrgHub extends EventEmitter<HubEvents> {
     return this.grids.get(sceneId);
   }
 
+  /** A scene's walk grid, built on first entry for a room outside the world's own (a seat lab room). */
+  private gridFor(sceneId: string): WalkGrid | undefined {
+    let g = this.grids.get(sceneId);
+    if (!g && isSeatLab(sceneId) && this.scene(sceneId)) this.grids.set(sceneId, (g = new WalkGrid(this.scene(sceneId)!, this.activeDecor())));
+    return g;
+  }
+
   member(id: string): Member | undefined {
     return this.store.member(this.orgId, id);
   }
@@ -261,7 +269,7 @@ export class OrgHub extends EventEmitter<HubEvents> {
   /** Places an actor in a scene (live user, sim, or provider). Returns the actor. */
   enter(memberId: string, sceneId: string, via: Occupant['via'], at?: Tile): Actor | null {
     const scene = this.scene(sceneId);
-    const grid = this.grids.get(sceneId);
+    const grid = this.gridFor(sceneId);
     if (!scene || !grid || !this.member(memberId)) return null;
     const prev = this.actors.get(memberId);
     const fromScene = prev?.sceneId;

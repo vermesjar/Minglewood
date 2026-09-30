@@ -55,12 +55,6 @@ function paintPixels(canvas: HTMLCanvasElement | null, px: Pixels, z: number, ba
   }
 }
 
-function Cell({ px, bad }: { px: Pixels; bad: boolean }) {
-  const ref = useRef<HTMLCanvasElement>(null);
-  useEffect(() => paintPixels(ref.current, px, 2, bad), [px, bad]);
-  return <canvas ref={ref} />;
-}
-
 export function SeatPanel({ draft, onPatch, onStatus }: { draft: Draft; onPatch: (p: Partial<FurnitureSpec>) => void; onStatus: (s: SeatStatus) => void }) {
   const f = draft.furniture!;
   const cal = f.seatCalibration;
@@ -95,8 +89,8 @@ export function SeatPanel({ draft, onPatch, onStatus }: { draft: Draft; onPatch:
     () => (drawings && cal && !stale ? fitSeat(drawings, f.footprint, { sitStyle: f.sitStyle, backrest: f.backrest }, { cushion: cal.cushion, cover: cal.cover }) : null),
     [drawings, cal, stale, f.footprint, f.sitStyle, f.backrest],
   );
-  const bad = fit ? fit.views.filter((v) => v.problems.length) : [];
-  const status: SeatStatus = !drawings ? 'loading' : !cal ? 'none' : stale ? 'stale' : bad.length ? 'bad' : 'ok';
+  // how people sit in each facing is the seat parts' job (PartsPanel): this panel gives the seat its height
+  const status: SeatStatus = !drawings ? 'loading' : !cal ? 'none' : stale ? 'stale' : 'ok';
   useEffect(() => onStatus(status), [status, onStatus]);
 
   // keep the stored profile in step with the fit (sit style or backrest changed since the click)
@@ -176,7 +170,7 @@ export function SeatPanel({ draft, onPatch, onStatus }: { draft: Draft; onPatch:
       <header className="card-head">
         <h3>Seat</h3>
         <span className={`chip ${status === 'ok' ? 'good' : status === 'loading' ? '' : 'bad'}`}>
-          {status === 'ok' ? 'calibrated · every facing sits right' : status === 'none' ? 'not calibrated' : status === 'stale' ? 'drawing changed: click again' : status === 'bad' ? `${bad.length} facing${bad.length > 1 ? 's' : ''} wrong` : 'loading…'}
+          {status === 'ok' ? 'calibrated' : status === 'none' ? 'not calibrated (the seat height above is used)' : status === 'stale' ? 'drawing changed: click again' : 'loading…'}
         </span>
         <span className="muted">click the centre of the first cushion’s top face, halfway front to back (yellow: where every cushion would be)</span>
       </header>
@@ -205,18 +199,7 @@ export function SeatPanel({ draft, onPatch, onStatus }: { draft: Draft; onPatch:
           )}
         </div>
         <div className="seat-views">
-          {fit ? (
-            fit.views.map((v) => (
-              <figure key={v.facing} className={v.problems.length ? 'bad' : 'good'}>
-                <Cell px={v.cell} bad={v.problems.length > 0} />
-                <figcaption>
-                  <b>{v.facing}</b> {v.problems.length ? v.problems.join(' · ') : 'sits right'}
-                </figcaption>
-              </figure>
-            ))
-          ) : (
-            <div className="lab-empty small">{status === 'stale' ? 'The drawings changed since the seat was calibrated. Click the cushion again.' : 'Click the cushion: every facing appears here with someone sitting on every cushion.'}</div>
-          )}
+          <div className="lab-empty small">The click gives the seat its height and hip depth (the hips below start from them). How people sit in each facing comes from its parts: see How people sit in it.</div>
         </div>
       </div>
     </section>

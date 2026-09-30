@@ -2,6 +2,7 @@ import type { SceneDef, SceneObject } from './scene';
 import { buildTown, TOWN_ID } from './northstarTown';
 import { buildInteriors } from './interiors';
 import { giveUses } from './uses';
+import { seatLabScene } from './seatLab';
 
 export { TOWN_ID };
 
@@ -19,8 +20,9 @@ export function allScenes(): Map<string, SceneDef> {
   return cache;
 }
 
+/** A scene of the world — or, by its id, a development seat lab room (seatLab.ts; the server keeps them out of production). */
 export function getScene(id: string): SceneDef | undefined {
-  return allScenes().get(id);
+  return allScenes().get(id) ?? seatLabScene(id);
 }
 
 /** The building object in town that leads to `roomId`. */

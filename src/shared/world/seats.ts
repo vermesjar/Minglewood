@@ -24,6 +24,8 @@ import { footprint, isSeat, isSolid, type Facing, type SceneDef, type SceneObjec
  *              rolled back): the part of the drawing that isn't cushion is drawn over them (seatFit.ts)
  *   backLine   only where colour can't tell backrest from cushion: the backrest's top edge traced in each
  *              drawn back view (ne / nw, that drawing's own px, left to right); a mirrored view mirrors it
+ *   arms       whether it has arms: seen from the front, its near arm stands between its sitter and us (the
+ *              seat rig must draw it over them: src/shared/world/seatRigs.ts)
  */
 export type SitStyle = 'chair' | 'stool' | 'lounge' | 'floor';
 
@@ -34,19 +36,20 @@ export interface SeatProfile {
   sitStyle: SitStyle;
   backrest: boolean;
   backLine?: Partial<Record<'ne' | 'nw', Array<[number, number]>>>;
+  arms?: boolean;
 }
 
 /** The manifest fields that make up a seat profile (the model spec's seat section). */
-export const SEAT_FIELDS = ['seat', 'seatDepth', 'backDepth', 'sitStyle', 'backrest', 'backLine'] as const;
+export const SEAT_FIELDS = ['seat', 'seatDepth', 'backDepth', 'sitStyle', 'backrest', 'backLine', 'arms'] as const;
 
 type FamilyProfile = Omit<SeatProfile, 'backDepth' | 'backLine'>;
 const FAMILY: Array<[RegExp, FamilyProfile]> = [
   [/^stool/, { seat: 16, seatDepth: 0, sitStyle: 'stool', backrest: false }],
   [/^beanbag/, { seat: 9, seatDepth: 0, sitStyle: 'floor', backrest: true }],
   [/^ottoman/, { seat: 8, seatDepth: 0, sitStyle: 'chair', backrest: false }],
-  [/^(couch|armchair)/, { seat: 10, seatDepth: 0.1, sitStyle: 'lounge', backrest: true }],
+  [/^(couch|armchair)/, { seat: 10, seatDepth: 0.1, sitStyle: 'lounge', backrest: true, arms: true }],
   [/^bench/, { seat: 10, seatDepth: 0, sitStyle: 'chair', backrest: false }],
-  [/^heirloom-throne/, { seat: 13, seatDepth: 0.15, sitStyle: 'chair', backrest: true }],
+  [/^heirloom-throne/, { seat: 13, seatDepth: 0.15, sitStyle: 'chair', backrest: true, arms: true }],
 ];
 const DEFAULT_PROFILE: FamilyProfile = { seat: 12, seatDepth: 0, sitStyle: 'chair', backrest: true };
 
@@ -61,6 +64,7 @@ export function seatProfile(sprite: string, own: Partial<SeatProfile> = {}): Sea
     sitStyle: own.sitStyle ?? base.sitStyle,
     backrest: own.backrest ?? base.backrest,
     ...(own.backLine ? { backLine: own.backLine } : {}),
+    ...((own.arms ?? base.arms) ? { arms: true } : {}),
   };
 }
 
@@ -99,6 +103,28 @@ export const BACK_COVER_UP = 6;
 /** How far a sitter's figure is lifted off the floor so their thighs rest on the cushion (world px). */
 export function sitterLift(p: SeatProfile, facing?: Facing): number {
   return p.seat - sitThigh(p.sitStyle) - (facing && seenFromBehind(facing) ? BACK_SINK : 0);
+}
+
+/**
+ * Getting into and out of a seat, `k` of the way in (0 standing … 1 seated): in a crouch with the feet on the
+ * floor until CROUCH_UNTIL, then up into the seat — from about where the seated feet meet the floor, a touch
+ * past it (SETTLE world px) and settling; getting up, lifted off the cushion a touch, then down into the crouch.
+ * `lift` is how high the seat lifts its sitter. (The renderer and the rig sheets move a sitter the same way.)
+ */
+export const CROUCH_UNTIL = 0.35;
+export const SETTLE = 2;
+export function sitMotion(k: number, sittingDown: boolean, lift: number): { inSeat: boolean; lift: number } {
+  const inSeat = k >= CROUCH_UNTIL;
+  if (!inSeat) return { inSeat, lift: 0 };
+  const u = (k - CROUCH_UNTIL) / (1 - CROUCH_UNTIL);
+  const rise = Math.min(1, u / 0.6);
+  const settle = Math.max(0, (u - 0.6) / 0.4);
+  return {
+    inSeat,
+    lift: sittingDown
+      ? 0.6 * lift + (0.4 * lift + SETTLE) * (1 - (1 - rise) * (1 - rise)) - SETTLE * settle * settle * (3 - 2 * settle)
+      : lift + SETTLE * (1 - u * (2 - u)),
+  };
 }
 
 /** Whether a sitter facing this way is seen from behind (the camera looks from the south: +x +y is toward us). */

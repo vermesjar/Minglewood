@@ -296,6 +296,19 @@ export class Store {
     return found;
   }
 
+  /** A team piece moved: to another floor tile, or along a wall (`wall` absent: it stands on the floor). */
+  moveDecoration(orgId: string, id: string, to: { x: number; y: number; wall?: 'left' | 'right' }): Decoration | undefined {
+    const data = this.get(orgId);
+    const i = data.decorations.findIndex((d) => d.id === id);
+    if (i < 0) return undefined;
+    const { wall: _was, ...rest } = data.decorations[i];
+    void _was;
+    const moved: Decoration = { ...rest, x: to.x, y: to.y, ...(to.wall ? { wall: to.wall } : {}) };
+    data.decorations = data.decorations.map((d, j) => (j === i ? moved : d));
+    this.scheduleSave();
+    return moved;
+  }
+
   addNote(orgId: string, n: BoardNote): void {
     this.get(orgId).notes.push(n);
     this.scheduleSave();

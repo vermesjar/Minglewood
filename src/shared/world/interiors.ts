@@ -101,10 +101,12 @@ export function buildInteriors(): SceneDef[] {
       { sprite: 'grinder', x: 5, y: 1, z: COUNTER_TOP, label: 'Coffee grinder' },
       { sprite: 'register', x: 6, y: 1, z: COUNTER_TOP, facing: 'ne' },
       { sprite: 'jar', x: 3, y: 1, z: COUNTER_TOP, label: 'Biscotti' },
-      { sprite: 'backbar', wall: 'right', x: 5, y: 0, w: 3, label: 'Back bar' },
+      // the shelving behind the barista's spots (2, 4); the menu board over the grinder and register, clear of
+      // anyone working: a standing barista covers the wall up to 34 units, and the board is 29 tall at 2:1
+      { sprite: 'backbar', wall: 'right', x: 2, y: 0, w: 3, label: 'Back bar' },
       { sprite: 'stool', x: 6, y: 2, actions: sit },
       { sprite: 'stool', x: 7, y: 2, actions: sit },
-      { sprite: 'menu-board', wall: 'right', x: 3, y: 0, w: 2, label: 'Today: oat flat white' },
+      { sprite: 'menu-board', wall: 'right', x: 5, y: 0, w: 2, label: 'Today: oat flat white' },
       { sprite: 'window', wall: 'right', x: 8, y: 0, w: 2 },
       { sprite: 'window', wall: 'left', x: 0, y: 2, d: 2 },
       { sprite: 'frame', wall: 'left', x: 0, y: 5, variant: 'lake' },
@@ -162,7 +164,8 @@ export function buildInteriors(): SceneDef[] {
       spots: [
         { x: 4, y: 0, facing: 'sw' },
         { x: 2, y: 0, facing: 'sw' },
-        { x: 6, y: 0, facing: 'sw' },
+        // by the pastry case (at 6 she stood in front of the menu board)
+        { x: 7, y: 0, facing: 'sw' },
       ],
       serves: 'espresso',
     },

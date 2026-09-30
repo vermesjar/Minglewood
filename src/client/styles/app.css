@@ -2026,6 +2026,24 @@ body.rm *::after {
 .decorate-head .muted {
   flex: 1;
 }
+.decorate-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+.decorate-tab {
+  border: 2px solid var(--paper-3);
+  background: var(--white);
+  border-radius: 999px;
+  padding: 3px 12px;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.decorate-tab.on {
+  border-color: var(--ink);
+  background: #fff1b3;
+}
 .decorate-items {
   display: flex;
   gap: 6px;

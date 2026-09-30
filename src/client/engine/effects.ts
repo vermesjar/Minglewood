@@ -4,6 +4,7 @@ import { terrainAt, type SceneDef, type SceneObject } from '@shared/world/scene'
 import { hash2 } from '@shared/world/builders';
 import { makeCanvas, type Sprite } from './sprites/painter';
 import { TownLife } from './townLife';
+import { hasWaterworks } from './waterworks';
 
 interface Particle {
   x: number;
@@ -192,7 +193,8 @@ export class Effects {
         for (const m of marks) {
           const p = { x: st.dx + m.x / k, y: st.dy + m.y / k };
           if (m.kind === 'smoke') this.emitters.push({ kind: 'smoke', ...p, acc: 0, rate: 2.2 });
-          else if (m.kind === 'spray') this.emitters.push({ kind: 'spray', ...p, acc: 0, rate: 26 });
+          // (a drawing whose water moves on its own pixels makes its own spray: waterworks.ts)
+          else if (m.kind === 'spray' && !hasWaterworks(st.sprite.file)) this.emitters.push({ kind: 'spray', ...p, acc: 0, rate: 26 });
           else if (m.kind === 'blink') this.blinks.push({ ...p, phase: (o.x * 7 + o.y * 3) % 10 / 10 });
           else if (m.kind === 'beam') this.lighthouse = p;
         }

@@ -25,7 +25,7 @@ const FEET = 104;
 const solid = (p: Pixels, x: number, y: number) => x >= 0 && y >= 0 && x < p.w && y < p.h && p.d[(y * p.w + x) * 4 + 3] > 0;
 
 /** Is a drawing pixel inside the footprint diamond lifted to height `h` (world px)? */
-function inDiamond(art: SeatArt, x: number, y: number, w: number, d: number, h: number): boolean {
+export function inDiamond(art: SeatArt, x: number, y: number, w: number, d: number, h: number): boolean {
   // back vertex at (ax, ay − 2h); tile axes: +x → (+32, +16), +y → (−32, +16) sprite px
   const X = x + 0.5 - art.ax;
   const Y = y + 0.5 - (art.ay - 2 * h);
@@ -154,6 +154,76 @@ export function backrestMask(
       for (let y = Math.max(0, Math.ceil(top)); y < px.h; y++) if (!air(x, y)) mask[y * W + x] = 1;
     }
   return mask;
+}
+
+/**
+ * The seat's SURFACE in a drawing — the top of the cushion (or cane, or slats) a person sits on: the pixels that
+ * lie inside the footprint at the cushion's height and aren't the backrest's or arms' colours (read, as
+ * backrestMask reads them, off what stands above the cushion's highest point), each going with the majority
+ * around it. The seat rig's checks use it: from behind, the surface must never be drawn over a sitter's hips
+ * nor show between their torso and the seat; from the front, their thighs must lie on it. Where the seat is one
+ * colour with its back (a sofa, a beanbag), nothing is told apart from behind (its surface is hidden by the back
+ * there anyway); `geometric` then takes everything inside the footprint at cushion height (for the front views).
+ */
+export function seatSurface(art: SeatArt, w: number, d: number, seat: number, backrest: boolean, geometric: boolean): Uint8Array {
+  const { px } = art;
+  const W = px.w;
+  const top = Math.floor(art.ay - 2 * seat);
+  const above = new Map<number, [number, number, number, number]>();
+  const inside = new Map<number, [number, number, number, number]>();
+  let nAbove = 0;
+  let nInside = 0;
+  const key = (i: number) => ((px.d[i] >> 3) << 10) | ((px.d[i + 1] >> 3) << 5) | (px.d[i + 2] >> 3);
+  const count = (m: typeof above, i: number) => {
+    const k = key(i);
+    const e = m.get(k);
+    if (e) e[3]++;
+    else m.set(k, [px.d[i], px.d[i + 1], px.d[i + 2], 1]);
+  };
+  const diamond = new Uint8Array(W * px.h);
+  for (let y = 0; y < px.h; y++)
+    for (let x = 0; x < W; x++) {
+      const i = (y * W + x) * 4;
+      if (!px.d[i + 3]) continue;
+      // (what stands above the cushion's highest point can only be backrest or arms)
+      if (y < top) {
+        count(above, i);
+        nAbove++;
+      } else if (inDiamond(art, x, y, w, d, seat)) {
+        count(inside, i);
+        nInside++;
+      }
+      if (inDiamond(art, x, y, w, d, seat)) diamond[y * W + x] = 1;
+    }
+  const share = (m: typeof above, n: number, c: readonly number[]) => {
+    let sum = 0;
+    for (const e of m.values()) if ((e[0] - c[0]) ** 2 + (e[1] - c[1]) ** 2 + (e[2] - c[2]) ** 2 < 26 * 26) sum += e[3];
+    return n ? sum / n : 0;
+  };
+  const verdict = new Map<number, boolean>();
+  for (const [k, e] of inside) verdict.set(k, backrest && nAbove > 0 && share(above, nAbove, e) >= 0.5 * share(inside, nInside, e));
+  const raw = new Uint8Array(W * px.h);
+  for (let i = 0; i < raw.length; i++) if (diamond[i] && !verdict.get(key(i * 4))) raw[i] = 1;
+  const out = new Uint8Array(W * px.h);
+  let n = 0;
+  for (let y = 0; y < px.h; y++)
+    for (let x = 0; x < W; x++) {
+      if (!diamond[y * W + x]) continue;
+      let all = 0;
+      let c = 0;
+      for (let v = y - 2; v <= y + 2; v++)
+        for (let u = x - 2; u <= x + 2; u++) {
+          if (u < 0 || v < 0 || u >= W || v >= px.h || !diamond[v * W + u]) continue;
+          all++;
+          c += raw[v * W + u];
+        }
+      if (c * 2 > all) {
+        out[y * W + x] = 1;
+        n++;
+      }
+    }
+  if (geometric && n < 0.25 * nInside) return diamond;
+  return out;
 }
 
 /** A backrest line traced in a drawing, for the drawing's mirror image (width `w`). */

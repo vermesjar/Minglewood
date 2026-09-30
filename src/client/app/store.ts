@@ -63,8 +63,11 @@ export interface State {
   hoverLabel: string | null;
   inDiscord: boolean;
   announce: string;
-  /** Decorate mode: which catalog item is selected (null = remove mode). */
-  decorate: { itemId: string | null } | null;
+  /**
+   * Decorate mode: which catalog item is selected (floor or wall), or none: the remove tool, or with `move` the
+   * move tool. `moving`: the team piece picked up to move (the selected item is what it is).
+   */
+  decorate: { itemId: string | null; move?: boolean; moving?: string } | null;
   authError: string | null;
 }
 

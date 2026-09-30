@@ -15,7 +15,17 @@ export function Field({ label, hint, children }: { label: string; hint?: string;
 export const usd = (v: number | null | undefined, digits = 2) => (v === null || v === undefined ? '—' : `$${v.toFixed(digits)}`);
 
 /** Every generation asks first: what it makes, what it likely costs, and what's left. */
-export function Confirm(props: { title: string; usage: Usage | null; est: number | null; onOk: () => void; onCancel: () => void; children: ReactNode }) {
+export function Confirm(props: {
+  title: string;
+  usage: Usage | null;
+  est: number | null;
+  onOk: () => void;
+  onCancel: () => void;
+  children: ReactNode;
+  /** The fine print under the costs, and the button's words after "Spend ≈ $x" (default: drawing). */
+  note?: ReactNode;
+  verb?: string;
+}) {
   const left = props.usage ? props.usage.cap - props.usage.total : null;
   const over = left !== null && props.est !== null && props.est > left;
   return (
@@ -33,13 +43,13 @@ export function Confirm(props: { title: string; usage: Usage | null; est: number
             {usd(left)} of {usd(props.usage?.cap, 0)}
           </dd>
         </dl>
-        <p className="muted small">Drawings take 30–90 seconds. The key stays on the server; nothing leaves this machine but the prompt and references.</p>
+        <p className="muted small">{props.note ?? 'Drawings take 30–90 seconds. The key stays on the server; nothing leaves this machine but the prompt and references.'}</p>
         <div className="row end">
           <button className="btn ghost" onClick={props.onCancel}>
             Cancel
           </button>
           <button className="btn primary" autoFocus disabled={over} onClick={props.onOk}>
-            Spend {props.est === null ? '' : `≈ ${usd(props.est, 3)}`} and draw
+            Spend {props.est === null ? '' : `≈ ${usd(props.est, 3)}`} and {props.verb ?? 'draw'}
           </button>
         </div>
       </div>

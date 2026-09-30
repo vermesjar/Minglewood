@@ -10,15 +10,15 @@ import type { EmoteId } from '@shared/presence';
 import { EMOTE_IDS } from '@shared/presence';
 import { getScene, TOWN_ID, buildingForRoom } from '@shared/world';
 import { livedScene } from '@shared/world/lived';
-import { DECOR_BY_ID, decorObject, placementProblem } from '@shared/world/decor';
-import type { SceneObject } from '@shared/world/scene';
+import { decorItem, decorObject, placementProblem, wallPiece, wallPlacementProblem, wallSpanOf, withoutDecoration, type DecorItem, type WallFace } from '@shared/world/decor';
+import type { SceneDef, SceneObject } from '@shared/world/scene';
 import { seatSpotAt, seatSpots, stepOffTiles } from '@shared/world/seats';
 import { approach } from '@shared/world/interact';
 import { WalkGrid } from '@shared/world/walkGrid';
 import { findPath, type Tile } from '@shared/world/pathfinding';
 import { heldDelta, KEY_DIRS, planHeldWalk, type ScreenDir } from '@shared/world/heldWalk';
-import { WorldView, type BuildingBadge } from '../engine/WorldView';
-import { loadArt } from '../engine/sprites/art';
+import { WorldView, type BuildingBadge, type WallSpot } from '../engine/WorldView';
+import { clientArt, loadArt } from '../engine/sprites/art';
 import { clearSpriteCache } from '../engine/sprites/registry';
 import { setWorldClock } from '../engine/weather';
 import { api, ApiError, setActivityTransport } from './api';
@@ -179,6 +179,8 @@ class Game {
       onObjectActivate: (o) => this.onObjectActivate(o),
       onHover: (label) => setState({ hoverLabel: label }),
       onHoverTile: (tile) => this.updateGhost(tile),
+      onHoverWall: (spot) => this.updateWallGhost(spot),
+      onWallClick: (spot) => this.onWallClick(spot),
       nameOf: (id) => getState().membersById.get(id)?.displayName ?? 'Someone',
     });
     this.applyPrefs();
@@ -376,6 +378,8 @@ class Game {
       case 'decor': {
         setState((s) => (s.boot ? { boot: { ...s.boot, decorations: m.decorations } } : {}));
         if (getState().sceneId === m.roomId && this.lastScene) this.loadScene(m.roomId, Object.values(getState().occupants));
+        // the ghost under the pointer is judged against the room as it now is
+        if (getState().sceneId === m.roomId) this.updateWallGhost(this.lastWallSpot);
         if (m.by && m.by !== this.meId && getState().sceneId === m.roomId) toast(`🌿 ${this.name(m.by).split(' ')[0]} just redecorated`, 'social', undefined, 3500);
         break;
       }
@@ -495,7 +499,10 @@ class Game {
     const scene = this.scene(sceneId);
     if (!scene) return null;
     const decor = [...new Set(this.activeEvents().map((e) => e.decor))].sort().join(',');
-    const placed = (getState().boot?.decorations ?? []).filter((d) => d.roomId === sceneId).map((d) => d.id).join(',');
+    const placed = (getState().boot?.decorations ?? [])
+      .filter((d) => d.roomId === sceneId)
+      .map((d) => `${d.id}@${d.x},${d.y}${d.wall ?? ''}`)
+      .join(',');
     const key = `${sceneId}|${decor}|${placed}`;
     let g = this.grids.get(key);
     if (!g) {
@@ -601,7 +608,8 @@ class Game {
   private onGroundClick(t: Tile) {
     const dec = getState().decorate;
     if (dec) {
-      if (dec.itemId) void this.placeDecoration(dec.itemId, t);
+      // (a wall piece hangs from a click on the wall: onWallClick)
+      if (dec.itemId && !decorItem(dec.itemId)?.wall) void this.placeDecoration(dec.itemId, t);
       return;
     }
     setState({ selection: null });
@@ -733,9 +741,18 @@ class Game {
 
   private onObjectClick(o: SceneObject, p: { x: number; y: number }) {
     const sceneId = getState().sceneId!;
-    if (getState().decorate) {
-      if (o.id.startsWith('decor-')) void this.removeDecoration(o.id.slice(6));
-      else toast('That piece belongs to the room — you can remove things your team added.', 'info', undefined, 3000);
+    const dec = getState().decorate;
+    if (dec) {
+      if (!o.id.startsWith('decor-')) toast('That piece belongs to the room — you can move or remove things your team added.', 'info', undefined, 3000);
+      else if (!dec.move) void this.removeDecoration(o.id.slice(6));
+      else if (!dec.moving) {
+        // the move tool: pick it up; the next click puts it down
+        const d = getState().boot?.decorations.find((x) => x.id === o.id.slice(6));
+        if (d) {
+          this.setDecorate({ itemId: d.itemId, move: true, moving: d.id });
+          toast(`Moving the ${decorItem(d.itemId)?.name.toLowerCase() ?? 'piece'}: click where it goes`, 'info', undefined, 3000);
+        }
+      }
       return;
     }
     const kinds = new Set(o.actions?.map((a) => a.kind));
@@ -991,31 +1008,89 @@ class Game {
     return me.role !== 'member' || (!!room.ownerTeamId && room.ownerTeamId === me.teamId);
   }
 
-  setDecorate(mode: { itemId: string | null } | null) {
+  setDecorate(mode: { itemId: string | null; move?: boolean; moving?: string } | null) {
     setState({ decorate: mode, selection: null });
-    if (!mode) this.world?.setGhost(null);
+    const item = mode?.itemId ? decorItem(mode.itemId) : undefined;
+    this.world?.setDecorMode(!mode ? null : item?.wall ? 'wall' : item ? 'floor' : 'pick');
+    this.world?.setGhost(null);
+    this.lastWallSpot = null;
+  }
+
+  /** The room as the piece being placed meets it: without itself while it's being moved. */
+  private decorScene(sceneId: string) {
+    const scene = this.scene(sceneId);
+    const moving = getState().decorate?.moving;
+    return scene && moving ? withoutDecoration(scene, moving) : scene;
   }
 
   private updateGhost(tile: Tile | null) {
     const dec = getState().decorate;
     const sceneId = getState().sceneId;
+    const item = dec?.itemId ? decorItem(dec.itemId) : undefined;
+    if (item?.wall) return; // wall pieces follow the wall under the pointer (updateWallGhost)
     if (!dec?.itemId || !tile || !sceneId || !this.world) {
       this.world?.setGhost(null);
       return;
     }
-    const scene = this.scene(sceneId);
+    const scene = this.decorScene(sceneId);
     const obj = decorObject({ id: 'ghost', roomId: sceneId, itemId: dec.itemId, x: tile[0], y: tile[1], placedBy: '', placedAt: '' });
     if (!scene || !obj) return;
     const occupied = new Set(Object.values(getState().occupants).map((o) => `${Math.round(o.x)},${Math.round(o.y)}`));
-    this.world.setGhost({ obj, valid: !placementProblem(scene, tile[0], tile[1], occupied) });
+    this.world.setGhost({ obj, valid: !placementProblem(scene, tile[0], tile[1], occupied, obj, clientArt) });
   }
 
-  async placeDecoration(itemId: string, t: Tile) {
+  /** The last point of a wall under the pointer (decorate mode, hanging a wall piece). */
+  private lastWallSpot: WallSpot | null = null;
+
+  /** Where a wall piece hangs with the pointer at `spot`: its span centred on the pointer, kept on the wall. */
+  private wallSpotAt(item: DecorItem, spot: WallSpot, scene: SceneDef): number {
+    const span = wallSpanOf(item);
+    const len = spot.face === 'right' ? scene.width : scene.height;
+    return Math.max(0, Math.min(len - span, Math.round(spot.u - span / 2)));
+  }
+
+  private updateWallGhost(spot: WallSpot | null) {
+    this.lastWallSpot = spot;
+    const dec = getState().decorate;
+    const sceneId = getState().sceneId;
+    const item = dec?.itemId ? decorItem(dec.itemId) : undefined;
+    if (!item?.wall) return;
+    const scene = sceneId ? this.decorScene(sceneId) : undefined;
+    if (!spot || !scene || !this.world) {
+      this.world?.setGhost(null);
+      return;
+    }
+    const at = this.wallSpotAt(item, spot, scene);
+    const obj = wallPiece(item, spot.face, at);
+    if (obj) this.world.setGhost({ obj, valid: !wallPlacementProblem(scene, item, spot.face, at, clientArt) });
+  }
+
+  private onWallClick(spot: WallSpot) {
+    const dec = getState().decorate;
+    const sceneId = getState().sceneId;
+    const item = dec?.itemId ? decorItem(dec.itemId) : undefined;
+    const scene = sceneId ? this.decorScene(sceneId) : undefined;
+    if (!item?.wall || !scene) return;
+    const at = this.wallSpotAt(item, spot, scene);
+    void this.placeDecoration(item.id, spot.face === 'right' ? [at, 0] : [0, at], spot.face);
+  }
+
+  /** Place a piece (on a floor tile, or on a wall with its span starting at x or y), or put down the one being moved. */
+  async placeDecoration(itemId: string, t: Tile, wall?: WallFace) {
     const sceneId = getState().sceneId;
     if (!sceneId) return;
+    const moving = getState().decorate?.moving;
+    const name = decorItem(itemId)?.name.toLowerCase() ?? 'piece';
+    const json = { itemId, x: t[0], y: t[1], ...(wall ? { wall } : {}) };
     try {
-      await api(`/rooms/${sceneId}/decor`, { method: 'POST', json: { itemId, x: t[0], y: t[1] } });
-      toast(`Placed ${DECOR_BY_ID.get(itemId)?.name.toLowerCase()} ✨`, 'celebrate', undefined, 2000);
+      if (moving) {
+        await api(`/rooms/${sceneId}/decor/${moving}`, { method: 'PATCH', json });
+        toast(`Moved the ${name} ✨`, 'celebrate', undefined, 2000);
+        this.setDecorate({ itemId: null, move: true });
+      } else {
+        await api(`/rooms/${sceneId}/decor`, { method: 'POST', json });
+        toast(`${wall ? 'Hung' : 'Placed'} ${name} ✨`, 'celebrate', undefined, 2000);
+      }
     } catch (e) {
       toast((e as Error).message, 'info', undefined, 3500);
     }
@@ -1055,6 +1130,8 @@ class Game {
       return;
     }
     if (e.key === 'Escape') {
+      // (a piece picked up to move stays where it was)
+      if (getState().decorate?.moving) this.setDecorate({ itemId: null, move: true });
       setState({ selection: null, panel: null });
       this.world?.setSelected(null);
       return;

@@ -7,7 +7,17 @@ import type { Facing, SceneObject } from '@shared/world/scene';
 import { makeCanvas, type Sprite } from './painter';
 import { centredAnchor } from './footing';
 import { seatProfile, type SeatProfile } from '@shared/world/seats';
+import { rigForView, type SeatRig, type SeatRigs } from '@shared/world/seatRigs';
+import type { SeatModel, SeatModels } from '@shared/world/seatModels';
 import type { Drawing, ModelSpec, Rotation } from '@shared/models';
+import { WALL_PX_PER_TILE, wallFit, type Manifest as WallManifest } from '@shared/models';
+import { registerWallArt } from '@shared/world/decor';
+import type { Pixels } from '@shared/art/footing';
+import type { ArtSource } from '@shared/art/source';
+// the seat rigs, authored and audited per drawn view (src/shared/world/seatRigs.ts; scripts/seat-rig.ts)
+import RIGS_JSON from '../../../../art/seat-rigs.json';
+// the seat models: every seat's 3D proxy, shared by its four facings (src/shared/world/seatModels.ts; scripts/seat-model.ts)
+import MODELS_JSON from '../../../../art/seat-models.json';
 
 /** A drawing of a model and a manifest entry: THE MODEL SPEC (src/shared/models.ts). */
 type ArtFile = Drawing;
@@ -58,6 +68,9 @@ export async function loadArt(base = ''): Promise<void> {
     manifest = m;
     lightCache.clear();
     seatProfiles.clear();
+    pixelCache.clear();
+    // the Wall category follows the catalog (decor.ts): a piece just published from the Design Lab is in it
+    registerWallArt(m as WallManifest);
   } catch {
     manifest = null;
   }
@@ -66,6 +79,57 @@ export async function loadArt(base = ''): Promise<void> {
 function entryFor(o: SceneObject): ArtEntry | null {
   if (!manifest) return null;
   return (o.variant ? manifest.sprites[`${o.sprite}.${o.variant}`] : undefined) ?? manifest.sprites[o.sprite] ?? null;
+}
+
+/** The catalog key an object's art comes from (a variant without art of its own is drawn as its family). */
+function keyFor(o: SceneObject): string | null {
+  if (!manifest) return null;
+  if (o.variant && manifest.sprites[`${o.sprite}.${o.variant}`]) return `${o.sprite}.${o.variant}`;
+  return manifest.sprites[o.sprite] ? o.sprite : null;
+}
+
+const RIGS = RIGS_JSON as unknown as SeatRigs;
+/** Review renders only (the furniture lab's before/after): draw every seat the old, inferred way. */
+let rigsOff = false;
+export function setSeatRigsEnabled(on: boolean) {
+  rigsOff = !on;
+}
+
+/**
+ * How a person sits in this seat's drawing, seen facing `facing` (the seat rig standard): in the pixels of the
+ * sprite the game draws for it (`sp`: mirrored with it when it's its partner's drawing mirrored), or null for a
+ * seat without a rig (the renderer then falls back to inferring it). A Design Lab draft carries its own rig in
+ * its sandbox manifest entry (`seatRig`).
+ */
+export function artSeatRig(o: SceneObject, facing: Facing, sp: Sprite): SeatRig | null {
+  const key = keyFor(o);
+  if (rigsOff || !key || !manifest || (sp.scale ?? 1) !== 2) return null;
+  const own = (manifest.sprites[key] as ArtEntry & { seatRig?: SeatRigs[string] }).seatRig;
+  return rigForView(own ? { [key]: own } : RIGS, key, facing, { mirrored: !!sp.mirrored, width: sp.canvas.width })?.rig ?? null;
+}
+
+const MODELS = MODELS_JSON as unknown as SeatModels;
+/**
+ * The game draws seats Habbo's way, with authored layers (the seat rig: the drawing's part behind a sitter, its
+ * front layer over them, one hand-placed sitting point), not the 3D proxies: a flat figure given per-pixel depth
+ * kept misplacing bodies (Carter, 2026-09-29). The models stay a tool (fitting, checks, the Lab) and can be turned
+ * back on for comparison renders.
+ */
+let modelsOff = true;
+export function setSeatModelsEnabled(on: boolean) {
+  modelsOff = !on;
+}
+
+/**
+ * The seat's model (its 3D proxy: the seat model standard), or null for a seat without one (the renderer then falls
+ * back to its rig, else to inferring it). Only for the 2×-density art it was fitted to. A Design Lab draft carries its
+ * own in its sandbox manifest entry (`seatModel`).
+ */
+export function artSeatModel(o: SceneObject, sp: Sprite): SeatModel | null {
+  const key = keyFor(o);
+  if (modelsOff || !key || !manifest || (sp.scale ?? 1) !== 2) return null;
+  const own = (manifest.sprites[key] as ArtEntry & { seatModel?: SeatModel }).seatModel;
+  return own ?? MODELS[key] ?? null;
 }
 
 /** Flat wall art for a wall-mounted object, if it has been drawn. */
@@ -81,11 +145,53 @@ export function artCatalog(): Array<{ key: string; footprint: [number, number]; 
   }));
 }
 
-export function wallArt(o: SceneObject): { img: HTMLImageElement; v: [number, number]; margin?: number } | null {
+/**
+ * Flat wall art for a wall-mounted object, if it has been drawn, hung by THE WALL ART STANDARD (models.ts
+ * wallFit): at exactly 2:1 (32 drawing px per tile along the wall, 2 per wall unit up it, the wall texture's own
+ * density, so it's painted pixel for pixel and never squeezed), centred in its span. `margin`: tiles from the
+ * span's start to the drawing's left edge (a whole drawing px); `width`: the drawing's width in tiles; `v`: its
+ * bottom and top, wall units above the floor.
+ */
+export function wallArt(o: SceneObject): { img: HTMLImageElement; v: [number, number]; margin: number; width: number } | null {
   const e = entryFor(o);
   if (!e?.wall || !e.file) return null;
   const img = images.get(e.file);
-  return img ? { img, v: e.wall.v, margin: e.wall.margin } : null;
+  if (!img) return null;
+  const span = o.wall === 'left' ? (o.d ?? o.w ?? 1) : (o.w ?? 1);
+  const fit = wallFit(e.wall, { w: img.width, h: img.height }, span);
+  return { img, v: [fit.v0, fit.v1], margin: fit.left / WALL_PX_PER_TILE, width: img.width / WALL_PX_PER_TILE };
+}
+
+/**
+ * The client's art as an ArtSource (src/shared/art/source.ts): the manifest and the loaded images' pixels, for the
+ * rules decorate mode shares with the server (what a tall plant hides on the wall).
+ */
+const pixelCache = new Map<string, Pixels | null>();
+export const clientArt: ArtSource = {
+  manifest: () => manifest as WallManifest | null,
+  pixels(file: string) {
+    if (pixelCache.has(file)) return pixelCache.get(file)!;
+    const img = images.get(file);
+    let px: Pixels | null = null;
+    if (img) {
+      const c = makeCanvas(img.width, img.height);
+      const ctx = c.getContext('2d', { willReadFrequently: true })!;
+      ctx.drawImage(img, 0, 0);
+      px = { w: img.width, h: img.height, d: ctx.getImageData(0, 0, img.width, img.height).data };
+    }
+    pixelCache.set(file, px);
+    return px;
+  },
+};
+
+/**
+ * A standing piece's height and layer as its model declares them (world px from its base to its top), for the depth
+ * by proxy prototype (docs/furniture.md): null for anything without finished art, a rug or wall art.
+ */
+export function artBody(o: SceneObject): { height: number; layer: string } | null {
+  const e = entryFor(o);
+  if (!e || !Number.isFinite(e.height) || e.layer === 'floor' || e.layer === 'wall' || e.wall) return null;
+  return { height: e.height, layer: e.layer };
 }
 
 /**
@@ -119,7 +225,7 @@ function seatProfileOf(o: SceneObject): SeatProfile {
       ? Object.entries(manifest.sprites).find(([k, e]) => (k === o.sprite || k.startsWith(`${o.sprite}.`)) && e.seat !== undefined)?.[1]
       : undefined;
   const e = own?.seat !== undefined ? own : (sibling ?? own);
-  return seatProfile(o.sprite, { seat: e?.seat, seatDepth: e?.seatDepth, backDepth: e?.backDepth, sitStyle: e?.sitStyle, backrest: e?.backrest, backLine: e?.backLine });
+  return seatProfile(o.sprite, { seat: e?.seat, seatDepth: e?.seatDepth, backDepth: e?.backDepth, sitStyle: e?.sitStyle, backrest: e?.backrest, backLine: e?.backLine, arms: e?.arms });
 }
 
 /** Where a lamp's light comes from, relative to the sprite's anchor, in art px (follows mirroring). */

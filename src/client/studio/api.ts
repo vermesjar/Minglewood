@@ -1,5 +1,40 @@
 /** The Design Lab's client for /api/dev/lab (localhost only; every write carries the lab header). */
 import type { ModelCategory, RoomKind, Theme } from '@shared/models';
+import type { Pt } from '@shared/world/seatRigs';
+import type { DraftRig } from './rigLab';
+import type { SeatModel } from '@shared/world/seatModels';
+
+/**
+ * A draft seat's PARTS (src/client/engine/sprites/seatParts.ts; PartsPanel.tsx): each own view's part map (partsToString),
+ * where it came from, and the drawings it was made on. Compiled into the draft's seatRig on every change.
+ */
+export interface DraftParts {
+  views: Partial<Record<Facing, string>>;
+  proposal?: Partial<Record<Facing, { by: 'ai' | 'copy'; at: string; usd?: number; model?: string; from?: string; notes?: string }>>;
+  for: string;
+}
+
+/** What art/designlab.py propose-parts answers for one view. */
+export interface PartsProposal {
+  facing: Facing;
+  labels: Record<'back' | 'seat' | 'arm' | 'leg' | 'other', number[]>;
+  missing: number[];
+  parts: string;
+  w: number;
+  h: number;
+  regions: number;
+  notes: string;
+  usd: number;
+  model: string;
+  effort?: string;
+}
+
+/** A draft seat's model (the seat model standard; ModelPanel.tsx): the proxy, the day the reviewer passed it, and the drawings it was made on. */
+export interface DraftModel {
+  model: SeatModel;
+  reviewed?: string;
+  for: string;
+}
 
 export type Facing = 'se' | 'sw' | 'ne' | 'nw';
 export type Rotation = 'radial' | 'mirror' | 'full' | 'flat';
@@ -25,6 +60,16 @@ export interface FurnitureSpec {
   seat: number | null;
   sitStyle: 'chair' | 'stool' | 'lounge' | 'floor';
   backrest: boolean;
+  /** A catalog seat's own profile, kept when it's opened as a draft (until it's calibrated here). */
+  catalogProfile?: { seatDepth: number; backDepth: number; backLine?: Partial<Record<'ne' | 'nw', Array<[number, number]>>> } | null;
+  /** Has arms: seen from the front, the near arm is drawn over its sitter (the seat rig standard). */
+  arms?: boolean;
+  /** How people sit in it, per drawn view (the seat rig standard): compiled from its parts (PartsPanel.tsx). */
+  seatRig?: DraftRig | null;
+  /** Which of each own view's pixels are back, seat, arm or leg (PartsPanel.tsx): what the rig is compiled from. */
+  seatParts?: DraftParts | null;
+  /** How people sit in it: its 3D proxy (the seat model standard; ModelPanel.tsx). A seat publishes with one, passed. */
+  seatModel?: DraftModel | null;
   /** The seat standard's calibration: the cushion centre clicked in the front drawing (seatLab.ts), for which drawing, and what it gave. */
   seatCalibration: {
     cushion: [number, number];
@@ -103,6 +148,8 @@ export interface Usage {
   today: number;
   callsToday: number;
   estimates: Record<string, number>;
+  /** A parts proposal (one view): the default vision model, its likely cost and the cap no call may pass. */
+  parts?: { model: string; effort: string; cap: number; estimate: number | null };
 }
 
 export interface CheckResult {
@@ -120,6 +167,30 @@ export interface LibraryPiece {
   seat: number | null;
   facings: string[];
   issues: string[];
+  /** A seat's rig in art/seat-rigs.json: none, some views proposed, or every view audited. */
+  rig?: 'unrigged' | 'proposed' | 'audited';
+}
+
+/** What the Lab sends the vision model to propose a view's rig (devLab.ts /rig-vision), and what comes back. */
+export interface RigVisionAsk {
+  facing: Facing;
+  image: string;
+  width: number;
+  height: number;
+  zoom: number;
+  cushions: number;
+  sitStyle: string;
+  backrest: boolean;
+  arms: boolean;
+  name: string;
+  pieces: Array<{ id: number; at: Pt; size: number }>;
+  inferred: { front: number[]; hips: Pt[] };
+}
+export interface RigVisionAnswer {
+  front: number[];
+  hips: Pt[];
+  notes?: string;
+  usd?: number;
 }
 
 const BASE = '/api/dev/lab';
@@ -156,6 +227,11 @@ export const lab = {
   check: (id: string) => call<CheckResult>(`/drafts/${id}/check`, { method: 'POST', body: '{}' }),
   publish: (id: string, overwrite = false) => call<Record<string, unknown>>(`/drafts/${id}/publish`, { method: 'POST', body: body({ overwrite }) }),
   fromCatalog: (key: string) => call<Draft>(`/from-catalog/${encodeURIComponent(key)}`, { method: 'POST', body: '{}' }),
+  rigVision: (id: string, ask: RigVisionAsk) => call<RigVisionAnswer>(`/drafts/${id}/rig-vision`, { method: 'POST', body: body(ask) }),
+  proposeParts: (id: string, facing: Facing) => call<PartsProposal>(`/drafts/${id}/propose-parts`, { method: 'POST', body: body({ facing }) }),
+  /** The catalog's part maps (art/seat-parts): key → the facings it has one for. */
+  seatParts: () => call<Record<string, Facing[]>>('/seat-parts'),
+  seatPartUrl: (key: string, facing: Facing) => `${BASE}/seat-parts/${encodeURIComponent(`${key}.${facing}.png`)}`,
   library: () => call<{ scale: number; pieces: LibraryPiece[] }>('/library'),
   parts: () => call<Record<PartKind, string[]>>('/parts'),
   fileUrl: (id: string, rel: string, bust = '') => `${BASE}/drafts/${id}/file/${rel}${bust ? `?v=${bust}` : ''}`,

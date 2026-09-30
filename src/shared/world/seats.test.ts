@@ -79,7 +79,7 @@ describe('seat profiles', () => {
   });
 
   it('names every field the manifest carries for a seat', () => {
-    expect([...SEAT_FIELDS]).toEqual(['seat', 'seatDepth', 'backDepth', 'sitStyle', 'backrest', 'backLine']);
+    expect([...SEAT_FIELDS]).toEqual(['seat', 'seatDepth', 'backDepth', 'sitStyle', 'backrest', 'backLine', 'arms']);
   });
 });
 
@@ -103,5 +103,27 @@ describe('using things', () => {
     expect(first).toEqual([machine.x, machine.y - 1]);
     const [fx, fy] = approachTiles({ ...machine, facing: 'sw' })[0];
     expect([fx, fy]).toEqual([machine.x, machine.y + 1]);
+  });
+});
+
+describe('seat rigs', () => {
+  it('knows which facings of a catalog seat need a rig of their own', async () => {
+    const { ownRigFacings, rigStatus } = await import('./seatRigs');
+    expect(ownRigFacings({ footprint: [1, 1], facings: { se: 1, nw: 1 } })).toEqual(['se', 'nw']);
+    expect(ownRigFacings({ footprint: [2, 1], facings: { sw: 1, ne: 1 } })).toEqual(['sw', 'ne']);
+    expect(ownRigFacings({ footprint: [1, 1], file: 'stool.png' })).toEqual(['se', 'sw', 'ne', 'nw']);
+    expect(ownRigFacings({ footprint: [2, 1], file: 'bench.png' })).toEqual(['sw', 'ne']);
+    const rig = { hips: [[1, 1]] as Array<[number, number]>, front: [], legs: 'show' as const };
+    expect(rigStatus({ footprint: [1, 1], facings: { se: 1, nw: 1 } })).toBe('unrigged');
+    expect(rigStatus({ footprint: [1, 1], facings: { se: 1, nw: 1 } }, { se: { ...rig, audited: '2026-09-29' } })).toBe('proposed');
+    expect(rigStatus({ footprint: [1, 1], facings: { se: 1, nw: 1 } }, { se: { ...rig, audited: '2026-09-29' }, nw: { ...rig, audited: '2026-09-29' } })).toBe('audited');
+  });
+
+  it('mirrors a rig with its drawing, cushions in the same order', async () => {
+    const { mirrorRig, rigForView } = await import('./seatRigs');
+    const r = { hips: [[10, 20], [40, 30]] as Array<[number, number]>, front: [[[0, 0], [10, 0], [10, 5]]] as Array<Array<[number, number]>>, legs: 'show' as const };
+    expect(mirrorRig(r, 100).hips).toEqual([[90, 20], [60, 30]]);
+    expect(rigForView({ k: { sw: r } }, 'k', 'se', { mirrored: true, width: 100 })?.rig.front[0]).toEqual([[100, 0], [90, 0], [90, 5]]);
+    expect(rigForView({ k: { sw: r } }, 'k', 'se', { mirrored: false, width: 100 })).toBeNull();
   });
 });

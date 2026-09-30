@@ -16,6 +16,7 @@ import { DemoProvider } from './providers/demo';
 import { DiscordVoiceGateway } from './providers/discord/gateway';
 import { VoicePresenceSync } from './providers/voiceSync';
 import { apiRoutes } from './routes/api';
+import { serverArt } from './art';
 import { authRoutes } from './routes/auth';
 import { adminRoutes } from './routes/admin';
 import { MockSlack, SlackApi } from './slack/api';
@@ -49,6 +50,8 @@ export interface App {
 }
 
 export async function createApp(opts: AppOptions): Promise<App> {
+  // the art catalog from disk: fills the Wall category (decor.ts), so teams' wall pieces are in their rooms
+  serverArt();
   const store = new Store(opts.persistence);
   await store.init(new Date(), { demo: opts.demo !== false });
 
@@ -142,16 +145,18 @@ export async function createApp(opts: AppOptions): Promise<App> {
   app.set('trust proxy', 1);
   // Slack signs the raw request bytes, so its routes read the body themselves (before the JSON parser).
   app.use('/api/slack', slackRoutes(ctx, slackMock));
-  app.use(express.json({ limit: '64kb' }));
   if (!config.isProd) {
     // Dev only: the Design Lab (src/client/studio.html), localhost only (routes/devLab.ts labGuard). Loaded on
-    // first use and never in production; ahead of the API rate limit because its sandbox loads every sprite.
+    // first use and never in production; ahead of the API rate limit because its sandbox loads every sprite, and
+    // ahead of the JSON parser because its routes parse their own bodies (a seat rig's picture for the vision
+    // model is a few hundred kB).
     let lab: Promise<{ guard: express.RequestHandler; router: express.Router }> | null = null;
     app.use('/api/dev/lab', (req, res, next) => {
       lab ??= import('./routes/devLab').then((m) => ({ guard: m.labGuard, router: m.devLabRoutes() }));
       lab.then(({ guard, router }) => guard(req, res, (err?: unknown) => (err ? next(err) : router(req, res, next)))).catch(next);
     });
   }
+  app.use(express.json({ limit: '64kb' }));
   const apiLimiter = new KeyedLimiter(600, 60_000);
   app.use('/api', (req, res, next) => {
     if (!apiLimiter.allow(req.ip ?? 'unknown')) {

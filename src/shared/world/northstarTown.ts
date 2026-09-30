@@ -214,7 +214,7 @@ const STOOP_BLOCKS: Record<string, Array<[number, number]>> = {
   'b-hq': [[31, 23], [32, 23], [32, 24], [33, 23], [33, 24], [34, 23], [34, 24], [36, 23], [36, 24], [37, 23], [37, 24], [38, 23], [38, 24]],
   'b-cafe': [[55, 30], [57, 30], [58, 30], [61, 25]],
   'b-focus': [[15, 7], [15, 8], [15, 9], [15, 11]],
-  'b-eng': [[28, 40], [28, 41], [29, 41]],
+  'b-eng': [[28, 40], [28, 41]],
   'b-design': [[28, 53], [28, 55], [28, 56], [28, 57]],
   'b-launch': [[28, 64]],
   'b-events': [[40, 63], [41, 63], [42, 63], [45, 63], [46, 63], [47, 63]],
@@ -424,7 +424,6 @@ export function buildTown(): SceneDef {
   add({ sprite: 'bench', x: 40, y: 37, d: 2, facing: 'nw', actions: [{ kind: 'sit' }] });
   add({ sprite: 'flowerbed', x: 29, y: 29, variant: 'pink' });
   add({ sprite: 'flowerbed', x: 41, y: 29, variant: 'yellow' });
-  add({ sprite: 'flowerbed', x: 29, y: 41, variant: 'blue' });
   add({ sprite: 'flowerbed', x: 41, y: 41, variant: 'pink' });
   add({
     id: 'welcome-sign',

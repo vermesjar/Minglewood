@@ -12,6 +12,7 @@ import type { BoardNote, MomentKind } from '@shared/protocol';
 import { noteColor } from '@shared/world/uses';
 import { wallArt } from './sprites/art';
 import { TABLES, TableGame, label } from './tabletop';
+import { WATERWORKS, Waterworks, type WaterLight } from './waterworks';
 import type { Effects } from './effects';
 import type { Sprite } from './sprites/painter';
 import { worldTimeNow } from './weather';
@@ -31,8 +32,13 @@ export type AnimSpec =
   | { kind: 'flames'; at: P; spread: number; rate: number }
   /** Little lights winking on and off. */
   | { kind: 'blink'; at: P[]; colors: string[] }
-  /** A soft pulsing glow (lanterns, neon); several colours cycle slowly. */
-  | { kind: 'glow'; at: P; r: number; color: string; speed: number; cycle?: string[] }
+  /**
+   * A soft pulsing glow (lanterns, neon); several colours cycle slowly. `dusk`: a lantern on a building, faint by
+   * day and full from dusk (the lit windows' own glow comes from the drawing's night glow).
+   */
+  | { kind: 'glow'; at: P; r: number; color: string; speed: number; cycle?: string[]; dusk?: boolean }
+  /** Marquee bulbs in a row (any path, in order): every third one dims in turn, chasing along (r: bulb radius). */
+  | { kind: 'marquee'; at: P[]; r: number; off: string; rate: number }
   /** Music notes drifting up. */
   | { kind: 'notes'; at: P; every: number }
   /** Marquee lights chasing along a line. */
@@ -60,16 +66,30 @@ export type AnimSpec =
   /** Part of the drawing (a hanging lantern, a claw) sways by a pixel on a slow sine: [x0, y0, x1, y1]. */
   | { kind: 'regionSway'; rect: [number, number, number, number]; amp: number; period: number }
   /** The top of the drawing (leaves) stirs in a breeze from a nearby window. */
-  | { kind: 'bandSway'; top: number; period: number };
+  | { kind: 'bandSway'; top: number; period: number }
+  /**
+   * A flag waving: the columns of the cloth ([x0, y0, x1, y1], the pole outside it) ride a wave travelling out
+   * from the pole (at x `poleX`, the cloth `len` px long), each lifted or dropped a pixel, more towards the free
+   * end. A cloth caught on something is given as several boxes of the one flag.
+   */
+  | { kind: 'flag'; rect: [number, number, number, number]; poleX: number; len: number; amp: number; period: number }
+  /** Smoke puffing from a chimney pot's mouth. */
+  | { kind: 'smoke'; at: P; every: number }
+  /** Now and then part of the drawing hops or pecks by (dx, dy) for a beat (a bird on a bird bath, a crow). */
+  | { kind: 'nod'; rect: [number, number, number, number]; dx: number; dy: number; every: number };
 
 /** Wall things (painted into the room's wall): where they are is worked out per scene, see loadWalls. */
-type WallSpec =
+export type WallSpec =
   /** A countdown ring whose segments light one by one, and a dot flying along the trajectory arc. */
   | { kind: 'countdown'; ring: P; r: number; arc: [P, P, P] }
   /** Paper lanterns glowing softly, each on its own breath. */
   | { kind: 'lanterns'; at: P[]; r: number }
   /** A neon sign: a steady buzz, and now and then one letter dips for a couple of frames. */
-  | { kind: 'neon'; letters: number };
+  | { kind: 'neon'; letters: number }
+  /** A clock on the wall showing the real time (its painted hands covered with the face's colour first). */
+  | { kind: 'clock'; at: P; rx: number; ry: number; paper: string }
+  /** Little lights on a wall piece winking on and off (status lights, stars, a call button). */
+  | { kind: 'blink'; at: P[]; colors: string[]; slow?: boolean };
 
 const ARCADE_SW: AnimSpec[] = [
   { kind: 'screen', quad: [[13, 25], [32, 31], [32, 48], [13, 43]] },
@@ -81,6 +101,11 @@ const DESK_SW: AnimSpec[] = [
   { kind: 'code', quad: [[53, 13], [77, 22], [77, 39], [53, 30]], colors: ['#8ab8ff', '#7ee0a8', '#ff9fd0'] },
 ];
 const ARCADE_NE: AnimSpec[] = [];
+const NEON_RIM: AnimSpec[] = [
+  { kind: 'strip', from: [1, 18.5], to: [8, 23], color: '112,199,236', speed: 0.5 },
+  { kind: 'strip', from: [8, 23.5], to: [29, 23.5], color: '112,199,236', speed: 0.5 },
+  { kind: 'strip', from: [29, 23], to: [36, 18.5], color: '112,199,236', speed: 0.5 },
+];
 
 /** Specs by drawing file (sw/se drawings are the fronts; ne/nw the backs). */
 const BY_FILE: Record<string, AnimSpec[]> = {
@@ -193,7 +218,7 @@ const BY_FILE: Record<string, AnimSpec[]> = {
     { kind: 'blink', at: [[44, 60]], colors: ['#ff8ad8'] },
   ],
   'lantern-floor.se.png': [
-    { kind: 'regionSway', rect: [7, 6, 31, 40], amp: 1, period: 5.5 },
+    { kind: 'regionSway', rect: [7, 6, 30, 40], amp: 1, period: 5.5 },
     { kind: 'glow', at: [18, 15], r: 12, color: '255,190,140', speed: 0.7 },
   ],
   'lantern-floor.sw.png': [
@@ -215,14 +240,155 @@ const BY_FILE: Record<string, AnimSpec[]> = {
   'claw-machine.ne.png': [{ kind: 'chase', from: [3, 11], to: [40, 11], n: 9, colors: ['#ffe66b', '#ff6bd5'] }],
   'arcade-cabinet.sw.png': ARCADE_SW,
   'arcade-cabinet.ne.png': ARCADE_NE,
+
+  // the town's props (docs/ambient-life.md). Boxes are [x0, y0, x1, y1) in the drawing's pixels.
+  // the rowboats ride the lake's swell
+  'boat.red.png': [{ kind: 'bob', amp: 1, period: 3.4 }],
+  'boat.yellow.png': [{ kind: 'bob', amp: 1, period: 3.9 }],
+  // the cattails and the left iris stir; the stems in the mud stay
+  'reeds.png': [{ kind: 'bandSway', top: 0.4, period: 4.5 }],
+  // the brown bird on the rim dips its beak to drink now and then (its water moves: waterworks.ts)
+  'birdbath.png': [{ kind: 'nod', rect: [32, 0, 42, 6], dx: 0, dy: 1, every: 4 }],
+  // the café umbrellas' canopies lift in the breeze over their poles
+  'umbrella-table.red.png': [{ kind: 'regionSway', rect: [0, 0, 112, 72], amp: 1, period: 6 }],
+  'umbrella-table.teal.png': [{ kind: 'regionSway', rect: [0, 0, 112, 72], amp: 1, period: 6.6 }],
+  // the crow on the scarecrow's arm hops now and then (it's drawn diagonally between hat, coat and straw, so
+  // it's lifted in the strips it's clear in, all together)
+  'scarecrow.se.png': [
+    [41, 8, 52, 14],
+    [38, 14, 48, 19],
+    [36, 19, 45, 20],
+    [36, 20, 44, 21],
+    [36, 21, 38, 22],
+  ].map((rect): AnimSpec => ({ kind: 'nod', rect: rect as [number, number, number, number], dx: 0, dy: -1, every: 7 })),
+  'scarecrow.nw.png': [
+    [41, 6, 53, 14],
+    [42, 14, 54, 18],
+    [46, 18, 55, 19],
+    [48, 19, 55, 20],
+    [50, 20, 56, 21],
+    [51, 21, 56, 23],
+    [52, 23, 56, 24],
+    [53, 24, 56, 25],
+    [54, 25, 56, 26],
+  ].map((rect): AnimSpec => ({ kind: 'nod', rect: rect as [number, number, number, number], dx: 0, dy: -1, every: 7 })),
+  // the town's buildings (docs/ambient-life.md)
+  // HQ: the flag on the roof waves (its cloth in two boxes round the pole's collar), the facade clock keeps the
+  // world's time, the portico lantern glows from dusk
+  'building.hq.png': [
+    { kind: 'flag', rect: [291, 21, 347, 93], poleX: 290, len: 102, amp: 1, period: 1.6 },
+    { kind: 'flag', rect: [347, 21, 393, 109], poleX: 290, len: 102, amp: 1, period: 1.6 },
+    { kind: 'clockface', at: [194.5, 302.5], rx: 14, ry: 17, paper: 'rgb(251,245,219)' },
+    { kind: 'glow', at: [192, 563], r: 8, color: '255,214,140', speed: 1, dusk: true },
+  ],
+  // the arcade: its marquee bulbs chase round the arch and along the canopy, the neon hums, the parapet's tubes
+  // carry light, the pennant on the star pole flutters, the wall lanterns glow from dusk
+  'building.arcade.png': [
+    { kind: 'marquee', at: [[55.5, 161.5], [66.5, 165.5], [77.5, 166.5], [85.5, 155.5], [98.5, 157.5], [109.5, 159.5], [110.5, 147.5], [114.5, 138.5], [122.5, 132.5], [133.5, 130.5], [145.5, 131.5], [156.5, 137.5], [166.5, 145.5], [173.5, 157.5], [178.5, 167.5], [179.5, 178.5], [178.5, 188.5], [190.5, 190.5], [202.5, 195.5], [212.5, 207.5], [219.5, 221.5], [228.5, 232.5], [240.5, 238.5], [246.5, 252.5], [246.5, 264.5], [246.5, 277.5], [245.5, 290.5], [232.5, 284.5], [220.5, 278.5], [208.5, 273.5], [195.5, 267.5], [183.5, 262.5], [171.5, 257.5], [160.5, 251.5], [148.5, 246.5], [137.5, 241.5], [125.5, 236.5], [114.5, 231.5], [102.5, 226.5], [91.5, 220.5], [79.5, 215.5], [68.5, 210.5], [56.5, 205.5], [44.5, 200.5], [44.5, 188.5], [44.5, 176.5], [44.5, 164.5]], r: 2, off: '#8e98a0', rate: 5 },
+    { kind: 'marquee', at: [[23.5, 234.5], [35.5, 241.5], [54.5, 244.5], [64.5, 244.5], [64.5, 250.5], [80.5, 251.5], [83.5, 260.5], [97.5, 260.5], [102.5, 269.5], [117.5, 268.5], [122.5, 278.5], [138.5, 278.5], [143.5, 288.5], [160.5, 288.5], [165.5, 298.5], [180.5, 298.5], [185.5, 308.5], [201.5, 307.5], [206.5, 318.5], [233.5, 332.5], [242.5, 337.5], [252.5, 343.5]], r: 2, off: '#8e98a0', rate: 5 },
+    { kind: 'glow', at: [248, 324], r: 16, color: '238,73,165', speed: 1.2 },
+    { kind: 'glow', at: [365, 247], r: 20, color: '238,73,165', speed: 0.9 },
+    { kind: 'strip', from: [293, 273], to: [437, 211], color: '255,150,215', speed: 0.35 },
+    { kind: 'strip', from: [293, 282], to: [437, 220], color: '153,229,240', speed: 0.3 },
+    { kind: 'glow', at: [78, 304], r: 10, color: '255,214,120', speed: 1, dusk: true },
+    { kind: 'glow', at: [222, 366], r: 10, color: '255,214,120', speed: 1.1, dusk: true },
+    { kind: 'flag', rect: [219, 46, 253, 83], poleX: 212, len: 41, amp: 1, period: 1.4 },
+  ],
+  // Lantern Hall: its seventeen paper lanterns under the eaves breathe, each on its own beat, and glow from dusk
+  'building.events.png': [
+    { kind: 'glow', at: [16, 194], r: 12, color: '255,110,70', speed: 0.80, dusk: true },
+    { kind: 'glow', at: [44, 213], r: 12, color: '255,200,90', speed: 0.92, dusk: true },
+    { kind: 'glow', at: [77, 225], r: 12, color: '130,220,210', speed: 1.04, dusk: true },
+    { kind: 'glow', at: [122, 201], r: 12, color: '255,200,90', speed: 1.16, dusk: true },
+    { kind: 'glow', at: [158, 196], r: 13, color: '255,150,180', speed: 1.28, dusk: true },
+    { kind: 'glow', at: [206, 153], r: 8, color: '150,195,245', speed: 0.80, dusk: true },
+    { kind: 'glow', at: [256, 243], r: 13, color: '130,220,210', speed: 0.92, dusk: true },
+    { kind: 'glow', at: [278, 276], r: 13, color: '255,110,70', speed: 1.04, dusk: true },
+    { kind: 'glow', at: [304, 310], r: 12, color: '255,200,90', speed: 1.16, dusk: true },
+    { kind: 'glow', at: [334, 342], r: 13, color: '255,110,70', speed: 1.28, dusk: true },
+    { kind: 'glow', at: [366, 364], r: 12, color: '130,220,210', speed: 0.80, dusk: true },
+    { kind: 'glow', at: [396, 360], r: 13, color: '255,200,90', speed: 0.92, dusk: true },
+    { kind: 'glow', at: [434, 349], r: 11, color: '255,200,90', speed: 1.04, dusk: true },
+    { kind: 'glow', at: [472, 329], r: 12, color: '255,150,180', speed: 1.16, dusk: true },
+    { kind: 'glow', at: [505, 309], r: 12, color: '130,220,210', speed: 1.28, dusk: true },
+    { kind: 'glow', at: [549, 288], r: 11, color: '255,200,90', speed: 0.80, dusk: true },
+    { kind: 'glow', at: [582, 264], r: 12, color: '255,110,70', speed: 0.92, dusk: true },
+  ],
+  // the café: the little glass lanterns under its eaves and its two wall sconces
+  'building.cafe.png': [
+    { kind: 'glow', at: [74.5, 161.5], r: 6, color: '255,214,150', speed: 0.80, dusk: true },
+    { kind: 'glow', at: [110.5, 134.5], r: 6, color: '255,214,150', speed: 0.95, dusk: true },
+    { kind: 'glow', at: [151.5, 109.5], r: 6, color: '255,214,150', speed: 1.10, dusk: true },
+    { kind: 'glow', at: [219.5, 198.5], r: 6, color: '255,214,150', speed: 1.25, dusk: true },
+    { kind: 'glow', at: [250.5, 240.5], r: 6, color: '255,214,150', speed: 0.80, dusk: true },
+    { kind: 'glow', at: [319.5, 280.5], r: 6, color: '255,214,150', speed: 0.95, dusk: true },
+    { kind: 'glow', at: [360.5, 263.5], r: 6, color: '255,214,150', speed: 1.10, dusk: true },
+    { kind: 'glow', at: [400.5, 247.5], r: 6, color: '255,214,150', speed: 1.25, dusk: true },
+    { kind: 'glow', at: [444.5, 231.5], r: 6, color: '255,214,150', speed: 0.80, dusk: true },
+    { kind: 'glow', at: [116, 323], r: 7, color: '255,214,140', speed: 0.9, dusk: true },
+    { kind: 'glow', at: [182, 351], r: 7, color: '255,214,140', speed: 1.05, dusk: true },
+  ],
+  // the Quiet Grove: the porch lantern and the one by the door
+  'building.focus.png': [
+    { kind: 'glow', at: [411, 276], r: 9, color: '255,210,140', speed: 0.8, dusk: true },
+    { kind: 'glow', at: [263, 329], r: 8, color: '255,210,140', speed: 0.95, dusk: true },
+  ],
+  // the Design Loft's chimney smokes like the others (its drawing marks no emitter)
+  'building.design.png': [{ kind: 'smoke', at: [78.5, 57], every: 0.45 }],
+  // the lighthouse's weathervane turns a little in the wind (its beam: effects.ts)
+  'lighthouse.png': [{ kind: 'regionSway', rect: [30, 0, 48, 11], amp: 1, period: 4 }],
+  // the bandstand's string bulbs twinkle
+  'gazebo.png': [{ kind: 'blink', at: [[5.5, 111.5], [31.5, 130.5], [70.5, 137.5], [95.5, 140.5], [121.5, 138.5], [160.5, 130.5], [186.5, 111.5]], colors: ['#fff4c0', '#f8d973'] }],
+
+  // rooms (docs/ambient-life.md)
+  // Lantern Hall's cocktail tables: the candle in each hurricane glass
+  'cocktail-table.se.png': [{ kind: 'candles', at: [[20.5, 15]] }],
+  'cocktail-table.nw.png': [{ kind: 'candles', at: [[20.5, 15]] }],
+  // the arcade's prize counter: the ticket display and the lit glass edges (from behind, its neon rails)
+  'prize-counter.sw.png': [
+    { kind: 'screen', quad: [[23, 10], [31, 13], [31, 16], [23, 13]] },
+    { kind: 'strip', from: [8, 22], to: [69, 49], color: '137,217,246', speed: 0.35 },
+    { kind: 'strip', from: [6, 54], to: [69, 82], color: '137,217,246', speed: 0.45 },
+  ],
+  'prize-counter.ne.png': [
+    { kind: 'strip', from: [6, 12], to: [68, 41], color: '255,110,200', speed: 0.35 },
+    { kind: 'strip', from: [6, 46], to: [68, 75], color: '255,110,200', speed: 0.45 },
+  ],
+  // the arcade's high table: light running round its neon rim
+  'table-high.neon.se.png': NEON_RIM,
+  'table-high.neon.nw.png': NEON_RIM,
+  // the Launch Lab workbench: the 3D printer's head works back and forth, the soldering iron smokes a little
+  'workbench.sw.png': [
+    { kind: 'regionSway', rect: [19, 16, 26, 21], amp: 1, period: 3 },
+    { kind: 'steam', at: [58.5, 33], every: 4 },
+  ],
+  'workbench.ne.png': [{ kind: 'steam', at: [43.5, 20], every: 4 }],
+  // the water cooler: now and then a bubble rises through the jug
+  'water-cooler.sw.png': [{ kind: 'bubbles', glass: [[5, 10], [25, 10], [25, 28], [5, 28]], every: 6 }],
+  'water-cooler.se.png': [{ kind: 'bubbles', glass: [[5, 10], [26, 10], [26, 27], [5, 27]], every: 6 }],
+  'water-cooler.nw.png': [{ kind: 'bubbles', glass: [[6, 10], [27, 10], [27, 27], [6, 27]], every: 6 }],
+  'water-cooler.ne.png': [{ kind: 'bubbles', glass: [[5, 10], [27, 10], [27, 27], [5, 27]], every: 6 }],
+  // HQ's time capsule: a soft light behind its porthole
+  'time-capsule.png': [{ kind: 'glow', at: [17.5, 30], r: 9, color: '150,200,255', speed: 0.7 }],
+  'time-capsule.ne.png': [{ kind: 'glow', at: [24.5, 33.5], r: 6, color: '150,200,255', speed: 0.7 }],
+  // the Quiet Grove's side tables: the tea steams
+  'side-table.walnut.se.png': [{ kind: 'steam', at: [15.5, 27], every: 3.6 }],
+  'side-table.walnut.nw.png': [{ kind: 'steam', at: [15.5, 27], every: 3.6 }],
+  // the model rocket: its porthole lit, the stars on its space-window decal twinkling (both ride it on liftoff)
+  'rocket-model.se.png': [
+    { kind: 'glow', at: [23.5, 32], r: 4, color: '150,190,255', speed: 0.6 },
+    { kind: 'blink', at: [[16.5, 45.5], [13.5, 47.5], [14.5, 49.5]], colors: ['#eef2ff'] },
+  ],
+  'rocket-model.nw.png': [{ kind: 'glow', at: [20.5, 53], r: 4, color: '150,190,255', speed: 0.6 }],
 };
 for (const c of ['cyan', 'gold', 'lime', 'orange', 'pink']) {
   BY_FILE[`arcade-cabinet.${c}.sw.png`] = ARCADE_SW;
   BY_FILE[`arcade-cabinet.${c}.ne.png`] = ARCADE_NE;
 }
 
+/** Whether a drawing has life of its own: idle animations, or water that moves on it (waterworks.ts). */
 export function hasAnimation(file: string | undefined): boolean {
-  return !!file && !!BY_FILE[file]?.length;
+  return !!file && (!!BY_FILE[file]?.length || !!WATERWORKS[file]);
 }
 
 interface Fish {
@@ -258,6 +424,8 @@ interface Live {
   moments: Partial<Record<MomentKind, { at: number; detail?: string }>>;
   /** A pool or air-hockey table's game, played on its own drawing (tabletop.ts). */
   table?: TableGame;
+  /** Water that moves on its drawing: a fountain's streams, pools and lily pads (waterworks.ts). */
+  water?: Waterworks;
   /** Where its moments happen on the drawing (MOMENT_SPOTS). */
   spot?: Spots;
   /** The drawing darkened (a server rack switched off), made when first needed. */
@@ -289,7 +457,8 @@ export class ObjectAnimations {
       // a potted plant by a window stirs in the breeze coming in
       if (scene && st.obj.sprite === 'plant' && nearWindow(scene, st.obj)) specs = [...(specs ?? []), { kind: 'bandSway', top: 0.42, period: 4.5 }];
       const usable = !!st.obj.actions?.some((a) => a.kind === 'use' || a.kind === 'note') || (!!st.sprite.file && !!MOMENT_SPOTS[st.sprite.file]);
-      if (!specs?.length && !usable) continue;
+      const water = st.sprite.file ? WATERWORKS[st.sprite.file] : undefined;
+      if (!specs?.length && !usable && !water) continue;
       specs ??= [];
       const k = st.sprite.scale ?? 1;
       const w = st.sprite.canvas.width;
@@ -312,6 +481,7 @@ export class ObjectAnimations {
       };
       const table = st.sprite.file ? TABLES[st.sprite.file] : undefined;
       if (table) live.table = new TableGame(st.sprite, table, this.effects);
+      if (water) live.water = waterOf(st.sprite, st.obj.id, water);
       live.spot = st.sprite.file ? MOMENT_SPOTS[st.sprite.file] : undefined;
       for (const s of specs) {
         if (s.kind === 'fish')
@@ -367,12 +537,20 @@ export class ObjectAnimations {
     }
   }
 
+  /** The light the world is in (WorldView, every frame): sunlight for glints on water, the lamps at night. */
+  private light: { sun: number; lamps: WaterLight[] } = { sun: 1, lamps: [] };
+
+  setLight(sun: number, lamps: WaterLight[]) {
+    this.light = { sun, lamps };
+  }
+
   update(dt: number, reducedMotion: boolean) {
     this.t += dt;
     if (reducedMotion) return;
     for (const l of this.live.values()) {
       const on = this.isOn(l.obj.id);
       this.updateUse(l, dt);
+      l.water?.update(dt, this.light.sun, this.effects.night);
       l.specs.forEach((s, i) => {
         l.clock[i] += dt;
         if (s.kind === 'steam' && l.clock[i] > s.every) {
@@ -380,6 +558,12 @@ export class ObjectAnimations {
           const [x, y] = l.at(s.at);
           for (let k = 0; k < 3; k++)
             this.effects.add({ x: x + (Math.random() - 0.5) * 1.5, y: y - k * 1.2, vx: (Math.random() - 0.5) * 2, vy: -5 - Math.random() * 3, max: 1.6 + Math.random() * 0.6, size: 1 + Math.random() * 0.6, color: 'rgba(255,255,255,0.45)', gravity: -0.5 });
+        }
+        // chimney smoke: a soft puff now and then, drifting up and off with the breeze (as effects.ts's chimneys)
+        if (s.kind === 'smoke' && l.clock[i] > s.every) {
+          l.clock[i] = -Math.random() * s.every * 0.3;
+          const [x, y] = l.at(s.at);
+          this.effects.add({ x, y, vx: 4 + Math.random() * 4, vy: -8 - Math.random() * 4, max: 3.5, size: 3 + Math.random() * 2, color: 'rgba(240,236,230,0.55)', gravity: -1 });
         }
         if (s.kind === 'flames' && on) {
           l.clock[i] += dt * s.rate;
@@ -493,30 +677,83 @@ export class ObjectAnimations {
         part(rx0, ry0, rx1 - rx0, ry1 - ry0, 0, dy);
         return true;
       }
-      if (s.kind === 'regionSway') {
-        const v = Math.sin((this.t / s.period) * Math.PI * 2 + l.seed);
-        const d = (v > 0.55 ? 1 : v < -0.55 ? -1 : 0) * s.amp * (sp.mirrored ? -1 : 1);
-        if (!d) return false;
-        const [ax0, ry0, ax1, ry1] = s.rect;
-        const [rx0, rx1] = sp.mirrored ? [W - ax1, W - ax0] : [ax0, ax1];
-        part(0, 0, W, ry0);
-        part(0, ry0, rx0, ry1 - ry0);
-        part(rx0, ry0, rx1 - rx0, ry1 - ry0, d);
-        part(rx1, ry0, W - rx1, ry1 - ry0);
-        part(0, ry1, W, H - ry1);
-        return true;
-      }
       if (s.kind === 'bandSway') {
         const v = Math.sin((this.t / s.period) * Math.PI * 2 + l.seed) + 0.4 * Math.sin(this.t * 1.7 + l.seed * 2);
         const d = v > 0.8 ? 1 : v < -0.8 ? -1 : 0;
-        if (!d) return false;
+        if (!d) continue;
         const cut = Math.round(H * s.top);
         part(0, 0, W, cut, d);
         part(0, cut, W, H - cut);
         return true;
       }
     }
-    return false;
+    // the parts that move now (a swaying sign, a waving flag's columns, a pecking bird), in canvas px; the rest
+    // of the drawing is drawn around them as it is, and each moved part over it
+    const moves = this.moves(l);
+    if (!moves.length) return false;
+    const holes = moves.map((m) => m.r);
+    const ys = [...new Set([0, H, ...holes.flatMap((r) => [r[1], r[3]])])].sort((a, b) => a - b);
+    for (let i = 0; i + 1 < ys.length; i++) {
+      const [ya, yb] = [ys[i], ys[i + 1]];
+      const cuts = holes.filter((r) => r[1] <= ya && r[3] >= yb).sort((a, b) => a[0] - b[0]);
+      let xa = 0;
+      for (const r of cuts) {
+        part(xa, ya, r[0] - xa, yb - ya);
+        xa = Math.max(xa, r[2]);
+      }
+      part(xa, ya, W - xa, yb - ya);
+    }
+    for (const m of moves) {
+      const [rx0, ry0, rx1, ry1] = m.r;
+      // what a moved part uncovers is filled from just beside it (the wall or sky it hangs against), so no
+      // see-through slit opens behind it
+      if (m.dx > 0 && rx0 > 0) for (let i = 0; i < m.dx; i++) part(rx0 - 1, ry0, 1, ry1 - ry0, i + 1);
+      if (m.dx < 0 && rx1 < W) for (let i = 0; i < -m.dx; i++) part(rx1, ry0, 1, ry1 - ry0, -i - 1);
+      if (m.dy > 0 && ry0 > 0) for (let i = 0; i < m.dy; i++) part(rx0, ry0 - 1, rx1 - rx0, 1, 0, i + 1);
+      if (m.dy < 0 && ry1 < H) for (let i = 0; i < -m.dy; i++) part(rx0, ry1, rx1 - rx0, 1, 0, -i - 1);
+      part(rx0, ry0, rx1 - rx0, ry1 - ry0, m.dx, m.dy);
+    }
+    return true;
+  }
+
+  /**
+   * Where an object's moving parts are this frame: boxes of its canvas (x0, y0, x1, y1, half-open, mirrored with
+   * the drawing) and how far each is shifted, only those shifted at all. A flag is a box per run of columns.
+   */
+  private moves(l: Live): Array<{ r: [number, number, number, number]; dx: number; dy: number }> {
+    const sp = l.sprite;
+    const W = sp.canvas.width;
+    const flip = sp.mirrored ? -1 : 1;
+    const box = (r: [number, number, number, number]): [number, number, number, number] => (sp.mirrored ? [W - r[2], r[1], W - r[0], r[3]] : [...r]);
+    const out: Array<{ r: [number, number, number, number]; dx: number; dy: number }> = [];
+    for (const s of l.specs) {
+      if (s.kind === 'regionSway') {
+        const v = Math.sin((this.t / s.period) * Math.PI * 2 + l.seed);
+        const d = (v > 0.55 ? 1 : v < -0.55 ? -1 : 0) * s.amp * flip;
+        if (d) out.push({ r: box(s.rect), dx: d, dy: 0 });
+      } else if (s.kind === 'nod') {
+        // a quick double dip every so often, each piece on its own beat
+        const ph = (this.t + l.seed * 0.61) % s.every;
+        if (ph < 0.16 || (ph > 0.3 && ph < 0.46)) out.push({ r: box(s.rect), dx: s.dx * flip, dy: s.dy });
+      } else if (s.kind === 'flag') {
+        // columns out from the pole ride a travelling wave, the free end most; neighbours alike share a box
+        const [x0, y0, x1, y1] = s.rect;
+        let run: { a: number; dy: number } | null = null;
+        const flush = (end: number) => {
+          if (run && run.dy) out.push({ r: box([run.a, y0, end, y1]), dx: 0, dy: run.dy });
+        };
+        for (let x = x0; x < x1; x++) {
+          const d = Math.min(1, Math.abs(x - s.poleX) / s.len);
+          const v = Math.sin((this.t / s.period) * Math.PI * 2 - d * Math.PI * 2 + l.seed) * (0.35 + 0.65 * d);
+          const dy = (v > 0.4 ? 1 : v < -0.4 ? -1 : 0) * s.amp;
+          if (run && run.dy === dy) continue;
+          flush(x);
+          run = { a: x, dy };
+        }
+        flush(x1);
+      }
+    }
+    return out;
   }
 
   /** Find the scene's animated wall things (painted into the walls) and where their drawings land. */
@@ -534,14 +771,20 @@ export class ObjectAnimations {
       const span = face === 'right' ? (o.w ?? 1) : (o.d ?? o.w ?? 1);
       const onWall = (u: number, v: number): [number, number] => (face === 'right' ? [u * 16, u * 8 - v] : [-u * 16, u * 8 - v]);
       const art = wallArt(o);
+      // things on the left wall are drawn mirrored about their span there, so they read the right way round
+      // (interior.ts): their drawings' x runs the other way along the wall
+      const along = (f: number) => (face === 'left' ? 1 - f : f);
       let at: (p: P) => [number, number];
       if (art) {
-        const m = art.margin ?? 0.08;
+        // hung by the wall art standard (art.ts wallArt): `margin` tiles in from its span's start, `width` tiles
+        // wide, mirrored about the span's middle on the left wall
+        const { margin: m, width } = art;
         const [v0, v1] = art.v;
-        at = ([ix, iy]) => onWall(u0 + m + (ix / art.img.width) * (span - 2 * m), v1 - (iy / art.img.height) * (v1 - v0));
+        const x0 = face === 'left' ? u0 + span - m : u0 + m;
+        at = ([ix, iy]) => onWall(x0 + (face === 'left' ? -1 : 1) * (ix / art.img.width) * width, v1 - (iy / art.img.height) * (v1 - v0));
       } else {
         // procedural signs: (u across the span 0…1, v art px up from the floor)
-        at = ([u, v]) => onWall(u0 + u * span, v);
+        at = ([u, v]) => onWall(u0 + along(u) * span, v);
       }
       if (board) {
         // sticky notes go along the top of the board, clear of what's drawn on it
@@ -659,6 +902,40 @@ export class ObjectAnimations {
         const [dx, dy] = w.at([px, py]);
         c.fillStyle = '#ffe9a8';
         c.fillRect(dx - 0.5, dy - 0.5, 1, 1);
+      } else if (s.kind === 'clock') {
+        // the real time on the wall: the face (sheared onto the wall like the drawing) painted over, then hands
+        const face: P[] = [];
+        for (let a = 0; a < 16; a++) face.push(w.at([s.at[0] + Math.cos((a / 16) * Math.PI * 2) * s.rx, s.at[1] + Math.sin((a / 16) * Math.PI * 2) * s.ry]));
+        c.fillStyle = s.paper;
+        c.beginPath();
+        face.forEach(([x, y], i) => (i ? c.lineTo(x, y) : c.moveTo(x, y)));
+        c.closePath();
+        c.fill();
+        const now = worldTimeNow();
+        const [cx, cy] = w.at(s.at);
+        const px = wallPixel(w.at);
+        const hand = (turn: number, len: number, width: number) => {
+          const a = turn * Math.PI * 2;
+          const [hx, hy] = w.at([s.at[0] + Math.sin(a) * s.rx * len, s.at[1] - Math.cos(a) * s.ry * len]);
+          c.strokeStyle = '#2a1f2d';
+          c.lineWidth = px * width;
+          c.beginPath();
+          c.moveTo(cx, cy);
+          c.lineTo(hx, hy);
+          c.stroke();
+        };
+        hand(((now.hours % 12) + now.minutes / 60) / 12, 0.55, 1);
+        hand(now.minutes / 60, 0.9, 0.8);
+      } else if (s.kind === 'blink') {
+        // each light on its own slow beat, on a little over half the time
+        const px = wallPixel(w.at);
+        s.at.forEach((p, i) => {
+          const period = (s.slow ? 2.4 : 1.1) + ((w.seed + i * 13) % 7) * (s.slow ? 0.6 : 0.35);
+          if (((t + i * 0.37 + w.seed) % period) / period > 0.62) return;
+          const [x, y] = w.at(p);
+          c.fillStyle = s.colors[i % s.colors.length];
+          c.fillRect(x - px / 2, y - px / 2, px, px);
+        });
       } else if (s.kind === 'neon') {
         // a steady buzz of pink light; every ~8 s one letter stutters for two frames
         const [cx, cy] = w.at([0.5, 35]);
@@ -708,10 +985,14 @@ export class ObjectAnimations {
     return [dx, dy];
   }
 
-  /** Draw an object's inline animations; called right after the object itself is drawn. */
-  drawFor(c: CanvasRenderingContext2D, objectId: string, reducedMotion: boolean) {
+  /**
+   * Draw an object's inline animations; called right after the object itself is drawn (`hovered`: it was drawn
+   * lit up for the pointer, so water repainted over it is lit up the same).
+   */
+  drawFor(c: CanvasRenderingContext2D, objectId: string, reducedMotion: boolean, hovered = false) {
     const l = this.live.get(objectId);
     if (!l) return;
+    if (l.water && !reducedMotion) l.water.draw(c, l.dx, l.dy, hovered);
     const on = this.isOn(l.obj.id);
     const t = reducedMotion ? 0 : this.t;
     const k = l.sprite.scale ?? 1;
@@ -751,7 +1032,7 @@ export class ObjectAnimations {
               color = '#6bff8e';
             }
             if (!lit) return;
-            const [x, y] = l.at(p);
+            const [x, y] = this.onPiece(l, p);
             const d = rb < 2.8 ? px * 2 : px;
             c.fillStyle = color;
             c.fillRect(x - d / 2, y - d / 2, d, d);
@@ -762,9 +1043,11 @@ export class ObjectAnimations {
           // a song on: the jukebox's lights pump to the beat
           const song = this.age(l, 'song') < SONG_S;
           if (!on && !song) break;
-          const [x, y] = l.at(s.at);
+          const [x, y] = this.onPiece(l, s.at);
           const color = s.cycle ? mixCycle(s.cycle, t * (song ? 0.6 : 0.12) + l.seed * 0.1) : s.color;
-          const a = song ? 0.3 + 0.28 * Math.abs(Math.sin(t * Math.PI * 2.1)) : 0.16 + 0.1 * Math.sin(t * s.speed + l.seed) + 0.04 * Math.sin(t * 3.1 * s.speed);
+          let a = song ? 0.3 + 0.28 * Math.abs(Math.sin(t * Math.PI * 2.1)) : 0.16 + 0.1 * Math.sin(t * s.speed + l.seed + s.at[0] * 0.37) + 0.04 * Math.sin(t * 3.1 * s.speed + s.at[1]);
+          // a lantern on a building: faint by day (after dark it glows on the glow layer, drawGlow)
+          if (s.dusk) a *= 0.45 * (1 - this.effects.night);
           const r = s.r * px * (song ? 1.8 : 1);
           const g = c.createRadialGradient(x, y, 0, x, y, r);
           g.addColorStop(0, `rgba(${color},${a})`);
@@ -846,29 +1129,45 @@ export class ObjectAnimations {
           break;
         }
         case 'clockface': {
-          // the real time, on a face whose painted hands are covered first
-          const [x, y] = l.at(s.at);
+          // the real time, on a face whose painted hands are covered first; face and hands in whole pixels
+          const [cx, cy] = s.at;
+          const dot = (ix: number, iy: number) => {
+            const [x, y] = l.at([ix + 0.5, iy + 0.5]);
+            c.fillRect(x - px / 2, y - px / 2, px, px);
+          };
           c.fillStyle = s.paper;
-          c.beginPath();
-          c.ellipse(x, y, s.rx * px, s.ry * px, 0, 0, Math.PI * 2);
-          c.fill();
+          for (let iy = Math.floor(cy - s.ry); iy <= Math.ceil(cy + s.ry); iy++) {
+            const dy = (iy + 0.5 - cy) / s.ry;
+            if (Math.abs(dy) > 1) continue;
+            const hw = s.rx * Math.sqrt(1 - dy * dy);
+            for (let ix = Math.ceil(cx - hw - 0.5); ix <= Math.floor(cx + hw - 0.5); ix++) dot(ix, iy);
+          }
           const now = worldTimeNow(); // the world clock, the same for everyone
           const mins = now.minutes;
           const hours = (now.hours % 12) + mins / 60;
+          // (a mirrored drawing's pixels run the other way: the hands are turned back so it still reads clockwise)
           const flip = l.sprite.mirrored ? -1 : 1;
-          const hand = (turn: number, len: number, w: number) => {
+          const hub: P = [Math.floor(cx), Math.floor(cy)];
+          const hand = (turn: number, len: number, thick: boolean) => {
             const a = turn * Math.PI * 2;
-            c.strokeStyle = '#2a1f2d';
-            c.lineWidth = w * px;
-            c.beginPath();
-            c.moveTo(x, y);
-            c.lineTo(x + Math.sin(a) * s.rx * len * px * flip, y - Math.cos(a) * s.ry * len * px);
-            c.stroke();
+            const tip: P = [Math.round(cx - 0.5 + Math.sin(a) * s.rx * len * flip), Math.round(cy - 0.5 - Math.cos(a) * s.ry * len)];
+            c.fillStyle = '#2a1f2d';
+            for (const [ix, iy] of pixelLine(hub, tip)) {
+              dot(ix, iy);
+              // a big face's hour hand is two pixels wide
+              if (thick) dot(ix + (Math.abs(Math.cos(a)) > 0.7 ? 1 : 0), iy + (Math.abs(Math.cos(a)) > 0.7 ? 0 : 1));
+            }
           };
-          hand(hours / 12, 0.55, 1);
-          hand(mins / 60, 0.85, 0.8);
+          hand(hours / 12, 0.55, s.rx >= 8);
+          hand(mins / 60, 0.85, false);
           c.fillStyle = '#b8872e';
-          c.fillRect(x - px / 2, y - px / 2, px, px);
+          dot(...hub);
+          break;
+        }
+        case 'marquee': {
+          c.globalAlpha = 0.85;
+          this.drawMarquee(c, l, s, t, px);
+          c.globalAlpha = 1;
           break;
         }
         case 'shimmer': {
@@ -982,6 +1281,58 @@ export class ObjectAnimations {
     this.drawUse(c, l);
   }
 
+  /**
+   * An object's light on the town's glow layer (dusk to dawn), in depth order like lit windows: water catching
+   * the lamplight. Called right after the object's own glow.
+   */
+  drawGlow(g: CanvasRenderingContext2D, objectId: string, reducedMotion: boolean) {
+    const l = this.live.get(objectId);
+    if (!l) return;
+    if (l.water && !reducedMotion) l.water.drawGlow(g, l.dx, l.dy, this.light.lamps);
+    // a building's lanterns, lit from dusk: they shine over the dimmed town like its windows
+    const t = reducedMotion ? 0 : this.t;
+    const px = 1 / (l.sprite.scale ?? 1);
+    for (const s of l.specs) {
+      // marquee bulbs lit by the drawing's night glow: the dimmed ones go dark on the glow layer too
+      if (s.kind === 'marquee') {
+        g.globalCompositeOperation = 'destination-out';
+        this.drawMarquee(g, l, s, t, px);
+        g.globalCompositeOperation = 'source-over';
+        continue;
+      }
+      if (s.kind !== 'glow' || !s.dusk || !this.isOn(l.obj.id)) continue;
+      const [x, y] = this.onPiece(l, s.at);
+      const a = 0.42 + 0.14 * Math.sin(t * s.speed + l.seed + s.at[0]) + 0.05 * Math.sin(t * 3.1 * s.speed + s.at[1]);
+      const r = s.r * px * 1.3;
+      const grad = g.createRadialGradient(x, y, 0, x, y, r);
+      grad.addColorStop(0, `rgba(${s.color},${a})`);
+      grad.addColorStop(1, `rgba(${s.color},0)`);
+      g.fillStyle = grad;
+      g.fillRect(x - r, y - r, r * 2, r * 2);
+    }
+  }
+
+  /** Marquee bulbs: every third one dimmed (a round of whole pixels in `off`), the gap stepping along the row. */
+  private drawMarquee(c: CanvasRenderingContext2D, l: Live, s: Extract<AnimSpec, { kind: 'marquee' }>, t: number, px: number) {
+    const step = Math.floor(t * s.rate);
+    c.fillStyle = s.off;
+    s.at.forEach((p, i) => {
+      if ((i + step) % 3) return;
+      const [x, y] = l.at(p);
+      for (let j = -s.r; j <= s.r; j++) {
+        const hw = Math.round(Math.sqrt(s.r * s.r - j * j));
+        c.fillRect(x - (hw + 0.5) * px, y + (j - 0.5) * px, (hw * 2 + 1) * px, px);
+      }
+    });
+  }
+
+  /** A drawing point in world px, riding the part of the piece that moves in a moment (the rocket off its pad). */
+  private onPiece(l: Live, p: P): [number, number] {
+    const [x, y] = l.at(p);
+    const cut = l.spot?.liftoff?.cut;
+    return cut !== undefined && p[1] < cut ? [x, y - this.hop(l)] : [x, y];
+  }
+
   /* ------------------------------------------------------------------ things being used (uses.ts) */
 
   /** Seconds since a moment last happened here (Infinity if never). */
@@ -1079,7 +1430,9 @@ export class ObjectAnimations {
         this.later(l, WISH_T, () => {
           for (let i = 0; i < 8; i++)
             fx.add({ x: cx + (Math.random() - 0.5) * 2, y: cy, vx: (Math.random() - 0.5) * 16, vy: -14 - Math.random() * 12, max: 0.55, size: 1, color: 'rgba(225,245,255,0.95)', gravity: 70, kind: 'drop' });
-          for (let i = 0; i < 3; i++) this.later(l, i * 0.25, () => fx.add({ x: cx, y: cy + 1, max: 1.2, size: 2, color: 'rgba(255,255,255,0.95)', kind: 'ripple' }));
+          // water that moves on its own drawing takes the coin itself: foam, crisp rings, drops, all in its pixels
+          if (l.water) l.water.splash(...this.toDrawing(l, cx, cy));
+          else for (let i = 0; i < 3; i++) this.later(l, i * 0.25, () => fx.add({ x: cx, y: cy + 1, max: 1.2, size: 2, color: 'rgba(255,255,255,0.95)', kind: 'ripple' }));
           for (let i = 0; i < 4; i++)
             this.later(l, 0.3 + i * 0.15, () => fx.add({ x: cx + (Math.random() - 0.5) * 8, y: cy - 3, vy: -9, max: 1.1, size: 2, color: '#ffe066', kind: 'star' }));
         });
@@ -1146,9 +1499,18 @@ export class ObjectAnimations {
   /** The coin's arc from the rim at the front into the water of the basin, `a` seconds in. */
   private coinPath(l: Live, a: number): [number, number] {
     const [sx, sy] = this.boxAt(l, 0.55, 0.98);
-    const [cx, cy] = this.boxAt(l, 0.38, 0.8);
+    let [cx, cy] = this.boxAt(l, 0.38, 0.8);
+    // into open water, not onto a lily pad
+    if (l.water) [cx, cy] = l.at(l.water.coinSpot(...this.toDrawing(l, cx, cy)));
     const k = Math.min(1, a / WISH_T);
     return [sx + (cx - sx) * k, sy + (cy - sy) * k - Math.sin(k * Math.PI) * 26];
+  }
+
+  /** A world point on an object's drawing, in the drawing's own (unmirrored) pixels: the inverse of `at`. */
+  private toDrawing(l: Live, x: number, y: number): [number, number] {
+    const k = l.sprite.scale ?? 1;
+    const px = (x - l.dx) * k;
+    return [l.sprite.mirrored ? l.sprite.canvas.width - px : px, (y - l.dy) * k];
   }
 
   /** How far the rocket is off its pad (world px), and where its nozzle is. */
@@ -1458,7 +1820,29 @@ const WALL_SPECS: Record<string, WallSpec> = {
   'screen.countdown': { kind: 'countdown', ring: [49, 14], r: 6, arc: [[9, 22], [22, 10], [37, 9]] },
   'lantern-string': { kind: 'lanterns', at: [[6, 11], [19, 15], [30, 18], [47, 19], [60, 18], [74, 14], [87, 11]], r: 5 },
   neon: { kind: 'neon', letters: 4 },
+  // the Launch Lab's mission clock keeps the world's time
+  'clock-wall': { kind: 'clock', at: [11, 17.5], rx: 5.5, ry: 6.5, paper: 'rgb(241,225,204)' },
+  // Engineering's build dashboard: its status lights (the two grey ones come on too)
+  dashboard: {
+    kind: 'blink',
+    at: [[41.5, 14.5], [41.5, 17.5], [41.5, 20.5], [45.5, 25.5], [45.5, 27.5], [45.5, 30.5], [45.5, 32.5]],
+    colors: ['#b4ffc8', '#b4ffc8', '#ffd27a', '#b4ffc8', '#46e375', '#46e375', '#b4ffc8'],
+  },
+  // the Launch Lab's star map: its stars twinkle, slowly
+  'star-map': {
+    kind: 'blink',
+    at: [[50.5, 40.5], [45.5, 23.5], [48.5, 22.5], [53.5, 27.5], [40.5, 34.5], [24.5, 36.5], [19.5, 27.5], [10.5, 41.5], [33.5, 32.5], [18.5, 32.5], [12.5, 25.5], [41.5, 41.5], [9.5, 30.5], [16.5, 38.5]],
+    colors: ['#fff4d6', '#ffe6a8'],
+    slow: true,
+  },
+  // HQ's elevator: its call button glows on and off, as if someone upstairs called it
+  elevator: { kind: 'blink', at: [[56.5, 53.5]], colors: ['#ffe9a8'], slow: true },
 };
+
+/** Every idle animation by drawing file, and every wall piece's by manifest key: for the spec check (animations.test.ts). */
+export function animationSpecs(): { byFile: Record<string, AnimSpec[]>; walls: Record<string, WallSpec> } {
+  return { byFile: BY_FILE, walls: WALL_SPECS };
+}
 
 /** Whether a floor object stands within a couple of tiles of a window in its room. */
 function nearWindow(scene: SceneDef, o: SceneObject): boolean {
@@ -1467,6 +1851,39 @@ function nearWindow(scene: SceneDef, o: SceneObject): boolean {
     if (w.wall === 'right') return o.y <= 2 && o.x >= w.x - 1 && o.x <= w.x + (w.w ?? 1);
     return o.x <= 2 && o.y >= w.y - 1 && o.y <= w.y + (w.d ?? w.w ?? 1);
   });
+}
+
+/** The pixels of a straight line between two pixels (Bresenham), both ends included. */
+function pixelLine(a: P, b: P): P[] {
+  const out: P[] = [];
+  let [x, y] = a;
+  const dx = Math.abs(b[0] - x);
+  const dy = -Math.abs(b[1] - y);
+  const sx = x < b[0] ? 1 : -1;
+  const sy = y < b[1] ? 1 : -1;
+  let err = dx + dy;
+  for (let n = 0; n < 512; n++) {
+    out.push([x, y]);
+    if (x === b[0] && y === b[1]) break;
+    const e2 = 2 * err;
+    if (e2 >= dy) {
+      err += dy;
+      x += sx;
+    }
+    if (e2 <= dx) {
+      err += dx;
+      y += sy;
+    }
+  }
+  return out;
+}
+
+/** How big one pixel of a wall piece's drawing is on the wall (world px). */
+function wallPixel(at: (p: P) => [number, number]): number {
+  const [ax, ay] = at([0, 0]);
+  const [bx, by] = at([1, 0]);
+  const [, cy] = at([0, 1]);
+  return Math.max(0.5, Math.min(Math.hypot(bx - ax, by - ay), Math.abs(cy - ay)));
 }
 
 /** A colour sliding slowly around a cycle of "r,g,b" colours. */
@@ -1513,6 +1930,19 @@ function sampleColor(sprite: Sprite, q: Quad): string {
   if (!best) return '#3a2618';
   const [r, g, b] = best.split(',').map((v) => Number(v) * 8 + 4);
   return `rgb(${r},${g},${b})`;
+}
+
+/**
+ * A placed piece's moving water, read off its drawing once (the town is walked into and out of often); each
+ * piece has its own (two bird baths share a drawing, not their ripples).
+ */
+const waters = new WeakMap<Sprite, Map<string, Waterworks>>();
+function waterOf(sprite: Sprite, id: string, spec: (typeof WATERWORKS)[string]): Waterworks {
+  let byId = waters.get(sprite);
+  if (!byId) waters.set(sprite, (byId = new Map()));
+  let w = byId.get(id);
+  if (!w) byId.set(id, (w = new Waterworks(sprite, spec)));
+  return w;
 }
 
 /** The opaque bounds of a drawing (canvas px). */

@@ -32,7 +32,7 @@ requires:
 | footprint width × depth, height | `footprint` [width, depth] as seen facing sw, `height` (art px). The height is measured again from the drawing |
 | how it turns | `rotation`: **radial** (one drawing), **mirror** (a front and a back drawn: se + nw, or sw + ne for a long piece, lying along its width like the catalog's long pieces; the other two are their mirrors), **full** (four drawings: anything handed), **flat** (wall art). "Looks the same from behind" is `sameFromBehind` |
 | stands on | `layer`: the floor (`object`), a counter (`surface`, placed at the counter's z), flat (`floor`, a rug) |
-| sat in as, backrest, and the **Seat** panel | the seat standard's profile (`seat`, `seatDepth`, `backDepth`, `sitStyle`, `backrest`, `backLine`), fitted from one click (below). Only seating has one |
+| sat in as, backrest, arms, and the **Seat** panel | the seat standard's profile (`seat`, `seatDepth`, `backDepth`, `sitStyle`, `backrest`, `arms`), the height fitted from one click (below). Only seating has one; how people sit in each view is its rig (**How people sit in it**) |
 | surface height, lights up, action, used from | `surface`, a light point per drawing, `use: {face, actions}` |
 
 **Describe it** in the prompt (what it is, materials, colours, era; the house style block is added for you). Drop
@@ -56,25 +56,40 @@ them on their footprint whatever the anchor says). For each drawn view you can:
 standing on its footprint (the fill rule), and a complete declaration. It also runs the furniture review's per-view
 placement, stray pixels and sliced-top tests. A red dot on a view says which one.
 
-**Seat** (seating only) calibrates the seat, the same way `scripts/seat-fit.ts` calibrates the catalog's seats:
+**Seat** (seating only) gives the seat its height: click the centre of the first cushion's top face in the front
+drawing, halfway front to back (hover it: the yellow dots show where every cushion's centre would be). Without a
+click, the seat height set in the spec stands. The proposals below start from it.
 
-1. The front drawing is shown big, as the game shows it facing se. Hover it: the yellow dots show where every
-   cushion's centre would be for the point under the pointer.
-2. Click the centre of the first cushion's top face, halfway front to back. That gives the seat height and hip
-   depth; the back views' hip depth is fitted automatically. The front drawing is the only one you click.
-3. All four facings then appear with someone sitting on every cushion, each checked against the seat standard:
-   - facing front: thighs resting on the seat, not floating over it or sunk into it;
-   - from behind: the sitter tucked into the seat, not perched on the backrest, head showing;
-   - one sitter per cushion.
-   A facing that fails is framed red and says why. Click again until all four sit right. For a beanbag or a sofa
-   upholstered all in one colour, tick "the whole seat wraps its sitter" (seen from behind, all of it covers
-   them).
+**How people sit in it** (seating only) gives the seat its PARTS: which of each drawn view's pixels are the **back**,
+the **seat**, an **arm** or a **leg** (`src/client/engine/sprites/seatParts.ts`, shared with
+`scripts/seat-parts.ts`). Fixed rules compile them into the seat rig (`src/shared/world/seatRigs.ts`,
+`art/seat-rigs.json`), what of the seat is drawn over a seated person: from behind, the back, the near arm below its
+top, and the seat and legs below the hips; from the front, only the near arm below its top. It's a click-to-confirm
+job:
 
-The calibration is saved with the draft. A new drawing, a redraw or a nudge makes it stale, and you click again.
-**Publish stays disabled until every facing sits right.** The server checks it again on the staged drawings before
-it publishes (`scripts/lab-seat.ts`). When the seat is published, its cushion point goes into
-`art/seat-calibration.json`, which `scripts/seat-fit.ts` (in the gate) reads, so a lab seat passes the gate
-without anyone calibrating it by hand.
+1. **Propose (AI)** (the button shows the likely cost; it asks first): each drawn view is split into its natural
+   colour regions, numbered, and a vision model labels every region (OpenAI, through `designlab.py propose-parts` →
+   `studio.py vision-parts`, so the key never reaches the browser; logged in the usage log; the default
+   `gpt-6.1-sol` at low effort costs under a cent and ~10 s a view, and no call may cost more than
+   `PARTS_MAX_USD`, $0.05; `PARTS_VISION_MODEL` / `PARTS_VISION_EFFORT` pick others). Or **Copy parts from…** a
+   piece drawn in the same shape (another colour of it): each pixel takes the part of the nearest labelled one.
+2. Fix it a click at a time on the big drawing, regions outlined and tinted by part: click a region to cycle it
+   (back → seat → arm → leg → other; shift-click sets the part picked in the palette, keys 1–5; right-click goes
+   back one). Where a region runs across two parts, **Brush** or **Polygon** paints the picked part, "only this
+   colour" keeping it to one material (a spindle among slats). Drag the yellow hip dot of each cushion to where the
+   sitter's seat rests. **In front** shows what the rules put over a sitter.
+3. Every change compiles at once, and every facing previews live: three looks (short hair and a tee; long hair; a
+   puffer coat and a cowboy hat) at play scale and 4×, every cushion taken, and the sit-down → sit → stand-up loop.
+   A facing drawn as its partner's mirror fills itself from the partner. Each facing lists its checks (the same as
+   `scripts/seat-rig.ts --check`) and has its own **looks right** tick; a change that alters a view's layers clears
+   its tick.
+
+The parts are saved with the draft; a new drawing, a redraw or a nudge makes them stale. **Publish stays disabled
+until every drawn view has its parts, compiled, and every facing holds and is ticked.** The server checks it again
+on the staged drawings (`scripts/lab-parts.ts`, `scripts/lab-rig.ts`) and, once the piece is published, writes each
+view into `art/seat-rigs.json`, audited, with its drawing's fingerprint, and its part maps into `art/seat-parts/`,
+so a lab seat passes the gate. **Library → Open** opens any catalog seat with its current rig and profile; its
+3D model (the collapsed panel under it) is optional.
 
 **Try it in game** is a real room drawn by the game's renderer from the draft's own sprites. The published catalog
 is untouched: the lab serves a copy of the manifest with the draft swapped in. You can:
@@ -86,8 +101,8 @@ is untouched: the lab serves a copy of the manifest with the draft swapped in. Y
 
 Counter pieces stand on a counter.
 
-**Publish to catalog** is enabled once every view is accepted, the checks pass and, for a seat, every facing
-sits right. It goes through
+**Publish to catalog** is enabled once every view is accepted, the checks pass and, for a seat, its parts are
+compiled and every facing holds and is ticked. It goes through
 `studio.py lab-publish`: the model check runs again on the staged entry, and then, under the manifest lock, the
 drawings are copied to `public/art/sprites` and the entry is written to `public/art/manifest.json`. After that it's in
 the decorate palette. The lab won't overwrite a key that's already in the catalog unless the draft was opened from

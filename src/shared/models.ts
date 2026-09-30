@@ -154,16 +154,108 @@ export interface UseSpec {
   actions: ActionKind[];
 }
 
-/** Wall art: where it hangs. */
+/**
+ * Wall art: where it hangs. Its SIZE is never declared: it comes from its drawing (THE WALL ART STANDARD below).
+ */
 export interface WallSpec {
-  /** Art px above the floor it spans, bottom to top. */
+  /**
+   * Wall units (art px) above the floor, bottom to top. The bottom is where it hangs; the top is always the bottom
+   * plus half the drawing's height (the standard: model-check fails anything else).
+   */
   v: [number, number];
-  /** Fraction of a tile left clear at each end. */
+  /**
+   * Retired: wall art is centred in its span (the standard). Old entries may still carry one; it's ignored, and
+   * the model check asks for it to be removed.
+   */
   margin?: number;
   /** Which walls it may hang on (default both). Either way it reads the right way round: never mirrored. */
   walls?: Array<'left' | 'right'>;
   /** It carries lettering or a logo. */
   text?: boolean;
+  /** It stands on the floor, through the baseboard, like a door (a lift): its bottom is 0. */
+  floor?: boolean;
+}
+
+/* ─────────────────────────── THE WALL ART STANDARD ─────────────────────────── */
+
+/**
+ * Wall art is drawn at exactly 2:1 against the wall: one drawing px is half a wall unit each way. Along the wall
+ * that's 32 drawing px per tile (the wall shows 16 art px per tile), up it 2 drawing px per wall unit (art px). The
+ * wall texture has exactly that density (interior.ts), so a drawing lands on it pixel for pixel, never resampled:
+ * nearest-neighbour squeezing drops whole pixel columns (the café's menu board lost its right frame that way).
+ *
+ * The rules (wallFit, checked for every model by scripts/model-check.ts and for every placed piece by room-map
+ * and decorate-mode placement):
+ *   - its size is its drawing's: w/32 tiles wide, h/2 wall units tall (`wall.v` records bottom and top; the top
+ *     must be bottom + h/2)
+ *   - it's centred in its span (a whole number of drawing px from each end) and inside it
+ *   - what shows of it (its opaque pixels) stays clear of the baseboard (≥ WALL_BASEBOARD, unless it stands on the
+ *     floor: `wall.floor`) and of the crown moulding (≤ WALL_CROWN)
+ *   - its bottom lands on a whole drawing px (a multiple of half a unit)
+ *   - a drawing that doesn't fit its span is a model-spec error: the span (footprint[0]) grows. Never a squeeze.
+ */
+export const WALL_PX_PER_TILE = 32;
+export const WALL_PX_PER_UNIT = 2;
+/** The room's wall height (ground.ts WALL_H), wall units. */
+export const WALL_HEIGHT = 62;
+/** The top of the baseboard, wall units. */
+export const WALL_BASEBOARD = 4.5;
+/** The bottom of the crown moulding (WALL_HEIGHT − 4), wall units. */
+export const WALL_CROWN = 58;
+/** Drawing px kept clear at each end of its span (none: a string of lanterns may run its whole span). */
+export const WALL_EDGE_PX = 0;
+
+/** Where a wall drawing lands in its span, by the standard, and what (if anything) breaks it. */
+export interface WallFit {
+  /** Drawing px from the span's start to the drawing's left edge (a whole number: it's centred in its span). */
+  left: number;
+  /** The drawing's size, drawing px. */
+  w: number;
+  h: number;
+  /** Wall units above the floor, bottom and top of the drawing (top = bottom + h/2). */
+  v0: number;
+  v1: number;
+  /**
+   * What of it shows (its opaque pixels' bounds; the whole drawing when they aren't known): drawing px from the
+   * span's start, and wall units above the floor. The trim and anything standing in front are judged by these.
+   */
+  vis: { l: number; r: number; v0: number; v1: number };
+  problems: string[];
+}
+
+/** The fewest tiles a drawing `w` px wide fits in, by the standard. */
+export function wallSpanFor(w: number): number {
+  return Math.max(1, Math.ceil((w + 2 * WALL_EDGE_PX) / WALL_PX_PER_TILE));
+}
+
+/**
+ * How a `w`×`h` drawing hangs in a `span`-tile stretch of wall (THE WALL ART STANDARD). `bbox` is the drawing's
+ * opaque bounds (footing.ts silhouette: inclusive px), so transparent padding never counts against the trim.
+ */
+export function wallFit(
+  spec: Pick<WallSpec, 'v' | 'floor'>,
+  size: { w: number; h: number },
+  span: number,
+  bbox?: { l: number; r: number; t: number; b: number } | null,
+): WallFit {
+  const { w, h } = size;
+  const U = WALL_PX_PER_UNIT;
+  const room = span * WALL_PX_PER_TILE;
+  const left = Math.floor((room - w) / 2);
+  const v0 = spec.floor ? 0 : spec.v[0];
+  const v1 = v0 + h / U;
+  const b = bbox ?? { l: 0, r: w - 1, t: 0, b: h - 1 };
+  const vis = { l: left + b.l, r: left + b.r + 1, v0: v1 - (b.b + 1) / U, v1: v1 - b.t / U };
+  const problems: string[] = [];
+  if (w + 2 * WALL_EDGE_PX > room)
+    problems.push(`its drawing is ${w} px wide, more than its ${span}-tile span holds at 2:1 (${room - 2 * WALL_EDGE_PX} px): grow its span to ${wallSpanFor(w)}, never squeeze it`);
+  if (Math.abs(spec.v[1] - spec.v[0] - h / U) > 1e-6)
+    problems.push(`wall.v [${spec.v.join(', ')}] is ${spec.v[1] - spec.v[0]} units tall but its drawing is ${h} px (${h / U} units at 2:1): v must be [${v0}, ${v1}]`);
+  if (spec.floor && spec.v[0] !== 0) problems.push(`it stands on the floor (wall.floor): wall.v starts at 0`);
+  if (!spec.floor && vis.v0 < WALL_BASEBOARD) problems.push(`it shows down to ${vis.v0}, on the baseboard (below ${WALL_BASEBOARD}): hang it higher (or declare wall.floor)`);
+  if (vis.v1 > WALL_CROWN) problems.push(`it shows up to ${vis.v1}, into the crown moulding (above ${WALL_CROWN}): hang it lower`);
+  if (Math.abs(v0 * U - Math.round(v0 * U)) > 1e-6) problems.push(`its bottom (${v0}) isn't on a whole drawing px (a multiple of 0.5)`);
+  return { left, w, h, v0, v1, vis, problems };
 }
 
 /* ─────────────────────────── the spec ─────────────────────────── */
@@ -406,6 +498,10 @@ export function validateModel(key: string, spec: Partial<ModelSpec>): string[] {
     const w = spec.wall;
     if (!isPt(w.v) || w.v[0] >= w.v[1]) bad('wall.v must be [bottom, top] art px above the floor');
     if (w.walls !== undefined && (!Array.isArray(w.walls) || !w.walls.length || !w.walls.every((x) => x === 'left' || x === 'right'))) bad("wall.walls: 'left' and/or 'right'");
+    // the wall art standard, as far as the declaration goes (its drawing is checked by scripts/model-check.ts)
+    if (w.margin !== undefined) bad('wall.margin is retired: wall art is centred in its span at 2:1 (the wall art standard); remove it');
+    if (w.floor !== undefined && typeof w.floor !== 'boolean') bad('wall.floor is true or absent');
+    if (Array.isArray(fp) && fp[1] !== 1) bad('wall art is one tile deep: footprint [span, 1]');
   }
   return out;
 }
