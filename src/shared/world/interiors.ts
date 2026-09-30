@@ -113,9 +113,10 @@ export function buildInteriors(): SceneDef[] {
       { sprite: 'table-round', x: 4, y: 4 },
       chair(3, 4, 'se', 'cafe'),
       chair(5, 4, 'nw', 'cafe'),
-      { sprite: 'table-round', x: 8, y: 3 },
-      chair(7, 3, 'se', 'cafe'),
-      chair(9, 3, 'nw', 'cafe'),
+      // (a row down from the bar: a chair right in front of a stool, toward the camera, hid the stool)
+      { sprite: 'table-round', x: 8, y: 4 },
+      chair(7, 4, 'se', 'cafe'),
+      chair(9, 4, 'nw', 'cafe'),
       { sprite: 'table-round', x: 4, y: 8 },
       chair(3, 8, 'se', 'cafe'),
       chair(5, 8, 'nw', 'cafe'),
