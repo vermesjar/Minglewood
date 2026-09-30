@@ -36,6 +36,11 @@ export interface SeatDepth {
   part: Int16Array;
   /** 1: the ray meets that part's box; 2: outside every box, on the nearest covered pixel's face extended. */
   how: Uint8Array;
+  /** The face of the box the ray meets: 0 its top, 1 or 2 a side (always the side toward the camera). */
+  face: Uint8Array;
+  /** Where the ray meets it, in the seat's local frame (tiles). */
+  u: Float64Array;
+  v: Float64Array;
 }
 
 const FACE_CODE: Record<Face, number> = { top: 0, u: 1, v: 2 };
@@ -108,7 +113,15 @@ export function seatDepth(v: ModelView): SeatDepth {
     z[i] = rayPlane(rays[i], parts[part[s]], FACES[face[s]]);
   }
   for (let i = 0; i < W * H; i++) if (!px.d[i * 4 + 3]) part[i] = -1;
-  const out = { w: W, h: H, z, part, how };
+  const u = new Float64Array(W * H);
+  const vv = new Float64Array(W * H);
+  for (let i = 0; i < W * H; i++) {
+    if (part[i] < 0) continue;
+    const r = rays[i];
+    u[i] = r.u0 + r.du * z[i];
+    vv[i] = r.v0 + r.dv * z[i];
+  }
+  const out = { w: W, h: H, z, part, how, face, u, v: vv };
   memo.set(key, out);
   if (memo.size > 24) memo.delete(memo.keys().next().value!);
   return out;

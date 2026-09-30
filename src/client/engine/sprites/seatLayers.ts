@@ -7,6 +7,7 @@
  * boxes: seatModel.ts seatDepth). A WHOLE PART goes over the people sitting in it or behind them, by where it stands:
  *   the arm on the camera's side      over (it's between them and us, seen from any side)
  *   the back, a wrap, a crest          over when the seat is seen from behind, else behind them
+ *   the seat's and base's flanks       over when seen from behind (their side faces toward the camera wrap the sitter)
  *   everything else                    behind them (the cushion they sit on, the base, legs, the far arm)
  * The split follows the drawing's own pixels, so its edges are the artist's. Nothing is decided pixel by pixel
  * against a body, so a box a little off the drawing never cuts into a person: it can only move an edge between parts.
@@ -23,7 +24,7 @@
  */
 import type { Facing } from '@shared/world/scene';
 import type { AvatarLoadout } from '@shared/domain/types';
-import { behindView, cushionTiles, cushionTop, projectLocal, towardCamera, viewSits, type PartKind, type SitPoint } from '@shared/world/seatModels';
+import { behindView, cushionTiles, cushionTop, projectLocal, towardCamera, viewSits, type ModelPart, type PartKind, type SitPoint } from '@shared/world/seatModels';
 import { SIT_POSE_OF } from '@shared/world/seats';
 import { kneeV, legsFor, THIGH_R, type SitLegs } from '@shared/world/sitLegs';
 import { coverRow, FIG, figAx, hipFeet, polyMask } from '@shared/world/seatFigure';
@@ -59,6 +60,8 @@ export interface SeatLayers {
 
 /** The figure's shoulder line sits this far above its seat point (figure px): the over layer stops there. */
 export const COVER = FIG.hip + FIG.thigh - 58;
+/** A back's pixels count as over a sitter only this far (world px) or more above the cushion top. */
+export const OVER_ABOVE_CUSHION = 0;
 
 const OVER_FROM_BEHIND: ReadonlySet<PartKind> = new Set(['back', 'wrap', 'other']);
 
@@ -68,7 +71,9 @@ export function overParts(v: Pick<ModelView, 'model' | 'facing'>): boolean[] {
   const cam = Math.sign(towardCamera(v.facing).u);
   const mid = v.model.size[0] / 2;
   return v.model.parts.map((p) => {
-    if (p.part === 'arm') return ((p.u[0] + p.u[1]) / 2 - mid) * cam > 0;
+    // from the front the near arm is in front of the sitter and the far one behind them; from behind the sitter is
+    // inside the arms, so both are in front (an elbow beside the far arm showed over it)
+    if (p.part === 'arm') return behind || ((p.u[0] + p.u[1]) / 2 - mid) * cam > 0;
     return behind && OVER_FROM_BEHIND.has(p.part);
   });
 }
@@ -89,7 +94,25 @@ export function seatLayers(v: ModelView): SeatLayers {
   if (traced) over = polyMask(D.w, D.h, traced);
   else {
     over = new Uint8Array(D.w * D.h);
-    for (let i = 0; i < over.length; i++) if (D.part[i] >= 0 && ov[D.part[i]]) over[i] = 1;
+    // a back can only be in front of a body above the cushion it sits on: a back box's pixels below that height are
+    // the seat's rear (a thick box standing in for a thin rail claims the back of a cane seat) and stay under
+    const parts = v.model.parts;
+    const cushionZ = Math.max(0, ...parts.filter((p) => p.part === 'seat').map((p) => p.z[1]));
+    const behind = behindView(v.facing);
+    for (let i = 0; i < over.length; i++) {
+      const k = D.part[i];
+      if (k < 0) continue;
+      const p = parts[k];
+      if (ov[k]) {
+        if ((p.part === 'back' || p.part === 'wrap') && D.z[i] < cushionZ + OVER_ABOVE_CUSHION) continue;
+        over[i] = 1;
+      } else if (behind && (p.part === 'seat' || p.part === 'base') && (D.face[i] !== 0 || underPart(parts, D.u[i], D.v[i]))) {
+        // from behind, the seat's flank toward the camera (a side face of its box, never its top) is in front of the
+        // sitter inside it (an elbow showed through a wingback's side below the arm), and so is cushion top lying
+        // under an arm or the back (the corner where an armrest meets a wing is chair, not cushion)
+        over[i] = 1;
+      }
+    }
   }
   // only the drawing's own pixels (a traced polygon may run past its edge)
   for (let i = 0; i < over.length; i++) if (!v.art.px.d[i * 4 + 3]) over[i] = 0;
@@ -118,6 +141,19 @@ export function seatLayers(v: ModelView): SeatLayers {
 export const layerTiles = (v: Pick<ModelView, 'model' | 'facing'>) => cushionTiles(v.model.size, v.facing);
 
 /* ------------------------------------------------------------------ the check */
+
+/** An armrest overhangs the box fitted to its silhouette by up to this much (tiles): cushion that close is under it. */
+const ARM_OVERHANG = 0.12;
+
+/** Whether a point of the seat's top (local u, v) lies under an arm (or its overhang), the back or a wrap. */
+function underPart(parts: ModelPart[], u: number, v: number): boolean {
+  for (const p of parts) {
+    if (p.part !== 'arm' && p.part !== 'back' && p.part !== 'wrap') continue;
+    const m = p.part === 'arm' ? ARM_OVERHANG : 0;
+    if (u >= p.u[0] - m && u <= p.u[1] + m && v >= p.v[0] && v <= p.v[1]) return true;
+  }
+  return false;
+}
 
 /** A model's silhouette must cover each drawing at least this well (IoU against the drawing with its gaps filled). */
 export const FIT_MIN = 0.8;

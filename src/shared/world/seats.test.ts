@@ -124,11 +124,23 @@ describe('where each view sits you (seat models)', () => {
     sits: [[0.5, 0.35, 10]],
   };
 
-  it('sits you forward from the front and just in front of the backrest from behind, unless the view has its own point', async () => {
-    const { backSitV, BACK_GAP, viewSits } = await import('./seatModels');
+  it('sits you forward from the front and, from behind, by the kind of seat: in front of a thin back, inside a padded one, forward on a long one', async () => {
+    const { backSitV, BACK_GAP, seatKind, viewSits } = await import('./seatModels');
     expect(viewSits(m, 'se')[0]).toEqual([0.5, 0.35, 10]);
     expect(viewSits(m, 'ne')[0]).toEqual([0.5, backSitV(m, 0.5, 10), 10]);
-    expect(backSitV(m, 0.5, 10)).toBeCloseTo(0.7 - BACK_GAP);
+    // m's back is 0.25 deep: padded (a wingback) — the pelvis at the middle of its padding
+    expect(seatKind(m, 0.5, 10)).toBe('padded');
+    expect(backSitV(m, 0.5, 10)).toBeCloseTo((0.7 + 0.95) / 2);
+    // a thin back (a dining chair): just in front of it
+    const thin: SeatModel = { ...m, parts: [m.parts[0], { part: 'back', u: [0.1, 0.9], v: [0.7, 0.8], z: [10, 22] }] };
+    expect(seatKind(thin, 0.5, 10)).toBe('open');
+    expect(backSitV(thin, 0.5, 10)).toBeCloseTo(0.7 - BACK_GAP);
+    // a couch: forward onto the cushion, at the middle of its depth
+    const couch: SeatModel = { size: [2, 1], parts: [{ part: 'seat', u: [0, 2], v: [0.1, 0.7], z: [4, 10] }, { part: 'back', u: [0, 2], v: [0.7, 0.95], z: [10, 22] }], sits: [[0.5, 0.35, 10], [1.5, 0.35, 10]] };
+    expect(seatKind(couch, 0.5, 10)).toBe('long');
+    expect(backSitV(couch, 0.5, 10)).toBeCloseTo(0.4);
+    const stool: SeatModel = { size: [1, 1], parts: [{ part: 'seat', u: [0.3, 0.7], v: [0.3, 0.7], z: [20, 22] }], sits: [[0.5, 0.5, 22]] };
+    expect(seatKind(stool, 0.5, 22)).toBe('backless');
     const own: SeatModel = { ...m, views: { ne: [[0.45, 0.6]] } };
     expect(viewSits(own, 'ne')[0]).toEqual([0.45, 0.6, 10]);
     expect(viewSits(own, 'nw')[0]).toEqual([0.5, backSitV(m, 0.5, 10), 10]);

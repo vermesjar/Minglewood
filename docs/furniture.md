@@ -149,8 +149,12 @@ from behind the back, a wrap or a crest. The split follows the drawing's own pix
 their shoulders, so their head always shows.
 
 **Where a sitter sits** (`viewSits`). The figure is small for its furniture, so no one depth serves every view. From the
-front a sitter sits forward so their knees reach the front edge (`standardSitV`); from behind, on the cushion just in
-front of the backrest (`backSitV`). Each view is composed on its own, as sprite games do.
+front a sitter sits forward so their knees reach the front edge (`standardSitV`); from behind, by the kind of seat the
+model reads off itself (`seatKind`: long → forward at the cushion's middle; padded → the pelvis inside the padding at
+the back box's middle; open → just in front of the back's face; backless → a little behind the middle; `backSitV`).
+Each view is composed on its own, as sprite games do. There are no per-seat numbers: a seat that looks wrong wants a
+better model or a redrawn view, never a nudge (the tuned overrides of 2026-09-30 were removed once the rules matched
+them).
 
 **The legs** (`src/shared/world/sitLegs.ts`). The thighs run from the hip toward the camera, foreshortened at the
 floor's 2:1, to just past the front of whatever the shins would hang through; the shins drop to the floor when they

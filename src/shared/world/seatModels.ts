@@ -308,18 +308,52 @@ export function sitsByCushion(m: Pick<SeatModel, 'size' | 'sits'>, f: Facing): A
 }
 
 /**
- * Where the standard puts a sitter's pelvis in depth seen from BEHIND, at u on a cushion at z: on the cushion just in
- * front of the backrest (BACK_GAP before its front face), the backrest over their lower back; on a backless seat, a
- * little behind its middle. Never past the back of the seat. (Carter, on the café couch and Lantern Hall's chairs:
- * sunk into the backrest, a sitter read as standing in it or sitting at an angle; on the cushion in front of it, as
- * sitting in the seat.)
+ * THE KINDS OF SEAT, read off the model — what decides how a sitter is composed seen from BEHIND, where a square-on
+ * figure meets the seat's own drawing of its back (no per-seat numbers: a new seat from the Lab gets the same
+ * treatment as the catalog's):
+ *   long     the cushion runs LONG_CUSHION or more across (a couch, a bench): the sitter forward onto the cushion,
+ *            at the middle of its depth, their thighs out along it
+ *   padded   a thick back (PADDED_BACK deep or more): a tub chair, a wingback, a throne — the drawing's padding
+ *            wraps the sitter, so the pelvis sits inside the back's box, at its middle, and the torso rises out of
+ *            the padding (a tub's rim is low but thick: it still swallows the hips)
+ *   open     everything else (a dining chair, an office chair, a beanbag): on the cushion just in front of the back's
+ *            face (BACK_GAP), the back rail across the lower back
+ *   backless a stool, an ottoman: a little behind the cushion's middle
+ * (Fitted to what read right in game across the catalog, 2026-09-30: sunk into a thin back a sitter read as standing
+ * in the chair; perched in front of a thick one, as sitting too far forward with the padding behind them.)
  */
+export type SeatKind = 'long' | 'padded' | 'open' | 'backless';
+export const LONG_CUSHION = 1.2;
+export const PADDED_BACK = 0.25;
 export const BACK_GAP = 0.04;
+
+/** The back (or wrap) part behind a sitter at u on a cushion at z whose front face backFace found, if any. */
+function backPart(m: Pick<SeatModel, 'parts'>, u: number, z: number): ModelPart | null {
+  const face = backFace(m, u, z);
+  if (face === null) return null;
+  return m.parts.find((p) => (p.part === 'back' || p.part === 'wrap') && u >= p.u[0] - 0.02 && u <= p.u[1] + 0.02 && p.z[1] > z + 2 && p.v[0] === face) ?? null;
+}
+
+export function seatKind(m: Pick<SeatModel, 'parts'>, u: number, z: number): SeatKind {
+  const blocks = m.parts.filter((p) => p.part === 'seat' && p.z[1] >= z - 0.5 && u >= p.u[0] - 0.05 && u <= p.u[1] + 0.05);
+  if (blocks.length && Math.max(...blocks.map((p) => p.u[1])) - Math.min(...blocks.map((p) => p.u[0])) >= LONG_CUSHION) return 'long';
+  const back = backPart(m, u, z);
+  if (!back) return 'backless';
+  return back.v[1] - back.v[0] >= PADDED_BACK ? 'padded' : 'open';
+}
+
+/** Where the standard puts a sitter's pelvis in depth seen from BEHIND, at u on a cushion at z, by the seat's kind. */
 export function backSitV(m: Pick<SeatModel, 'parts'>, u: number, z: number): number | null {
   const s = seatSpan(m, u);
   if (!s) return null;
+  const kind = seatKind(m, u, z);
+  if (kind === 'padded') {
+    const b = backPart(m, u, z)!;
+    return (b.v[0] + b.v[1]) / 2;
+  }
+  if (kind === 'long') return (s.v0 + s.v1) / 2;
   const back = backFace(m, u, z);
-  const v = back !== null ? back - BACK_GAP : (s.v0 + s.v1) / 2 + 0.1;
+  const v = kind === 'open' && back !== null ? back - BACK_GAP : (s.v0 + s.v1) / 2 + 0.1;
   return Math.min(v, s.v1 - 0.05);
 }
 

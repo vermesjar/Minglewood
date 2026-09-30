@@ -68,9 +68,19 @@ model that holds and has been passed.
 starts there, so a generated seat looks right out of Auto-fit):
 
 - **Where they sit.** From the front: back against the backrest, knees at the cushion's front edge
-  (`standardSitV`). From behind: on the cushion just in front of the backrest, the backrest over their lower back,
-  never sunk into it (`backSitV`). Across: a single seat's sitter in its middle; on a couch or bench the sitters
-  0.8 tile apart about its middle and clear of its arms, never against them (`placeSits`).
+  (`standardSitV`). From behind, by the **kind of seat** the model reads off itself (`seatKind`, no per-seat
+  numbers): a *long* seat (a cushion 1.2 tiles or more across: couches, benches) sits them forward at the middle of
+  the cushion; a *padded* one (a back 0.25 tile thick or more: tub chairs, wingbacks, thrones) sinks the pelvis
+  into the padding, at the middle of the back's box, so the torso rises out of it; an *open* one (any other back:
+  dining, office, banquet chairs, beanbags) sits them on the cushion just in front of the back's face, the rail
+  across the lower back; a *backless* one (stools, ottomans) a little behind the cushion's middle (`backSitV`).
+  Across: a single seat's sitter in its middle; on a couch or bench the sitters 0.8 tile apart about its middle and
+  clear of its arms, never against them (`placeSits`).
+- **What draws over them.** Whole parts, by where they stand: the near arm from the front; from behind the back,
+  both arms, the seat's flanks toward the camera and any cushion top lying under an arm or the back (chair, not
+  cushion) — never the cushion they sit on, and a back only above the cushion's top (a thick box standing in for
+  a thin rail must not claim the back of a cane seat). Over them it stops at the shoulders so the head shows,
+  unless the back rises past the head anyway (a throne).
 - **How their legs lie** (`src/shared/world/sitLegs.ts`, drawn by the avatar kit). From the front: the thighs toward
   the camera to just past the seat's front, the shins down to the floor (or hanging, on a tall seat). From behind:
   the thighs out along the cushion in every seat, so a sitter visibly faces the way the seat does, and nothing below
