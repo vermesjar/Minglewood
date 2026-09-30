@@ -217,7 +217,6 @@ export const ROUND: Record<string, string> = {
 export const PROJECTION_TODO = new Set<string>([
   'air-hockey',
   'armchair.green',
-  'armchair.mustard',
   'armchair.rust',
   'bike-rack',
   'cake-table',

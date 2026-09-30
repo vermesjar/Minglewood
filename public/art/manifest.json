@@ -481,32 +481,6 @@
       "backDepth": 0.23
     },
     "armchair.mustard": {
-      "footprint": [
-        1,
-        1
-      ],
-      "fit": "anchor",
-      "facings": {
-        "se": {
-          "file": "armchair.mustard.se.png",
-          "anchor": [
-            33,
-            42
-          ]
-        },
-        "nw": {
-          "file": "armchair.mustard.nw.png",
-          "anchor": [
-            33,
-            40
-          ]
-        }
-      },
-      "seat": 13.77,
-      "seatDepth": 0.19,
-      "sitStyle": "chair",
-      "backrest": true,
-      "rotation": "mirror",
       "name": "Mustard armchair",
       "category": "seating",
       "tags": [
@@ -520,17 +494,43 @@
         "office",
         "studio"
       ],
-      "height": 25,
+      "footprint": [
+        1,
+        1
+      ],
+      "rotation": "mirror",
+      "height": 20,
       "base": "filled",
       "walk": "seat",
       "layer": "object",
+      "seat": 12,
+      "seatDepth": 0.19,
+      "backDepth": 0.19,
+      "sitStyle": "chair",
+      "backrest": true,
       "use": {
         "face": "front",
         "actions": [
           "sit"
         ]
       },
-      "backDepth": 0.19
+      "fit": "anchor",
+      "facings": {
+        "sw": {
+          "file": "armchair.mustard.sw.png",
+          "anchor": [
+            32,
+            32
+          ]
+        },
+        "nw": {
+          "file": "armchair.mustard.nw.png",
+          "anchor": [
+            32,
+            32
+          ]
+        }
+      }
     },
     "armchair.rust": {
       "footprint": [
@@ -2182,7 +2182,7 @@
       "sitStyle": "chair",
       "backrest": true,
       "rotation": "mirror",
-      "name": "Caf\u00e9 chair",
+      "name": "Café chair",
       "category": "seating",
       "tags": [
         "chair",
@@ -2626,32 +2626,6 @@
       "backDepth": 0.13
     },
     "couch.green": {
-      "footprint": [
-        2,
-        1
-      ],
-      "fit": "anchor",
-      "facings": {
-        "sw": {
-          "file": "couch.green.sw.png",
-          "anchor": [
-            32,
-            39
-          ]
-        },
-        "ne": {
-          "file": "couch.green.ne.png",
-          "anchor": [
-            32,
-            40
-          ]
-        }
-      },
-      "seat": 10.15,
-      "seatDepth": 0.2,
-      "sitStyle": "lounge",
-      "backrest": true,
-      "rotation": "mirror",
       "name": "Green couch",
       "category": "seating",
       "tags": [
@@ -2664,17 +2638,43 @@
         "office",
         "studio"
       ],
-      "height": 26,
+      "footprint": [
+        2,
+        1
+      ],
+      "rotation": "mirror",
+      "height": 21,
       "base": "filled",
       "walk": "seat",
       "layer": "object",
+      "seat": 10.15,
+      "seatDepth": 0.2,
+      "backDepth": 0.2,
+      "sitStyle": "lounge",
+      "backrest": true,
       "use": {
         "face": "front",
         "actions": [
           "sit"
         ]
       },
-      "backDepth": 0.2
+      "fit": "anchor",
+      "facings": {
+        "sw": {
+          "file": "couch.green.sw.png",
+          "anchor": [
+            32,
+            30
+          ]
+        },
+        "nw": {
+          "file": "couch.green.nw.png",
+          "anchor": [
+            64,
+            28
+          ]
+        }
+      }
     },
     "couch.purple": {
       "footprint": [
@@ -4314,7 +4314,7 @@
       "sitStyle": "chair",
       "backrest": true,
       "rotation": "mirror",
-      "name": "Founders\u2019 throne",
+      "name": "Founders’ throne",
       "category": "seating",
       "tags": [
         "heirloom",

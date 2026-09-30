@@ -381,7 +381,8 @@ export function rigFindings(v: RigView, rig: SeatRig, looks: AvatarLoadout[] = R
       // must show to read as a person seated there; from the front nearly all of the upper body must
       const want = behind ? (rig.tallBack ? 0 : 0.5) : 0.95;
       note(`${i} upper`, s.upper ? s.upperShown / s.upper : 1, true, (n) => n < want, (n) => `cushion ${i}: the seat hides their head, shoulders or upper back (${Math.round(n * 100)}% show)`);
-      if (s.legs && rig.legs === 'show') note(`${i} legs`, s.legsShown / s.legs, true, (n) => n < 0.5, (n) => `cushion ${i}: their legs are lost (${Math.round(n * 100)}% show)`);
+      // lost legs are a defect from the front (cut off by the seat); from behind the seat and the body cover them anyway
+      if (s.legs && rig.legs === 'show' && !behind) note(`${i} legs`, s.legsShown / s.legs, true, (n) => n < 0.5, (n) => `cushion ${i}: their legs are lost (${Math.round(n * 100)}% show)`);
       // from behind and above, some of the legs shows past a low seat's sides or between a back's spindles: hiding them
       // is right while under half would show (the same line "lost" draws for showing them, so one of the two holds)
       if (s.legs && rig.legs === 'hide') note(`${i} legs`, s.legsShown / s.legs, false, (n) => n >= 0.5, (n) => `cushion ${i}: legs set to hide, but ${Math.round(n * 100)}% of them show`);
