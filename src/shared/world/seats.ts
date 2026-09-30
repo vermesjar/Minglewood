@@ -160,6 +160,45 @@ export function frontOf(spot: SeatSpot): [number, number] {
 }
 
 /**
+ * THE SEAT SPACING RULE (Carter: "leave some space where chairs don't sit right in front of items like the coffee
+ * table"). The tile in front of every seat is clear floor, where a sitter's legs and feet go — except that a chair
+ * or a stool may be pulled right up to what you sit at: a desk, a dining or work table, a counter, a bar. A couch,
+ * armchair, beanbag, ottoman, bench or throne never has anything right in front of it (a coffee table goes a tile
+ * away), and no seat faces a low table, a lamp or a plant. The layout check (scripts/room-map.ts) and decorate mode
+ * (decor.ts) both hold rooms to it.
+ */
+const PULLS_UP = /^(chair|stool)/;
+const SIT_AT = /^(desk|table-long|table-round|table-high|umbrella-table|counter|workbench|bar)/;
+
+/** What stands on a tile (standing, solid, not on top of something else), if anything. */
+function standingAt(scene: SceneDef, x: number, y: number, not?: SceneObject): SceneObject | undefined {
+  return scene.objects.find((o) => {
+    if (o === not || !isSolid(o) || o.z) return false;
+    const f = footprint(o);
+    return x >= f.x0 && x < f.x1 && y >= f.y0 && y < f.y1;
+  });
+}
+
+/** Why a seat breaks the spacing rule in this scene (one line per cushion that does), empty if it doesn't. */
+export function seatSpacingProblems(seat: SceneObject, scene: SceneDef): string[] {
+  const out: string[] = [];
+  for (const spot of seatSpots(seat, scene)) {
+    const [fx, fy] = frontOf(spot);
+    const hit = standingAt(scene, fx, fy, seat);
+    if (!hit) continue;
+    if (PULLS_UP.test(seat.sprite) && SIT_AT.test(hit.sprite)) continue;
+    const name = (o: SceneObject) => `${o.id ?? o.sprite} (${o.sprite}${o.variant ? `.${o.variant}` : ''})`;
+    out.push(`${name(seat)} cushion ${spot.index} at ${spot.x},${spot.y} faces ${name(hit)} right in front of it: leave a tile of floor`);
+  }
+  return out;
+}
+
+/** Every seat spacing problem in a scene. */
+export function spacingProblems(scene: SceneDef): string[] {
+  return scene.objects.filter(isSeat).flatMap((o) => seatSpacingProblems(o, scene));
+}
+
+/**
  * Where you can step off a seat when you stand up, best first: forward (off a couch facing open floor), back
  * (out from a chair pulled up to a table, off a stool at the bar), then to either side.
  */

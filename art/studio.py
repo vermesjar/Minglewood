@@ -680,6 +680,26 @@ def lean(img: Image.Image) -> float:
     return float((tx.mean() - xs.mean()) / (xs.max() - xs.min() + 1))
 
 
+def orient_fronts(results: list[dict], m: dict) -> None:
+    """The model sometimes draws a front view facing its mirror's way (a chair asked for facing sw, drawn facing se):
+    filed as-is, the game mirrors it the wrong way round for every seat facing its partner (armchair.mustard's front
+    was, and in Engineering it faced the wall while its sitter faced the table). For one-tile seats with a clear
+    backrest, a front facing se leans its backrest left of centre, one facing sw right (check_facings.py's rule):
+    flip any that lean the wrong way. A near-symmetric drawing (a tub chair) says nothing either way: the reviewer
+    checks it against the facing arrows on the Lab's previews."""
+    for r in results:
+        if r.get("facing") not in ("se", "sw") or r.get("footprint") != [1, 1]:
+            continue
+        seat = r.get("extra", {}).get("seat") is not None or m["sprites"].get(r["key"], {}).get("seat") is not None
+        if not seat:
+            continue
+        v = lean(r["img"])
+        if abs(v) >= 0.06 and (v < 0) != (r["facing"] == "se"):
+            r["img"] = r["img"].transpose(Image.FLIP_LEFT_RIGHT)
+            r["anchor"] = (r["img"].width - r["anchor"][0], r["anchor"][1])
+            print(f"  ! {r['key']}.{r['facing']}: front drawn facing its mirror's way; flipped (lean {v:+.2f})")
+
+
 def orient_backs(results: list[dict], m: dict) -> None:
     """The model sometimes draws a back view facing the front's way (a chair's back view leaning like its front):
     published as-is, it would sit sideways to its desk. For one-tile seats, compare each back view's lean with its
@@ -993,6 +1013,7 @@ def cmd_build(a):
     rotations: dict = {}
     with ManifestLock():
         m = load_manifest()
+        orient_fronts([r for _, res in done for r in res], m)
         orient_backs([r for _, res in done for r in res], m)
         for sh, res in done:
             for r in res:
@@ -1135,6 +1156,7 @@ def cmd_lab_generate(a):
     results = run_sheet(run, sheet, argparse.Namespace(regen=True, quality=run["quality"]))
     if not results:
         emit({"ok": False, "error": "the model returned no usable drawing"}, 1)
+    orient_fronts(results, load_manifest())
     orient_backs(results, load_manifest())
     sprites = out / "sprites"
     lamp = spec.get("category") == "lighting" or spec.get("light") is not None

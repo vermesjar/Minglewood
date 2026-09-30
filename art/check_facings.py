@@ -1,4 +1,4 @@
-"""Back views must face the opposite way to their fronts.
+"""Every seat drawing must face the way it's filed, and back views the opposite way to their fronts.
 
   uv run check_facings.py
 
@@ -43,6 +43,9 @@ def symmetry(file: str) -> float:
     return float((a & b).sum() / max(1, (a | b).sum()))
 
 
+MIRROR = {"se": "sw", "sw": "se", "ne": "nw", "nw": "ne"}
+
+
 def main() -> int:
     sprites = json.loads((PUBLIC / "manifest.json").read_text(encoding="utf-8"))["sprites"]
     bad = []
@@ -61,17 +64,28 @@ def main() -> int:
     for key, e in sprites.items():
         f = e.get("facings") or {}
         # seats: their backrest is what says which way they face (props with one drawing for both views skip)
-        if e.get("seat") is None or e.get("footprint", [1, 1]) != [1, 1] or "se" not in f or "nw" not in f:
+        if e.get("seat") is None or e.get("footprint", [1, 1]) != [1, 1] or not f:
+            continue
+        # every drawing on its own: a backrest's top leans left of the piece's centre in a drawing that faces se or ne,
+        # right in one facing sw or nw. (armchair.mustard's front was drawn facing se and filed as sw, so the game
+        # mirrored it for every chair facing se: in Engineering it faced the wall, its sitter the table.)
+        for label, rec in f.items():
+            d = lean(rec["file"])
+            if abs(d) < 0.06:  # no clear backrest to judge by (a tub chair, a stool, a beanbag)
+                continue
+            checked += 1
+            if (d < 0) != (label in ("se", "ne")):
+                bad.append(f"{key}: '{rec['file']}' is filed as {label} but its backrest leans {'left' if d < 0 else 'right'} (lean {d:+.2f}): it faces {MIRROR[label]}")
+        if "se" not in f or "nw" not in f:
             continue
         front, back = lean(f["se"]["file"]), lean(f["nw"]["file"])
         if abs(front) < 0.06:  # no clear backrest to judge by (plants, tables, stools)
             continue
-        checked += 1
         if (front < 0) == (back < 0) and abs(back) > 0.03:
             bad.append(f"{key}: back view '{f['nw']['file']}' faces the same way as its front (lean {front:+.2f} / {back:+.2f})")
     for b in bad:
         print("  !", b)
-    print(f"{checked} directional piece(s) checked, {len(bad)} with back views facing the wrong way")
+    print(f"{checked} directional drawing(s) checked, {len(bad)} facing the wrong way")
     return 1 if bad else 0
 
 

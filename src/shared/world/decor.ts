@@ -13,7 +13,7 @@ import { wallDrawingSize, type ArtSource } from '../art/source';
 import { MEMORY_SLOTS } from './memory';
 import type { Facing, SceneDef, SceneObject } from './scene';
 import { footprint, isSeat } from './scene';
-import { FACING_VEC, seatSpots } from './seats';
+import { FACING_VEC, seatSpots, spacingProblems } from './seats';
 import { withUseActions } from './uses';
 import { WalkGrid } from './walkGrid';
 import { hides, silhouetteOf, standing, wallBox, wallBoxes, wallSpan, type WallFace } from './wallPieces';
@@ -257,6 +257,13 @@ export function placementProblem(
     for (let tx = f.x0; tx < f.x1; tx++) around.push([tx, f.y0 - 1], [tx, f.y1]);
     const usable = !item?.anySide && front.length ? front.some(reachable) : around.some(reachable);
     if (!usable) return front.length && !item?.anySide ? 'Its front would face a wall or furniture: turn it (R) or move it.' : 'Nobody could reach it there.';
+  }
+  // The seat spacing rule (seats.ts): nothing right in front of a seat but a desk, table or counter a chair or a stool
+  // is pulled up to — placing a seat, or placing something in front of one.
+  if (placed) {
+    const before = new Set(spacingProblems(scene));
+    const now = spacingProblems({ ...scene, objects: [...scene.objects, placed] }).filter((p) => !before.has(p));
+    if (now.length) return isSeat(placed) ? 'Leave a tile of floor in front of it: turn it (R) or move it.' : 'Leave a tile of floor in front of the seat there.';
   }
   // Nothing on the walls may end up hidden behind it.
   if (placed && art) {

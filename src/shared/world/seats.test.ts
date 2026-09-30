@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { allScenes, getScene } from './index';
 import { findPath, isValidPath } from './pathfinding';
 import { approach, approachTiles } from './interact';
-import { SEAT_FIELDS, seatFacing, seatProfile, seatSpotAt, seatSpots, seenFromBehind, sitterLift, sitterPoint, sitThigh, stepOffTiles } from './seats';
+import { SEAT_FIELDS, seatFacing, seatProfile, seatSpotAt, seatSpots, seenFromBehind, sitterLift, sitterPoint, sitThigh, spacingProblems, stepOffTiles } from './seats';
 import type { SeatModel } from './seatModels';
 import { isSeat } from './scene';
 import { WalkGrid } from './walkGrid';
@@ -43,6 +43,20 @@ describe('seat standard', () => {
           expect(stepOffTiles(s).some(([x, y]) => grid.walkable(x, y)), `${scene.id} ${o.id} step off`).toBe(true);
         }
     }
+  });
+
+  it('leaves a tile of floor in front of every seat in every room (the seat spacing rule)', () => {
+    for (const s of allScenes().values()) expect(spacingProblems(s), s.id).toEqual([]);
+    // a couch hard up against a coffee table breaks it; a chair pulled up to a desk doesn't
+    const base = getScene('cafe')!;
+    const room = (objects: typeof base.objects) => ({ ...base, objects });
+    const sit = [{ kind: 'sit' as const, label: 'Sit' }];
+    const couch = { id: 'c', sprite: 'couch', x: 2, y: 2, w: 2, d: 1, facing: 'sw' as const, actions: sit };
+    expect(spacingProblems(room([couch, { id: 't', sprite: 'table-low', x: 2, y: 3, w: 2, d: 1 }]))).toHaveLength(2);
+    expect(spacingProblems(room([couch, { id: 't', sprite: 'table-low', x: 2, y: 4, w: 2, d: 1 }]))).toEqual([]);
+    const chair = { id: 'o', sprite: 'chair', variant: 'office', x: 2, y: 2, facing: 'sw' as const, actions: sit };
+    expect(spacingProblems(room([chair, { id: 'd', sprite: 'desk', x: 2, y: 3, w: 2, d: 1 }]))).toEqual([]);
+    expect(spacingProblems(room([chair, { id: 'l', sprite: 'lamp', x: 2, y: 3 }]))).toHaveLength(1);
   });
 
   it('keeps guests out of the lane behind the café bar', () => {
@@ -136,6 +150,23 @@ describe('where each view sits you (seat models)', () => {
     const stool: SeatModel = { size: [1, 1], parts: [{ part: 'seat', u: [0.3, 0.7], v: [0.3, 0.7], z: [20, 22] }], sits: [[0.5, 0.5, 22]] };
     expect(legsFor(stool, stool.sits[0], 'stool').drop).toBe(SHIN_MAX);
     expect(legsFor(stool, stool.sits[0], 'stool').hang).toBeCloseTo(22 + THIGH_R - 1.5 - SHIN_MAX);
+  });
+
+  it('seats a couch’s sitters toward its middle, clear of its arms', async () => {
+    const { placeSits, ARM_CLEAR } = await import('../../client/engine/sprites/seatModelFit');
+    const couch = [
+      { part: 'seat' as const, u: [0, 2] as [number, number], v: [0.1, 0.9] as [number, number], z: [4, 10] as [number, number] },
+      { part: 'arm' as const, u: [0, 0.25] as [number, number], v: [0.1, 0.9] as [number, number], z: [10, 16] as [number, number] },
+      { part: 'arm' as const, u: [1.75, 2] as [number, number], v: [0.1, 0.9] as [number, number], z: [10, 16] as [number, number] },
+    ];
+    const [a, b] = placeSits(couch, [2, 1]);
+    expect(a[0]).toBeCloseTo(0.25 + ARM_CLEAR);
+    expect(b[0]).toBeCloseTo(1.75 - ARM_CLEAR);
+    // an armless bench: the spacing about its middle
+    const [c, d] = placeSits([couch[0]], [2, 1]);
+    expect([c[0], d[0]]).toEqual([0.6, 1.4]);
+    // a single seat: its middle
+    expect(placeSits([{ ...couch[0], u: [0, 1] }], [1, 1])[0][0]).toBe(0.5);
   });
 
   it('shows the legs from behind in every seat, so a sitter faces the way it does, unless its back hides them', async () => {

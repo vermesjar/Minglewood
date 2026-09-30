@@ -997,6 +997,13 @@ canvas.clickable {
 .rig-facing .tick {
   margin-left: auto;
 }
+.rig-facing .facing-arrow {
+  color: var(--muted);
+}
+.rig-facing .facing-arrow b {
+  font-size: 16px;
+  line-height: 1;
+}
 .rig-preview {
   display: flex;
   flex-wrap: wrap;

@@ -287,13 +287,35 @@ export interface FitResult {
   score: number;
 }
 
-/** Sitting points by the standard: on the cushion over each cushion's tile, back against the backrest (else its middle). */
+/**
+ * Sitters on a seat of several cushions sit this far apart (tiles), about its middle: at their tiles' middles the end
+ * ones sat against the arms and read as sitting on them (Carter: "the seats are overlapping the couch arms"; the
+ * catalog's couches were moved 0.1–0.15 tile in, to 0.66 and 1.4 on a two-seater).
+ */
+export const CUSHION_SPACING = 0.8;
+/** How far (tiles) a sitter's hips stay from an arm's inner face: half their torso's width on screen and a little. */
+export const ARM_CLEAR = 0.42;
+
+/**
+ * Sitting points by the standard: on the cushion over each cushion's tile, back against the backrest (else its
+ * middle); across, a single seat's sitter in its middle, a longer seat's CUSHION_SPACING apart about its middle and
+ * ARM_CLEAR from its arms. `hintU` keeps the sitters where they are across (the Lab's "sit them back" button).
+ */
 export function placeSits(parts: ModelPart[], size: [number, number], hintU?: number[]): SitPoint[] {
   const [W] = size;
   const n = Math.max(1, Math.round(W));
+  const arms = parts.filter((p) => p.part === 'arm');
+  const armL = Math.max(0, ...arms.filter((p) => p.u[0] + p.u[1] < W).map((p) => p.u[1]));
+  const armR = Math.min(W, ...arms.filter((p) => p.u[0] + p.u[1] >= W).map((p) => p.u[0]));
+  const across = (i: number) => {
+    if (n === 1) return W / 2;
+    const u = W / 2 + (i + 0.5 - n / 2) * CUSHION_SPACING;
+    // clear of the arms, but over its own tile
+    return Math.min(i + 0.95, Math.max(i + 0.05, Math.min(armR - ARM_CLEAR, Math.max(armL + ARM_CLEAR, u))));
+  };
   const out: SitPoint[] = [];
   for (let i = 0; i < n; i++) {
-    const u = hintU?.[i] !== undefined && hintU[i] >= i && hintU[i] <= i + 1 ? hintU[i] : i + 0.5;
+    const u = hintU?.[i] !== undefined && hintU[i] >= i && hintU[i] <= i + 1 ? hintU[i] : across(i);
     // the standard (seatModels.ts SIT_GAP): bottom back against the backrest, else the middle of a backless seat —
     // on the cushion top there (a back's front face depends on the cushion's height, so settle it twice)
     const span = seatSpan({ parts }, u);

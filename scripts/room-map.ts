@@ -11,13 +11,16 @@
  *   - squeezes: wall art hung in a span too narrow for its drawing at 2:1 (THE WALL ART STANDARD, models.ts).
  *   - crowding: an occupied seat whose sitter would cover the face and body of someone sitting just behind
  *     them in the same screen column (see crowdedSeats).
+ *   - spacing: a seat with something right in front of it (the seat spacing rule, src/shared/world/seats.ts,
+ *     shared with decorate mode): a coffee table goes a tile from a couch; only a chair or a stool pulls up to
+ *     a desk, a table or a counter.
  *
  *   npx tsx scripts/room-map.ts [roomId ...] [--quiet]     (exits 1 if anything is wrong)
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { buildInteriors } from '../src/shared/world/interiors';
 import { isSeat, footprint, type SceneDef, type SceneObject } from '../src/shared/world/scene';
-import { seatSpots } from '../src/shared/world/seats';
+import { seatSpots, spacingProblems } from '../src/shared/world/seats';
 import { WalkGrid } from '../src/shared/world/walkGrid';
 // the occlusion rule and the wall art standard are shared with decorate mode and the server (one rule, one answer)
 import { wallFitProblems, wallOcclusions } from '../src/shared/world/wallPieces';
@@ -131,6 +134,11 @@ for (const s of buildInteriors()) {
   }
   for (const line of crowdedSeats(s)) {
     console.log(`  ! ${line}`);
+    problems++;
+  }
+  // the seat spacing rule (shared with decorate mode: src/shared/world/seats.ts)
+  for (const line of spacingProblems(s)) {
+    console.log(`  ! ${s.id}: ${line}`);
     problems++;
   }
 }

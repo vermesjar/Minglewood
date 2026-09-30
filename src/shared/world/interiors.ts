@@ -174,7 +174,7 @@ export function buildInteriors(): SceneDef[] {
   const hq = room(
     'hq',
     'Northstar HQ — Lobby',
-    14,
+    16,
     12,
     {
       floor: '#e9e2d3',
@@ -187,8 +187,8 @@ export function buildInteriors(): SceneDef[] {
       ambient: 'bright',
     },
     [
-      { sprite: 'rug', x: 5, y: 5, w: 5, d: 4, flat: true, variant: 'logo' },
-      { sprite: 'reception', x: 6, y: 2, w: 3, d: 1, facing: 'sw', label: 'Reception' },
+      { sprite: 'rug', x: 7, y: 5, w: 5, d: 4, flat: true, variant: 'logo' },
+      { sprite: 'reception', x: 8, y: 2, w: 3, d: 1, facing: 'sw', label: 'Reception' },
       {
         id: 'hq-3',
         sprite: 'frame',
@@ -229,7 +229,7 @@ export function buildInteriors(): SceneDef[] {
         artifactId: 'art-series-a',
         actions: [{ kind: 'artifact', artifactId: 'art-series-a' }],
       },
-      { sprite: 'logo-wall', wall: 'right', x: 6, y: 0, w: 3, label: 'Northstar Labs' },
+      { sprite: 'logo-wall', wall: 'right', x: 8, y: 0, w: 3, label: 'Northstar Labs' },
       {
         sprite: 'elevator',
         wall: 'left',
@@ -264,7 +264,7 @@ export function buildInteriors(): SceneDef[] {
         // along the right edge, its glass front toward the room's open side so the trophies show
         id: 'hq-10',
         sprite: 'trophy-case',
-        x: 12,
+        x: 14,
         y: 4,
         w: 1,
         d: 2,
@@ -275,12 +275,12 @@ export function buildInteriors(): SceneDef[] {
       },
       // The heirloom gallery: the trophy case, then the company's treasures on plinths along the right edge,
       // on a navy runner with brass stanchions at either end.
-      { id: 'hq-gallery-rug', sprite: 'rug', x: 11, y: 6, w: 3, d: 5, flat: true, variant: 'navy' },
-      { id: 'hq-plinth-1', sprite: 'plinth', x: 12, y: 7 },
+      { id: 'hq-gallery-rug', sprite: 'rug', x: 13, y: 6, w: 3, d: 5, flat: true, variant: 'navy' },
+      { id: 'hq-plinth-1', sprite: 'plinth', x: 14, y: 7 },
       {
         id: 'hq-trophy',
         sprite: 'heirloom-trophy',
-        x: 12,
+        x: 14,
         y: 7,
         z: PLINTH_TOP,
         label: 'The Keystone Trophy',
@@ -289,49 +289,50 @@ export function buildInteriors(): SceneDef[] {
       {
         id: 'hq-14',
         sprite: 'time-capsule',
-        x: 12,
+        x: 14,
         y: 8,
         label: 'Time capsule',
         artifactId: 'art-time-capsule',
         actions: [{ kind: 'artifact', artifactId: 'art-time-capsule' }],
       },
-      { id: 'hq-plinth-2', sprite: 'plinth', x: 12, y: 9 },
+      { id: 'hq-plinth-2', sprite: 'plinth', x: 14, y: 9 },
       {
         id: 'hq-gold',
         sprite: 'heirloom-gold',
-        x: 12,
+        x: 14,
         y: 9,
         z: PLINTH_TOP,
         label: 'The Gold Reserve',
         actions: [{ kind: 'info', title: 'The Gold Reserve', body: 'Seven ingots for seven straight quarters on plan. One more quarter and the pyramid grows a new layer.' }],
       },
-      { id: 'hq-stanchion-1', sprite: 'stanchion', x: 11, y: 6 },
-      { id: 'hq-stanchion-2', sprite: 'stanchion', x: 11, y: 10 },
+      { id: 'hq-stanchion-1', sprite: 'stanchion', x: 13, y: 6 },
+      { id: 'hq-stanchion-2', sprite: 'stanchion', x: 13, y: 10 },
       // The Founders' Throne on its own oxblood dais, flanked by topiaries and stanchions.
-      { id: 'hq-dais', sprite: 'rug', x: 10, y: 1, w: 3, d: 3, flat: true, variant: 'oxblood' },
-      { id: 'hq-throne', sprite: 'heirloom-throne', x: 11, y: 1, facing: 'sw', label: 'The Founders’ Throne — earned at Series A', actions: sit },
-      { id: 'hq-topiary-1', sprite: 'planter', variant: 'brass', x: 10, y: 1 },
-      { id: 'hq-topiary-2', sprite: 'planter', variant: 'brass', x: 12, y: 1 },
-      { id: 'hq-stanchion-3', sprite: 'stanchion', x: 10, y: 3 },
-      { id: 'hq-stanchion-4', sprite: 'stanchion', x: 12, y: 3 },
+      { id: 'hq-dais', sprite: 'rug', x: 12, y: 1, w: 3, d: 3, flat: true, variant: 'oxblood' },
+      { id: 'hq-throne', sprite: 'heirloom-throne', x: 13, y: 1, facing: 'sw', label: 'The Founders’ Throne — earned at Series A', actions: sit },
+      { id: 'hq-topiary-1', sprite: 'planter', variant: 'brass', x: 12, y: 1 },
+      { id: 'hq-topiary-2', sprite: 'planter', variant: 'brass', x: 14, y: 1 },
+      { id: 'hq-stanchion-3', sprite: 'stanchion', x: 12, y: 3 },
+      { id: 'hq-stanchion-4', sprite: 'stanchion', x: 14, y: 3 },
       // Reception, framed by topiaries under the logo wall.
-      { id: 'hq-desk-chair', sprite: 'chair', variant: 'office', x: 8, y: 1, facing: 'sw', label: 'Reception chair' },
-      { id: 'hq-topiary-3', sprite: 'planter', variant: 'brass', x: 5, y: 2 },
-      { id: 'hq-topiary-4', sprite: 'planter', variant: 'brass', x: 9, y: 2 },
-      // The lounge by the elevator, on its own rug.
-      { id: 'hq-lounge-rug', sprite: 'rug', x: 1, y: 6, w: 5, d: 4, flat: true, variant: 'cream' },
+      { id: 'hq-desk-chair', sprite: 'chair', variant: 'office', x: 10, y: 1, facing: 'sw', label: 'Reception chair' },
+      { id: 'hq-topiary-3', sprite: 'planter', variant: 'brass', x: 7, y: 2 },
+      { id: 'hq-topiary-4', sprite: 'planter', variant: 'brass', x: 11, y: 2 },
+      // The lounge by the elevator, on its own rug: the couches face each other a tile either side of the coffee
+      // table, the armchair at its head a tile off (the seat spacing rule, seats.ts).
+      { id: 'hq-lounge-rug', sprite: 'rug', x: 1, y: 5, w: 6, d: 5, flat: true, variant: 'cream' },
       { sprite: 'couch', x: 2, y: 7, w: 1, d: 2, facing: 'se', variant: 'blue', actions: sit },
-      { sprite: 'table-low', x: 3, y: 7, w: 1, d: 2 },
-      { sprite: 'couch', x: 4, y: 7, w: 1, d: 2, facing: 'nw', variant: 'blue', actions: sit },
-      { id: 'hq-armchair', sprite: 'armchair', variant: 'mustard', x: 5, y: 6, facing: 'sw', actions: sit },
+      { sprite: 'table-low', x: 4, y: 7, w: 1, d: 2 },
+      { sprite: 'couch', x: 6, y: 7, w: 1, d: 2, facing: 'nw', variant: 'blue', actions: sit },
+      { id: 'hq-armchair', sprite: 'armchair', variant: 'mustard', x: 4, y: 5, facing: 'sw', actions: sit },
       { id: 'hq-side-table', sprite: 'table-side', variant: 'brass', x: 2, y: 6 },
       { id: 'hq-lamp', sprite: 'lamp', x: 1, y: 8, actions: [{ kind: 'toggle', label: 'Switch the lamp' }] },
       // Visitors wait on benches facing reception across the star.
-      { id: 'hq-bench-1', sprite: 'bench', variant: 'navy', x: 5, y: 10, w: 2, d: 1, facing: 'ne', actions: sit },
-      { id: 'hq-bench-table', sprite: 'table-side', variant: 'brass', x: 7, y: 10 },
-      { id: 'hq-bench-2', sprite: 'bench', variant: 'navy', x: 8, y: 10, w: 2, d: 1, facing: 'ne', actions: sit },
-      { id: 'hq-topiary-5', sprite: 'planter', variant: 'brass', x: 4, y: 10 },
-      { id: 'hq-topiary-6', sprite: 'planter', variant: 'brass', x: 10, y: 10 },
+      { id: 'hq-bench-1', sprite: 'bench', variant: 'navy', x: 7, y: 10, w: 2, d: 1, facing: 'ne', actions: sit },
+      { id: 'hq-bench-table', sprite: 'table-side', variant: 'brass', x: 9, y: 10 },
+      { id: 'hq-bench-2', sprite: 'bench', variant: 'navy', x: 10, y: 10, w: 2, d: 1, facing: 'ne', actions: sit },
+      { id: 'hq-topiary-5', sprite: 'planter', variant: 'brass', x: 6, y: 10 },
+      { id: 'hq-topiary-6', sprite: 'planter', variant: 'brass', x: 12, y: 10 },
       {
         id: 'hq-aquarium',
         sprite: 'heirloom-aquarium',
@@ -344,13 +345,13 @@ export function buildInteriors(): SceneDef[] {
         actions: [{ kind: 'info', title: 'The Koi Aquarium', body: 'Every fish is named after a product codename. The black moor is Aurora. Nobody knows who named the snail.' }],
       },
       { id: 'hq-window', sprite: 'window', wall: 'left', x: 0, y: 0, d: 2 },
-      { id: 'hq-clock', sprite: 'clock-grand', x: 13, y: 0, facing: 'sw', label: 'The grandfather clock' },
+      { id: 'hq-clock', sprite: 'clock-grand', x: 15, y: 0, facing: 'sw', label: 'The grandfather clock' },
     ],
   );
 
   // One back-to-back pod: the far row faces the room over its monitors, the near row faces the screens.
   // The front desk is the receptionist's: guests talk to Margot across it.
-  hq.staff = [{ x: 6, y: 1, w: 3, d: 1 }];
+  hq.staff = [{ x: 8, y: 1, w: 3, d: 1 }];
   hq.npcs = [
     {
       id: 'receptionist',
@@ -378,9 +379,9 @@ export function buildInteriors(): SceneDef[] {
         accessory: 'acc.none',
       },
       spots: [
-        { x: 7, y: 1, facing: 'sw' },
-        { x: 6, y: 1, facing: 'sw', doing: 'work' },
-        { x: 8, y: 1, facing: 'sw', sit: 'hq-desk-chair' },
+        { x: 9, y: 1, facing: 'sw' },
+        { x: 8, y: 1, facing: 'sw', doing: 'work' },
+        { x: 10, y: 1, facing: 'sw', sit: 'hq-desk-chair' },
       ],
       greeting: ['Welcome to Northstar!', 'Looking for someone? I can point you there.', 'Good to see you — make yourself at home.'],
     },
@@ -484,21 +485,23 @@ export function buildInteriors(): SceneDef[] {
         label: 'Build status',
         actions: [{ kind: 'info', title: 'Build status', body: 'Main is green. The nightly Aurora build finished in 11 minutes; one flaky test is quarantined.' }],
       },
-      { id: 'eng-meet-rug', sprite: 'rug', x: 1, y: 9, w: 4, d: 3, flat: true, variant: 'teal' },
+      // The meeting corner: the sofa a tile off the coffee table, the armchair at its head a tile off (the seat spacing
+      // rule, seats.ts), clear of the dashboard on the wall.
+      { id: 'eng-meet-rug', sprite: 'rug', x: 1, y: 8, w: 4, d: 4, flat: true, variant: 'teal' },
       { id: 'eng-meet-table', sprite: 'table-low', x: 2, y: 10, w: 1, d: 2 },
-      { id: 'eng-meet-sofa', sprite: 'couch', variant: 'blue', x: 3, y: 10, w: 1, d: 2, facing: 'nw', actions: sit },
-      { id: 'eng-meet-chair', sprite: 'armchair', variant: 'mustard', x: 1, y: 11, facing: 'se', actions: sit },
+      { id: 'eng-meet-sofa', sprite: 'couch', variant: 'blue', x: 4, y: 10, w: 1, d: 2, facing: 'nw', actions: sit },
+      { id: 'eng-meet-chair', sprite: 'armchair', variant: 'mustard', x: 2, y: 8, facing: 'sw', actions: sit },
       { id: 'eng-meet-lamp', sprite: 'lamp', x: 4, y: 9, actions: [{ kind: 'toggle', label: 'Switch the lamp' }] },
-      // The lounge: a sofa and a coffee table anchor the beanbags, a step back from the table so a sitter's legs
-      // stretch out on the floor in front of them (hard up against it, their feet lay on the tabletop).
+      // The lounge: a sofa and a coffee table anchor the beanbags, each a tile off the table so a sitter's legs stretch
+      // out on the floor in front of them (hard up against it, their feet lay on the tabletop: the seat spacing rule).
       { id: 'eng-lounge-rug', sprite: 'rug', x: 10, y: 6, w: 5, d: 5, flat: true, variant: 'teal' },
       { id: 'eng-lounge-sofa', sprite: 'couch', variant: 'green', x: 11, y: 6, w: 2, d: 1, facing: 'sw', actions: sit },
       { id: 'eng-lamp', sprite: 'lamp', x: 13, y: 6, actions: [{ kind: 'toggle', label: 'Switch the lamp' }] },
-      { id: 'eng-lounge-table', sprite: 'table-low', x: 11, y: 7, w: 2, d: 1 },
-      { sprite: 'beanbag', x: 11, y: 9, variant: 'orange', facing: 'ne', actions: sit },
-      { sprite: 'beanbag', x: 12, y: 9, variant: 'purple', facing: 'ne', actions: sit },
-      { sprite: 'beanbag', x: 10, y: 9, variant: 'cyan', facing: 'ne', actions: sit },
-      { id: 'eng-lounge-side', sprite: 'table-low', x: 10, y: 7, w: 1, d: 1, variant: 'side' },
+      { id: 'eng-lounge-table', sprite: 'table-low', x: 11, y: 8, w: 2, d: 1 },
+      { sprite: 'beanbag', x: 11, y: 10, variant: 'orange', facing: 'ne', actions: sit },
+      { sprite: 'beanbag', x: 12, y: 10, variant: 'purple', facing: 'ne', actions: sit },
+      { sprite: 'beanbag', x: 10, y: 10, variant: 'cyan', facing: 'ne', actions: sit },
+      { id: 'eng-lounge-side', sprite: 'table-low', x: 10, y: 6, w: 1, d: 1, variant: 'side' },
       plant(15, 10, 'b'),
       // A second, smaller pod at the front for the platform team.
       { id: 'eng-pod2-rug', sprite: 'rug', x: 5, y: 8, w: 4, d: 4, flat: true, variant: 'slate' },
@@ -609,9 +612,9 @@ export function buildInteriors(): SceneDef[] {
       { id: 'launch-lamp', sprite: 'lamp', x: 9, y: 7, actions: [{ kind: 'toggle', label: 'Switch the lamp' }] },
       { id: 'launch-couch', sprite: 'couch', variant: 'blue', x: 7, y: 7, w: 2, d: 1, facing: 'sw', actions: sit },
       { id: 'launch-side-table', sprite: 'table-low', x: 6, y: 7, w: 1, d: 1, variant: 'side' },
-      { id: 'launch-coffee-table', sprite: 'table-low', x: 7, y: 8, w: 2, d: 1 },
-      // the beanbags at the table's front corners, facing the couch over open floor (hard up against the table, a
-      // sitter's feet lay on the tabletop)
+      // the coffee table a tile off the couch, the beanbags either side of it facing the couch over open floor (hard up
+      // against the table, a sitter's feet lay on the tabletop: the seat spacing rule, seats.ts)
+      { id: 'launch-coffee-table', sprite: 'table-low', x: 7, y: 9, w: 2, d: 1 },
       { id: 'launch-beanbag-2', sprite: 'beanbag', x: 6, y: 9, variant: 'cyan', facing: 'ne', actions: sit },
       { sprite: 'beanbag', x: 9, y: 9, variant: 'orange', facing: 'ne', actions: sit },
       plant(10, 9, 'b'),
@@ -694,7 +697,7 @@ export function buildInteriors(): SceneDef[] {
       { id: 'events-coat-rack', sprite: 'coat-rack', x: 0, y: 9, label: 'Coat rack' },
       // Lanterns light the walk from the door to the stage.
       { id: 'events-lantern-4', sprite: 'lantern-floor', x: 2, y: 9, actions: [{ kind: 'toggle', label: 'Switch the lantern' }] },
-      { id: 'events-lantern-5', sprite: 'lantern-floor', x: 12, y: 7, actions: [{ kind: 'toggle', label: 'Switch the lantern' }] },
+      { id: 'events-lantern-5', sprite: 'lantern-floor', x: 13, y: 7, actions: [{ kind: 'toggle', label: 'Switch the lantern' }] },
       plant(1, 1, 'b'),
       plant(15, 1, 'b'),
       plant(0, 12, 'b'),
@@ -749,19 +752,20 @@ export function buildInteriors(): SceneDef[] {
       chair(4, 5, 'ne'),
       chair(5, 5, 'ne'),
       { id: 'focus-globe', sprite: 'globe-stand', x: 6, y: 4, label: 'The old globe' },
-      // The reading circle: two wingbacks facing across the marble table, an ottoman footrest, on a forest rug.
+      // The reading circle: two wingbacks facing across the marble table, a tile off it either side (the seat spacing
+      // rule), an ottoman footrest, on a forest rug.
       { id: 'focus-circle-rug', sprite: 'rug', x: 7, y: 5, w: 5, d: 5, flat: true, variant: 'forest' },
-      { sprite: 'armchair', x: 8, y: 7, facing: 'se', variant: 'rust', actions: sit },
+      { sprite: 'armchair', x: 7, y: 7, facing: 'se', variant: 'rust', actions: sit },
       { sprite: 'table-round', x: 9, y: 7 },
-      { sprite: 'armchair', x: 10, y: 7, facing: 'nw', variant: 'rust', actions: sit },
+      { sprite: 'armchair', x: 11, y: 7, facing: 'nw', variant: 'rust', actions: sit },
       { id: 'focus-ottoman', sprite: 'ottoman', variant: 'green', x: 9, y: 8, label: 'Footrest' },
       { sprite: 'lamp', x: 8, y: 6 },
       { id: 'focus-circle-books', sprite: 'book-stack', x: 10, y: 8 },
-      // A second nook by the door: two wingbacks and a side table.
+      // A second nook by the door: two wingbacks side by side facing the room, a lamp table between them.
       { id: 'focus-nook2-rug', sprite: 'rug', x: 1, y: 7, w: 4, d: 3, flat: true, variant: 'cream' },
-      { id: 'focus-nook2-chair-1', sprite: 'armchair', x: 2, y: 8, facing: 'se', variant: 'green', actions: sit },
+      { id: 'focus-nook2-chair-1', sprite: 'armchair', x: 2, y: 8, facing: 'sw', variant: 'green', actions: sit },
       { id: 'focus-nook2-table', sprite: 'side-table', variant: 'walnut', x: 3, y: 8, actions: [{ kind: 'toggle', label: 'Switch the lamp' }] },
-      { id: 'focus-nook2-chair-2', sprite: 'armchair', x: 4, y: 8, facing: 'nw', variant: 'rust', actions: sit },
+      { id: 'focus-nook2-chair-2', sprite: 'armchair', x: 4, y: 8, facing: 'sw', variant: 'rust', actions: sit },
       {
         sprite: 'sign-quiet',
         wall: 'left',
@@ -865,10 +869,11 @@ export function buildInteriors(): SceneDef[] {
       { id: 'arcade-popcorn', sprite: 'popcorn-cart', x: 6, y: 7, label: 'Popcorn', actions: [{ kind: 'vend', item: 'popcorn', label: 'Grab some popcorn' }] },
       // Beanbags round a side table in the front corner.
       { id: 'arcade-lounge-rug', sprite: 'rug', x: 8, y: 6, w: 4, d: 4, flat: true, variant: 'cyan' },
-      { id: 'arcade-side-table', sprite: 'table-low', x: 9, y: 8, w: 1, d: 1, variant: 'side' },
-      { sprite: 'beanbag', x: 9, y: 7, variant: 'cyan', actions: sit },
-      { sprite: 'beanbag', x: 10, y: 9, variant: 'pink', actions: sit },
-      { id: 'arcade-beanbag-3', sprite: 'beanbag', x: 8, y: 8, variant: 'purple', actions: sit },
+      // three beanbags round a patch of open floor, the side table beside them (the seat spacing rule, seats.ts)
+      { id: 'arcade-side-table', sprite: 'table-low', x: 10, y: 8, w: 1, d: 1, variant: 'side' },
+      { sprite: 'beanbag', x: 9, y: 7, variant: 'cyan', facing: 'sw', actions: sit },
+      { sprite: 'beanbag', x: 10, y: 9, variant: 'pink', facing: 'nw', actions: sit },
+      { id: 'arcade-beanbag-3', sprite: 'beanbag', x: 8, y: 8, variant: 'purple', facing: 'se', actions: sit },
       plant(11, 5),
     ],
   );
@@ -948,20 +953,21 @@ export function buildInteriors(): SceneDef[] {
       // Materials by the door.
       { id: 'design-materials', sprite: 'materials-shelf', x: 0, y: 9, facing: 'se', label: 'Materials' },
       { id: 'design-paper', sprite: 'paper-bin', x: 1, y: 9, label: 'Paper rolls' },
-      // The lounge: the sage sofa, a coffee table and the mustard armchairs under the arc lamp.
+      // The lounge: the sage sofa, a coffee table and the mustard armchairs under the arc lamp, a tile of floor either
+      // side of the table (the seat spacing rule, seats.ts).
       { id: 'design-print', sprite: 'print', variant: 'poster', wall: 'right', x: 6, y: 0, label: 'Print' },
       { id: 'design-lounge-rug', sprite: 'rug', x: 6, y: 7, w: 6, d: 3, flat: true, variant: 'oat' },
       { id: 'design-arc-lamp', sprite: 'lamp-arc', x: 11, y: 7, actions: [{ kind: 'toggle', label: 'Switch the lamp' }] },
-      { id: 'design-sofa', sprite: 'couch', variant: 'green', x: 7, y: 8, w: 1, d: 2, facing: 'se', actions: sit },
+      { id: 'design-sofa', sprite: 'couch', variant: 'green', x: 6, y: 8, w: 1, d: 2, facing: 'se', actions: sit },
       { id: 'design-lounge-table', sprite: 'table-low', x: 8, y: 8, w: 1, d: 2 },
-      { id: 'design-crit-1', sprite: 'armchair', variant: 'mustard', x: 9, y: 8, facing: 'nw', actions: sit },
-      { id: 'design-crit-2', sprite: 'armchair', variant: 'mustard', x: 9, y: 9, facing: 'nw', actions: sit },
+      { id: 'design-crit-1', sprite: 'armchair', variant: 'mustard', x: 10, y: 8, facing: 'nw', actions: sit },
+      { id: 'design-crit-2', sprite: 'armchair', variant: 'mustard', x: 10, y: 9, facing: 'nw', actions: sit },
       { id: 'design-crit-table', sprite: 'table-round', x: 11, y: 8 },
       {
         id: 'design-globe',
         sprite: 'heirloom-globe',
         x: 11,
-        y: 9,
+        y: 6,
         label: 'The Crystal Globe',
         actions: [{ kind: 'info', title: 'The Crystal Globe', body: 'Marks the day Northstar had teammates on every continent except Antarctica. (We’re working on it.)' }],
       },

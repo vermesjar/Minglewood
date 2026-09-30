@@ -251,10 +251,11 @@ function seatedLegs(view: View, h: number, S: SitLegs, hanging: boolean): { near
 
 /**
  * Seen from behind, a sitter's shins show hanging down to their feet on a stool, or wherever the soles are this far
- * (world px) or more off the floor; a tall chair's feet (a café chair's hang 7.5) read as down on the floor, as they do
- * from the front.
+ * (world px) or more off the floor: on a tall seat (a café chair's hang is 7.5) the shoe just past the knee floated
+ * in the air past its thin seat, a foot held up (Carter: "almost like the feet are upside down"). Lower, the shoe past
+ * the knee rests over the seat (couches, armchairs, office and banquet chairs).
  */
-export const HANG_SHOWN = 8;
+export const HANG_SHOWN = 6;
 /** Seen from behind in a seat whose back hides its sitter (sitLegs `hidden`), the thighs are drawn this long (tiles). */
 const HIDDEN_REACH = 0.1;
 const feetHang = (pose: Pose, S: SitLegs) => pose === 'sit-stool' || S.hang >= HANG_SHOWN;

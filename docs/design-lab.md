@@ -62,20 +62,45 @@ else) and one sitting point per cushion, one model for all four facings. The gam
 one way (`src/client/engine/sprites/seatLayers.ts`): which of the seat's parts are drawn over the people in it (the
 arm on the camera's side; seen from behind, the back), where each sitter's hips go, and how their legs lie on the
 cushion. What goes over them stops at their shoulders, so a head always shows. A seat can't be published without a
-model that holds and has been passed. The flow:
+model that holds and has been passed.
+
+**What you get without touching anything** (the standard every catalog seat was tuned to, 2026-09-30; a new seat
+starts there, so a generated seat looks right out of Auto-fit):
+
+- **Where they sit.** From the front: back against the backrest, knees at the cushion's front edge
+  (`standardSitV`). From behind: on the cushion just in front of the backrest, the backrest over their lower back,
+  never sunk into it (`backSitV`). Across: a single seat's sitter in its middle; on a couch or bench the sitters
+  0.8 tile apart about its middle and clear of its arms, never against them (`placeSits`).
+- **How their legs lie** (`src/shared/world/sitLegs.ts`, drawn by the avatar kit). From the front: the thighs toward
+  the camera to just past the seat's front, the shins down to the floor (or hanging, on a tall seat). From behind:
+  the thighs out along the cushion in every seat, so a sitter visibly faces the way the seat does, and a shoe just
+  past each knee; on a stool or a seat as tall as a café chair the shins hang down to the feet; a back that rises
+  past the sitter's head (a throne) hides the legs too.
+- **Which way it faces.** Every facing's preview says which way its sitters face on screen (↘ ↙ ↗ ↖): the seat must
+  face the same way. The generator flips a one-tile seat's front or back drawn facing its mirror's way
+  (`studio.py orient_fronts`, `orient_backs`), and the gate checks every seat drawing's backrest against its facing
+  (`art/check_facings.py`); a near-symmetric drawing (a tub chair) can only be caught by eye, on the arrows.
+- **Where it can stand.** Placed in a room (the layouts, or decorate mode), a seat has a tile of floor in front of
+  it: a coffee table goes a tile from a couch; only a chair or a stool is pulled right up to a desk, a table or a
+  counter (the seat spacing rule, `src/shared/world/seats.ts`, checked by `scripts/room-map.ts`).
+
+The flow:
 
 1. **Auto-fit.** Set the seat height, "sat in as", backrest and arms in the spec first: the fitter starts from them
    (`src/client/engine/sprites/seatModelFit.ts`, the same fitter as `scripts/seat-model.ts --fit`). It takes the
    family's boxes (chair, armchair, couch, stool, bench, beanbag, ottoman or throne, by the key), puts the cushion at
    the seat height, fits every box until the model's silhouette matches every facing's drawing, and sits each cushion
-   by the standard (bottom back against the backrest, the middle of a backless seat). **Auto-fit again** starts over:
-   it drops any per-view nudges.
+   by the standard above. **Auto-fit again** starts over: it drops any per-view nudges. Set the seat height to the
+   drawn cushion's top: set low, the backrest reaches the sitters' shoulders and they look sunk into the seat (the blue
+   couch was 8.7 and sat right at 11).
 2. **Check.** Every facing runs the gate's own check (`seatProblems`, what `scripts/seat-layers.ts --check` runs on
    the catalog), on the draft's drawings exactly as the game draws them (mirrored, and a small piece centred on its
    footprint): the model fits the drawing (IoU at least 0.8), every cushion has a sitting point on its cushion, the
    legs stay above the floor and come off the cushion's front, and from behind a seat with a back hides something of
    its sitters. Each facing previews as the game draws it (`composeSeat`): three looks (short hair and a tee; long
-   hair; a puffer coat and a cowboy hat), someone on every cushion, at play scale and 4×, its checks under it. To fix
+   hair; a puffer coat and a cowboy hat), someone on every cushion, at play scale and 4×, its checks under it, and the
+   way its sitters face (the seat must face the same way). Read the back views as carefully as the front ones: that's
+   where sitters sink into a backrest or lose their legs. To fix
    one, pick it (**edit this view**, or the facing buttons over the editor). The editor shows the drawing with what
    goes over the sitters **tinted red**, the model's boxes (colour by part, hidden edges dashed), each cushion's
    sitting point (a cross), the knees (yellow) and the feet (blue):
@@ -83,7 +108,7 @@ model that holds and has been passed. The flow:
      ("keep it mirror-symmetric" moves its twin with it). **+ box**, **delete** and the part menu add, remove and
      retype boxes;
    - a sitting point's sliders move it in every view; **Sit them back against the backrest** puts them all where the
-     standard does; **onto the cushion top** drops one onto its cushion.
+     standard does (keeping them where they are across); **onto the cushion top** drops one onto its cushion.
 3. **Per-view nudges.** Generated drawings aren't exact 3D, so a view sometimes needs its sitters a little elsewhere.
    Dragging a sitting point on the editor nudges it **in that view only** (the model's `views`: that facing's own
    [u, v] per cushion; its crosses turn orange). **Clear this view's nudge** puts that view back on the model's

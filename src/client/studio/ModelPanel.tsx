@@ -161,6 +161,9 @@ function Pix({ src, scale }: { src: HTMLCanvasElement; scale: number }) {
   return <canvas ref={ref} />;
 }
 
+/** Which way a sitter facing this way looks on screen. */
+const FACING_ARROW: Record<string, string> = { se: '↘', sw: '↙', ne: '↗', nw: '↖' };
+
 /** One facing as the game draws it: three looks, every cushion taken, at play scale and 4×, and its check. */
 function FacingPreview({ v, check, on, onPick }: { v: LabView; check: FacingCheck; on: boolean; onPick: () => void }) {
   const cells = useMemo(() => seatCells(v), [v]);
@@ -169,6 +172,12 @@ function FacingPreview({ v, check, on, onPick }: { v: LabView; check: FacingChec
     <figure className={`rig-facing ${problems.length ? 'bad' : 'good'} ${on ? 'on' : ''}`} data-facing={v.facing}>
       <figcaption>
         <b>{v.facing}</b> {behindView(v.facing) ? 'from behind' : 'from the front'}
+        {/* a drawing filed under the wrong facing is mirrored the wrong way round in the game (armchair.mustard's front
+            faced the wall while its sitter faced the table): the reviewer checks the seat faces its sitters' way */}
+        <span className="facing-arrow" title="its sitters face this way on screen: the seat must face the same way">
+          {' '}
+          sitters face <b>{FACING_ARROW[v.facing]}</b>: the seat must too
+        </span>
         {v.mirrored && <span className="muted"> · drawing mirrored</span>}
         {v.model.views?.[v.facing] && <span className="muted"> · sitting points nudged here</span>}
         {v.model.over?.[v.facing] && <span className="muted"> · over layer traced</span>}
@@ -608,7 +617,7 @@ export function ModelPanel({ draft, onPatch, onStatus }: { draft: Draft; onPatch
               )}
               <button
                 className="btn ghost small"
-                title="the standard: bottom back against the backrest (the middle of a backless seat), on the cushion top — in every view without a nudge of its own"
+                title="the standard: from the front bottom back against the backrest (the middle of a backless seat), on the cushion top; from behind just in front of the backrest — in every view without a nudge of its own"
                 onClick={() => save({ ...model, sits: placeSits(model.parts, model.size, model.sits.length > 1 ? model.sits.map((q) => q[0]) : undefined) })}
               >
                 Sit them back against the backrest (the standard)

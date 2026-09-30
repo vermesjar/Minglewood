@@ -512,8 +512,8 @@
       },
       "fit": "anchor",
       "facings": {
-        "sw": {
-          "file": "armchair.mustard.sw.png",
+        "se": {
+          "file": "armchair.mustard.se.png",
           "anchor": [
             32,
             32
