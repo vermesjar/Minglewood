@@ -30,7 +30,6 @@ export function formatModels(r: SeatModels): string {
     lines.push(`    "sits": [${m.sits.map((s) => `[${s.map(n).join(', ')}]`).join(', ')}]`);
     if (m.views) lines.push(`    "views": ${JSON.stringify(m.views)}`);
     if (m.over) lines.push(`    "over": ${JSON.stringify(m.over)}`);
-    if (m.feetBehind) lines.push(`    "feetBehind": true`);
     if (m.fitted) lines.push(`    "fitted": "${m.fitted}"`);
     if (m.reviewed) lines.push(`    "reviewed": "${m.reviewed}"`);
     if (m.drawings) lines.push(`    "drawings": ${JSON.stringify(m.drawings)}`);
