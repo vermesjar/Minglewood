@@ -188,7 +188,6 @@ const P: PersonSeed[] = [
   // Engineering — Aurora squad
   { id: 'm-nia', name: 'Nia Thompson', pronouns: 'she/her', title: 'Full-stack Engineer', dept: 'dep-eng', team: 'team-aurora', manager: 'm-omar', location: 'Atlanta', tz: 'America/New_York', start: '2022-07-25', ask: ['offline sync', 'React'], interests: ['roller skating', 'sci-fi'], bio: 'Building offline sync for Aurora 2.0. Has a theory about CRDTs.', look: L(5, 'curly', '#2b1d16', 'shirt', '#9b6bd6', 'jeans', '#1f2a44', 'none', 'shoes.sneakers', '#e27ca7'), sim: { start: 'launch', haunts: ['launch', 'eng', 'cafe'], status: 'open', sociability: 0.6 }, unlocks: ['top.aurora-tee'] },
   { id: 'm-sam', name: 'Sam Rivera', pronouns: 'he/him', title: 'Full-stack Engineer', dept: 'dep-eng', team: 'team-aurora', manager: 'm-omar', location: 'Toronto', tz: 'America/Toronto', start: '2021-12-06', ask: ['TypeScript', 'testing'], interests: ['board games', 'hot sauce'], bio: 'Wore the Aurora launch tee three days straight in 2025.', look: L(2, 'short', '#2b1d16', 'aurora-tee', '#1f2a44', 'jeans', '#3f8fd8'), sim: { start: 'launch', haunts: ['launch', 'eng', 'arcade'], status: 'available', note: 'pairing with Nia', sociability: 0.6 }, unlocks: ['top.aurora-tee'] },
-  { id: 'm-felix', name: 'Felix Wagner', pronouns: 'he/him', title: 'Data Engineer', dept: 'dep-eng', team: 'team-aurora', manager: 'm-omar', location: 'Vienna', tz: 'Europe/Vienna', start: '2023-11-20', ask: ['pipelines', 'dbt'], interests: ['chess', 'waltz'], bio: 'Quiet, brilliant, and always has a spare pen.', look: L(0, 'swoop', '#e8c16d', 'sweater', '#8e8a84', 'chinos', '#3a3a46', 'glasses'), sim: { start: 'focus', haunts: ['focus', 'launch'], status: 'focused', note: 'heads-down till 3', sociability: 0.2 } },
 
   // Newer folks
   { id: 'm-luca', name: 'Luca Romano', pronouns: 'he/him', title: 'Sales Development Rep', dept: 'dep-sales', team: 'team-sales', manager: 'm-marcus', location: 'Milan', tz: 'Europe/Rome', start: '2026-08-31', ask: ['anything! I’m new'], interests: ['espresso', 'cycling'], bio: 'Four weeks in. Still getting lost between HQ and the café.', look: L(1, 'curly', '#2b1d16', 'shirt', '#3f8fd8', 'chinos', '#8e8a84', 'none', 'shoes.loafers', '#6b4a33'), sim: { start: 'town', haunts: ['town', 'cafe', 'hq'], status: 'open', note: 'exploring', sociability: 0.8 } },
@@ -227,7 +226,6 @@ const EXTRAS: Record<string, Partial<AvatarLoadout>> = {
   'm-theo': { accessory: 'acc.hearing-aid', headwear: 'hat.capback', headwearColor: '#e0503f' },
   'm-nia': { hair: 'hair.afro', shoes: 'shoes.skates', shoesColor: '#e27ca7' },
   'm-sam': { hair: 'hair.curlyshort', held: 'held.icecream' },
-  'm-felix': { mobility: 'mob.wheelchair' },
   'm-luca': { held: 'held.coffee' },
   'm-alex': { hairHighlight: '#9fe3e0', eyes: 'eyes.wide', eyeColor: '#3f7fbf' },
   'm-diego': { held: 'held.coffee', hair: 'hair.locs' },

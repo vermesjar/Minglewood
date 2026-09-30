@@ -308,20 +308,22 @@ export function sitsByCushion(m: Pick<SeatModel, 'size' | 'sits'>, f: Facing): A
 }
 
 /**
- * Where the standard puts a sitter's pelvis in depth seen from BEHIND, at u on a cushion at z: under the backrest
- * (BACK_SINK past its front face), so it hides their hips; on a backless seat, a little behind its middle. Never past
- * the back of the seat.
+ * Where the standard puts a sitter's pelvis in depth seen from BEHIND, at u on a cushion at z: on the cushion just in
+ * front of the backrest (BACK_GAP before its front face), the backrest over their lower back; on a backless seat, a
+ * little behind its middle. Never past the back of the seat. (Carter, on the café couch and Lantern Hall's chairs:
+ * sunk into the backrest, a sitter read as standing in it or sitting at an angle; on the cushion in front of it, as
+ * sitting in the seat.)
  */
-export const BACK_SINK = 0.12;
+export const BACK_GAP = 0.04;
 export function backSitV(m: Pick<SeatModel, 'parts'>, u: number, z: number): number | null {
   const s = seatSpan(m, u);
   if (!s) return null;
   const back = backFace(m, u, z);
-  const v = back !== null ? back + BACK_SINK : (s.v0 + s.v1) / 2 + 0.1;
+  const v = back !== null ? back - BACK_GAP : (s.v0 + s.v1) / 2 + 0.1;
   return Math.min(v, s.v1 - 0.05);
 }
 
-/** The sitting point a facing draws a cushion's sitter with, by the standard: its own from the front, deeper from behind. */
+/** The sitting point a facing draws a cushion's sitter with, by the standard: its own from the front, just in front of the backrest from behind. */
 export function sitFor(m: Pick<SeatModel, 'parts'>, s: SitPoint, f: Facing): SitPoint {
   if (!behindView(f)) return s;
   return [s[0], backSitV(m, s[0], s[2]) ?? s[1], s[2]];

@@ -149,14 +149,15 @@ from behind the back, a wrap or a crest. The split follows the drawing's own pix
 their shoulders, so their head always shows.
 
 **Where a sitter sits** (`viewSits`). The figure is small for its furniture, so no one depth serves every view. From the
-front a sitter sits forward so their knees reach the front edge (`standardSitV`); from behind, deep under the backrest
-so it hides their hips (`backSitV`). Each view is composed on its own, as sprite games do.
+front a sitter sits forward so their knees reach the front edge (`standardSitV`); from behind, on the cushion just in
+front of the backrest (`backSitV`). Each view is composed on its own, as sprite games do.
 
 **The legs** (`src/shared/world/sitLegs.ts`). The thighs run from the hip toward the camera, foreshortened at the
 floor's 2:1, to just past the front of whatever the shins would hang through; the shins drop to the floor when they
-can reach it (`SHIN_MAX`), else hang. Seen from behind on a single seat only the seat of the trousers shows; on a long
-seat (a couch, a bench) the whole thighs lie out along the cushion, a shoe just past each knee. The avatar kit draws
-the figure with these legs (`frameFor(…, legs)`), so every sitter's legs fit the seat they're in.
+can reach it (`SHIN_MAX`), else hang. Seen from behind the thighs lie out along the cushion in every seat, so a sitter
+faces the way the seat does, with a shoe just past each knee, or on a stool the shins hanging to the feet; a back that
+rises past the sitter's head (`BACK_HIDES`, a throne) hides the legs too. The avatar kit draws the figure with these
+legs (`frameFor(…, legs)`), so every sitter's legs fit the seat they're in.
 
 **Per-drawing overrides.** Generated drawings aren't exact 3D, and a drawing sometimes needs its sitters or its over
 layer somewhere the boxes don't say. A model may carry, per facing, `views` (a sitting point per cushion, `[u, v]`) and

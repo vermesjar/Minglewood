@@ -35,7 +35,7 @@ describe('serendipity', () => {
   });
 
   it('never suggests quiet rooms as hangouts', () => {
-    const d = dir(['m-ben', 'm-lena', 'm-felix'].map((memberId) => ({ memberId, sceneId: 'focus', status: 'focused' as const })));
+    const d = dir(['m-ben', 'm-lena', 'm-sam'].map((memberId) => ({ memberId, sceneId: 'focus', status: 'focused' as const })));
     const s = suggest({ me, members: seed.members, directory: d, events: [], rooms: ROOMS, now, dismissed: new Set(), greeted: new Set() });
     expect(s.some((x) => x.id.includes('focus'))).toBe(false);
   });

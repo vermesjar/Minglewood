@@ -489,14 +489,15 @@ export function buildInteriors(): SceneDef[] {
       { id: 'eng-meet-sofa', sprite: 'couch', variant: 'blue', x: 3, y: 10, w: 1, d: 2, facing: 'nw', actions: sit },
       { id: 'eng-meet-chair', sprite: 'armchair', variant: 'mustard', x: 1, y: 11, facing: 'se', actions: sit },
       { id: 'eng-meet-lamp', sprite: 'lamp', x: 4, y: 9, actions: [{ kind: 'toggle', label: 'Switch the lamp' }] },
-      // The lounge: a sofa and a coffee table anchor the beanbags.
+      // The lounge: a sofa and a coffee table anchor the beanbags, a step back from the table so a sitter's legs
+      // stretch out on the floor in front of them (hard up against it, their feet lay on the tabletop).
       { id: 'eng-lounge-rug', sprite: 'rug', x: 10, y: 6, w: 5, d: 5, flat: true, variant: 'teal' },
       { id: 'eng-lounge-sofa', sprite: 'couch', variant: 'green', x: 11, y: 6, w: 2, d: 1, facing: 'sw', actions: sit },
       { id: 'eng-lamp', sprite: 'lamp', x: 13, y: 6, actions: [{ kind: 'toggle', label: 'Switch the lamp' }] },
       { id: 'eng-lounge-table', sprite: 'table-low', x: 11, y: 7, w: 2, d: 1 },
-      { sprite: 'beanbag', x: 11, y: 8, variant: 'orange', actions: sit },
-      { sprite: 'beanbag', x: 12, y: 8, variant: 'purple', actions: sit },
-      { sprite: 'beanbag', x: 10, y: 8, variant: 'cyan', actions: sit },
+      { sprite: 'beanbag', x: 11, y: 9, variant: 'orange', facing: 'ne', actions: sit },
+      { sprite: 'beanbag', x: 12, y: 9, variant: 'purple', facing: 'ne', actions: sit },
+      { sprite: 'beanbag', x: 10, y: 9, variant: 'cyan', facing: 'ne', actions: sit },
       { id: 'eng-lounge-side', sprite: 'table-low', x: 10, y: 7, w: 1, d: 1, variant: 'side' },
       plant(15, 10, 'b'),
       // A second, smaller pod at the front for the platform team.
@@ -609,8 +610,10 @@ export function buildInteriors(): SceneDef[] {
       { id: 'launch-couch', sprite: 'couch', variant: 'blue', x: 7, y: 7, w: 2, d: 1, facing: 'sw', actions: sit },
       { id: 'launch-side-table', sprite: 'table-low', x: 6, y: 7, w: 1, d: 1, variant: 'side' },
       { id: 'launch-coffee-table', sprite: 'table-low', x: 7, y: 8, w: 2, d: 1 },
-      { id: 'launch-beanbag-2', sprite: 'beanbag', x: 7, y: 9, variant: 'cyan', actions: sit },
-      { sprite: 'beanbag', x: 8, y: 9, variant: 'orange', actions: sit },
+      // the beanbags at the table's front corners, facing the couch over open floor (hard up against the table, a
+      // sitter's feet lay on the tabletop)
+      { id: 'launch-beanbag-2', sprite: 'beanbag', x: 6, y: 9, variant: 'cyan', facing: 'ne', actions: sit },
+      { sprite: 'beanbag', x: 9, y: 9, variant: 'orange', facing: 'ne', actions: sit },
       plant(10, 9, 'b'),
     ],
   );

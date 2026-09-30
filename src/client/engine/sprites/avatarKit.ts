@@ -613,8 +613,8 @@ function drawGesture(P: Pix, F: Frame, [x, y]: [number, number], skin: RGB) {
 
 /**
  * Seated and seen from behind, the legs run away from us on the far side of the body: the thighs show, out along the
- * seat, no shin (a backless bench or stool must not show feet dangling toward the camera), and on a long seat a shoe
- * just past each knee, under the thigh (avatarFrame seatedLegs).
+ * seat, and past the knees a shoe, under the thigh; where the feet hang (a stool) the shins hang down to the shoes
+ * (avatarFrame seatedLegs).
  */
 export const seatedFromBehind = (F: Frame) => F.sitting && F.view === 'back';
 
@@ -629,12 +629,14 @@ function drawLegs(P: Pix, F: Frame, L: FullLoadout) {
     [F.legNear, false],
   ] as const) {
     const shade = far ? 0.35 : 0;
-    // (from behind, a seated leg ends at the knee; its shoe is past it, under the thigh)
-    limb(P, leg.a, leg.m, seatedFromBehind(F) ? leg.m : leg.b, 2.7, 2.4, skin, shade);
+    // (from behind, a seated leg ends at the knee, its shoe past it under the thigh, unless the shins hang)
+    const thighOnly = seatedFromBehind(F) && !F.shinsBehind;
+    limb(P, leg.a, leg.m, thighOnly ? leg.m : leg.b, 2.7, 2.4, skin, shade);
     if (skirt) continue;
     const pm = M().capsule(leg.a[0], leg.a[1], leg.m[0], leg.m[1], r);
     if (seatedFromBehind(F)) {
-      // the thigh only, out to the knee
+      // the thigh out to the knee, and a hanging shin down to the shoe
+      if (!thighOnly && b !== 'shorts') pm.capsule(leg.m[0], leg.m[1], leg.b[0], leg.b[1], r - 0.3);
       paint(P, pm, pants, { shade });
       continue;
     }
@@ -776,8 +778,7 @@ function drawLowerGarment(P: Pix, F: Frame, L: FullLoadout) {
 }
 
 function drawShoes(P: Pix, F: Frame, L: FullLoadout) {
-  // seated and seen from behind, only a whole thigh has feet past it (a stub stops at the knee: avatarFrame seatedLegs)
-  if (seatedFromBehind(F) && F.legNear.b[0] === F.legNear.m[0] && F.legNear.b[1] === F.legNear.m[1]) return;
+  if (F.feetHidden) return;
   const kind = L.shoes.replace('shoes.', '');
   const c = hx(L.shoesColor);
   const front = F.view === 'front';
@@ -1267,8 +1268,8 @@ export function drawAvatarV2(input: AvatarLoadout, view: View, requested: Pose, 
   // (a balloon or umbrella still shows above it).
   on(LAYER.held);
   if (!F.holdInFront || L.held === 'held.balloon') drawHeld(P, F, L);
-  // seated and seen from behind, the feet are out past the knees: the thighs go over them
-  const feetUnder = seatedFromBehind(F);
+  // seated and seen from behind, the feet are out past the knees: the thighs go over them (hanging, they're below them)
+  const feetUnder = seatedFromBehind(F) && !F.shinsBehind;
   on(LAYER.shoes);
   if (feetUnder) drawShoes(P, F, L);
   on(LAYER.legs);
