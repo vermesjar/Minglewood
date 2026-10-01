@@ -10,7 +10,7 @@
  */
 import { EventEmitter } from 'node:events';
 import { randomUUID } from 'node:crypto';
-import type { Member, OrgEvent, PresenceState, PresenceStatus } from '@shared/domain/types';
+import type { ChatEntry, Member, OrgEvent, PresenceState, PresenceStatus } from '@shared/domain/types';
 import { CARRYABLE, NOTES_PER_BOARD, type BoardNote, type DirectoryEntry, type KnockKind, type KnockReply, type Occupant, type ServerMsg } from '@shared/protocol';
 import type { EmoteId } from '@shared/presence';
 import { STATUS_META } from '@shared/presence';
@@ -70,6 +70,7 @@ export type HubEvents = {
   knock: [knock: Knock];
   /** A knock for someone who isn't in the world (providers may deliver it elsewhere, e.g. a Slack DM). */
   missedKnock: [knock: Knock];
+  bindings: [];
 };
 
 const facingFromDir = (dx: number, dy: number, prev: Facing): Facing => {
@@ -315,6 +316,7 @@ export class OrgHub extends EventEmitter<HubEvents> {
           npcs: this.npcs.statesIn(sceneId),
           notes: this.data.notes.filter((n) => n.sceneId === sceneId),
         });
+        c.send(this.chatHistoryMsg(sceneId));
       }
     }
     this.toScene(sceneId, { t: 'joined', sceneId, occupant: this.occupant(actor) });
@@ -740,9 +742,22 @@ export class OrgHub extends EventEmitter<HubEvents> {
     this.toScene(a.sceneId, { t: 'updated', memberId, patch: { speaking } });
   }
 
+  /**
+   * A member's own browser says they're talking (mic level only, opt-in). Shown only while they're really
+   * in voice and not muted there — otherwise a meeting in the room, or music, would light them up.
+   */
+  speakingFromMic(memberId: string, on: boolean) {
+    const a = this.actors.get(memberId);
+    if (!a || a.via !== 'live') return;
+    const voice = this.presenceOf(memberId).voice;
+    const demo = !this.data.connections.some((c) => c.status === 'active' && c.provider !== 'demo');
+    this.setSpeaking(memberId, on && (demo || (!!voice && !voice.muted)));
+  }
+
   setVoice(memberId: string, voice: PresenceState['voice']) {
     const p = this.presenceOf(memberId);
     p.voice = voice;
+    if (!voice || voice.muted) this.setSpeaking(memberId, false);
     const a = this.actors.get(memberId);
     if (a) this.toScene(a.sceneId, { t: 'updated', memberId, patch: { voice } });
     this.directoryDirty = true;
@@ -776,8 +791,74 @@ export class OrgHub extends EventEmitter<HubEvents> {
       return false;
     }
     this.toScene(a.sceneId, { t: 'said', memberId, text });
+    const m = this.member(memberId);
+    this.pushChat({ id: randomUUID(), sceneId: a.sceneId, memberId, name: m?.displayName ?? 'Someone', text, at: new Date().toISOString(), source: 'world' });
     this.emit('said', memberId, text, a.sceneId);
     return true;
+  }
+
+  /* ------------------------------------------------------------------ conversation log */
+
+  /**
+   * The recent conversation of each space, kept in memory only. When a space has a text channel,
+   * the channel is the record: this log is seeded from its history and mirrors it live.
+   */
+  private chatLogs = new Map<string, ChatEntry[]>();
+  static readonly CHAT_LOG = 60;
+
+  pushChat(entry: ChatEntry) {
+    const log = this.chatLogs.get(entry.sceneId) ?? [];
+    if (log.some((e) => e.id === entry.id)) return;
+    log.push(entry);
+    if (log.length > OrgHub.CHAT_LOG) log.splice(0, log.length - OrgHub.CHAT_LOG);
+    this.chatLogs.set(entry.sceneId, log);
+    this.toScene(entry.sceneId, { t: 'chat', entry });
+  }
+
+  /** Replace a space's log with the channel's history (merged with anything said meanwhile) and resend it. */
+  seedChat(sceneId: string, history: ChatEntry[]) {
+    const seen = new Set(history.map((e) => e.id));
+    const merged = [...history, ...(this.chatLogs.get(sceneId) ?? []).filter((e) => !seen.has(e.id))].sort((a, b) => a.at.localeCompare(b.at));
+    this.chatLogs.set(sceneId, merged.slice(-OrgHub.CHAT_LOG));
+    this.toScene(sceneId, this.chatHistoryMsg(sceneId));
+  }
+
+  /** Swap the id of a line once the provider has assigned its own (so the echo isn't shown twice). */
+  relabelChat(sceneId: string, oldId: string, newId: string) {
+    const e = this.chatLogs.get(sceneId)?.find((x) => x.id === oldId);
+    if (e) e.id = newId;
+  }
+
+  /** Spaces were linked to different channels: clients refresh, and each space's header follows. */
+  bindingsChanged() {
+    this.broadcast({ t: 'bindings-changed' });
+    for (const sceneId of this.activeScenes()) this.toScene(sceneId, this.chatHistoryMsg(sceneId));
+    this.emit('bindings');
+  }
+
+  /** Spaces someone is looking at right now. */
+  activeScenes(): string[] {
+    return [...new Set([...this.clients.values()].map((c) => c.sceneId).filter((s): s is string => !!s))];
+  }
+
+  chatLog(sceneId: string): ChatEntry[] {
+    return this.chatLogs.get(sceneId) ?? [];
+  }
+
+  /** Show a line as a speech bubble over a member who's here (e.g. they typed it in Discord). */
+  bubble(memberId: string, text: string) {
+    const a = this.actors.get(memberId);
+    if (a) this.toScene(a.sceneId, { t: 'said', memberId, text });
+  }
+
+  private chatHistoryMsg(sceneId: string): ServerMsg {
+    const text = this.store.bindingFor(this.orgId, sceneId, 'text');
+    return {
+      t: 'chat-history',
+      sceneId,
+      entries: this.chatLog(sceneId),
+      channel: text ? { name: text.label, provider: text.provider } : undefined,
+    };
   }
 
   setAvatar(memberId: string, loadout: Member['avatar']) {

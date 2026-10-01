@@ -15,6 +15,8 @@ export class DemoProvider implements CommunicationProvider {
     directVoiceJoin: false,
     deepLinkJoin: false,
     embeddedApp: false,
+    chatBridge: false,
+    voiceFollow: false,
   };
 
   async listChannels(): Promise<ExternalChannel[]> {

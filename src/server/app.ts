@@ -15,6 +15,7 @@ import { DiscordProvider } from './providers/discord/provider';
 import { DemoProvider } from './providers/demo';
 import { DiscordVoiceGateway } from './providers/discord/gateway';
 import { VoicePresenceSync } from './providers/voiceSync';
+import { DiscordBridge } from './providers/discord/bridge';
 import { apiRoutes } from './routes/api';
 import { serverArt } from './art';
 import { authRoutes } from './routes/auth';
@@ -57,6 +58,16 @@ export async function createApp(opts: AppOptions): Promise<App> {
 
   const hubs = new Map<string, OrgHub>();
   const sims: LifeSim[] = [];
+  // Each space *is* its Discord channels: chat both ways, history, voice that follows you (needs the bot).
+  const bridge = discordBotConfigured()
+    ? new DiscordBridge({
+        store,
+        token: () => config.discord.botToken,
+        applicationId: () => config.discord.clientId,
+        hubFor: (orgId) => ensureHub(orgId),
+        orgForGuild: (guildId) => resolveGuild(guildId),
+      })
+    : undefined;
   const calendar = new MockCalendarProvider(DEMO_CALENDAR, Date.now());
   /** One realtime hub per company world, created the first time it's needed. */
   const ensureHub = (orgId: string) => {
@@ -64,6 +75,7 @@ export async function createApp(opts: AppOptions): Promise<App> {
     if (hub) return hub;
     hub = new OrgHub(orgId, store);
     hubs.set(orgId, hub);
+    bridge?.attach(hub);
     // Simulated coworkers only live in the demo company.
     if (opts.simulateCoworkers && orgId === ORG_ID) {
       const sim = new LifeSim(hub, store, calendar);
@@ -95,7 +107,7 @@ export async function createApp(opts: AppOptions): Promise<App> {
   const slack = new SlackService(store, ensureHub, new SlackProvider(new SlackApi(slackMock?.transport), slackTokens));
   slack.start();
 
-  const ctx: AppContext = { store, hubs, discord: new DiscordProvider(), demo: new DemoProvider(), slack, resolveGuild };
+  const ctx: AppContext = { store, hubs, discord: new DiscordProvider(), demo: new DemoProvider(), slack, resolveGuild, discordBridge: bridge };
 
   // Events start and end on their own; tell clients when the set of active events changes.
   const activeKey = new Map<string, string>();
@@ -125,16 +137,36 @@ export async function createApp(opts: AppOptions): Promise<App> {
     };
     gateway = new DiscordVoiceGateway(config.discord.botToken, () => [...guildToOrg().keys()], !!opts.cloud);
     const syncs = new Map<string, VoicePresenceSync>();
+    const gw = gateway;
     gateway.on('voice', (guildId, change) => {
       void (async () => {
         const orgId = guildToOrg().get(guildId) ?? (await resolveGuild(guildId));
+        bridge?.onVoice(guildId, change, orgId && store.hasOrg(orgId) ? orgId : undefined);
         if (!orgId || !store.hasOrg(orgId)) return;
         const hub = ensureHub(orgId);
         if (!syncs.has(orgId)) syncs.set(orgId, new VoicePresenceSync(hub, store));
         syncs.get(orgId)!.apply(change);
       })();
     });
-    gateway.on('ready', () => console.log('[discord] gateway ready — watching voice presence'));
+    gateway.on('message', ({ guildId, message }) => void bridge?.onMessage(guildId, message));
+    gateway.on('channel', (guildId, channel) => {
+      void (async () => {
+        const orgId = guildToOrg().get(guildId) ?? (await resolveGuild(guildId));
+        if (orgId && store.hasOrg(orgId)) bridge?.onChannel(orgId, channel);
+      })();
+    });
+    gateway.on('degraded', (why) => {
+      if (bridge && why === 'message-content') bridge.messageContent = false;
+      console.warn(
+        why === 'message-content'
+          ? '[discord] Message Content intent is off — messages from Discord arrive without their text. Turn it on: Developer Portal → Bot → Privileged Gateway Intents.'
+          : '[discord] not allowed to read server messages — chat from Discord won’t show in the world.',
+      );
+    });
+    gateway.on('ready', () => {
+      if (bridge) bridge.botUserId = gw.botUserId;
+      console.log('[discord] gateway ready — voice presence, channel chat and voice follow are live');
+    });
     gateway.on('error', (e) => console.warn('[discord] gateway:', e.message));
     gateway.start();
   };

@@ -1669,12 +1669,22 @@ export class WorldView {
         c.stroke();
       }
       if (a.occ.speaking) {
-        const k = (t * 1.6) % 1;
-        c.strokeStyle = `rgba(47,191,113,${1 - k})`;
-        c.lineWidth = 1.2;
+        // Talking: a soft green pool under them and two rings rippling out, a beat apart.
+        const glow = c.createRadialGradient(p.x, p.y, 0, p.x, p.y, 16);
+        glow.addColorStop(0, 'rgba(47,191,113,0.45)');
+        glow.addColorStop(1, 'rgba(47,191,113,0)');
+        c.fillStyle = glow;
         c.beginPath();
-        c.ellipse(p.x, p.y, 9 + k * 8, 4.5 + k * 4, 0, 0, Math.PI * 2);
-        c.stroke();
+        c.ellipse(p.x, p.y, 16, 8, 0, 0, Math.PI * 2);
+        c.fill();
+        for (const off of this.reducedMotion ? [0.35] : [0, 0.5]) {
+          const k = (t * 1.4 + off) % 1;
+          c.strokeStyle = `rgba(47,191,113,${0.95 * (1 - k)})`;
+          c.lineWidth = 1.6;
+          c.beginPath();
+          c.ellipse(p.x, p.y, 9 + k * 12, 4.5 + k * 6, 0, 0, Math.PI * 2);
+          c.stroke();
+        }
       }
     }
 
@@ -1974,6 +1984,56 @@ export class WorldView {
    */
   private bubbleMemory = new Map<string, { dx: number; dy: number }>();
 
+  /**
+   * Someone's talking: sound waves off the side of their head and a green "on air" badge with a live
+   * equalizer above their name. Returns the badge's rect so speech bubbles steer around it.
+   */
+  private drawTalking(c: CanvasRenderingContext2D, hx: number, hy: number, top: number, z: number, now: number): Rect {
+    const still = this.reducedMotion;
+    const s = Math.min(Math.max(z, 1), 3);
+    // sound waves: three arcs to the right of the head, pulsing outward
+    const cx = hx + 5 * s;
+    const cy = hy + 9 * s;
+    for (let i = 0; i < 3; i++) {
+      const k = still ? 0.4 : (now / 700 + i / 3) % 1;
+      c.strokeStyle = `rgba(47,191,113,${(1 - k) * 0.95})`;
+      c.lineWidth = 2;
+      c.beginPath();
+      c.arc(cx, cy, (4 + k * 9) * s * 0.7, -Math.PI / 4, Math.PI / 4);
+      c.stroke();
+    }
+    // the badge: a green pill with a speaker and four bouncing bars
+    const w = 34;
+    const h = 16;
+    const x = Math.round(hx - w / 2);
+    const y = Math.round(top - h);
+    c.fillStyle = 'rgba(42,31,45,0.25)';
+    roundRect(c, x, y + 2, w, h, h / 2);
+    c.fill();
+    c.fillStyle = '#2fbf71';
+    roundRect(c, x, y, w, h, h / 2);
+    c.fill();
+    c.lineWidth = 2;
+    c.strokeStyle = INK_CSS;
+    c.stroke();
+    c.fillStyle = '#ffffff';
+    // speaker cone
+    c.fillRect(x + 6, y + 6, 3, 4);
+    c.beginPath();
+    c.moveTo(x + 9, y + 6);
+    c.lineTo(x + 13, y + 3);
+    c.lineTo(x + 13, y + 13);
+    c.lineTo(x + 9, y + 10);
+    c.closePath();
+    c.fill();
+    for (let i = 0; i < 4; i++) {
+      const amp = still ? 0.6 : 0.35 + 0.65 * Math.abs(Math.sin(now / (110 + i * 37) + i * 1.7));
+      const bh = Math.max(2, Math.round(10 * amp));
+      c.fillRect(x + 16 + i * 4, y + 8 - bh / 2, 2, bh);
+    }
+    return { x, y, w, h };
+  }
+
   private drawActorOverlays() {
     const c = this.ctx;
     const z = this.camera.zoom;
@@ -2027,6 +2087,11 @@ export class WorldView {
           obstacles.push(r);
           top = r.y - 3;
         }
+      }
+      if (a.occ.speaking && !a.npc) {
+        const r = this.drawTalking(c, hx, hy, top, z, now);
+        obstacles.push(r);
+        top = r.y - 3;
       }
       if (a.bubble && now < a.bubble.until) {
         const age = now - a.bubble.start;

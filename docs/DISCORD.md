@@ -5,40 +5,87 @@ the *conversation*. This document records what the platform actually allows (ver
 the current developer docs at `docs.discord.com/developers`, September 2026), what we built on
 top of it, and where we deliberately stop.
 
+## Spaces are channels
+
+Every space in the world is its Discord channels. The town is the server's **#general** (and the
+General voice channel); each building has its own text and voice channel. Discord is the book of
+record: Minglewood mirrors and drives it, and stores no messages of its own.
+
+- **Walk into a space → you're in its voice channel.** Discord never lets an app connect someone
+  to voice, but once you are in *any* voice channel the bot can move you (Move Members). So: join
+  voice once (the chat panel's **Join voice** button opens the space's channel in Discord), and
+  from then on walking into the café moves you into the café's voice channel. It works the other
+  way too: switch channels in Discord and your avatar walks into that space. Members can turn this
+  off (Profile → *Voice follows me*).
+- **Say something in a space → it's posted in its text channel**, under your name and Discord
+  picture (a Minglewood webhook per channel). If the bot can't manage webhooks it posts as itself:
+  `**Name**: text`.
+- **Post in the channel → it shows up in the space**, in the chat panel and as a speech bubble over
+  you if you're standing there. Mentions are shown by name and never ping anyone.
+- **Walk in → you see the channel's recent history** (the last 30 messages), loaded from Discord.
+- **Rename or delete a channel in Discord → the space follows** (label updated / link removed).
+- **Walk into a space with no voice channel (the Quiet Grove) → you leave the call.** If the server
+  has an AFK channel you're parked there, connected but silent, so the next space with a voice
+  channel moves you straight back in; otherwise you're disconnected. People in a voice channel that
+  isn't one of the spaces' are never touched.
+- **Messages look like you.** Posts use your current nickname and picture *in that server* (fetched
+  from Discord). Discord shows its small "APP" tag on them: no app may post *as* a person — that
+  would take your personal token, which Discord bans.
+- **Talk light (opt-in).** Discord doesn't tell apps who's speaking, so members can let their own
+  browser watch their mic *level* while in voice (🎙️ in the chat panel, or Profile). Only "talking
+  yes/no" leaves the page; no audio is recorded or sent. Hidden while muted in Discord.
+- Quiet rooms have no channels, on purpose.
+
+Code: `src/server/providers/discord/bridge.ts` (chat, history, voice follow, channel sync),
+`setup.ts` (matching and creating channels), `gateway.ts` (intents), the hub's per-space chat log
+(`OrgHub.pushChat`), and `src/client/ui/ChatPanel.tsx`.
+
 ## Capability audit
 
 | Want | Discord mechanism | Status in Minglewood |
 | --- | --- | --- |
 | Sign in, verify company membership | OAuth2 `identify` + `guilds.members.read`; `GET /users/@me/guilds/{guild}/member` (404 ⇒ not a member) | ✅ Implemented (`/api/auth/discord/*`) |
-| List channels to bind to rooms | Bot token, `GET /guilds/{guild}/channels`; bot needs **View Channels** only | ✅ Admin → Rooms & channels |
-| Who is in a voice channel (+ mute/video) | Gateway, intents `GUILDS` + `GUILD_VOICE_STATES` (both non-privileged). `GUILD_CREATE` carries initial `voice_states`, then `VOICE_STATE_UPDATE` | ✅ People in a bound channel appear in the room (`via: provider`), even if they never opened Minglewood |
-| Online/idle status | `GUILD_PRESENCES` (privileged) | ❌ Intentionally not requested. Availability is something members choose to share in Minglewood. |
-| Live speaking indicators | Embedded App SDK `SPEAKING_START/STOP` require `rpc.voice.read`, granted only to approved partners; bots only see speaking by joining voice | ❌ Not available. UI shows "in voice" + mute instead. Demo mode simulates speaking and labels it as such. |
-| Put a user into a voice channel | No API moves a user into voice unless already connected; the Embedded App SDK has **no** join/select-voice command | ❌ Not possible. We deep-link: `https://discord.com/channels/{guild}/{channel}` opens the channel; the user clicks "Join Voice". |
-| Embed video/voice streams in our world | Not exposed | ❌ Participants are represented as avatars; the call stays in Discord. |
-| Run inside Discord | Embedded App SDK (`@discord/embedded-app-sdk`) Activities | ✅ Supported (see below) |
-| Who's in this Activity | `getInstanceConnectedParticipants` + `ACTIVITY_INSTANCE_PARTICIPANTS_UPDATE` (no scope) | ✅ Toast on join |
-| Open links from inside the Activity | `openExternalLink` (no scope) | ✅ Used for "Join the conversation" |
-| Rich presence ("Playing Minglewood in Café") | `setActivity` needs `rpc.activities.write` | ⏸ Not requested (keep scopes minimal). Easy to add later. |
+| Link spaces to channels | Bot token, `GET /guilds/{guild}/channels` (View Channels) | ✅ Admin → Spaces & channels: a voice and a text channel per space, the town included |
+| Set up channels for every space | `POST /guilds/{guild}/channels` (Manage Channels) | ✅ Admin → Spaces & channels → *Link, and create what's missing* (matches by name first; creates a "Minglewood" category) |
+| Who is in a voice channel (+ mute/video) | Gateway `GUILDS` + `GUILD_VOICE_STATES` (non-privileged) | ✅ People in a bound channel appear in the space, even if they never opened Minglewood |
+| Voice follows you between spaces | `PATCH /guilds/{guild}/members/{user}` with `channel_id` (Move Members; works only for someone already in voice) | ✅ Walking in moves you; switching in Discord walks your avatar |
+| Connect someone to voice from nothing | Not exposed (no API, no SDK command) | ❌ We deep-link for the first join: `https://discord.com/channels/{guild}/{channel}` |
+| Chat from the world into the channel | Webhook per channel (Manage Webhooks), `POST /webhooks/{id}/{token}` with the member's name and avatar; `allowed_mentions: []` | ✅ |
+| Chat from the channel into the world | Gateway `GUILD_MESSAGES` + **Message Content** (privileged — switch it on in the Developer Portal) | ✅ Without Message Content we see that a message happened but not its text; admin shows ❌ |
+| History when you arrive | `GET /channels/{id}/messages` (Read Message History) | ✅ Last 30, in memory only |
+| Online/idle status | `GUILD_PRESENCES` (privileged) | ❌ Intentionally not requested. Availability is something members choose to share. |
+| Live speaking indicators | Needs `rpc.voice.read` (approved partners only) | ❌ Not available; UI shows "in voice" + mute. |
+| Run inside Discord | Embedded App SDK Activities | ✅ Supported (see below) |
 
-The same matrix is rendered live in **Admin → Discord** from `DiscordProvider.capabilities`.
+The same matrix is rendered live in **Admin → Discord**, and **Admin → Spaces & channels** checks the
+bot's actual permissions in your server and links to re-grant anything missing.
 
-## Setup
+### Bot permissions
 
-1. Create an application at <https://discord.com/developers/applications>.
-2. **OAuth2** → copy Client ID and Client Secret into `.env`
-   (`DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`). Add the redirect
-   `http://localhost:5173/api/auth/discord/callback` (or your `PUBLIC_URL` equivalent).
-3. **Bot** → reset/copy the token into `DISCORD_BOT_TOKEN`. No privileged intents are needed.
-4. Restart `npm run dev`. Sign in to Minglewood as an admin (the demo admin works), open
-   **Admin → Discord**, click *Add the bot to your server*, then *Find servers the bot is in* →
-   *Connect*.
-5. **Admin → Rooms & channels**: switch a room's provider to Discord and pick a voice channel.
-6. Members can now use **Continue with Discord** on the sign-in page. Only members of the
-   connected server are admitted. Anyone sitting in a bound voice channel shows up in that room.
+`554781712` = View Channels, Read Message History, Send Messages, Embed Links, Manage Webhooks,
+Connect, Move Members, Manage Channels. Servers that added the bot earlier keep the old permissions
+until someone clicks **Add to Discord** again for the same server (that only updates permissions).
 
-Optional: `DISCORD_GUILD_ID` pre-connects a server; `DISCORD_ADMIN_USER_IDS` makes specific
-Discord users admins on first sign-in.
+## Setup (and testing it on your own server)
+
+1. Create an application at <https://discord.com/developers/applications> (or use the existing one).
+2. **OAuth2** → copy Client ID and Client Secret into `.env` (`DISCORD_CLIENT_ID`,
+   `DISCORD_CLIENT_SECRET`). Add the redirect `http://localhost:5173/api/auth/discord/callback`
+   (or your `PUBLIC_URL` equivalent).
+3. **Bot** → copy the token into `DISCORD_BOT_TOKEN`, and under *Privileged Gateway Intents* turn on
+   **Message Content Intent** (leave Presence and Server Members off).
+4. Put your server's id in `DISCORD_GUILD_ID` (Discord → Settings → Advanced → Developer Mode, then
+   right-click the server → *Copy Server ID*) and your own user id in `DISCORD_ADMIN_USER_IDS`.
+5. Restart `npm run dev`. The log should say *gateway ready — voice presence, channel chat and
+   voice follow are live*. If it warns that Message Content is off, step 3 isn't saved yet.
+6. Add (or re-add) the bot with the new permissions: **Admin → Discord → Add the bot**, or the
+   Minglewood Cloud *Add to Discord* button. Then **Admin → Discord → Connect** your server.
+7. **Admin → Spaces & channels → Link, and create what's missing.** Check the permissions list is
+   all ✅.
+8. Sign in with **Continue with Discord**. Join the town's voice channel once (chat panel →
+   *Join voice*), then walk into the café: Discord moves you to the café's voice channel. Type in
+   the world and watch it appear in `#tidewater-cafe`; post in Discord and watch it appear in the
+   world.
 
 ## Running as a Discord Activity
 

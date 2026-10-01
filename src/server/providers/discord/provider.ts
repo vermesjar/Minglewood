@@ -21,8 +21,26 @@ export interface UserGuild {
 
 const ADMINISTRATOR = 0x8n;
 const MANAGE_GUILD = 0x20n;
-/** Bot install: View Channels only (1024) — enough to list channels and see voice occupancy. */
-export const DISCORD_BOT_PERMISSIONS = '1024';
+/**
+ * Bot install permissions (554781712):
+ * View Channels + Read Message History — list channels, see voice occupancy, load a space's history;
+ * Send Messages + Embed Links + Manage Webhooks — post what's said in the world, under the speaker's name;
+ * Connect + Move Members — move you between voice channels as you walk between spaces;
+ * Manage Channels — the admin's one-click "set up channels for every space".
+ */
+export const DISCORD_BOT_PERMISSION_BITS = {
+  'Manage Channels': 1n << 4n,
+  'View Channels': 1n << 10n,
+  'Send Messages': 1n << 11n,
+  'Embed Links': 1n << 14n,
+  'Read Message History': 1n << 16n,
+  Connect: 1n << 20n,
+  'Move Members': 1n << 24n,
+  'Manage Webhooks': 1n << 29n,
+} as const;
+export const DISCORD_BOT_PERMISSIONS = Object.values(DISCORD_BOT_PERMISSION_BITS)
+  .reduce((a, b) => a | b, 0n)
+  .toString();
 
 export class DiscordProvider implements CommunicationProvider {
   readonly kind = 'discord' as const;
@@ -39,6 +57,9 @@ export class DiscordProvider implements CommunicationProvider {
       directVoiceJoin: false,
       deepLinkJoin: true,
       embeddedApp: !!config.discord.clientId,
+      chatBridge: discordBotConfigured(),
+      // Moving someone who's already in voice: the bot can, with Move Members.
+      voiceFollow: discordBotConfigured(),
     };
   }
 
@@ -169,8 +190,8 @@ export class DiscordProvider implements CommunicationProvider {
       webUrl: `https://discord.com/channels/${g}/${c}`,
       appUrl: `discord://-/channels/${g}/${c}`,
       explainer: voice
-        ? 'Opens the voice channel in Discord — click “Join Voice” there. Discord doesn’t let apps move you into voice automatically.'
-        : 'Opens the channel in Discord.',
+        ? 'Opens the voice channel in Discord — click “Join Voice” there once. From then on Minglewood moves you between voice channels as you walk between spaces.'
+        : 'Opens the channel in Discord. What’s said here in the world is posted there too.',
     };
   }
 }

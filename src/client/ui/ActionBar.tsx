@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { EMOTES, EMOTE_IDS } from '@shared/presence';
+import { MAX_CHAT } from '@shared/protocol';
 import { game } from '../app/game';
 import { useStore } from '../app/store';
 import { carryMeta } from '@shared/carry';
@@ -38,7 +39,7 @@ export function ActionBar() {
           id="mw-chat"
           value={text}
           onChange={(e) => setText(e.target.value)}
-          maxLength={120}
+          maxLength={MAX_CHAT}
           disabled={quiet}
           placeholder={quiet ? 'Quiet room — emotes only 🤫' : 'Say something to the room… (Enter)'}
           aria-label="Say something to people in this room"

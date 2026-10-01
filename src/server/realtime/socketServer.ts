@@ -133,6 +133,9 @@ export function attachSockets(server: Server, store: Store, hubs: Map<string, Or
         case 'say':
           if (chatBucket.take()) hub.say(memberId, msg.text);
           break;
+        case 'speaking':
+          hub.speakingFromMic(memberId, msg.on);
+          break;
         case 'knock':
           if (knockBucket.take()) hub.knock(memberId, msg.targetId, msg.kind);
           else client.send({ t: 'toast', text: 'Easy there — give them a moment to answer.' });

@@ -16,6 +16,7 @@ export function ProfilePanel() {
   const prefs = useStore((s) => s.prefs);
   const slackConnected = useStore((s) => s.boot?.slackConnected);
   const [knockDms, setKnockDms] = useState(me?.settings.slackKnockDms ?? false);
+  const discordLinked = useStore((s) => !!s.boot?.discordConnected);
   const [f, setF] = useState(() => ({
     displayName: me?.displayName ?? '',
     title: me?.title ?? '',
@@ -25,6 +26,7 @@ export function ProfilePanel() {
     askMeAbout: me?.askMeAbout.join(', ') ?? '',
     locationVisibility: me?.settings.locationVisibility ?? 'everyone',
     knocksWhileFocused: me?.settings.knocksWhileFocused ?? false,
+    voiceFollow: me?.settings.voiceFollow !== false,
   }));
   if (!me) return null;
   const close = () => setState({ panel: null });
@@ -38,7 +40,7 @@ export function ProfilePanel() {
         location: f.location,
         interests: list(f.interests).slice(0, 8),
         askMeAbout: list(f.askMeAbout).slice(0, 6),
-        settings: { locationVisibility: f.locationVisibility as MemberSettings['locationVisibility'], knocksWhileFocused: f.knocksWhileFocused },
+        settings: { locationVisibility: f.locationVisibility as MemberSettings['locationVisibility'], knocksWhileFocused: f.knocksWhileFocused, voiceFollow: f.voiceFollow },
       });
       toast('Profile saved', 'info', undefined, 2500);
       close();
@@ -105,6 +107,12 @@ export function ProfilePanel() {
               <input type="checkbox" checked={f.knocksWhileFocused} onChange={(e) => setF({ ...f, knocksWhileFocused: e.target.checked })} />
               <span>Let knocks through even when I’m focused</span>
             </label>
+            {discordLinked && (
+              <label className="check">
+                <input type="checkbox" checked={f.voiceFollow} onChange={(e) => setF({ ...f, voiceFollow: e.target.checked })} />
+                <span>Voice follows me — while I’m in Discord voice, walking into a space moves me into its voice channel</span>
+              </label>
+            )}
             {slackConnected && (
               <label className="check">
                 <input
@@ -139,6 +147,10 @@ export function ProfilePanel() {
             <label className="check">
               <input type="checkbox" checked={prefs.showAllNames} onChange={pref('showAllNames')} />
               <span>Always show everyone’s names</span>
+            </label>
+            <label className="check">
+              <input type="checkbox" checked={!!prefs.talkLight} onChange={pref('talkLight')} />
+              <span>Light up my avatar when I talk in voice — uses my mic level on this device only; no audio is recorded or sent</span>
             </label>
           </section>
         </div>
