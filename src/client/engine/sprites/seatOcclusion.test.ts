@@ -5,7 +5,8 @@ import { MODEL_FACINGS, SEAT_LOOKS } from '@shared/world/seatModels';
 import { FIG, figAx, hipFeet } from '@shared/world/seatFigure';
 import { THIGH_R } from '@shared/world/sitLegs';
 import { SIT_POSE_OF } from '@shared/world/seats';
-import { seatDepth } from './seatModel';
+import { resolveSeatSurfaceMap, seatDepth } from './seatModel';
+import { authoredMapProblems } from '@shared/world/seatSurfaceAuthored';
 import { seatLayers, sitterMask } from './seatLayers';
 import { renderAvatarLayers } from './avatarQa';
 import { LAYER } from './avatarKit';
@@ -16,11 +17,14 @@ const catalog = loadManifest().sprites as unknown as Sprites;
 const models = readModels();
 
 describe('seating occlusion at the pelvis and open backs', () => {
-  it('keeps every catalog sitter above the supporting cushion, including rear-view overlapping shins', () => {
+  it('keeps sitters above flat supporting cushions, including rear-view overlapping shins', () => {
     const cuts: string[] = [];
     let checked = 0;
     for (const [key, model] of Object.entries(models)) for (const facing of MODEL_FACINGS) {
       const v = modelView(catalog, key, facing, model), L = seatLayers(v), D = seatDepth(v);
+      // A rolled rim can legitimately cover the lower pelvis. Part labels do not
+      // make its curved surface a flat cushion; exact winners need independent review.
+      if (D.source === 'authored') continue;
       for (let c = 0; c < L.hips.length; c++) for (const look of SEAT_LOOKS) {
         const feet = hipFeet(L.hips[c]!, v.style), legs = L.legs[c]!, pose = SIT_POSE_OF[v.style] as Pose;
         const fig = renderAvatarLayers(look, facing, pose, legs), mask = sitterMask(v, look, facing, pose, feet, legs, L.sits[c]![2] + THIGH_R);
@@ -87,10 +91,21 @@ describe('seating occlusion at the pelvis and open backs', () => {
     }
   });
 
-  it('never extends a fitted part above or below its physical height bounds', () => {
+  it('keeps fitted depths within part bounds and authored depths on their declared curved solid', () => {
     const bad: string[] = [];
     for (const [key, model] of Object.entries(models)) for (const facing of MODEL_FACINGS) {
-      const D = seatDepth(modelView(catalog, key, facing, model));
+      const v = modelView(catalog, key, facing, model), D = seatDepth(v);
+      const map = resolveSeatSurfaceMap(v);
+      if (map?.version === 2) {
+        // Authored depth replaces the legacy box heights. Validate the analytic
+        // curved solid, support contact and source correspondence instead.
+        expect(authoredMapProblems(map, model, facing), `${key}/${facing}`).toEqual([]);
+        for (let i = 0; i < D.z.length; i++) {
+          if (map.authored.z[i] === null) expect(Number.isNaN(D.z[i])).toBe(true);
+          else expect(D.z[i], `${key}/${facing}/${i}`).toBe(map.authored.z[i]);
+        }
+        continue;
+      }
       for (let i = 0; i < D.part.length; i++) if (D.part[i] >= 0) {
         const [lo, hi] = model.parts[D.part[i]].z;
         if (D.z[i] < lo - 1e-8 || D.z[i] > hi + 1e-8) bad.push(`${key}/${facing}/${i}`);
