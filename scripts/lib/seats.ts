@@ -1,13 +1,15 @@
 /**
  * The catalog's seats from Node: which kinds there are, each one's drawing in a facing resolved exactly as the game
  * resolves it (art.ts: its own drawing for a facing, else its partner's mirrored; small seats centred), and its
- * profile. The review tools (furniture-review.ts, seat-shots.ts) share it; the seat grade reads the catalog's builds instead.
+ * profile. The seat tools (seat-model.ts, seat-layers.ts) and the Design Lab's publish check (lab-model.ts) share it.
  */
 import { existsSync } from 'node:fs';
 import { centredAnchor, type Pixels } from '../../src/client/engine/sprites/footing';
 import { allScenes } from '../../src/shared/world';
 import { isSeat, type Facing } from '../../src/shared/world/scene';
 import { drawingPrint } from '../../src/shared/world/seatFigure';
+import type { SeatModel } from '../../src/shared/world/seatModels';
+import type { SeatVerificationReference } from './seat-publication';
 import { seatProfile, type SeatProfile } from '../../src/shared/world/seats';
 import { mirrorImg, readPng } from './png';
 
@@ -17,6 +19,9 @@ export interface Entry extends Partial<SeatProfile> {
   facings?: Partial<Record<Facing, { file: string; anchor: [number, number] }>>;
   footprint: [number, number];
   wall?: unknown;
+  seatModel?: SeatModel;
+  /** Transient local publication proof; never copied into the public manifest. */
+  seatVerification?: SeatVerificationReference;
 }
 export type Sprites = Record<string, Entry>;
 
@@ -78,5 +83,5 @@ export function profileOf(M: Sprites, key: string): SeatProfile {
   const own = M[key];
   const sibling = own?.seat === undefined ? Object.entries(M).find(([k, e]) => (k === sprite || k.startsWith(`${sprite}.`)) && e.seat !== undefined)?.[1] : undefined;
   const e = own?.seat !== undefined ? own : (sibling ?? own);
-  return seatProfile(sprite, { seat: e?.seat, sitStyle: e?.sitStyle, backrest: e?.backrest, arms: e?.arms });
+  return seatProfile(sprite, { seat: e?.seat, sitStyle: e?.sitStyle, backrest: e?.backrest, arms: e?.arms, seatKind: e?.seatKind });
 }

@@ -8,10 +8,12 @@
  * toward the table or counter beside it, else toward the room (sw).
  */
 import { footprint, isSeat, isSolid, type Facing, type SceneDef, type SceneObject } from './scene';
+import { SEAT_TYPES } from './seatTypes';
+import type { ModelPart } from './seatModels';
 
 /**
  * The seat profile — what a seat's manifest entry says about sitting in it (the model spec's seat section); how people
- * are placed and drawn in it is its spec's build (src/shared/world/seatSpec.ts, src/client/engine/sprites/seatLayers.ts).
+ * are placed and drawn in it is its model's (art/seat-models.json, src/client/engine/sprites/seatLayers.ts).
  *   seat       height of the cushion surface where the hips rest, world px above the floor (it seeds the model's fit)
  *   sitStyle   chair | stool | lounge | floor: which sitting pose the figure takes (avatarFrame SIT_POSE) and how its
  *              legs lie (sitLegs.ts)
@@ -19,8 +21,11 @@ import { footprint, isSeat, isSolid, type Facing, type SceneDef, type SceneObjec
  *   arms       whether it has arms (the fit gives its model a pair)
  */
 export type SitStyle = 'chair' | 'stool' | 'lounge' | 'floor';
+export const SEAT_KINDS = ['chair', 'armchair', 'couch', 'bench', 'stool', 'ottoman', 'beanbag', 'floor-cushion', 'throne'] as const;
+export type SeatKind = (typeof SEAT_KINDS)[number];
 
 export interface SeatProfile {
+  seatKind?: SeatKind;
   seat: number;
   sitStyle: SitStyle;
   backrest: boolean;
@@ -28,7 +33,7 @@ export interface SeatProfile {
 }
 
 /** The manifest fields that make up a seat profile (the model spec's seat section). */
-export const SEAT_FIELDS = ['seat', 'sitStyle', 'backrest', 'arms'] as const;
+export const SEAT_FIELDS = ['seat', 'sitStyle', 'backrest', 'arms', 'seatKind'] as const;
 
 const FAMILY: Array<[RegExp, SeatProfile]> = [
   [/^stool/, { seat: 16, sitStyle: 'stool', backrest: false }],
@@ -42,8 +47,9 @@ const DEFAULT_PROFILE: SeatProfile = { seat: 12, sitStyle: 'chair', backrest: tr
 
 /** A seat's profile: its art's own values over its family's defaults. */
 export function seatProfile(sprite: string, own: Partial<SeatProfile> = {}): SeatProfile {
-  const base = FAMILY.find(([re]) => re.test(sprite))?.[1] ?? DEFAULT_PROFILE;
+  const base = (own.seatKind ? SEAT_TYPES.find((t) => t.kind === own.seatKind)?.profile : FAMILY.find(([re]) => re.test(sprite))?.[1]) ?? DEFAULT_PROFILE;
   return {
+    ...(own.seatKind ? { seatKind: own.seatKind } : {}),
     seat: own.seat ?? base.seat,
     sitStyle: own.sitStyle ?? base.sitStyle,
     backrest: own.backrest ?? base.backrest,
@@ -76,25 +82,84 @@ export function sitterLift(p: SeatProfile): number {
 }
 
 /**
- * Getting into and out of a seat, `k` of the way in (0 standing … 1 seated): in a crouch with the feet on the
- * floor until CROUCH_UNTIL, then up into the seat — from about where the seated feet meet the floor, a touch
- * past it (SETTLE world px) and settling; getting up, lifted off the cushion a touch, then down into the crouch.
- * `lift` is how high the seat lifts its sitter. (The renderer and the rig sheets move a sitter the same way.)
+ * Raise the pelvis before moving onto support, then settle. Lift compensates for the different pose drops:
+ * the underside of the pelvis stays continuous when the crouch changes into the seated frame.
+ * Proximity supplies a geometry constraint in addition to timing, including side approaches and deep cushions.
  */
 export const CROUCH_UNTIL = 0.35;
 export const SETTLE = 2;
-export function sitMotion(k: number, sittingDown: boolean, lift: number): { inSeat: boolean; lift: number } {
-  const inSeat = k >= CROUCH_UNTIL;
-  if (!inSeat) return { inSeat, lift: 0 };
-  const u = (k - CROUCH_UNTIL) / (1 - CROUCH_UNTIL);
-  const rise = Math.min(1, u / 0.6);
-  const settle = Math.max(0, (u - 0.6) / 0.4);
-  return {
-    inSeat,
-    lift: sittingDown
-      ? 0.6 * lift + (0.4 * lift + SETTLE) * (1 - (1 - rise) * (1 - rise)) - SETTLE * settle * settle * (3 - 2 * settle)
-      : lift + SETTLE * (1 - u * (2 - u)),
-  };
+export function sitMotion(k: number, sittingDown: boolean, lift: number, style: SitStyle = 'chair', proximity = 0, supportLift = -Infinity, overSupport = true): { inSeat: boolean; lift: number } {
+  k = Math.max(0, Math.min(1, k));
+  const rising = k < CROUCH_UNTIL;
+  const inSeat = !rising && overSupport;
+  const poseCompensation = (SIT_DROP[style] - 3) / 2;
+  const crouchContactLift = lift - poseCompensation;
+  const clearance = sittingDown ? SETTLE : SETTLE * 0.75;
+  const smooth = (t: number) => t * t * (3 - 2 * t);
+  const height = rising
+    ? (crouchContactLift + clearance) * smooth(k / CROUCH_UNTIL)
+    : crouchContactLift + clearance * (1 - smooth((k - CROUCH_UNTIL) / (1 - CROUCH_UNTIL)));
+  // A positive lift is required only where the pelvis would otherwise penetrate support. Low floor seats
+  // may legitimately lower it; clamping those to zero would move their final resting position.
+  const guarded = crouchContactLift > 0 ? Math.max(height, crouchContactLift * Math.max(0, Math.min(1, proximity))) : height;
+  return { inSeat, lift: Math.max(guarded, supportLift) + (inSeat ? poseCompensation : 0) };
+}
+
+const PELVIS_HALF = 10 / 32;
+const SUPPORT_LEAD = 0.3;
+
+/** Take the seated pose only once the pelvis centre has reached an actual cushion. */
+export function seatSupportContains(parts: readonly ModelPart[], u: number, v: number): boolean {
+  return parts.some(p => p.part === 'seat' && u >= p.u[0] && u <= p.u[1] && v >= p.v[0] && v <= p.v[1]);
+}
+
+/** Last intersection of the exit ray with a support box expanded for the whole pelvis. */
+export function seatSupportExit(parts: readonly ModelPart[], u: number, v: number, du: number, dv: number): number {
+  if (!du && !dv) return 0;
+  let distance = 0;
+  for (const p of parts) {
+    if (p.part !== 'seat') continue;
+    let enter = -Infinity, leave = Infinity;
+    for (const [span, origin, direction] of [[p.u, u, du], [p.v, v, dv]] as const) {
+      if (!direction) {
+        if (origin < span[0] - PELVIS_HALF || origin > span[1] + PELVIS_HALF) { leave = -Infinity; break; }
+      } else {
+        const a = (span[0] - PELVIS_HALF - origin) / direction;
+        const b = (span[1] + PELVIS_HALF - origin) / direction;
+        enter = Math.max(enter, Math.min(a, b));
+        leave = Math.min(leave, Math.max(a, b));
+      }
+    }
+    if (leave >= Math.max(0, enter)) distance = Math.max(distance, leave + 0.001);
+  }
+  return distance;
+}
+
+/** Pelvis footprint plus an approach band in local tile units, independent of facing and catalog key. */
+export function seatSupportProximity(parts: readonly ModelPart[], u: number, v: number, lead = SUPPORT_LEAD): number {
+  // The pelvis is 20 sprite px across: 10 px on either side of its centre, projected at 32 px per tile.
+  let proximity = 0;
+  for (const p of parts) {
+    if (p.part !== 'seat') continue;
+    const gap = Math.max(p.u[0] - PELVIS_HALF - u, u - p.u[1] - PELVIS_HALF, p.v[0] - PELVIS_HALF - v, v - p.v[1] - PELVIS_HALF, 0);
+    const t = gap === 0 ? 1 : lead > 0 ? Math.max(0, 1 - gap / lead) : 0;
+    proximity = Math.max(proximity, t * t * (3 - 2 * t));
+  }
+  return proximity;
+}
+
+/** Minimum crouched lift required by the actual nearby planes, including a raised adjacent cushion. */
+export function seatSupportLift(parts: readonly ModelPart[], u: number, v: number, k: number): number {
+  // Anticipation contracts at both endpoints: clear floor is reachable without overshooting, and a nearby
+  // higher cushion cannot raise a resting sitter. Actual intersection always retains full clearance.
+  const lead = SUPPORT_LEAD * Math.max(0, Math.min(1, k / CROUCH_UNTIL, (1 - k) / CROUCH_UNTIL));
+  let lift = -Infinity;
+  for (const p of parts) {
+    if (p.part !== 'seat') continue;
+    const proximity = seatSupportProximity([p], u, v, lead);
+    if (proximity > 0) lift = Math.max(lift, (p.z[1] - 8) * proximity);
+  }
+  return lift;
 }
 
 /** Whether a sitter facing this way is seen from behind (the camera looks from the south: +x +y is toward us). */

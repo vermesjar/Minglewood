@@ -1,0 +1,41 @@
+{
+  "look": {
+    "skin": "#b3764c",
+    "hair": "hair.pigtails",
+    "hairColor": "#d9a35b",
+    "hairHighlight": "",
+    "eyes": "eyes.lashes",
+    "eyeColor": "#3f7fbf",
+    "brows": "brows.soft",
+    "mouth": "mouth.neutral",
+    "facialHair": "fh.mustache",
+    "faceDetail": "fd.none",
+    "headwear": "hat.none",
+    "headwearColor": "#3f8fd8",
+    "eyewear": "eye.none",
+    "neck": "neck.none",
+    "neckColor": "#3f8fd8",
+    "top": "top.northstar-hoodie",
+    "topColor": "#f4efe6",
+    "topAccent": "#f4efe6",
+    "topPattern": "pat.solid",
+    "bottom": "bottom.skirt",
+    "bottomColor": "#1f2a44",
+    "shoes": "shoes.slippers",
+    "shoesColor": "#3f8fd8",
+    "accessory": "acc.none",
+    "held": "held.none",
+    "heldColor": "#f4efe6",
+    "pet": "pet.none",
+    "petColor": "#e8a15a",
+    "mobility": "mob.none",
+    "body": "body.a"
+  },
+  "source": {
+    "claim": "Original completed crouch frame before skirt seating failure; painter byte preservation only.",
+    "pose": "crouch",
+    "facing": "ne",
+    "rgbaSha256": "972f3430829c74cf2db7a2ce14d2ab140b1de3ee14d620a46e337dc1c32f08dc",
+    "ownerSha256": "ee088b63f21b4a3c51018db8b9e5c1daa81d49f1cf0fccf8da75cd4e73b71276"
+  }
+}

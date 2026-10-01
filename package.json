@@ -11,6 +11,7 @@
     "dev": "concurrently -k -n server,web -c magenta,cyan \"npm:dev:server\" \"npm:dev:web\"",
     "dev:server": "tsx watch --clear-screen=false src/server/index.ts",
     "dev:web": "vite",
+    "prebuild": "npm run seats:check && node --no-maglev node_modules/vitest/vitest.mjs run src/client/engine/sprites/seatOcclusion.test.ts src/client/engine/sprites/seatPixels.test.ts src/client/engine/sprites/seatReviewed.test.ts",
     "build": "vite build",
     "start": "cross-env NODE_ENV=production tsx src/server/index.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
@@ -23,6 +24,9 @@
     "avatars:review": "tsx --tsconfig tsconfig.json scripts/avatar-review.ts",
     "avatars:sweep": "tsx --tsconfig tsconfig.json scripts/avatar-sweep.ts",
     "furniture:review": "tsx --tsconfig tsconfig.json scripts/furniture-review.ts",
+    "seats:compile": "node --no-maglev --import tsx scripts/seat-compile.ts --write",
+    "seats:check": "node --no-maglev --import tsx scripts/seat-layers.ts --check",
+    "seats:audit": "node --no-maglev --import tsx scripts/seat-audit.ts",
     "slack:sim": "tsx --tsconfig tsconfig.json scripts/slack-simulate.ts",
     "playtest": "playwright test",
     "playtest:gate": "cross-env PLAYTEST_URL=http://localhost:5190 PLAYTEST_TAG=gate playwright test regressions carry late-walk --workers 2 --retries 1"

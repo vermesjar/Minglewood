@@ -28,10 +28,26 @@ export const lum = (c: RGB) => (c[0] * 0.3 + c[1] * 0.59 + c[2] * 0.11) / 255;
 
 /* ================================================================== pixels & shapes */
 
+export interface LowerGarmentSource {
+  version: 1;
+  vertices: Array<{point:[number,number];anchor:'waist'|'hip'|'nearKnee'|'farKnee';drop:number}>;
+  triangles: Array<[number,number,number]>;
+  mask: Uint8Array;
+}
+
 export class Pix {
   readonly d = new Uint8ClampedArray(W * H * 4);
   /** Which part painted each pixel (a Layer id), for QA: what covers what. */
   readonly owner = new Uint8Array(W * H);
+  /** Original concave pockets deliberately painted by sealPinholes; never inferred from a seat mask. */
+  sealed?: Uint8Array;
+  /** Exact original shoe painter: 1 near, 2 far; zero for all other paint. */
+  shoeLimb?: Uint8Array;
+  shoeLimbActive = 0;
+  /** Original sealHairPockets fills with no hair/hat boundary, distinct from real hair. */
+  bodyPocket?: Uint8Array;
+  /** Exact original lower-garment painter domain and authored drape anchors. */
+  lowerGarment?: LowerGarmentSource;
   /** The part currently being drawn. */
   layer = 0;
   set(x: number, y: number, c: RGB, a = 255) {
@@ -39,6 +55,8 @@ export class Pix {
     y = Math.round(y);
     if (x < 0 || y < 0 || x >= W || y >= H) return;
     this.owner[y * W + x] = this.layer;
+    if (this.shoeLimbActive) this.shoeLimb ??= new Uint8Array(W * H);
+    if (this.shoeLimb) this.shoeLimb[y * W + x] = this.shoeLimbActive;
     const i = (y * W + x) * 4;
     if (a < 255 && this.d[i + 3] > 0) {
       const k = a / 255;
@@ -224,4 +242,3 @@ export function outline(P: Pix) {
       P.set(x, y, mix(avg, LINE, 0.9));
     }
 }
-

@@ -19,9 +19,9 @@ ts scripts/model-check.ts --projection
 ts scripts/room-map.ts --quiet
 ts scripts/town-stoops.ts
 ts scripts/town-seats.ts
-# the seat grade: every catalog seat, built from its spec, passes the seat framework's measurements in every facing
-# with every review look on every cushion, and its PNGs and manifest entry are its render (docs/seating.md)
-ts scripts/seat-grade.ts --check
+# how people sit: every seat kind has a 3D model that fits its drawings, a sitting point on each cushion and legs that
+# come off its front, in every facing (scripts/seat-layers.ts; the layers and legs the game draws people with)
+ts scripts/seat-layers.ts --check
 ts scripts/furniture-review.ts
 (cd art && uv run check_facings.py)
 echo "gate: all green"

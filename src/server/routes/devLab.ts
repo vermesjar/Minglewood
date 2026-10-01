@@ -12,7 +12,9 @@ import { extname, relative, resolve, sep } from 'node:path';
 import type { IncomingHttpHeaders } from 'node:http';
 import { CATEGORIES, ROOM_KINDS, THEMES, wallSpanFor, type ModelCategory, type RoomKind, type Theme } from '@shared/models';
 import { humanizeKey, NAME_MAX } from '@shared/catalogName';
-import { seatProfile } from '@shared/world/seats';
+import { SEAT_KINDS, type SeatKind, seatProfile } from '@shared/world/seats';
+import { SEAT_TYPES } from '@shared/world/seatTypes';
+import { MODEL_FACINGS, modelShapeProblems, seatSurfaceShapeProblems, tidyModel, type SeatModel, type SeatModels } from '@shared/world/seatModels';
 
 /* ------------------------------------------------------------------ the guard */
 
@@ -260,9 +262,15 @@ export interface FurnitureSpec {
    * What the Lab's Auto-fit seeds the seat's model from.
    */
   seat: number | null;
+  seatKind?: SeatKind;
   sitStyle: 'chair' | 'stool' | 'lounge' | 'floor';
   backrest: boolean;
   arms: boolean;
+  /**
+   * How people sit in it: its 3D model (the seat model standard, src/shared/world/seatModels.ts; the Lab's
+   * ModelPanel), the day the reviewer passed it and the drawings it was made on. A seat publishes with one.
+   */
+  seatModel?: SeatModelDraft | null;
   surface: number | null;
   light: { x: number; y: number; r?: number } | null;
   wallV?: [number, number];
@@ -294,6 +302,7 @@ export interface Draft {
   published?: string;
   catalogLine?: string;
   origin?: string;
+  seatMotionReview?: { result?: string; state: string; identity?: string; visualApproval: boolean; error?: string };
   refs: string[];
   furniture?: FurnitureSpec;
   part?: PartSpec;
@@ -320,6 +329,7 @@ function defaultFurniture(): FurnitureSpec {
     sitStyle: 'chair',
     backrest: true,
     arms: false,
+    seatModel: null,
     surface: null,
     light: null,
     actions: [],
@@ -343,7 +353,8 @@ const str = (v: unknown, max: number) => (typeof v === 'string' ? v.slice(0, max
 /** Only known fields, in range: the spec is written to disk and handed to the Python tools. */
 export function cleanFurniture(f: Partial<FurnitureSpec>): FurnitureSpec {
   const d = defaultFurniture();
-  const fp = Array.isArray(f.footprint) ? f.footprint : d.footprint;
+  const type = f.category === 'seating' ? SEAT_TYPES.find((t) => t.kind === f.seatKind) : undefined;
+  const fp = Array.isArray(f.footprint) ? f.footprint : type ? [type.width, 1] : d.footprint;
   const rotation = (ROTATIONS as readonly string[]).includes(String(f.rotation)) ? (f.rotation as FurnitureSpec['rotation']) : d.rotation;
   const prompts: FurnitureSpec['prompts'] = {};
   for (const k of ['se', 'sw', 'ne', 'nw'] as const) if (f.prompts?.[k]) prompts[k] = str(f.prompts[k], 600);
@@ -359,7 +370,7 @@ export function cleanFurniture(f: Partial<FurnitureSpec>): FurnitureSpec {
     rooms: rooms.length ? [...new Set(rooms)] : d.rooms,
     themes: [...new Set(words(f.themes).filter((t): t is Theme => (THEMES as readonly string[]).includes(t)))],
     footprint: [num(fp[0], 1, 4, 1), num(fp[1], 1, 4, 1)],
-    height: num(f.height, 4, 200, d.height),
+    height: num(f.height, 1, 200, type?.height ?? d.height),
     width: f.width ? num(f.width, 8, 400, 64) : undefined,
     fit: f.fit === 'diamond' ? 'diamond' : 'stand',
     fill: num(f.fill, 0, 1, d.fill),
@@ -368,10 +379,12 @@ export function cleanFurniture(f: Partial<FurnitureSpec>): FurnitureSpec {
     useFace: f.useFace === 'any' ? 'any' : 'front',
     sameFromBehind: !!f.sameFromBehind,
     // seating and only seating has a seat (the model spec's rule)
-    seat: category !== 'seating' ? null : f.seat === null || f.seat === undefined || (f.seat as unknown) === '' ? 12 : num(f.seat, 0, 60, 12),
-    sitStyle: (['chair', 'stool', 'lounge', 'floor'] as const).includes(f.sitStyle as never) ? (f.sitStyle as FurnitureSpec['sitStyle']) : 'chair',
-    backrest: f.backrest === undefined ? true : !!f.backrest,
-    arms: category === 'seating' && !!f.arms,
+    seat: category !== 'seating' ? null : f.seat === null || f.seat === undefined || (f.seat as unknown) === '' ? type?.profile.seat ?? 12 : num(f.seat, 0, 60, 12),
+    seatKind: SEAT_KINDS.includes(f.seatKind as SeatKind) ? f.seatKind : undefined,
+    sitStyle: (['chair', 'stool', 'lounge', 'floor'] as const).includes(f.sitStyle as never) ? (f.sitStyle as FurnitureSpec['sitStyle']) : type?.profile.sitStyle ?? 'chair',
+    backrest: f.backrest === undefined ? type?.profile.backrest ?? true : !!f.backrest,
+    arms: category === 'seating' && (f.arms === undefined ? !!type?.profile.arms : !!f.arms),
+    seatModel: category === 'seating' ? cleanSeatModel(f.seatModel) : null,
     surface: f.surface === null || f.surface === undefined || (f.surface as unknown) === '' ? null : num(f.surface, 0, 80, 20),
     light,
     wallV: rotation === 'flat' ? [num(f.wallV?.[0], 0, 60, 18), num(f.wallV?.[1], 1, 62, 47)] : undefined,
@@ -386,6 +399,60 @@ export function cleanFurniture(f: Partial<FurnitureSpec>): FurnitureSpec {
     quality: f.quality === 'high' || f.quality === 'low' ? f.quality : 'medium',
     colors: num(f.colors, 8, 64, d.colors),
   };
+}
+
+const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+const finite = (x: unknown): x is number => typeof x === 'number' && Number.isFinite(x);
+
+/**
+ * A draft's seat model (src/client/studio/ModelPanel.tsx DraftModel): the model (its boxes, its sitting points, each
+ * view's own sitting points `views` and traced over layer `over`, the day it was fitted, a note), the day the
+ * reviewer passed it, and the drawings it was made on.
+ */
+export interface SeatModelDraft {
+  model: SeatModel;
+  reviewed?: string;
+  for: string;
+}
+
+/** A seat model as a draft may keep it: well-formed and in range, or null (anything malformed in a view is dropped). */
+export function cleanSeatModel(v: unknown): SeatModelDraft | null {
+  const r = v as Partial<SeatModelDraft> | null | undefined;
+  if (!r || typeof r !== 'object' || !r.model || typeof r.model !== 'object') return null;
+  const m = r.model;
+  const base: SeatModel = { size: m.size, parts: m.parts, sits: m.sits };
+  if (modelShapeProblems(base).length || m.parts.length > 48 || m.sits.length > 8) {
+    if (m.surfaces !== undefined) throw new LabError(409, 'Cannot discard generated seating surfaces on an invalid model.');
+    return null;
+  }
+  const views: NonNullable<SeatModel['views']> = {};
+  const over: NonNullable<SeatModel['over']> = {};
+  for (const f of MODEL_FACINGS) {
+    const list = (m.views as Record<string, unknown> | undefined)?.[f];
+    if (Array.isArray(list) && list.length === m.sits.length && list.every((q) => Array.isArray(q) && q.length === 2 && q.every(finite)))
+      views[f] = (list as number[][]).map((q): [number, number] => [num(q[0], -4, 8, 0), num(q[1], -4, 8, 0)]);
+    const polys = (m.over as Record<string, unknown> | undefined)?.[f];
+    if (!Array.isArray(polys)) continue;
+    const kept = polys
+      .slice(0, 32)
+      .filter((poly): poly is unknown[] => Array.isArray(poly) && poly.length <= 4000)
+      .map((poly) => poly.filter((q): q is number[] => Array.isArray(q) && q.length === 2 && q.every(finite)).map((q): [number, number] => [num(q[0], -4000, 4000, 0), num(q[1], -4000, 4000, 0)]))
+      .filter((poly) => poly.length >= 3);
+    if (kept.length) over[f] = kept;
+  }
+  const model = tidyModel({
+    ...base,
+    ...(m.surfaces !== undefined ? { surfaces: structuredClone(m.surfaces) } : {}),
+    ...(m.bodyContact !== undefined ? { bodyContact: structuredClone(m.bodyContact) } : {}),
+    ...(m.compiler && Number.isInteger(m.compiler.version) && typeof m.compiler.source === 'string' && m.compiler.source.length < 8000 ? { compiler: m.compiler } : {}),
+    ...(Object.keys(views).length ? { views } : {}),
+    ...(Object.keys(over).length ? { over } : {}),
+    ...(typeof m.fitted === 'string' && DAY_RE.test(m.fitted) ? { fitted: m.fitted } : {}),
+    ...(typeof m.note === 'string' ? { note: str(m.note, 200) } : {}),
+  });
+  const surfaceProblems = seatSurfaceShapeProblems(model);
+  if (surfaceProblems.length) throw new LabError(409, surfaceProblems.join(' '));
+  return { model, ...(typeof r.reviewed === 'string' && DAY_RE.test(r.reviewed) ? { reviewed: r.reviewed } : {}), for: str(r.for, 4000) };
 }
 
 export function cleanPart(p: Partial<PartSpec>): PartSpec {
@@ -593,6 +660,8 @@ export function devLabRoutes(root = resolve(ART, 'drafts'), opts: { run?: typeof
   const r = Router();
   const PUBLIC_ART = resolve(process.cwd(), 'public', 'art');
   const readManifest = () => JSON.parse(readFileSync(resolve(PUBLIC_ART, 'manifest.json'), 'utf8')) as { scale: number; sprites: Record<string, Record<string, unknown>> };
+  const MODELS_FILE = resolve(ART, 'seat-models.json');
+  const readModels = (): SeatModels => (existsSync(MODELS_FILE) ? (JSON.parse(readFileSync(MODELS_FILE, 'utf8')) as SeatModels) : {});
   const wrap = (fn: (req: Request, res: Response) => Promise<unknown> | unknown) => async (req: Request, res: Response) => {
     try {
       const v = await fn(req, res);
@@ -645,6 +714,33 @@ export function devLabRoutes(root = resolve(ART, 'drafts'), opts: { run?: typeof
     }),
   );
   r.get('/drafts/:id', wrap((req) => ({ draft: store.read(req.params.id), history: store.history(req.params.id) })));
+  r.get('/drafts/:id/seat-review', wrap(async (req) => {
+    const module = ['..', '..', '..', 'scripts', 'lib', 'seat-review-status'].join('/');
+    const { seatReviewStatus } = await import(/* @vite-ignore */ module);
+    return seatReviewStatus(store.dir(req.params.id), store.read(req.params.id));
+  }));
+  r.post('/drafts/:id/seat-review', wrap((req) => once(req.params.id, async () => {
+    const d = store.read(req.params.id);
+    if (d.kind !== 'furniture' || d.furniture?.category !== 'seating') throw new LabError(400, 'Only seating drafts have seating checks.');
+    const args = ['furniture-surfaces', draftPath(d.id)];
+    const browserOrigin = req.get('origin') ?? (req.get('referer') ? new URL(req.get('referer')!).origin : undefined);
+    if (browserOrigin) args.push('--review-url', browserOrigin);
+    // Resume source-bound proposals and evidence without drawing another beauty take.
+    const { code, result } = await runLab(args, 30 * 60_000);
+    if ((code !== 0 && !Array.isArray(result.problems)) || result.error) throw new LabError(502, String(result.error ?? 'seating checks failed'));
+    return result;
+  })));
+  r.get('/drafts/:id/seat-review/frame', wrap(async (req) => {
+    const module = ['..', '..', '..', 'scripts', 'lib', 'seat-review-status'].join('/');
+    const { seatReviewFrame } = await import(/* @vite-ignore */ module);
+    return seatReviewFrame(store.dir(req.params.id), String(req.query.facing), Number(req.query.look));
+  }));
+  r.get('/drafts/:id/seat-review/motion', wrap(async (req) => {
+    const module = ['..', '..', '..', 'scripts', 'lib', 'seat-motion-viewer'].join('/');
+    const { seatMotionFrames } = await import(/* @vite-ignore */ module);
+    const draft = store.read(req.params.id);
+    return seatMotionFrames(store.dir(req.params.id), draft.seatMotionReview?.result, String(req.query.facing), Number(req.query.look));
+  }));
   r.put(
     '/drafts/:id',
     json({ limit: '1mb' }),
@@ -713,7 +809,13 @@ export function devLabRoutes(root = resolve(ART, 'drafts'), opts: { run?: typeof
             ? ['furniture-generate', draftPath(d.id), ...(b.view ? ['--view', String(b.view)] : []), ...(b.note ? ['--note', String(b.note).slice(0, 400)] : [])]
             : ['part-generate', draftPath(d.id), '--view', String(b.view ?? 'front')];
         if (b.quality && ['low', 'medium', 'high'].includes(b.quality)) args.push('--quality', b.quality);
-        const { code, result } = await runLab(args);
+        if (d.kind === 'furniture' && d.furniture?.category === 'seating') {
+          const browserOrigin = req.get('origin') ?? (req.get('referer') ? new URL(req.get('referer')!).origin : undefined);
+          if (browserOrigin) args.push('--review-url', browserOrigin);
+        }
+        // A seating take also identifies every physical source view. Keep those paid,
+        // resumable annotation passes within this serialized draft job.
+        const { code, result } = await runLab(args, d.kind === 'furniture' && d.furniture?.category === 'seating' ? 30 * 60_000 : undefined);
         if (code !== 0 || result.error) throw new LabError(502, String(result.error ?? 'generation failed'));
         return result;
       }),
@@ -811,8 +913,21 @@ export function devLabRoutes(root = resolve(ART, 'drafts'), opts: { run?: typeof
       const measured = e as { height?: number; base?: string };
       if (measured.height !== undefined || measured.base !== undefined)
         (d as Draft & { measured?: Record<string, unknown> }).measured = { ...(measured.height !== undefined ? { height: measured.height } : {}), ...(measured.base !== undefined ? { base: measured.base } : {}) };
-      // a seat's arms, as its family has them (the seat framework builds the seat itself: src/shared/art/seatCatalog.ts)
-      if (d.furniture && e.seat !== undefined) d.furniture.arms = !!seatProfile(key.split('.')[0], { arms: (e as { arms?: boolean }).arms }).arms;
+      // a seat comes with its model (art/seat-models.json), passed as the catalog has it: tune it here
+      if (d.furniture && e.seat !== undefined) {
+        d.furniture.arms = !!seatProfile(key.split('.')[0], { arms: (e as { arms?: boolean }).arms, seatKind: d.furniture.seatKind }).arms;
+        const own = readModels()[key];
+        if (own) {
+          // the drawings it's on (the Lab's seatLab.ts drawingsSignature): the catalog's, as this draft has them
+          const sig = JSON.stringify(
+            Object.entries(d.views)
+              .filter(([, v]) => v.file)
+              .sort(([a], [b]) => a.localeCompare(b))
+              .map(([k, v]) => [k, v.file, v.anchor, v.nudge ?? [0, 0]]),
+          );
+          d.furniture.seatModel = cleanSeatModel({ model: own, reviewed: own.reviewed, for: sig });
+        }
+      }
       store.write(d);
       return d;
     }),
@@ -830,7 +945,10 @@ export function devLabRoutes(root = resolve(ART, 'drafts'), opts: { run?: typeof
       if (d.kind === 'furniture' && d.furniture) {
         const f = d.furniture;
         const e: Record<string, unknown> = { name: f.name, category: f.category, footprint: f.footprint, height: f.height, fit: 'anchor', rotation: f.rotation };
-        if (f.seat !== null) Object.assign(e, { seat: f.seat, sitStyle: f.sitStyle, backrest: f.backrest, arms: f.arms });
+        if (f.seat !== null) Object.assign(e, { seat: f.seat, sitStyle: f.sitStyle, backrest: f.backrest, arms: f.arms, seatKind: f.seatKind });
+        // the renderer takes a draft's own model from its sandbox entry (art.ts artSeatModel): people sit in the
+        // sandbox as they will in the game (sprites/seatLayers.ts)
+        if (f.seatModel) e.seatModel = f.seatModel.model;
         if (f.surface !== null) e.surface = f.surface;
         if (f.light) e.light = f.light;
         if (f.rotation === 'flat') {
@@ -883,6 +1001,7 @@ export function devLabRoutes(root = resolve(ART, 'drafts'), opts: { run?: typeof
     '/library',
     wrap(async () => {
       const m = readManifest();
+      const models = readModels();
       const [fr, model] = await Promise.all([review(), modelCheckCatalog()]);
       const out = [];
       for (const [key, e] of Object.entries(m.sprites)) {
@@ -901,6 +1020,7 @@ export function devLabRoutes(root = resolve(ART, 'drafts'), opts: { run?: typeof
           footprint: e.footprint,
           seat: e.seat ?? null,
           facings: Object.keys((e.facings as object) ?? {}),
+          ...(e.seat !== undefined ? { model: models[key] ? (models[key].reviewed ? 'reviewed' : 'fitted') : 'none' } : {}),
           issues,
         });
       }

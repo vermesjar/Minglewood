@@ -17,6 +17,7 @@ import { HAIR, HAIR_ORIGIN, formBackHair, type PlacedMap } from './avatarHair';
 import HAIR_LIB from './hairLib.json';
 import FACE_LIB from './faceLib.json';
 import PET_LIB from './petLib.json';
+import { garmentTriangles } from './avatarGarmentDepth';
 
 /**
  * Paint a hand-drawn tone map at (x0, y0): '#' base, 'h' light, 's' shade, 'd' deep, '.' empty, tinted from
@@ -676,11 +677,15 @@ function drawLegs(P: Pix, F: Frame, L: FullLoadout) {
     if (b === 'cargo' && !far) paint(P, M().rrect(leg.m[0] - 3, leg.m[1] - 5, leg.m[0] + 1, leg.m[1] - 1, 1), shadowOf(pants), { flat: true });
   }
   if (!skirt) {
+    // The pelvis lies on the cushion, even where its silhouette overlaps a
+    // projected shin. Keep its ownership distinct for furniture occlusion.
+    P.layer = LAYER.pelvis;
     const hips = M().rrect(F.hx - 9, F.waistY - 1, F.hx + 10, F.hipY + 3, 2);
     paint(P, hips, pants);
     for (let x = F.hx - 8; x < F.hx + 9; x++) if (hips.has(x, F.waistY + 1)) P.set(x, F.waistY + 1, shadowOf(pants));
     // joggers tie at the front
     if (b === 'joggers' && F.view === 'front') P.stamp(F.collar[0] - 1, F.waistY + 2, ['w.w', 'w.w'], { w: lightOf(lightOf(pants)) });
+    P.layer = LAYER.legs;
   }
   if (skirt || isCoat(L)) drawLowerGarment(P, F, L);
 }
@@ -700,6 +705,7 @@ function drawLowerGarment(P: Pix, F: Frame, L: FullLoadout) {
   const long = b === 'longskirt' && !coat && !dress;
   const top = F.waistY - 1;
   let poly: Array<[number, number]>;
+  let anchors: Array<{anchor:'waist'|'hip'|'nearKnee'|'farKnee';drop:number}>;
   let hem: number;
   if (F.sitting && F.view === 'front') {
     // seated, seen from the front: it drapes from the waist over the thighs to the knees (sitLegs lays them toward us),
@@ -717,6 +723,8 @@ function drawLowerGarment(P: Pix, F: Frame, L: FullLoadout) {
       [nx - 4, ny + 3 + fall],
       [F.hx - 10, F.hipY + 3 + fall],
     ];
+    anchors=[{anchor:'waist',drop:0},{anchor:'waist',drop:0},{anchor:'farKnee',drop:-3},
+      {anchor:'farKnee',drop:2+fall},{anchor:'nearKnee',drop:4+fall},{anchor:'nearKnee',drop:3+fall},{anchor:'hip',drop:3+fall}];
   } else if (F.sitting) {
     hem = F.hipY + (long ? 10 : coat ? 8 : 6);
     poly = [
@@ -725,6 +733,7 @@ function drawLowerGarment(P: Pix, F: Frame, L: FullLoadout) {
       [F.hx + 16, hem],
       [F.hx - 9, hem],
     ];
+    anchors=[{anchor:'waist',drop:0},{anchor:'waist',drop:0},{anchor:'hip',drop:hem-F.hipY},{anchor:'hip',drop:hem-F.hipY}];
   } else {
     hem = long ? 98 : coat ? 94 : dress ? 91 : 90;
     // the legs' x at the hem, so a stride flares the hem
@@ -741,11 +750,15 @@ function drawLowerGarment(P: Pix, F: Frame, L: FullLoadout) {
       [Math.max(...xs) + 8, hem],
       [Math.min(...xs) - 7, hem],
     ];
+    anchors=[{anchor:'waist',drop:0},{anchor:'waist',drop:0},{anchor:'hip',drop:hem-F.hipY},{anchor:'hip',drop:hem-F.hipY}];
   }
   const shape = M().poly(poly);
   const front = F.view === 'front';
   const split = F.collar[0];
   if (coat && front && !F.sitting) shape.cut(M().rect(split - 1, F.waistY + 1, split + 1, hem + 1));
+  // Preserve the original painter domain, including a coat's open front. This
+  // describes authored cloth, not anatomical legs or any furniture mask.
+  P.lowerGarment={version:1,vertices:poly.map((point,i)=>({point,...anchors[i]})),triangles:garmentTriangles(poly),mask:shape.m.slice()};
   const shade = shadowOf(col);
   paint(P, shape, (x, y) => {
     if (coat) {
@@ -766,46 +779,49 @@ function drawShoes(P: Pix, F: Frame, L: FullLoadout) {
   const kind = L.shoes.replace('shoes.', '');
   const c = hx(L.shoesColor);
   const front = F.view === 'front';
-  for (const [leg, far, heel] of [
-    [F.legFar, true, F.heelFar],
-    [F.legNear, false, F.heelNear],
-  ] as const) {
-    const [ax, ay] = leg.b;
-    const lift = heel ? 1 : 0;
-    const x0 = ax - 3 - (front ? 0 : 2);
-    const x1 = ax + 4 + (front ? 2 : 0);
-    const y0 = ay - lift;
-    const shade = far ? 0.35 : 0;
-    const tall = kind === 'boots' ? 4 : kind === 'rainboots' ? 7 : kind === 'hightops' ? 2 : 0;
-    const shoe = M().rrect(x0, y0, x1, y0 + 5, 2);
-    if (tall) shoe.rect(ax - 3, y0 - tall, ax + 4, y0 + 2);
-    if (kind === 'sandals') {
-      paint(P, M().rrect(x0, y0 + 1, x1, y0 + 5, 2), hx(L.skin), { shade });
-      P.stamp(x0 + 1, y0 + 2, ['cccc'], { c });
-      continue;
+  try {
+    for (const [leg, far, heel] of [
+      [F.legFar, true, F.heelFar],
+      [F.legNear, false, F.heelNear],
+    ] as const) {
+      P.shoeLimbActive = far ? 2 : 1;
+      const [ax, ay] = leg.b;
+      const lift = heel ? 1 : 0;
+      const x0 = ax - 3 - (front ? 0 : 2);
+      const x1 = ax + 4 + (front ? 2 : 0);
+      const y0 = ay - lift;
+      const shade = far ? 0.35 : 0;
+      const tall = kind === 'boots' ? 4 : kind === 'rainboots' ? 7 : kind === 'hightops' ? 2 : 0;
+      const shoe = M().rrect(x0, y0, x1, y0 + 5, 2);
+      if (tall) shoe.rect(ax - 3, y0 - tall, ax + 4, y0 + 2);
+      if (kind === 'sandals') {
+        paint(P, M().rrect(x0, y0 + 1, x1, y0 + 5, 2), hx(L.skin), { shade });
+        P.stamp(x0 + 1, y0 + 2, ['cccc'], { c });
+        continue;
+      }
+      if (kind === 'heels') {
+        // a slim pointed pump: the toe box, an instep gap, and a thin heel under the back of the foot
+        const back = front ? x0 : x1 - 2;
+        const toe = front ? x1 : x0;
+        const pump = M().rrect(Math.min(back, toe - (front ? 5 : 0)), y0 + 1, Math.max(back + 2, toe + (front ? 0 : 5)), y0 + 4, 1.5);
+        paint(P, pump, c, { shade });
+        const hx0 = front ? x0 + 1 : x1 - 3;
+        paint(P, M().rect(hx0, y0 + 3, hx0 + 2, y0 + 6), mix(c, LINE, 0.35), { shade, flat: true });
+        continue;
+      }
+      paint(P, shoe, kind === 'slippers' ? lightOf(c) : c, { shade });
+      const sole: RGB = kind === 'sneakers' || kind === 'hightops' || kind === 'skates' ? WHITE : [52, 38, 40];
+      for (let x = x0 + 1; x < x1 - 1; x++) if (shoe.has(x, y0 + 3) && shoe.has(x, y0 + 4)) P.set(x, y0 + 3, sole);
+      if (kind === 'sneakers' || kind === 'hightops') P.stamp(ax - 1, y0 + 1, ['ww'], { w: WHITE });
+      if (kind === 'loafers') P.stamp(ax, y0 + 1, ['gg'], { g: GOLD });
+      if (kind === 'slippers') {
+        // a fluffy cuff round the opening
+        const fluff = mix(lightOf(c), WHITE, 0.55);
+        for (let x = x0; x < x1; x++) if (shoe.has(x, y0) || shoe.has(x, y0 + 1)) P.set(x, y0 + (x % 2), fluff);
+      }
+      if (kind === 'skates') for (const wx of [x0 + 1, x0 + 4, x0 + 7]) P.set(wx, y0 + 6, [255, 138, 61]);
     }
-    if (kind === 'heels') {
-      // a slim pointed pump: the toe box, an instep gap, and a thin heel under the back of the foot
-      const back = front ? x0 : x1 - 2;
-      const toe = front ? x1 : x0;
-      const pump = M().rrect(Math.min(back, toe - (front ? 5 : 0)), y0 + 1, Math.max(back + 2, toe + (front ? 0 : 5)), y0 + 4, 1.5);
-      paint(P, pump, c, { shade });
-      const hx0 = front ? x0 + 1 : x1 - 3;
-      paint(P, M().rect(hx0, y0 + 3, hx0 + 2, y0 + 6), mix(c, LINE, 0.35), { shade, flat: true });
-      continue;
-    }
-    paint(P, shoe, kind === 'slippers' ? lightOf(c) : c, { shade });
-    const sole: RGB = kind === 'sneakers' || kind === 'hightops' || kind === 'skates' ? WHITE : [52, 38, 40];
-    for (let x = x0 + 1; x < x1 - 1; x++) if (shoe.has(x, y0 + 3) && shoe.has(x, y0 + 4)) P.set(x, y0 + 3, sole);
-    if (kind === 'sneakers' || kind === 'hightops') P.stamp(ax - 1, y0 + 1, ['ww'], { w: WHITE });
-    if (kind === 'loafers') P.stamp(ax, y0 + 1, ['gg'], { g: GOLD });
-    if (kind === 'slippers') {
-      // a fluffy cuff round the opening
-      const fluff = mix(lightOf(c), WHITE, 0.55);
-      for (let x = x0; x < x1; x++) if (shoe.has(x, y0) || shoe.has(x, y0 + 1)) P.set(x, y0 + (x % 2), fluff);
-    }
-    if (kind === 'skates') for (const wx of [x0 + 1, x0 + 4, x0 + 7]) P.set(wx, y0 + 6, [255, 138, 61]);
-  }
+  } finally { P.shoeLimbActive = 0; }
 }
 
 /** The loadout's body base ('body.b' → 'b'; anything else is the default straight base). */
@@ -1211,6 +1227,7 @@ export const LAYER = {
   chairFront: 17,
   cane: 18,
   outline: 19,
+  pelvis: 20,
 } as const;
 
 /** A momentary expression layered on the look: a blink, or the mouth open mid-sentence. */
@@ -1337,9 +1354,11 @@ function sealPinholes(P: Pix) {
     }
     if (pocket.length > 8 || !acc[3]) continue;
     const c = mix([acc[0] / acc[3], acc[1] / acc[3], acc[2] / acc[3]], LINE, 0.6);
+    P.sealed ??= new Uint8Array(W * H);
     for (const i of pocket) {
       P.d.set([c[0], c[1], c[2], 255], i * 4);
       P.owner[i] = owner;
+      P.sealed[i] = 1;
     }
   }
 }
@@ -1404,6 +1423,7 @@ function sealHairPockets(P: Pix, L: FullLoadout) {
       P.d[i * 4 + 2] = shade[2];
       P.d[i * 4 + 3] = 255;
       P.owner[i] = layer;
+      if (byHair === 0) { P.bodyPocket ??= new Uint8Array(W * H); P.bodyPocket[i] = 1; }
     }
   }
 }

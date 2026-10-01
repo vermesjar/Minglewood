@@ -32,55 +32,44 @@ requires:
 | footprint width × depth, height | `footprint` [width, depth] as seen facing sw, `height` (art px). The height is measured again from the drawing |
 | how it turns | `rotation`: **radial** (one drawing), **mirror** (a front and a back drawn: se + nw, or sw + ne for a long piece, lying along its width like the catalog's long pieces; the other two are their mirrors), **full** (four drawings: anything handed), **flat** (wall art). "Looks the same from behind" is `sameFromBehind` |
 | stands on | `layer`: the floor (`object`), a counter (`surface`, placed at the counter's z), flat (`floor`, a rug) |
-| seat height, sat in as, backrest, arms | the seat standard's profile (`seat`, `sitStyle`, `backrest`, `arms`). Only seating has one. It's what the seat's model is fitted from; how people sit in it is the model (**How people sit in it**, below) |
-| surface height, lights up, action, used from | `surface`, a light point per drawing, `use: {face, actions}` |
+| seat height, sat in as, backrest, arms | the seat standard's profile (`seat`, `sitStyle`, `backrest`, `arms`). Only seating has one. It's what the seat's model is fitted from; how people sit in it is the model (**How people sit** is automatic. Choose a seating type, describe its appearance, and generate its drawings.
+The type supplies the pose, cushion height, and construction defaults. There are no sitting-point sliders,
+per-facing offsets, traced overlap masks, or anchor nudges for seating.
 
-**Describe it** in the prompt (what it is, materials, colours, era; the house style block is added for you). Drop
-up to six **reference images** for look. The construction guide still sets size and angle. For a *full* piece, the
-per-view notes say where handed details go ("the bell on the left end").
+Supported types are chairs (including office and dining chairs), armchairs, sofas/loveseats, benches/banquettes,
+stools, ottomans/poufs, beanbags, floor cushions, and thrones. Sofas and benches support a single row of two,
+three, or four cushions. Backrests and armrests are optional on chairs, benches, and stools. These are upright
+seating types: reclining poses, chaises, hammocks, corner sectionals, and multi-row seating need their own
+future mechanics and must not be represented as an ordinary chair.
 
-**✦ Draw it** shows what you're about to spend first: the likely cost (the mean of real past calls of the same
-kind, quality and size), today's spend and what's left of `art/budget.json`. Every generation asks. All the views
-it needs are drawn together on one sheet so they're the same piece.
+After generation, `seatCompiler.ts` fits one physical model to all four resolved views. It enforces cushion size,
+outer arm placement, support frames below the cushion, and clearance around the sitter. It retries a failed
+fit automatically. A drawing that still fails stays unpublished; redraw the artwork rather than manually rigging it.
+The declared `seatKind` determines construction, independently of the catalog key.
 
-**Every side** shows all four facings on a checkerboard with the footprint (cyan), and its centre (square), exactly
-as the game places them. Mirrored sides are labelled, and small pieces are marked *auto-centred* (the game centres
-them on their footprint whatever the anchor says). For each drawn view you can:
+The browser runs the compiler in a worker. The preview shows four directions, three outfits, individual cushions
+or full occupancy, and normal/enlarged scales. The server compiles or validates the same model on staged pixels
+before publishing. Changes to drawings, anchors, type, footprint, or pose invalidate its compilation fingerprint.
 
-- **nudge** the anchor a pixel at a time (for pieces that fill their footprint),
-- **accept** it (every view must be accepted to publish),
-- **Redraw…** with an optional note ("make the backrest taller"). The accepted views go along as references so it
-  stays the same piece.
+Every facing uses the same physical pelvis point. Complete legs are drawn in front and rear views, then each
+figure is masked against the furniture separately. Open chair frames reveal the legs behind them; solid backs
+and skirts occlude them. Reachable stool footrests support the feet. The same composition drives the preview
+and the room renderer, including the step into and out of the seat.
 
-**Checks** runs the same model check the gate runs: every drawing its rotation needs, each facing the right way,
-standing on its footprint (the fill rule), and a complete declaration. It also runs the furniture review's per-view
-placement, stray pixels and sliced-top tests. A red dot on a view says which one.
+Accepting a drawing remains an appearance choice. It is not manual calibration or a substitute for seating checks.
+Before publishing, use the occupied previews and room sandbox to review how the piece looks. Automated fit checks
+reject known structural failures; they cannot guarantee the artistic quality of every possible generated image.
 
-**Seating isn't drawn here.** Every seat in the game is built from a spec on the seat framework
-(`src/shared/world/seatSpec.ts`: the kinds — chair, armchair, couch, bench, stool, bar stool, beanbag, ottoman, throne —
-each sized to the figure that sits in it) and drawn from that model by the renderer (`src/shared/art/seatRender.ts`),
-which is what makes people sit in it exactly, from every side. To add or change a seat, add or edit its spec in the
-catalog (`src/shared/art/seatCatalog.ts`), then run `node --no-maglev --import tsx scripts/seat-build.ts` to rebuild its
-PNGs and manifest entry and `node --no-maglev --import tsx scripts/seat-grade.ts` to grade it (the gate runs the same).
-A seating draft here can't be drawn or published; the Lab says so.
+Developer verification and the catalog audit are documented in [seating.md](seating.md).
 
-**Try it in game** is a real room drawn by the game's renderer from the draft's own sprites. The published catalog
-is untouched: the lab serves a copy of the manifest with the draft swapped in. You can:
+**Try it in game** uses a real room and the draft's sprites without changing the published catalog. Turn the piece
+with the buttons or **R**, click the floor to walk, click the piece to use it, and use **Fill seats**, **+ People**,
+or **Clear** to change occupancy. Day/night and zoom controls are available. Counter pieces stand on a counter.
 
-- turn the piece (the buttons, or **R**),
-- click the floor to walk and click the piece to use it or sit on it (the nearest free cushion),
-- **Fill seats** to put someone on every cushion, **+ People** to add a few people and **Clear** to remove them,
-- switch between day and night, and zoom 1–4×.
-
-Counter pieces stand on a counter.
-
-**Publish to catalog** is enabled once every view is accepted and the checks pass (never for seating). It goes through
-`studio.py lab-publish`: the model check runs again on the staged entry, and then, under the manifest lock, the
-drawings are copied to `public/art/sprites` and the entry is written to `public/art/manifest.json`. After that it's in
-the decorate palette. The lab won't overwrite a key that's already in the catalog unless the draft was opened from
-that piece.
-
-**Export draft (.zip)** downloads the whole draft folder. **Discard** moves it to `art/drafts/.trash/`.
+**Publish to catalog** becomes available after every drawing is accepted and the checks pass. `studio.py lab-publish`
+checks the staged entry again, then copies drawings and updates the manifest under its lock. An existing key can
+only be replaced by a draft opened from that piece. **Export draft (.zip)** downloads the draft; **Discard** moves
+it to `art/drafts/.trash/`.
 
 ## Character parts
 

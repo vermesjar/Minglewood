@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import hashlib
 import json
 import shutil
 import subprocess
@@ -32,6 +33,15 @@ from PIL import Image
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import studio  # noqa: E402
+import seat_surfaces
+import seat_independent_review  # noqa: E402
+import seat_review_repair
+import seat_curved_generate
+import seat_authored_review
+import seat_visual_review
+import seat_motion_review
+import seat_motion_visual
+import seat_wardrobe_review
 
 DRAFTS = HERE / "drafts"
 CHARKIT_OUT = HERE / "out" / "charkit"
@@ -41,13 +51,18 @@ VIEWS = {"radial": [None], "flat": [None], "fixed": [None], "mirror": ["se", "nw
 NAME_MAX = 40
 
 
-def views_of(f: dict) -> list:
+def views_of(f: dict, have: dict | None = None) -> list:
     """The drawings a piece needs: one (radial, flat), a front and a back (mirror; just the front if it honestly
     looks the same from behind), or four (full). A long mirror piece is drawn sw + ne, lying along its width
     like every long piece in the catalog (the model draws a long piece turned se/nw along the wrong diagonal)."""
     if f["rotation"] == "mirror":
         long = f["footprint"][0] != f["footprint"][1]
         front, back = ("sw", "ne") if long else ("se", "nw")
+        have = have or {}
+        if front not in have:
+            front = next((v for v in ("se", "sw") if v in have), front)
+        if back not in have:
+            back = next((v for v in ("ne", "nw") if v in have), back)
         return [front] if f.get("sameFromBehind") else [front, back]
     return VIEWS[f["rotation"]]
 
@@ -160,6 +175,8 @@ def model_decl(draft: dict) -> dict:
         e["layer"] = "floor" if cat == "rug" else f.get("layer") or "object"
         e["walk"] = "seat" if seating else "open" if e["layer"] == "floor" else "blocked"
         if seating:
+            if f.get("seatKind"):
+                e["seatKind"] = f["seatKind"]
             e.update(seat=f.get("seat") or 12, sitStyle=f.get("sitStyle") or "chair", backrest=bool(f.get("backrest", True)))
             if f.get("arms"):
                 e["arms"] = True
@@ -196,7 +213,7 @@ def cmd_furniture_generate(a):
     d = draft_dir(a.draft)
     draft = load(d)
     f = draft["furniture"]
-    views = views_of(f)
+    views = views_of(f, draft.get("views"))
     if a.view:
         if a.view not in [v or "one" for v in views]:
             out({"error": f"{a.view} isn't a view of a '{f['rotation']}' piece"}, 2)
@@ -246,7 +263,7 @@ def cmd_furniture_generate(a):
     draft.setdefault("views", {})
     if not a.view:
         # a whole new drawing: views the piece no longer needs (it turned differently before) go
-        need = [v or "one" for v in views_of(f)]
+        need = [v or "one" for v in views_of(f, draft.get("views"))]
         draft["views"] = {k: v for k, v in draft["views"].items() if k in need}
     for name, v in results.items():
         rel = Path(v["file"]).resolve().relative_to(d)
@@ -256,7 +273,22 @@ def cmd_furniture_generate(a):
     names = sorted(results)
     draft.setdefault("takes", []).append({"n": n, "at": time.strftime("%Y-%m-%dT%H:%M:%S"), "views": names,
                                           "note": a.note or "", "usd": round(usd, 4)})
+    if f.get("category") == "seating":
+        # Only a successful new beauty take invalidates generated identities automatically.
+        # Keep the previous model as evidence; ordinary edits/checks/publish never drop maps.
+        if f.get("seatModel"):
+            (take / "previous-seat-model.json").write_text(json.dumps(f["seatModel"]), encoding="utf-8")
+        f["seatModel"] = None
+        draft["seatingSurfaceReview"] = {"status": "INCOMPLETE", "reason": "New beauty pixels require new surface identification."}
     save(d, draft)
+    if f.get("category") == "seating" and all(draft.get("views", {}).get(v or "one", {}).get("file") for v in views_of(f, draft.get("views"))):
+        entry, sprites = stage(d, draft)
+        draft["seatingProblems"] = generate_seating_surfaces(d, draft, entry, sprites)
+        if not draft["seatingProblems"]:
+            draft["seatingProblems"] = generate_seating_review(d, draft, getattr(a, "review_url", "http://localhost:5195"))
+        usd += spent_on(since, lambda label: label.startswith(f"surfaces/{draft['key']}/"))
+        draft["takes"][-1]["usd"] = round(usd, 4)
+        save(d, draft)
     history(d, "generate", take=n, views=names, usd=round(usd, 4), note=a.note or "")
     out({"draft": draft, "usd": round(usd, 4)})
 
@@ -283,7 +315,7 @@ def stage(d: Path, draft: dict) -> tuple[dict, Path]:
         e["base"] = m.get("base", "centred")
     e["fit"] = "anchor"
     light_r = (f.get("light") or {}).get("r", 40) if f.get("light") else None
-    need = [v or "one" for v in views_of(f)]
+    need = [v or "one" for v in views_of(f, draft.get("views"))]
     for name, v in sorted((draft.get("views") or {}).items()):
         if name not in need:
             continue
@@ -318,19 +350,453 @@ def wall_standard(e: dict, img: Image.Image):
     e["height"] = h
 
 
-def seat_checks(_d: Path, draft: dict, e: dict) -> list[str]:
-    """Seats aren't drafted here: every seat is built from its spec on the seat framework (src/shared/world/seatSpec.ts,
-    the catalog in src/shared/art/seatCatalog.ts, scripts/seat-build.ts), never drawn. A seating draft can't publish."""
-    if e.get("walk") != "seat" and draft["furniture"].get("category") != "seating":
+def model_check(d: Path, draft: dict, e: dict, write: bool = False) -> list[str]:
+    """THE SEAT CHECK (scripts/lab-model.ts: seatLayers.ts seatProblems, the gate's): the seat's model holding in every
+    facing on the staged drawings, compiled automatically; with `write`, stored in art/seat-models.json (after the
+    piece is published). A seat is published with its model: that's how people are drawn sitting in it."""
+    if e.get("walk") != "seat":
         return []
-    return ["seats are built from the seat framework (src/shared/art/seatCatalog.ts), not drawn here"]
+    model = draft["furniture"].get("seatModel") or {}
+    (d / "stage" / "model.json").write_text(json.dumps(model), encoding="utf-8")
+    # (--no-maglev: Node 24.12's Maglev JIT crashes node on this machine)
+    args = ["node", "--no-maglev", *studio.TSX, "scripts/lab-model.ts", "--entries", str(d / "stage" / "entries.json"),
+            "--sprites", str(d / "stage" / "sprites"), "--key", draft["key"], "--model", str(d / "stage" / "model.json")]
+    if write:
+        args.append("--write")
+    r = subprocess.run(args, cwd=HERE.parent, capture_output=True, text=True, encoding="utf-8")
+    lines = [ln for ln in r.stdout.splitlines() if ln.startswith("{")]
+    res = json.loads(lines[-1]) if lines else {"error": (r.stderr or "model check failed").strip()[-400:]}
+    if res.get("error"):
+        return [f"seat model: {res['error']}"]
+    if res.get("model"):
+        signature = json.dumps([[k, v["file"], v.get("anchor"), v.get("nudge", [0, 0])]
+                                for k, v in sorted(draft.get("views", {}).items()) if v.get("file")], separators=(",", ":"), ensure_ascii=False)
+        draft["furniture"]["seatModel"] = {"model": res["model"], "for": signature}
+        save(d, draft)
+    return [f"seating: {p_}" for p_ in res.get("problems", [])]
+
+
+def has_model(draft: dict) -> bool:
+    return bool((draft["furniture"].get("seatModel") or {}).get("model"))
+
+
+def surface_cache_valid(surface: dict, source: dict) -> bool:
+    """Cache integrity, not semantic approval: exact bindings and full alpha coverage."""
+    if not isinstance(surface, dict) or surface.get("version") != 1:
+        return False
+    if any(surface.get(k) != source.get(k) for k in ("width", "height", "drawing", "modelParts")):
+        return False
+    labels = surface.get("labels")
+    if not isinstance(labels, list) or len(labels) != source["width"] * source["height"]:
+        return False
+    return all(type(label) is int and 0 <= label <= len(source["parts"]) * 3 and
+               bool(label) == bool(source["rgba"][i * 4 + 3]) for i, label in enumerate(labels))
+
+
+def surface_source_views(entry: dict, model: dict) -> list[str]:
+    """Annotate actual front/rear drawings; asymmetric or single-image models need explicit resolved views."""
+    views = sorted((entry.get("facings") or {}).keys())
+    parts = model["parts"]
+    width = model["size"][0]
+    symmetric = all(any(q["part"] == p["part"] and q["v"] == p["v"] and q["z"] == p["z"] and
+                        abs(q["u"][0] - (width - p["u"][1])) < 1e-8 and
+                        abs(q["u"][1] - (width - p["u"][0])) < 1e-8 for q in parts) for p in parts)
+    if not symmetric or not any(v in views for v in ("se", "sw")) or not any(v in views for v in ("ne", "nw")):
+        return ["se", "sw", "ne", "nw"]
+    return views
+
+
+def seating_draft_source(d: Path, draft: dict) -> dict:
+    """Bind the Studio draft's actual drawings/declaration, not its review status."""
+    views = {f: {k: v for k, v in view.items() if k != "accepted"} for f, view in draft.get("views", {}).items()}
+    files = {}
+    for view in views.values():
+        if view.get("file"):
+            path = (d / view["file"]).resolve()
+            path.relative_to(d.resolve())
+            files[view["file"]] = hashlib.sha256(path.read_bytes()).hexdigest()
+    return {"key": draft["key"], "furniture": {k: v for k, v in draft.get("furniture", {}).items() if k != "seatModel"},
+            "views": views, "files": files}
+
+
+def surface_digests(d: Path, surfaces: dict) -> dict:
+    """Float-rich curved maps use the same numeric serialization as the TS gate."""
+    if not any(m.get("version") == 2 for m in surfaces.values()):
+        return {f:seat_review_repair.digest(m) for f,m in surfaces.items()}
+    source=d / "stage" / "surface-digest-input.json"
+    source.parent.mkdir(parents=True,exist_ok=True)
+    source.write_text(json.dumps(surfaces,allow_nan=False),encoding="utf-8")
+    result=subprocess.run(["node","--no-maglev",*studio.TSX,"scripts/seat-surface-digests.ts","--input",str(source)],
+                          cwd=HERE.parent,capture_output=True,text=True,encoding="utf-8")
+    if result.returncode:raise RuntimeError((result.stderr or result.stdout)[-1000:])
+    hashes=json.loads(result.stdout)
+    if set(hashes)!=set(surfaces) or any(not isinstance(v,str) or len(v)!=64 for v in hashes.values()):
+        raise ValueError("Malformed shared surface digest result")
+    return hashes
+
+
+def generate_seating_surfaces(d: Path, draft: dict, entry: dict, sprites: Path) -> list[str]:
+    """Automatic identity production after beauty generation, with resumable content-bound proposals.
+
+    This creates source labels, not an approval. Independent canvas/semantic review is separate.
+    A failure keeps the beauty take and cached proposals so annotation can resume without redrawing.
+    """
+    if entry.get("walk") != "seat":
+        return []
+    review = {}
+    try:
+        problems = model_check(d, draft, entry)
+        if problems:
+            raise RuntimeError("; ".join(problems))
+        model = draft["furniture"]["seatModel"]["model"]
+        models = d / "stage" / "surface-models.json"
+        models.write_text(json.dumps({draft["key"]: model}), encoding="utf-8")
+        pending, review, resolved = {}, {}, {}
+        for facing in ["se", "sw", "ne", "nw"]:
+            export = d / "stage" / "surface-inputs" / facing
+            result = subprocess.run(["node", "--no-maglev", *studio.TSX, "scripts/seat-surface-export.ts",
+                                     "--entries", str(d / "stage" / "entries.json"), "--models", str(models),
+                                     "--sprites", str(sprites), "--key", draft["key"], "--facing", facing,
+                                     "--out", str(export)], cwd=HERE.parent, capture_output=True, text=True, encoding="utf-8")
+            if result.returncode:
+                raise RuntimeError((result.stderr or result.stdout)[-1000:])
+            resolved[facing] = json.loads((export / "input.json").read_text(encoding="utf-8"))
+        beauty = {f: {k: data[k] for k in ("key", "facing", "width", "height", "drawing", "anchor", "rgba")} for f, data in resolved.items()}
+        context_hash = hashlib.sha256(json.dumps(beauty, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+        for facing, data in resolved.items():
+            # Never transport old semantic labels or tested avatar outputs to the source author.
+            resolved[facing] = {k: data[k] for k in ("key", "facing", "width", "height", "drawing", "mechanicsDigest", "modelParts", "anchor", "parts", "rgba")}
+            resolved[facing].update(projectedParts=data.get("projectedParts", []), model={"size": model["size"]}, sourceViews=beauty)
+            (d / "stage" / "surface-inputs" / facing / "input.json").write_text(json.dumps(resolved[facing]), encoding="utf-8")
+        # A resumed surface job must not replace a validated repaired map with its older cached first proposal.
+        previous_contract_path=d / "surface-review-contract.json"
+        if previous_contract_path.exists() and model.get("surfaces"):
+            previous=json.loads(previous_contract_path.read_text(encoding="utf-8"))
+            if previous.get("producerVersion")==seat_surfaces.SURFACE_PRODUCER_VERSION and previous.get("sourceContextSha256")==context_hash and \
+               previous.get("compiler")==model.get("compiler") and previous.get("sits")==model["sits"] and \
+               previous.get("mechanicsDigest")==next(iter(resolved.values()))["mechanicsDigest"] and \
+               previous.get("modelParts")==next(iter(resolved.values()))["modelParts"] and \
+               previous.get("surfaceDigests")==surface_digests(d,model["surfaces"]):
+                for facing, surface in model['surfaces'].items():
+                    seat_surfaces.validate_surface_ownership(resolved[facing], surface)
+                return []
+        for facing in surface_source_views(entry, model):
+            source = resolved[facing]
+            contract = {k: source[k] for k in ("key", "facing", "width", "height", "drawing", "mechanicsDigest", "modelParts", "anchor")}
+            contract.update(producerVersion=seat_surfaces.SURFACE_PRODUCER_VERSION, projectedParts=source.get("projectedParts"), sourceContextSha256=context_hash)
+            digest = hashlib.sha256(json.dumps(contract, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+            folder = d / "surface-proposals" / digest / facing
+            folder.mkdir(parents=True, exist_ok=True)
+            path = folder / "input.json"
+            path.write_text(json.dumps(source), encoding="utf-8")
+            surface_path, proposal_path = folder / "surface.json", folder / "proposal.json"
+            try:
+                surface = json.loads(surface_path.read_text(encoding="utf-8"))
+                proposal = json.loads(proposal_path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                surface, proposal = None, None
+            if not surface_cache_valid(surface, source) or not isinstance(proposal, dict) or not isinstance(proposal.get("uncertainties"), list):
+                seat_surfaces.propose(path, reasoning_effort="medium")
+                surface = json.loads(surface_path.read_text(encoding="utf-8"))
+                proposal = json.loads(proposal_path.read_text(encoding="utf-8"))
+            if not surface_cache_valid(surface, source):
+                raise RuntimeError(f"{facing}: generated surface labels do not match the source contract.")
+            if not isinstance(proposal, dict) or not isinstance(proposal.get("uncertainties"), list):
+                raise RuntimeError(f"{facing}: surface proposal lacks its uncertainty record.")
+            seat_surfaces.validate_ownership(proposal)
+            seat_surfaces.validate_surface_ownership(source, surface, proposal)
+            pending[facing] = surface
+            review[facing] = {"status": "UNREVIEWED", "contract": digest, "drawing": source["drawing"],
+                              "modelParts": source["modelParts"], "artifact": folder.relative_to(d).as_posix(),
+                              "producerVersion": seat_surfaces.SURFACE_PRODUCER_VERSION,
+                              "projectedParts": source.get("projectedParts"),
+                              "physicalPartAssignments": proposal.get("physicalPartAssignments", []),
+                              "uncertainties": proposal.get("uncertainties", [])}
+        # Attach atomically after every physical source view is complete. The shared compiler validates
+        # all four resolved views, including mirror identities, before this result is considered usable.
+        model["surfaces"] = pending
+        if seat_curved_generate.eligible(model):
+            # A wrap seat is authored as a continuous support well/rim, not box depths.
+            # This is still new unreviewed intent; capture and independent review follow.
+            models.write_text(json.dumps({draft["key"]: model}), encoding="utf-8")
+            request = d / "stage" / "curved-source.json"
+            result_file = d / "stage" / "curved-result.json"
+            attached_file = d / "stage" / "curved-model.json"
+            command = ["node", "--no-maglev", *studio.TSX, "scripts/seat-curved-author.ts",
+                       "--key", draft["key"], "--entries", str(d / "stage" / "entries.json"),
+                       "--models", str(models), "--sprites", str(sprites), "--request", str(request)]
+            prepared = subprocess.run([*command, "--prepare"], cwd=HERE.parent, capture_output=True, text=True, encoding="utf-8")
+            if prepared.returncode:
+                raise RuntimeError((prepared.stderr or prepared.stdout)[-1500:])
+            curve = seat_curved_generate.produce(request, result_file)
+            attached = subprocess.run([*command, "--result", str(result_file), "--out", str(attached_file)],
+                                      cwd=HERE.parent, capture_output=True, text=True, encoding="utf-8")
+            if attached.returncode:
+                raise RuntimeError((attached.stderr or attached.stdout)[-1500:])
+            model = json.loads(attached_file.read_text(encoding="utf-8"))
+            draft["furniture"]["seatModel"]["model"] = model
+            pending = model["surfaces"]
+            review["authoredGeometry"] = {"status": "UNREVIEWED_AUTHORED_INTENT", "generatorSha256": curve["generatorSha256"],
+                                         "sourceInputsSha256": curve["sourceInputsSha256"], "audits": curve["audits"],
+                                         "artifact": result_file.relative_to(d).as_posix()}
+        draft["seatingSurfaceReview"] = {"status": "UNREVIEWED", "views": review}
+        problems = model_check(d, draft, entry)
+        if problems:
+            raise RuntimeError("; ".join(problems))
+        contract = {"version": 1, "producerVersion": seat_surfaces.SURFACE_PRODUCER_VERSION,
+                    "draftSource": seating_draft_source(d, draft),
+                    "key": draft["key"], "compiler": model.get("compiler"), "sourceContextSha256": context_hash,
+                    "mechanicsDigest": next(iter(resolved.values()))["mechanicsDigest"],
+                    "modelParts": next(iter(resolved.values()))["modelParts"], "sits": model["sits"],
+                    "resolvedViews": {f: {k: data[k] for k in ("drawing", "width", "height", "anchor")} for f, data in resolved.items()},
+                    "surfaceDigests": surface_digests(d,pending),
+                    "physicalViewContracts": {f: data["contract"] for f, data in review.items() if "contract" in data},
+                    "requiredEvidence": ["independent identity of every opaque source pixel", "actual WorldView RGBA and ownership for every facing, cushion, outfit and sitting state"]}
+        (d / "surface-review-contract.json").write_text(json.dumps(contract, indent=2), encoding="utf-8")
+        draft["seatingSurfaceReview"]["contract"] = "surface-review-contract.json"
+        save(d, draft)
+        return []
+    except (Exception, SystemExit) as error:
+        draft["seatingSurfaceReview"] = {"status": "FAILED", "error": str(error), "views": review}
+        save(d, draft)
+        return [f"automatic seating surface identification: {error}"]
+
+
+def generate_seating_review(d: Path, draft: dict, url="http://localhost:5195", allow_visual_paid=True) -> list[str]:
+    """Capture actual runtime, independently judge originals, then verify exact complete evidence."""
+    if draft.get("furniture", {}).get("category") != "seating":
+        return []
+    try:
+        model = draft["furniture"]["seatModel"]["model"]
+        if not model.get("surfaces"):
+            raise RuntimeError("Surface identities are incomplete")
+        models = d / "stage" / "surface-models.json"
+        models.write_text(json.dumps({draft["key"]: model}), encoding="utf-8")
+        def run(script, *args, allow_failure=False):
+            result = subprocess.run(["node", "--no-maglev", *studio.TSX, script, *map(str, args)],
+                                    cwd=HERE.parent, capture_output=True, text=True, encoding="utf-8")
+            if result.returncode and not allow_failure:
+                raise RuntimeError((result.stderr or result.stdout)[-3000:])
+            return result
+        contract_path=d / "surface-review-contract.json"
+        contract=json.loads(contract_path.read_text(encoding="utf-8"))
+        if contract.get("draftSource") is not None and contract["draftSource"]!=seating_draft_source(d,draft):
+            raise RuntimeError("Draft beauty or declaration changed; resume source authoring before reviewing captures.")
+        authored = all(m.get("version") == 2 for m in model["surfaces"].values())
+        base=seat_review_repair.digest({**{k:contract.get(k) for k in ["key","compiler","mechanicsDigest","modelParts","sits","resolvedViews","sourceContextSha256","producerVersion"]},
+                                      "independentReviewerVersion":seat_independent_review.VERSION,
+                                      **({"authoredReference":{
+                                          "generators":{f:hashlib.sha256((HERE/f).read_bytes()).hexdigest() for f in
+                                              ["seat_authored_review.py","seat_body_reference.py","seat_curved_authoring.py","seat_correspondence.py"]},
+                                          "surfaces":{f:{k:v for k,v in m.get("authored",{}).items() if k!="z"} for f,m in model["surfaces"].items()}
+                                      }} if authored else {})})
+        ledger_path=d / "independent-review-runs" / base / "ledger.json"
+        ledger_path.parent.mkdir(parents=True,exist_ok=True)
+        ledger=json.loads(ledger_path.read_text(encoding="utf-8")) if ledger_path.exists() else {"attempts":[],"captures":[],"expectations":[]}
+        persist=lambda:ledger_path.write_text(json.dumps(ledger,indent=2),encoding="utf-8")
+        while True:
+            model=draft["furniture"]["seatModel"]["model"]
+            models.write_text(json.dumps({draft["key"]:model}),encoding="utf-8")
+            reuse=False
+            bundle_path=d / "seat-verification.bundle.json"
+            if ledger["captures"] and bundle_path.exists() and contract.get("draftSource")==seating_draft_source(d,draft):
+                try:
+                    last=d / ledger["captures"][-1]
+                    saved=json.loads(bundle_path.read_text(encoding="utf-8"))
+                    expected_capture=(last / (draft["key"]+".json")).resolve()
+                    bound_capture=len(saved["captures"])==1 and (d / saved["captures"][0]["path"]).resolve()==expected_capture
+                    if bound_capture and contract.get("surfaceDigests")==surface_digests(d,model["surfaces"]):
+                        current=d / "stage" / "review-current-model.json"
+                        current.write_text(json.dumps(model),encoding="utf-8")
+                        checked=run("scripts/seat-verify-bundle.ts","--contract",contract_path,"--bundle",bundle_path,"--model",current,allow_failure=True)
+                        reuse=checked.returncode==0 and json.loads(checked.stdout).get("ok") is True
+                    if reuse:capture_dir=last
+                except (OSError,ValueError,KeyError,TypeError):
+                    reuse=False
+            if not reuse:
+                capture_dir=ledger_path.parent / ("capture-%04d" % len(ledger["captures"]))
+                capture_dir.mkdir(parents=True,exist_ok=True)
+                ledger["captures"].append(capture_dir.relative_to(d).as_posix());persist()
+                run("scripts/seat-pixel-audit.ts", "--candidate", d / "stage", "--models", models,
+                    "--keys", draft["key"], "--out", capture_dir, "--url", url)
+            capture=capture_dir / (draft["key"]+".json")
+            if not ledger["expectations"]:
+                inputs=ledger_path.parent / "original-inputs"
+                run("scripts/seat-review-export.ts", "--capture", capture, "--out", inputs, "--key", draft["key"])
+                authored = all(m.get("version") == 2 for m in model["surfaces"].values())
+                expectations=[seat_authored_review.propose(inputs / (f+".json"),model,d / "independent-authored-references")
+                              if authored else seat_independent_review.propose(inputs / (f+".json"),d / "independent-proposals")
+                              for f in ["se","sw","ne","nw"]]
+                ledger["expectations"]=[str(p.resolve()) for p in expectations];persist()
+            expectations=[Path(p) for p in ledger["expectations"]]
+            result=run("scripts/seat-verify-bundle.ts", "--create", "--contract", contract_path,
+                "--bundle", d / "seat-verification.bundle.json", "--captures", capture,
+                "--expectations", ",".join(map(str,expectations)), allow_failure=True)
+            verdict=json.loads(result.stdout)
+            (capture_dir / "verification-result.json").write_text(json.dumps(verdict,indent=2),encoding="utf-8")
+            if result.returncode==0 and verdict.get("ok") is True:
+                authored=any(m.get("version") == 2 for m in model["surfaces"].values())
+                draft["independentSeatReview"]={"state":"NUMERICAL_EVIDENCE_ACCEPTED",
+                    "kind":"independent-authored-reference" if authored else "independent-ai",
+                    "bundle":"seat-verification.bundle.json","repairs":ledger["attempts"],"visualQuality":"PENDING"}
+                save(d,draft)
+                try:
+                    visual_dir=d / "visual-review"
+                    reference_files=["seat_authored_review.py","seat_body_reference.py","seat_curved_authoring.py","seat_correspondence.py"] if authored else ["seat_independent_review.py"]
+                    manifest=seat_visual_review.prepare(d / "seat-verification.bundle.json",contract_path,visual_dir,
+                        body_files=[HERE / f for f in reference_files],
+                        source_inputs=[ledger_path.parent / "original-inputs" / (f+".json") for f in ["se","sw","ne","nw"]])
+                    decision=seat_visual_review.review(manifest,visual_dir,allow_paid=allow_visual_paid)
+                    visual_problems=seat_visual_review.validate(manifest,decision)
+                    if visual_problems:raise RuntimeError("; ".join(visual_problems))
+                except (Exception,SystemExit) as error:
+                    draft["independentSeatReview"]["visualProblems"]=[str(error)]
+                    save(d,draft)
+                    return ["Seating numerical evidence passed; independent visual-quality review remains pending: "+str(error)]
+                draft["independentSeatReview"].update(state="EVIDENCE_ACCEPTED",visualQuality="SOURCE_BOUND_EVIDENCE_ACCEPTED",
+                    visualManifest="visual-review/manifest.json",visualDecision="visual-review/decision.json")
+                save(d,draft)
+                try:
+                    motion=seat_motion_review.run(d,draft,url,expectations)
+                    draft["seatMotionReview"]={"state":motion["state"],"identity":motion["identity"],
+                        "result":"motion-review/"+motion["identity"]+"/result.json","visualApproval":False,
+                        **({"error":motion["error"]} if motion.get("error") else {})}
+                except Exception as error:
+                    draft["seatMotionReview"]={"state":"FAILED","error":str(error),"visualApproval":False}
+                save(d,draft)
+                if draft["seatMotionReview"]["state"]=="FAILED":
+                    return ["Settled seating evidence passed; real interaction review failed: "+draft["seatMotionReview"]["error"]]
+                if draft["seatMotionReview"]["state"]!="INVARIANTS_PASSED_VISUAL_PENDING":
+                    return ["Settled seating evidence passed; real interaction evidence is still incomplete."]
+                try:
+                    motion_dir=d / "motion-visual-review"
+                    motion_manifest=seat_motion_visual.prepare(d / draft["seatMotionReview"]["result"],
+                        d / "seat-verification.bundle.json",contract_path,motion_dir)
+                    motion_decision=seat_motion_visual.review(motion_manifest,motion_dir,allow_paid=allow_visual_paid)
+                    motion_problems=seat_motion_visual.validate(motion_manifest,motion_decision)
+                    if motion_problems:raise RuntimeError("; ".join(motion_problems))
+                except (Exception,SystemExit) as error:
+                    draft["seatMotionReview"]["visualProblems"]=[str(error)]
+                    save(d,draft)
+                    return ["Settled seating evidence and motion byte invariants passed; independent transition visual review remains pending: "+str(error)]
+                draft["seatMotionReview"].update(state="EVIDENCE_ACCEPTED",visualApproval=True,
+                    visualManifest="motion-visual-review/manifest.json",visualDecision="motion-visual-review/decision.json")
+                try:
+                    draft["seatWardrobeReview"]=seat_wardrobe_review.run(d,d / "seat-verification.bundle.json",contract_path)
+                except (Exception,SystemExit) as error:
+                    draft["seatWardrobeReview"]={"state":"FAILED","error":str(error),"visualApproval":False}
+                    save(d,draft)
+                    return ["Seating visual reviews passed; original-body wardrobe coverage remains pending: "+str(error)]
+                save(d,draft);return []
+            if len(ledger["attempts"])>=2:raise RuntimeError("Independent verification still fails after two source-only repair passes: "+str(verdict.get("problems",[]))[:1600])
+            if any(m.get("version") == 2 for m in model["surfaces"].values()):
+                raise RuntimeError("Independent authored-depth verification remains pending; semantic-only repair cannot discard the curved physical surface.")
+            # Keep the first independently authored expectations unchanged across every repair/capture.
+            # Only confident mismatch coordinates reach the separate source-only surface author.
+            plan=seat_review_repair.repair_pixels(capture,expectations,draft["key"],model)
+            if not plan["groups"]:raise RuntimeError("Verification remains pending without confident surface disagreements; uncertainty or canvas/context failures are not repair approval.")
+            attempt={"capture":capture_dir.relative_to(d).as_posix(),"state":"STARTED"}
+            ledger["attempts"].append(attempt);persist()  # even a failed provider consumes the bounded attempt
+            repaired=seat_review_repair.repair_round(d,draft,capture,expectations)
+            if not repaired or not repaired["changed"]:
+                attempt["state"]="NO_CHANGE";persist();raise RuntimeError("Source-only review made no surface change; remaining verification is pending.")
+            old=json.loads(json.dumps(model))
+            model["surfaces"]=repaired["surfaces"]
+            entry=json.loads((d / "stage" / "entries.json").read_text(encoding="utf-8"))[draft["key"]]
+            problems=model_check(d,draft,entry)
+            if problems:
+                draft["furniture"]["seatModel"]["model"]=old
+                attempt.update(state="REJECTED",problems=problems);persist();raise RuntimeError("Repaired map failed shared model validation: "+str(problems))
+            model=draft["furniture"]["seatModel"]["model"]
+            contract["surfaceDigests"]=surface_digests(d,model["surfaces"])
+            contract.setdefault("repairArtifacts",[]).append({"identity":repaired["identity"],"artifact":repaired["artifact"]})
+            contract_path.write_text(json.dumps(contract,indent=2),encoding="utf-8")
+            attempt.update(state="UNREVIEWED",identity=repaired["identity"],artifact=repaired["artifact"],uncertainties=repaired["uncertainties"])
+            draft.setdefault("seatingSurfaceReview",{})["status"]="UNREVIEWED"
+            persist();save(d,draft)
+    except (Exception, SystemExit) as error:
+        draft["independentSeatReview"] = {"state": "REVIEW_PENDING", "kind": "independent-ai", "error": str(error)}
+        save(d, draft)
+        return [f"Automatic independent seating verification: {error}"]
+
+
+def cmd_furniture_review(a):
+    d = draft_dir(a.draft)
+    draft = load(d)
+    stage(d, draft)
+    problems = generate_seating_review(d, draft, a.review_url)
+    out({"draft": draft, "problems": problems}, 1 if problems else 0)
+
+
+def cmd_furniture_surfaces(a):
+    """Resume surface production on existing art; never spends on another beauty take."""
+    d = draft_dir(a.draft)
+    draft = load(d)
+    entry, sprites = stage(d, draft)
+    problems = generate_seating_surfaces(d, draft, entry, sprites)
+    if not problems:
+        problems = generate_seating_review(d, draft, getattr(a, "review_url", "http://localhost:5195"))
+    draft["seatingProblems"] = problems
+    save(d, draft)
+    out({"draft": draft, "problems": problems}, 1 if problems else 0)
+
+
+def seating_surface_publish_problems(d: Path, draft: dict) -> list[str]:
+    """Require a content-bound complete evidence bundle; status flags never grant approval."""
+    furniture = draft.get("furniture", {})
+    model = (furniture.get("seatModel") or {}).get("model") or {}
+    if furniture.get("category") != "seating" or ("seatingSurfaceReview" not in draft and not model.get("surfaces")):
+        return []  # Existing legacy catalog workflow; not a claim of pixel verification.
+    contract_path, bundle_path = d / "surface-review-contract.json", d / "seat-verification.bundle.json"
+    if not contract_path.exists() or not bundle_path.exists():
+        return ["Automatic independent seating pixel verification is pending; a complete source-bound evidence bundle is required."]
+    try:
+        contract = json.loads(contract_path.read_text(encoding="utf-8"))
+        current_surface_digests = surface_digests(d,model.get("surfaces") or {})
+        if contract.get("key") != draft["key"] or contract.get("compiler") != model.get("compiler") or contract.get("sits") != model.get("sits") or \
+           json.loads(contract.get("modelParts", "null")) != model.get("parts") or contract.get("surfaceDigests") != current_surface_digests or \
+           contract.get("producerVersion") != seat_surfaces.SURFACE_PRODUCER_VERSION:
+            return ["Seating verification contract is stale for the current source, geometry, labels or producer."]
+        # Compare the current staged mechanics too, before any publication writes.
+        current_model = d / "stage" / "publication-model.json"
+        current_model.parent.mkdir(parents=True, exist_ok=True)
+        current_model.write_text(json.dumps(model), encoding="utf-8")
+        result = subprocess.run(["node", "--no-maglev", *studio.TSX, "scripts/seat-verify-bundle.ts",
+                                 "--contract", str(contract_path), "--bundle", str(bundle_path), "--model", str(current_model)],
+                                cwd=HERE.parent, capture_output=True, text=True, encoding="utf-8")
+        verified = json.loads(result.stdout)
+        if result.returncode != 0 or verified.get("ok") is not True:
+            return [f"seating pixel verification: {p}" for p in verified.get("problems", ["incomplete evidence"])]
+        if model.get("surfaces"):
+            visual_manifest=d / "visual-review" / "manifest.json"
+            visual=json.loads(visual_manifest.read_text(encoding="utf-8"))
+            if visual.get("bundle",{}).get("sha256")!=hashlib.sha256(bundle_path.read_bytes()).hexdigest() or \
+               visual.get("contract",{}).get("sha256")!=hashlib.sha256(contract_path.read_bytes()).hexdigest():
+                return ["Independent visual-quality evidence belongs to different seating geometry or numerical capture."]
+            problems=seat_visual_review.validate(visual_manifest,d / "visual-review" / "decision.json")
+            if problems:return ["Independent seating visual-quality review: "+p for p in problems]
+            motion_manifest=d / "motion-visual-review" / "manifest.json"
+            motion=json.loads(motion_manifest.read_text(encoding="utf-8"))
+            if motion.get("bundle",{}).get("sha256")!=hashlib.sha256(bundle_path.read_bytes()).hexdigest() or \
+               motion.get("contract",{}).get("sha256")!=hashlib.sha256(contract_path.read_bytes()).hexdigest():
+                return ["Independent transition visual evidence belongs to different seating geometry or numerical capture."]
+            problems=seat_motion_visual.validate(motion_manifest,d / "motion-visual-review" / "decision.json")
+            if problems:return ["Independent seating transition visual review: "+p for p in problems]
+        return []
+    except (OSError, ValueError, TypeError, RuntimeError) as error:
+        return [f"Seating verification evidence could not be validated: {error}"]
+
+
+def seat_checks(d: Path, draft: dict, e: dict) -> list[str]:
+    """Compile and validate seating in every facing before publication."""
+    return model_check(d, draft, e)
 
 
 def cmd_furniture_check(a):
     d = draft_dir(a.draft)
     draft = load(d)
     f = draft["furniture"]
-    need = [v or "one" for v in views_of(f)]
+    need = [v or "one" for v in views_of(f, draft.get("views"))]
     missing = [v for v in need if v not in (draft.get("views") or {})]
     e, sprites = stage(d, draft)
     problems = [f"draw the {', '.join(missing)} view(s)"] if missing else []
@@ -351,8 +817,17 @@ def cmd_furniture_publish(a):
         out({"error": f"accept every view before publishing (not yet: {', '.join(not_ok) or 'all'})"}, 2)
     e, sprites = stage(d, draft)
     seat = seat_checks(d, draft, e)
+    seat += seating_surface_publish_problems(d, draft)
     if seat:
-        out({"error": "seats are built from the seat framework, not published from the Lab", "problems": seat}, 1)
+        out({"error": "the seat isn't ready: its model doesn't hold yet", "problems": seat}, 1)
+    # Carry the validated generated surfaces through the common publication compiler.
+    # Otherwise that second compilation would silently publish a proxy-only model.
+    compiled = (draft.get("furniture", {}).get("seatModel") or {}).get("model")
+    if compiled:
+        e["seatModel"] = compiled
+        if compiled.get("surfaces"):
+            e["seatVerification"] = {"contract": str(d / "surface-review-contract.json"), "bundle": str(d / "seat-verification.bundle.json")}
+        (d / "stage" / "entries.json").write_text(json.dumps({key: e}), encoding="utf-8")
     # a key already in the catalog is only replaced by its own draft: opened from the library, or published from here
     args = ["lab-publish", "--entries", str(d / "stage" / "entries.json"), "--sprites", str(sprites)]
     if draft.get("origin") == key or draft.get("published"):
@@ -361,6 +836,10 @@ def cmd_furniture_publish(a):
     if not res.get("ok"):
         problems = [p_ for ps in (res.get("problems") or {}).values() for p_ in ps]
         out({"error": res.get("error") or "the model check refuses it", "problems": problems}, 1)
+    if has_model(draft):
+        model = model_check(d, draft, e, write=True)
+        if model:
+            out({"error": "published, but its model couldn't be stored in art/seat-models.json", "problems": model}, 1)
     draft["published"] = time.strftime("%Y-%m-%dT%H:%M:%S")
     save(d, draft)
     history(d, "publish", key=key)
@@ -477,10 +956,19 @@ def main():
     g.add_argument("--view")
     g.add_argument("--note")
     g.add_argument("--quality")
+    g.add_argument("--review-url", default="http://localhost:5195")
     g.set_defaults(fn=cmd_furniture_generate)
     c = sub.add_parser("furniture-check")
     c.add_argument("draft")
     c.set_defaults(fn=cmd_furniture_check)
+    surface = sub.add_parser("furniture-surfaces")
+    surface.add_argument("draft")
+    surface.add_argument("--review-url", default="http://localhost:5195")
+    surface.set_defaults(fn=cmd_furniture_surfaces)
+    review = sub.add_parser("furniture-review")
+    review.add_argument("draft")
+    review.add_argument("--review-url", default="http://localhost:5195")
+    review.set_defaults(fn=cmd_furniture_review)
     p = sub.add_parser("furniture-publish")
     p.add_argument("draft")
     p.add_argument("--overwrite", action="store_true")

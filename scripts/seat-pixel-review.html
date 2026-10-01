@@ -1,0 +1,39 @@
+<!doctype html><meta charset="utf-8"><title>In-game seating pixel review</title>
+<style>
+body{background:#19171e;color:#eee;font:15px system-ui;margin:24px}button,select{font:inherit;padding:8px;margin:5px}canvas{image-rendering:pixelated;background:repeating-conic-gradient(#333 0% 25%,#292929 0% 50%) 0/16px 16px;max-width:none} .panels{display:flex;gap:20px;overflow:auto}pre{white-space:pre-wrap}img{max-width:100%;image-rendering:pixelated}p{max-width:1000px}h2{font-size:17px}.warn{color:#ffcb78}#info{min-height:110px}label{margin-right:20px}
+</style>
+<h1>In-game seating pixel review</h1>
+<p class="warn">Captured output is evidence, not an approved baseline. Inspect furniture boundaries in the original art and the actual game. Incorrect pixels must remain failing expectations until fixed.</p>
+<select id="cases"></select><label>Zoom <select id="zoom"><option>4</option><option selected>8</option><option>12</option></select></label>
+<label>Click expectation <select id="winner"><option value="avatar">Avatar in front</option><option value="furniture">Furniture in front</option></select></label><button id="save">Export pixel expectations</button>
+<p>Hover any panel for exact drawing coordinates, source colour, classified surface, depth, avatar ownership and the actual in-game mask. Click an overlap pixel to record an independently reviewed expected winner. Magenta marks expectations that disagree with the game. The room image below is the unmodified game capture.</p>
+<div class="panels"><div><h2>Original furniture</h2><canvas id="art"></canvas></div><div><h2>Actual masked avatar over furniture</h2><canvas id="result"></canvas></div><div><h2>Surface ownership</h2><canvas id="parts"></canvas></div><div><h2>Disputed overlap pixels</h2><canvas id="overlap"></canvas></div></div>
+<pre id="info"></pre><p id="status"></p><p id="canvasStatus"></p><h2>Actual room capture</h2><img id="room">
+<script>
+const records=/*CAPTURES*/[];
+const $=id=>document.getElementById(id), labels={seat:[220,65,225],back:[240,140,55],arm:[65,225,120],base:[60,160,240],leg:[110,110,240],wrap:[190,130,240]};
+let selected=0, points=[], current, offsetX, offsetY, pad=48, width,height;
+records.forEach((r,i)=>{const o=document.createElement('option');o.value=i;o.textContent=r.id+' / '+r.facing+' / cushion '+r.cushion+' / look '+(r.reviewLook??'captured');$('cases').append(o)});
+const caseKey=r=>r.id+'/'+r.facing+'/'+r.cushion;
+const context=r=>JSON.stringify([r.look,r.pose,r.legs,r.feet,r.height]);
+const matches=(q,r)=>q.case===caseKey(r)&&q.context===context(r);
+function pixel(x,y){const r=current,f=r.figure;const ax=x-pad,ay=y-pad,fx=x-offsetX,fy=y-offsetY;
+ const j=ax>=0&&ay>=0&&ax<r.art.w&&ay<r.art.h?ay*r.art.w+ax:-1;
+ const i=fx>=0&&fy>=0&&fx<f.w&&fy<f.h?fy*f.w+fx:-1;
+ return {x:ax,y:ay,j,i,overlap:j>=0&&i>=0&&r.art.rgba[j*4+3]>0&&f.rgba[i*4+3]>0};}
+function draw(){current=records[selected];const r=current,f=r.figure,z=+$('zoom').value;width=r.art.w+2*pad;height=r.art.h+2*pad;offsetX=pad+Math.round(r.feet[0])-f.ax;offsetY=pad+Math.round(r.feet[1])-f.ay;
+ for(const name of ['art','result','parts','overlap']){const c=$(name);c.width=width;c.height=height;c.style.width=width*z+'px';c.style.height=height*z+'px';const ctx=c.getContext('2d'),img=ctx.createImageData(width,height);
+ for(let y=0;y<height;y++)for(let x=0;x<width;x++){const p=pixel(x,y),o=(y*width+x)*4;let color=[0,0,0,0];if(p.j>=0)color=r.art.rgba.slice(p.j*4,p.j*4+4);
+ if(name==='parts'&&p.j>=0&&r.depth.part[p.j]>=0)color=[...(labels[r.model.parts[r.depth.part[p.j]].part]||[255,255,255]),color[3]];
+ if(name==='result'&&p.i>=0&&f.actual[p.i*4+3])color=f.actual.slice(p.i*4,p.i*4+4);
+ if(name==='overlap'){color=p.overlap?(f.mask[p.i]?[255,145,60,255]:[70,205,255,255]):[0,0,0,0];const expected=points.find(q=>matches(q,r)&&q.x===p.x&&q.y===p.y);if(expected&&p.overlap&&expected.winner!==(f.mask[p.i]?'furniture':'avatar'))color=[255,0,255,255];}
+ img.data.set(color,o);}ctx.putImageData(img,0,0);}
+ $('room').src=r.screenshot;$('status').textContent='UNAPPROVED — '+points.filter(p=>matches(p,r)).length+' independently labelled pixels in this case.';
+ const check=r.finalCanvas??records.find(q=>q.id===r.finalCanvasReference&&q.reviewLook===r.reviewLook&&q.finalCanvas)?.finalCanvas;
+ $('canvasStatus').textContent=check?'Final canvas: '+check.checked+' opaque device pixels checked; '+check.differences.length+' RGBA differences. Mask semantics still require independent review.':'Final canvas verification unavailable for this capture.';
+}
+for(const name of ['art','result','parts','overlap']){const c=$(name);const locate=e=>{const b=c.getBoundingClientRect();return pixel(Math.floor((e.clientX-b.left)*width/b.width),Math.floor((e.clientY-b.top)*height/b.height))};
+c.onmousemove=e=>{const p=locate(e),r=current,f=r.figure,k=p.j<0?-1:r.depth.part[p.j];$('info').textContent=JSON.stringify({drawing:[p.x,p.y],sourceRGBA:p.j>=0?r.art.rgba.slice(p.j*4,p.j*4+4):null,surface:k>=0?r.model.parts[k]:null,face:p.j>=0?r.depth.face[p.j]:null,depth:p.j>=0?r.depth.z[p.j]:null,assignment:p.j>=0?r.depth.how[p.j]:null,avatarOwner:p.i>=0?f.owner[p.i]:null,overlap:!!p.overlap,actualWinner:p.overlap?(f.mask[p.i]?'furniture':'avatar'):null},null,2)};
+c.onclick=e=>{const p=locate(e);if(!p.overlap)return;points=points.filter(q=>!(matches(q,current)&&q.x===p.x&&q.y===p.y));points.push({case:caseKey(current),x:p.x,y:p.y,winner:$('winner').value,source:current.model.compiler?.source,context:context(current)});draw()};}
+$('cases').onchange=()=>{selected=+$('cases').value;draw()};$('zoom').onchange=draw;$('save').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify({status:'partial pixel annotations; not whole-seat approval',points},null,2)],{type:'application/json'}));a.download='expected-pixels.json';a.click()};draw();
+</script>

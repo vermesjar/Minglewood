@@ -17,7 +17,7 @@ every one of them**, and every model declares what it is, how it stands and how 
 | **Walking** | `walk` | `blocked`, `seat` (blocked, but the path ends on it to sit) or `open` (rugs, and wall art, which isn't on the floor). |
 | **Layer** | `layer` | `floor` is drawn beneath everything (rugs, blankets). `object` stands on the floor and is depth-sorted by its footprint. `surface` stands on another model's `surface`, is placed with that z and is drawn after its host (an espresso machine on a counter); it never goes on the bare floor. `wall` is painted into the wall. |
 | **Surfaces** | `surface?` | Things can stand on it at this z, in art px (a counter top is 20.5, `COUNTER_TOP`). |
-| **Seats** | the seat standard's `SEAT_FIELDS` | `seat` (the cushion's height), `sitStyle`, `backrest` and `arms` (`src/shared/world/seats.ts`), written by `scripts/seat-build.ts` from the seat's spec. Seating has `walk: 'seat'` and `use` includes `sit`. How people sit in it is its spec's build ([seats](#seats-how-people-sit), docs/seating.md). |
+| **Seats** | the seat standard's `SEAT_FIELDS` | `seat` (the cushion's height, which seeds the fit), `sitStyle`, `backrest` and `arms` (`src/shared/world/seats.ts`). Seating has `walk: 'seat'` and `use` includes `sit`. A colour variant borrows its family's profile. How people sit in it is its entry in `art/seat-models.json`: a 3D model shared by all four facings, compiled automatically without per-drawing overrides ([seats](#seats-how-people-sit)). |
 | **Use** | `use?: { face, actions }` | `actions` lists the kinds of action it offers (`ObjectAction['kind']`). With `face: 'front'` it's used from the tiles in front of its working face, which is the way it faces. With `face: 'any'` it's used from any side (a bell, a pool table). |
 | **Light and life** | `light`, `glow`, `emitters`, `animated`, `still` | These are points in each drawing's own px. A model with more than one real drawing puts them on every drawing (`facings.nw.light`, …); the entry's own apply only to its first drawing. Mirrored sides reflect them. Animations are keyed by drawing file (`src/client/engine/animations.ts`). An `animated` model animates in every drawing except the ones listed in `still` (the back of an arcade cabinet). |
 | **Wall** | `wall: { v, walls?, text?, floor? }` | Wall art has `rotation: 'flat'`, `category: 'wall-art'` and `layer: 'wall'`, `footprint: [span, 1]`. It hangs on either wall (or only on `walls`) and is never mirrored: the left wall draws it reversed, so text and logos read the right way round. Its size is its drawing's (the wall art standard, below): `v` is [bottom, bottom + height/2]. `floor`: it stands on the floor like a door (the lift). `margin` is retired. |
@@ -105,7 +105,7 @@ stages wall pieces to it (art/designlab.py `wall_standard`: the span grows to ho
   - the fill rule in all four facings
   - height matches the drawing
   - animation hooks are declared
-  - seats have a profile (and `scripts/seat-grade.ts --check`, in the gate: every catalog seat passes the seat grade)
+  - seats have a profile (and `scripts/seat-layers.ts --check`, in the gate: every seat kind has a model that holds)
 - `npm run furniture:review` shows every model in all four facings, with the footprint and the fill rule
   (`art/review/furniture/<key>.png`).
 - `uv run art/check_facings.py`: seat back views face the right way.
@@ -131,13 +131,71 @@ reachable, and so does the piece's working face.
 
 ## Seats: how people sit
 
-Seating is its own framework: **[docs/seating.md](seating.md)**. A seat is a spec on one of nine kinds
-(`src/shared/world/seatSpec.ts`, `src/shared/art/seatCatalog.ts`), built into a 3D model sized from the figure, drawn
-from that model in all four facings by the seat renderer, and composed with its sitters pixel by pixel against the
-render's own depth. `scripts/seat-build.ts` writes the PNGs and manifest entries; `scripts/seat-grade.ts --check`
-(the gate) and `tests/e2e/seat-grade.spec.ts` (live) grade every seat in every facing at every zoom. The Design Lab
-doesn't draw seating.
+Seating is compiled automatically from its drawings and declaration. `seatKind` selects construction independently
+of the asset name; `sitStyle` selects the character pose. `seat`, `backrest`, and `arms` complete the profile.
+Design Lab supplies these mechanics from its seating-type presets.
 
-Depth against people for every other piece (a person passing a table, a jar on a counter) is still whole-object
-ordering (`engine/depth.ts`); the seat compositor is the model for extending it: give a piece a model, render from it,
-and settle people against it per pixel.
+`art/seat-models.json` stores one model per catalog seat: boxes describing its cushion, back, arms, supports, and
+soft wrapping, plus one physical sitting point per cushion. Local `u` runs across the seat, `v` runs front to back,
+and `z` is height in world pixels. Rotating a seat rotates these points; it does not move the pelvis into its backrest.
+
+`seatCompiler.ts` fits all four views together and validates the result through `seatProblems`. Arms stay at the
+ends, bases stay below the cushion, and no solid part may intersect the sitter's torso. Complete bent legs are
+rendered in every direction. `sitterMask` masks each figure independently against the original furniture pixels,
+including during entry and exit, so drawing a second sitter cannot repaint furniture over the first one.
+
+New models have compilation fingerprints and no hand-authored `views` or `over` overrides. Legacy fields remain
+readable for compatibility; recompiling a Design Lab draft replaces them. Normal authoring never requires tuning.
+
+- `npm run seats:compile`: compile all catalog seats from scratch, installing only if all pass.
+- `npm run seats:check`: validate every catalog cushion in all four directions.
+- `npm run seats:audit -- --url http://localhost:5195`: capture the actual renderer at both scales, all directions,
+  three outfits, each cushion alone, and full occupancy.
+- `scripts/seat-lab-check.py`: run renamed existing artwork through Design Lab staging and compilation with no rig.
+- `tests/e2e/seat-models.spec.ts`: live clicks, sitting, cushion shifts, and standing for each seat and facing.
+
+See [seating.md](seating.md) for the supported shapes, audit evidence, and limitations. Old `seat-model.ts` editing
+commands are diagnostic tools, not the Design Lab authoring workflow.
+
+## Depth by proxy: people around every piece (proposal and prototype)
+
+**Today.** WorldView sorts the pieces of a room once, topologically, by their footprint boxes (`depth.ts`): of two
+pieces that overlap on screen, the one whose box lies wholly behind the other's is drawn first. Each person is then
+slotted after the last overlapping piece whose box is behind the tile they stand on, and drawn whole; a seat's
+sitter is drawn after it with its model's overlay. Two things that overlap on screen can therefore only be
+*wholly* in front of or behind each other, which is wrong wherever a person and a piece interleave in depth. Seen in
+the café (`art/review/proxy-depth/`): the pastry jar on the bar drawn over the head of someone standing in front of
+the bar; someone behind the bar drawn over the pastry dome on it; the old "walking up to chairs puts you behind the
+furniture"; a person passing close beside a tall piece or between a table's legs.
+
+**Proposed.** Give every standing piece a 3D proxy and settle person against piece per pixel, with the same depth
+the seats use (on a pixel, the height at which its view ray meets a surface; higher is nearer):
+
+1. **A proxy per piece.** A seat's is its model. Everything else starts as a box on its footprint, from its base
+   (the floor, or the surface it stands on) up to its model's `height` (read off the drawing for a piece without one:
+   the top of a box is drawn 2 px per world px above its back vertex). Pieces a box describes badly get fitted
+   boxes with the same fitter, silhouette check and sheets as the seats, with families of their own: a table's top
+   slab on legs (feet show under it), a desk with knee space, a counter with its overhang, a lamp's pole and shade.
+2. **Pieces among themselves** keep the topological sort: they don't move, and it orders them right.
+3. **A person** is drawn after every piece they overlap on screen; then each of those pieces draws back over them its
+   pixels whose surface is nearer the camera than theirs (`overlayFor` with a free body: one billboard where they
+   are, at their feet or, sitting, at their pelvis). People among themselves stay ordered by x + y. The seat a
+   person is in keeps its own, fuller body model (thighs, shins, forearms on armrests).
+4. **Cost.** Each piece's depth map is worked out once. Overlays are cached per piece, look, pose and placement: a
+   seated or standing person costs a lookup, while a walking one recomputes each step for the few pieces they
+   overlap (about 10k cheap pixel tests each). Measured headless (`tests/e2e/_proxy-depth.spec.ts`), a whole frame:
+   café 37.6 ms sorted, 40.4 ms by proxy (6 people, 31 pieces); HQ 16.0 ms against 15.8 ms (noise). Cheaper still:
+   skip a piece whose proxy lies wholly behind the person (a box test), and in town consider only pieces near people.
+5. **Moving over.** (a) Every catalog piece gets a proxy (the box for now; fitted families where the box reads
+   wrong, reviewed like the seats); (b) review every room both ways at play scale and 4× with the flag on; (c) turn
+   it on by default, keeping the old slotting only for pieces without art. Watch for: overhangs and pieces drawn
+   wider than their footprint (the fill rule keeps them few); swaying plants (the overlay takes the sway offset);
+   the night glow layer (an overlay doesn't cut the glow the person already cut); wall art and rugs, which have no
+   proxy and never need one.
+
+**The prototype** is in WorldView behind a flag, off by default: `?depth=proxy` in the URL, or
+`__mw.world.proxyDepth = true` from the console. `boxProxyOf` makes the box proxies (classic 1× sprites are doubled
+onto the 2× grid), `buildDrawOrder` slots a person after every piece they overlap, and `drawProxyFront` draws the
+overlays. A piece it can't give a proxy is drawn again over a person it stands in front of, as today.
+`FILM=1 PLAYTEST_URL=http://localhost:5190 npx playwright test _proxy-depth` (with `PROXY_ROOM=hq` and so on) shoots
+a walk round a room's furniture both ways into `art/review/proxy-depth/` and prints the frame cost.

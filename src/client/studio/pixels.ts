@@ -28,10 +28,12 @@ export const TURN: Record<Facing, Facing> = { se: 'sw', sw: 'nw', nw: 'ne', ne: 
  * The drawings a piece needs (art/designlab.py views_of): a mirror piece's front and back are se + nw, or
  * sw + ne for a long piece (drawn lying along its width, like every long piece in the catalog).
  */
-export function drawnViews(f: Pick<FurnitureSpec, 'rotation' | 'sameFromBehind' | 'footprint'>): string[] {
+export function drawnViews(f: Pick<FurnitureSpec, 'rotation' | 'sameFromBehind' | 'footprint'>, have: string[] = []): string[] {
   if (f.rotation === 'radial' || f.rotation === 'flat') return ['one'];
   if (f.rotation === 'full') return ['se', 'sw', 'ne', 'nw'];
-  const [front, back] = f.footprint[0] !== f.footprint[1] ? ['sw', 'ne'] : ['se', 'nw'];
+  let [front, back] = f.footprint[0] !== f.footprint[1] ? ['sw', 'ne'] : ['se', 'nw'];
+  if (!have.includes(front)) front = ['se', 'sw'].find((v) => have.includes(v)) ?? front;
+  if (!have.includes(back)) back = ['ne', 'nw'].find((v) => have.includes(v)) ?? back;
   return f.sameFromBehind ? [front] : [front, back];
 }
 

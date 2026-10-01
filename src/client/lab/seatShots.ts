@@ -9,6 +9,7 @@ import { getScene } from '@shared/world';
 import { isSeat, type Facing } from '@shared/world/scene';
 import { seatSpots } from '@shared/world/seats';
 import { WorldView } from '../engine/WorldView';
+import { setSeatModelsEnabled } from '../engine/sprites/art';
 import { avatarSprite, type Pose } from '../engine/sprites/avatar';
 import { blit } from '../engine/sprites/painter';
 
@@ -30,6 +31,10 @@ export interface SeatShotOpts {
   facings?: Facing[];
   /** Stand everyone on their cushion's tile instead of seating them (the moment before sitting or stepping off). */
   standing?: boolean;
+  /** Draw seats by their 3D models (on) or their rigs (off); default: as the game does. */
+  models?: boolean;
+  /** Freeze optional game effects through the real accessibility setting for repeatable pixel capture. */
+  reducedMotion?: boolean;
 }
 
 const noop = () => undefined;
@@ -161,7 +166,7 @@ export function seatDebug(o: SeatShotOpts): unknown {
   });
 }
 
-export async function seatShots(o: SeatShotOpts): Promise<Partial<Record<Facing, string>>> {
+export async function seatShots(o: SeatShotOpts, capture?: (view: WorldView, objectId: string) => void): Promise<Partial<Record<Facing, string>>> {
   const scene = getScene(`seatlab-${o.key}`);
   if (!scene) throw new Error(`no seat lab for ${o.key}`);
   const zoom = o.zoom ?? 2;
@@ -176,6 +181,7 @@ export async function seatShots(o: SeatShotOpts): Promise<Partial<Record<Facing,
     let n = 0;
     for (const s of scene.objects.filter(isSeat))
       for (const spot of seatSpots(s, scene)) {
+        if (o.facings && !o.facings.includes(s.facing!)) continue;
         if (o.cushions && !o.cushions.includes(spot.index)) continue;
         const i = n++;
         occupants.push({
@@ -190,14 +196,17 @@ export async function seatShots(o: SeatShotOpts): Promise<Partial<Record<Facing,
         });
       }
   }
+  if (o.models !== undefined) setSeatModelsEnabled(o.models);
   const view = new WorldView(canvas, { onGroundClick: noop, onActorClick: noop, onObjectClick: noop, onObjectActivate: noop, nameOf: () => '' });
   view.loadScene(scene, occupants, { meId: '', activeDecor: new Set(), festiveRooms: new Set(), party: false });
   const v = view as unknown as {
     camera: { x: number; y: number; zoom: number; tx: number; ty: number; tzoom: number };
+    reducedMotion: boolean;
     update(dt: number): void;
     draw(): void;
     drawActorOverlays(): void;
   };
+  if (o.reducedMotion !== undefined) v.reducedMotion = o.reducedMotion;
   v.drawActorOverlays = noop;
   // no frame loop: every shot is drawn on demand
   view.destroy();
@@ -217,6 +226,7 @@ export async function seatShots(o: SeatShotOpts): Promise<Partial<Record<Facing,
     v.camera.zoom = v.camera.tzoom = zoom;
     v.draw();
     out[s.facing!] = canvas.toDataURL('image/png');
+    capture?.(view, s.id);
   }
   return out;
 }

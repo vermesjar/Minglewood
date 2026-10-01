@@ -4,7 +4,7 @@
  * contact sheet per zoom (art/review/seat-shots/sheet.z<zoom>.png, each shot magnified to 2× so pixels read).
  *
  *   node --no-maglev --import tsx scripts/seat-shots.ts [--url http://localhost:5195] [--zoom 2,4] [--keys a,b]
- *        [--looks 0,3,5] [--empty] [--out DIR]
+ *        [--looks 0,3,5] [--empty] [--models on|off] [--out DIR]
  *
  * Needs a vite server for the working tree (vite.seatwork.config.ts on 5195, or the review server on 5190).
  */
@@ -21,6 +21,7 @@ const URL = arg('url') ?? 'http://localhost:5195';
 const zooms = (arg('zoom') ?? '2,4').split(',').map(Number);
 const OUT = arg('out') ?? 'art/review/seat-shots';
 const empty = process.argv.includes('--empty');
+const models = arg('models') === undefined ? undefined : arg('models') === 'on';
 const manifest = loadManifest();
 const allSeats = Object.entries(manifest.sprites)
   .filter(([, e]) => (e as { walk?: string }).walk === 'seat')
@@ -43,14 +44,14 @@ for (const key of keys) {
   const byZoom = new Map<number, Record<string, Png>>();
   for (const zoom of zooms) {
     const shots: Shots = await page.evaluate(
-      async ({ key, zoom, lookIdx, empty }) => {
+      async ({ key, zoom, lookIdx, empty, models }) => {
         const lab = (window as unknown as { lab: any }).lab;
         await lab.ready;
         const members = lab.seed.members;
         const pick = lookIdx.map((i: number) => members[i % members.length]);
-        return lab.seatShots({ key, zoom, looks: pick.map((m: any) => m.avatar), ids: pick.map((m: any) => m.id), empty });
+        return lab.seatShots({ key, zoom, looks: pick.map((m: any) => m.avatar), ids: pick.map((m: any) => m.id), empty, models });
       },
-      { key, zoom, lookIdx, empty },
+      { key, zoom, lookIdx, empty, models },
     );
     const pngs: Record<string, Png> = {};
     for (const f of FACINGS) {

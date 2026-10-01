@@ -215,20 +215,18 @@ const STYLE_OF: Partial<Record<Pose, SitStyle>> = { sit: 'chair', 'sit-stool': '
 /**
  * Seated legs from the seat (sitLegs.ts), in this frame's px: the thighs from the hip joints forward to the knees and
  * the shins down to the soles, projected the way the world is (a tile forward is 32 px across and 16 px down from the
- * front, 16 px up from behind; a world px of height is 2 px). Seen from behind the legs run away from us, the thighs
- * out along the seat and the shins down beyond it: the seat itself hides what stands between them and us (the
- * compositor, src/shared/art/seatCompose.ts), so nothing here decides what shows.
+ * front, 16 px up from behind; a world px of height is 2 px). Every view has complete legs; the furniture
+ * compositor hides only the portions that are actually behind the seat.
  */
 function seatedLegs(view: View, h: number, S: SitLegs): { near: Limb; far: Limb } {
   const back = view === 'back';
-  const dir = back ? -16 : 16;
   const kx = 32 * S.reach;
-  const ky = dir * S.reach - 2 * S.rise;
+  const ky = (back ? -16 : 16) * S.reach - 2 * S.rise;
   const leg = (x: number, y: number): Limb => {
     const m: Pt = [x + kx, y + ky];
     // the ankle: the sole `drop` below the knee, `toe` further forward; the shoe is drawn 5 px tall above the sole
     const sx = m[0] + 32 * S.toe;
-    const sy = m[1] + dir * S.toe + 2 * S.drop;
+    const sy = m[1] + (back ? -16 : 16) * S.toe + 2 * S.drop;
     return { a: [x, y], m, b: [sx, sy - 5] };
   };
   return { near: leg(CX - 4, h), far: leg(CX + 4, h - 1) };

@@ -94,7 +94,7 @@ async function sitOn(
     target = await player.floorPoint(spot.x + 0.5, spot.y + 0.5);
   }
   await player.click(target);
-  const r = await player.until((m) => m.sittingOn === seat.id && !m.moving, 15_000);
+  const r = await player.until((m) => m.sittingOn === seat.id && m.server?.x === spot.x && m.server?.y === spot.y && !m.moving, 15_000);
   await player.page.waitForTimeout(300);
   const shot = await player.shot(`seat-${tag}`);
   if (!r.ok) {
@@ -104,7 +104,7 @@ async function sitOn(
       area: 'seats (SEAT agent)',
       what: `clicking ${name(seat)} cushion ${spot.index} ${how} didn't seat me${where.sittingOn ? ` (sat on ${where.sittingOn} instead)` : ''}${inside && !where.sittingOn ? ' — and I was left standing inside furniture' : ''}`,
       shot,
-      detail: { spot, me: where },
+      detail: { spot, me: where, target },
     });
     return 'failed';
   }
