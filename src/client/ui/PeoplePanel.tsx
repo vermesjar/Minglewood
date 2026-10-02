@@ -4,6 +4,7 @@ import { TOWN_ID } from '@shared/world';
 import { game } from '../app/game';
 import { setState, useStore } from '../app/store';
 import { AvatarCanvas, Modal, StatusDot } from './common';
+import { Photo } from './Photo';
 
 type Filter = 'all' | 'available' | 'here' | 'team';
 
@@ -84,6 +85,7 @@ export function PeoplePanel() {
                   return (
                     <li key={m.id} className="person-card">
                       <AvatarCanvas loadout={m.avatar} head scale={2} />
+                      <Photo url={m.avatarUrl} size={16} className="corner" />
                       <div className="pc-text">
                         <strong>
                           {m.displayName} {isMe && <span className="tag">you</span>}

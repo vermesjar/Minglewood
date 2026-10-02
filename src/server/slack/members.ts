@@ -7,6 +7,7 @@
 import { loadoutFromSeed } from '@shared/avatar';
 import { ORG_ID } from '@shared/seed/northstar';
 import type { Member } from '@shared/domain/types';
+import type { SlackUser } from './api';
 import { config } from '../config';
 import type { AppContext } from '../context';
 
@@ -18,8 +19,34 @@ export interface SlackPerson {
   timezone?: string;
   /** Their Slack picture, so what they say in the world can show up in the channel as them. */
   picture?: string;
+  /** What they do and their pronouns, as set in Slack. */
+  title?: string;
+  pronouns?: string;
   /** Workspace owner/admin, or the installer. */
   manager?: boolean;
+}
+
+/** The fields a member inherits from Slack (Slack is the profile of record on a Slack company). */
+export function fieldsFromSlack(p: Pick<SlackPerson, 'name' | 'title' | 'pronouns' | 'timezone'>): Partial<Pick<Member, 'displayName' | 'title' | 'pronouns' | 'timezone'>> {
+  const out: Partial<Pick<Member, 'displayName' | 'title' | 'pronouns' | 'timezone'>> = {};
+  if (p.name?.trim()) out.displayName = p.name.trim().slice(0, 40);
+  if (p.title?.trim()) out.title = p.title.trim().slice(0, 60);
+  if (p.pronouns !== undefined) out.pronouns = p.pronouns.trim().slice(0, 20) || undefined;
+  if (p.timezone) out.timezone = p.timezone;
+  return out;
+}
+
+/** A Slack profile (users.info / user_change) as the person we know. */
+export function personFromSlackUser(u: SlackUser): Pick<SlackPerson, 'userId' | 'name' | 'title' | 'pronouns' | 'timezone' | 'picture' | 'manager'> {
+  return {
+    userId: u.id,
+    name: u.profile?.display_name || u.real_name || u.name || '', // '' = the event didn't carry a name
+    title: u.profile?.title,
+    pronouns: u.profile?.pronouns,
+    timezone: u.tz,
+    picture: u.profile?.image_192 || u.profile?.image_72,
+    manager: !!(u.is_admin || u.is_owner),
+  };
 }
 
 export function upsertSlackMember(ctx: AppContext, orgId: string, p: SlackPerson): Member {
@@ -35,16 +62,21 @@ export function upsertSlackMember(ctx: AppContext, orgId: string, p: SlackPerson
   const found = known ?? (byEmail ? ctx.store.member(orgId, byEmail.memberId) : undefined);
   if (found) {
     if (!known || (p.picture && existing?.avatarUrl !== p.picture)) link(found.id);
-    if (admin && found.role === 'member') ctx.store.updateMember(orgId, found.id, { role: 'admin' });
-    return found;
+    // Slack is the profile of record: name, title, pronouns and timezone follow it on every sign-in
+    const inherited = fieldsFromSlack(p);
+    const changed = (Object.keys(inherited) as Array<keyof typeof inherited>).some((k) => inherited[k] !== found[k]);
+    const updated = ctx.store.updateMember(orgId, found.id, { ...(changed ? inherited : {}), ...(admin && found.role === 'member' ? { role: 'admin' as const } : {}) });
+    if (changed) ctx.hubs.get(orgId)?.profileChanged(found.id);
+    return updated;
   }
 
   const demoOrg = orgId === ORG_ID;
   const team = (demoOrg && data.teams.find((t) => t.id === 'team-aurora')) || data.teams[0];
   const avatar = loadoutFromSeed(`slack:${p.userId}`);
   const member = ctx.store.createMember(orgId, {
-    displayName: p.name.slice(0, 40),
-    title: 'Teammate',
+    displayName: (p.name.trim() || 'Teammate').slice(0, 40),
+    title: p.title?.trim().slice(0, 60) || 'Teammate',
+    pronouns: p.pronouns?.trim().slice(0, 20) || undefined,
     departmentId: team.departmentId,
     teamId: team.id,
     location: 'Somewhere lovely',

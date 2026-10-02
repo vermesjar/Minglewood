@@ -148,6 +148,34 @@ describe('Slack bridge: spaces are their channels', () => {
     expect(hub.chatLog('cafe').at(-1)?.id).toBe(slackMessageId('CCAFE', '1700000000.000001'));
   });
 
+  it('posts as the person, with their own token, once they have connected their account — and drops a dead token', async () => {
+    let token: string | undefined = 'xoxp-jay';
+    const dropped: string[] = [];
+    const b2 = new SlackBridge({ store, api, tokens: new SlackTokens(() => 'xoxb-test'), hubFor: () => hub, teamFor: () => TEAM, userTokenFor: () => token, onUserTokenBad: (_o, m) => dropped.push(m) });
+    hub.dispose();
+    hub = new OrgHub(ORG_ID, store);
+    b2.attach(hub);
+    const calls: Array<{ token: string; as?: unknown }> = [];
+    api.postMessage.mockImplementation(async (t: string, channel: string, text: string, _b?: unknown[], as?: { username: string }) => {
+      calls.push({ token: t, as });
+      if (t === 'xoxp-dead') throw new SlackApiError('chat.postMessage', 'invalid_auth');
+      api.posted.push({ channel, text, username: as?.username });
+      return { ts: `1700000000.${String(api.posted.length).padStart(6, '0')}`, channel };
+    });
+    hub.connect(client(memberId));
+    hub.enter(memberId, 'cafe', 'live');
+    hub.say(memberId, 'as myself');
+    await flush();
+    expect(calls).toEqual([{ token: 'xoxp-jay', as: undefined }]); // their token, no app-side name/picture
+    expect(hub.chatLog('cafe').at(-1)?.id).toBe(slackMessageId('CCAFE', '1700000000.000001'));
+    // the grant is gone: the app posts for them (under their name) and the bridge says so
+    token = 'xoxp-dead';
+    hub.say(memberId, 'still here');
+    await flush();
+    expect(dropped).toEqual([memberId]);
+    expect(calls.at(-1)).toMatchObject({ token: 'xoxb-test', as: { username: 'jay ☕' } });
+  });
+
   it('falls back to posting as the app when chat:write.customize is missing', async () => {
     api.customize = false;
     hub.connect(client(memberId));

@@ -25,8 +25,11 @@ export interface SlackSignIn {
   picture?: string;
 }
 
-/** What a person grants so the world can set their Slack status: users.profile:write. */
-export const SLACK_STATUS_USER_SCOPES = ['users.profile:write'];
+/**
+ * What a person grants when they connect their account: post in channels *as them* (chat:write) and have the
+ * status they set here mirrored to Slack (users.profile:write). One grant, their own token, kept server-side.
+ */
+export const SLACK_STATUS_USER_SCOPES = ['users.profile:write', 'chat:write'];
 
 export interface SlackInstall {
   teamId: string;
@@ -113,6 +116,7 @@ export class SlackProvider implements CommunicationProvider {
    * OpenID Connect) its claims can be read without a signature check; its nonce must be the one we sent.
    */
   async signIn(code: string, nonce?: string): Promise<SlackSignIn> {
+    this.api.expectNonce?.(nonce);
     const tok = await this.api.openIdToken(config.slack.clientId, config.slack.clientSecret, code, config.slack.signInRedirectUri);
     if (nonce !== undefined && idTokenClaims(tok.id_token).nonce !== nonce) throw new Error('nonce mismatch');
     const u = await this.api.openIdUserInfo(tok.access_token);

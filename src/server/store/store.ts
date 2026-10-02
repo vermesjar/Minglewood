@@ -17,6 +17,8 @@ import type {
   Member,
   OrgEvent,
   Organization,
+  Platform,
+  ProviderKind,
   ProviderConnection,
   Room,
   RoomBinding,
@@ -330,7 +332,15 @@ export class Store {
     return room;
   }
 
-  updateOrg(orgId: string, patch: Partial<Pick<Organization, 'name' | 'tagline'>>): Organization {
+  /** The platform a company runs on: the admin's pick, else whichever is connected (Slack first), else local. */
+  platformOf(orgId: string): Platform {
+    const d = this.get(orgId);
+    if (d.org.platform) return d.org.platform;
+    const active = (p: ProviderKind) => d.connections.some((c) => c.provider === p && c.status === 'active');
+    return active('slack') ? 'slack' : active('discord') ? 'discord' : 'local';
+  }
+
+  updateOrg(orgId: string, patch: Partial<Pick<Organization, 'name' | 'tagline' | 'platform'>>): Organization {
     const d = this.get(orgId);
     Object.assign(d.org, patch);
     this.scheduleSave();

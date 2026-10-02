@@ -29,6 +29,25 @@ record: Minglewood mirrors and drives it, and stores no messages of its own.
 | **Daily "who's around"** — optional; Admin → Slack picks the channel and hour (org timezone). |
 | Quiet rooms have no channels, on purpose. |
 
+## A Slack company: the pick, your account, your profile
+
+**One pick, org-wide.** Admin → Organization → *What runs your conversations?*: Just Minglewood, Discord, or Slack.
+Connect the workspace or server first (its tab), then choose it. The pick decides where spaces' channels come from
+(Spaces & channels shows only that platform), how people are expected to sign in, and where profiles are inherited
+from. Unpicked, the company runs as whatever is connected (Slack first), then local.
+
+**Your account.** Signing in with Slack on a Slack company sends you, once, to *Connect my Slack account* — a grant
+of your own token with `chat:write` and `users.profile:write`. With it, what you say in a space is posted **as you**
+(your account, no app tag, in your own Slack history), and the status you set here is mirrored to Slack. Decline and
+you still land in the world; the profile offers it again. Without it, posts go out from the app under your name and
+picture. A revoked token turns both off and the profile says so. Tokens live server-side with the world, keyed by
+member, never in anything a client receives.
+
+**Your profile is your Slack profile.** Display name, title, pronouns, timezone and picture are read from Slack at
+every sign-in and whenever Slack says they changed (`user_change`); those fields are read-only in the game ("edit it
+in Slack"). On a Discord company the name (your nickname there) and picture follow Discord the same way. Pictures show
+on cards, in room and people lists, and by chat lines.
+
 ## Silent disco: who's hearing what
 
 A space has one voice (its channel's huddle), but the people in it can be on other calls — a table's huddle, a
@@ -156,6 +175,7 @@ oauth_config:
       - profile
       - email
       - users.profile:write
+      - chat:write
     bot:
       - channels:read
       - groups:read
@@ -212,7 +232,7 @@ click **Retry**.
 | Scope | Used for |
 |---|---|
 | `openid`, `profile`, `email` (user) | Sign in with Slack: who you are, your name, and your email (for matching an existing member). |
-| `users.profile:write` (user) | "Sync my status to Slack": a person's own grant, so the world can set *their* Slack status. Their token is kept server-side with the world (never sent to clients). |
+| `users.profile:write`, `chat:write` (user) | "Connect my Slack account": a person's own grant, so the world can post *as them* and set *their* Slack status. Their token is kept server-side with the world (never sent to clients). |
 | `channels:read`, `groups:read` | Listing public and private channels to bind rooms to; following renames and archives. |
 | `channels:history`, `groups:history` | A space's conversation and history from its channel, and the huddle message Slack posts in a channel (how we know which channel a huddle is in). |
 | `users:read`, `users:read.email` | Names and pictures (so posts look like you), statuses, huddle state, admin flags, email matching. |

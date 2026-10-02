@@ -15,6 +15,12 @@ export function ProfilePanel() {
   const me = useStore((s) => s.boot?.me);
   const prefs = useStore((s) => s.prefs);
   const slackConnected = useStore((s) => s.boot?.slackConnected);
+  const linked = useStore((s) => s.boot?.linked ?? null);
+  const platform = useStore((s) => s.boot?.platform ?? 'local');
+  // on a Slack company your name, title, pronouns and timezone are your Slack profile's; on Discord, your name there
+  const fromPlatform = linked && linked === platform ? linked : null;
+  const inherited = (field: 'displayName' | 'title' | 'pronouns') => (fromPlatform === 'slack' ? true : fromPlatform === 'discord' ? field === 'displayName' : false);
+  const sourceName = fromPlatform === 'slack' ? 'Slack' : 'Discord';
   const [knockDms, setKnockDms] = useState(me?.settings.slackKnockDms ?? false);
   const [statusSync, setStatusSync] = useState<{ enabled: boolean; granted: boolean } | null>(null);
   useEffect(() => {
@@ -63,18 +69,19 @@ export function ProfilePanel() {
         <div className="cols">
           <section>
             <h2 className="pixel">You</h2>
+            {fromPlatform && <p className="muted small">Your name{fromPlatform === 'slack' ? ', title, pronouns and timezone' : ''} come from your {sourceName} profile — change them there and they follow.</p>}
             <label className="field">
               <span>Name</span>
-              <input value={f.displayName} onChange={(e) => setF({ ...f, displayName: e.target.value })} maxLength={40} required />
+              <input value={f.displayName} onChange={(e) => setF({ ...f, displayName: e.target.value })} maxLength={40} required readOnly={inherited('displayName')} title={inherited('displayName') ? `From ${sourceName}` : undefined} />
             </label>
             <label className="field">
               <span>What you do</span>
-              <input value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} maxLength={60} />
+              <input value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} maxLength={60} readOnly={inherited('title')} title={inherited('title') ? `From ${sourceName}` : undefined} />
             </label>
             <div className="row">
               <label className="field">
                 <span>Pronouns</span>
-                <input value={f.pronouns} onChange={(e) => setF({ ...f, pronouns: e.target.value })} maxLength={20} placeholder="optional" />
+                <input value={f.pronouns} onChange={(e) => setF({ ...f, pronouns: e.target.value })} maxLength={20} placeholder="optional" readOnly={inherited('pronouns')} title={inherited('pronouns') ? `From ${sourceName}` : undefined} />
               </label>
               <label className="field">
                 <span>Where you are</span>
@@ -134,14 +141,14 @@ export function ProfilePanel() {
                         api('/slack/me/status-sync', { method: 'PUT', json: { enabled } }).catch((x) => (setStatusSync({ ...statusSync, enabled: !enabled }), toast(`Couldn’t save: ${(x as Error).message}`)));
                       }}
                     />
-                    <span>Mirror my status to Slack — the status and note I set here become my Slack status (emoji + text); Available clears it</span>
+                    <span>Mirror my status to Slack — the status and note I set here become my Slack status (emoji + text); Available clears it. (What you say in a space is posted as you, with your own account.)</span>
                   </label>
                 ) : (
                   <p className="check">
-                    <a className="btn small slack" href="/api/slack/status/connect">
-                      💬 Sync my status to Slack
+                    <a className="btn small slack" href="/api/slack/me/connect">
+                      💬 Connect my Slack account
                     </a>
-                    <span className="muted small"> One-time grant: lets Minglewood set your own Slack status (and nothing else). Slack → here already works.</span>
+                    <span className="muted small"> One-time grant, your own account: what you say in a space is posted as you (no app tag), and the status you set here is mirrored to Slack. Slack → here already works.</span>
                   </p>
                 )}
                 {statusSync?.granted && (
@@ -150,7 +157,7 @@ export function ProfilePanel() {
                     className="btn small ghost"
                     onClick={() => api('/slack/me/status-sync', { method: 'DELETE' }).then(() => setStatusSync({ enabled: false, granted: false })).catch((x) => toast(`Couldn’t disconnect: ${(x as Error).message}`))}
                   >
-                    Forget my Slack status grant
+                    Disconnect my Slack account (posts go back to the app, status stops mirroring)
                   </button>
                 )}
               </div>

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { BRAND } from '@shared/brand';
-import type { Member, RoomBinding } from '@shared/domain/types';
+import type { ExternalIdentity, Member, Platform, RoomBinding } from '@shared/domain/types';
 import { loadoutSchema, outfitsSchema } from '@shared/protocol';
 import { sanitizeLoadout } from '@shared/avatar';
 import { decorItem, decorObject, MAX_DECOR_PER_ROOM, placementProblem, wallPlacementProblem, withoutDecoration, type Decoration } from '@shared/world/decor';
@@ -12,10 +12,13 @@ import { requireMember, type AppContext, authed } from '../context';
 import type { BindingView, PublicMember } from '@shared/api';
 
 
-export function toPublic(m: Member): PublicMember {
+export function toPublic(m: Member, identities: ExternalIdentity[] = [], platform: Platform = 'local'): PublicMember {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { settings, outfits, ...rest } = m;
-  return rest;
+  // their picture: on the company's platform first, else any linked account
+  const mine = identities.filter((i) => i.memberId === m.id && i.avatarUrl);
+  const pic = mine.find((i) => i.provider === platform) ?? mine[0];
+  return pic ? { ...rest, avatarUrl: pic.avatarUrl } : rest;
 }
 
 export function bindingView(ctx: AppContext, b: RoomBinding): BindingView {
@@ -61,18 +64,25 @@ export function apiRoutes(ctx: AppContext): Router {
   r.get('/bootstrap', auth, (req, res) => {
     const { orgId, member } = authed(req);
     const d = ctx.store.get(orgId);
+    const platform = ctx.store.platformOf(orgId);
+    // the account their profile comes from: the platform's, else any
+    const mine = d.identities.find((i) => i.memberId === member.id && i.provider === platform) ?? d.identities.find((i) => i.memberId === member.id && i.provider !== 'demo');
     res.json({
       org: d.org,
       world: d.world,
       departments: d.departments,
       teams: d.teams,
       rooms: d.rooms,
-      members: [...d.members.values()].map(toPublic),
+      members: [...d.members.values()].map((m) => toPublic(m, d.identities, platform)),
       bindings: d.bindings.map((b) => bindingView(ctx, b)),
       events: d.events,
       artifacts: d.artifacts,
       decorations: d.decorations,
       me: member,
+      platform,
+      linked: mine?.provider === 'slack' || mine?.provider === 'discord' ? mine.provider : null,
+      avatarUrl: toPublic(member, d.identities, platform).avatarUrl,
+      slackGranted: ctx.slack.hasStatusGrant(orgId, member.id),
       capabilities: {
         discord: discordConfigured() ? ctx.discord.capabilities : null,
         slack: slackConfigured() || config.slack.mock ? ctx.slack.provider.capabilities : null,

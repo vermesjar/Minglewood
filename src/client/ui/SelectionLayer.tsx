@@ -6,6 +6,7 @@ import { badgeTitle, callLink, roomVoiceChannel, voiceBadge } from '../app/huddl
 import { setState, useStore } from '../app/store';
 import { openLink } from '../discord/activity';
 import { HuddleIcon } from './HuddleIcon';
+import { Photo } from './Photo';
 import { AvatarCanvas, Popover, StatusDot, formatDate, formatTime, localTime, tenureLabel, timeAgo } from './common';
 import { NotesBoard } from './NotesBoard';
 
@@ -69,6 +70,7 @@ function ProfileCard({ id }: { id: string; x: number; y: number }) {
         <div className="infostand-head">
           <div className="infostand-avatar" style={{ background: `${dept?.color ?? '#ccc'}33` }}>
             <AvatarCanvas loadout={m.avatar} crop="bust" scale={2} />
+            <Photo url={m.avatarUrl} size={28} className="corner" title={`${first}’s picture`} />
           </div>
           <div className="infostand-who">
             <h3>

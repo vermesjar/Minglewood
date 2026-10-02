@@ -6,6 +6,7 @@ import { setState, toast, useStore } from '../app/store';
 import { openLink } from '../discord/activity';
 import { AvatarCanvas, StatusDot, formatDate } from './common';
 import { HuddleIcon } from './HuddleIcon';
+import { Photo } from './Photo';
 import type { BindingView } from '@shared/api';
 
 const PURPOSE: Record<string, string> = {
@@ -173,6 +174,7 @@ export function RoomPanel() {
               >
                 <span className={`head ${p.speaking ? 'speaking' : ''}`}>
                   <AvatarCanvas loadout={p.avatar} head scale={2} />
+                  <Photo url={m.avatarUrl} size={16} className="corner" />
                 </span>
                 <span className="person-text">
                   <strong>

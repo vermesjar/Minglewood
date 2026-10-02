@@ -17,6 +17,7 @@ import { dailyNote, knockDm, unfurlFor } from './messages';
 import { SlackPresence, type HuddleRoom } from './presence';
 import type { SlackProvider } from './provider';
 import { slackStatusFor } from './status';
+import { fieldsFromSlack, personFromSlackUser } from './members';
 
 /** The parts of a Slack event we read (https://api.slack.com/events). */
 export interface SlackEvent extends Partial<Omit<SlackMessage, 'channel' | 'user' | 'ts'>> {
@@ -134,6 +135,7 @@ export class SlackService {
     switch (ev.type) {
       case 'user_change':
         if (typeof ev.user === 'object') {
+          this.syncProfile(orgId, ev.user);
           const p = this.pushed.get(ev.user.id);
           const echo = p && Date.now() - p.at < 20_000 && (ev.user.profile?.status_text ?? '') === p.text && (ev.user.profile?.status_emoji ?? '') === p.emoji;
           if (echo) {
@@ -238,6 +240,33 @@ export class SlackService {
     for (const orgId of orgIds) if (this.teamFor(orgId)) this.relayKnocks(orgId);
   }
 
+  /* ------------------------------------------------------------------ profile ← Slack */
+
+  /** A Slack profile changed (user_change): the member's name, title, pronouns, timezone and picture follow. */
+  private syncProfile(orgId: string, u: SlackUser) {
+    const id = this.store.identity(orgId, 'slack', u.id);
+    const member = id && this.store.member(orgId, id.memberId);
+    if (!member || !u.profile) return;
+    const person = personFromSlackUser(u);
+    const inherited = fieldsFromSlack(person);
+    const changed = (Object.keys(inherited) as Array<keyof typeof inherited>).some((k) => inherited[k] !== member[k]);
+    if (changed) this.store.updateMember(orgId, member.id, inherited);
+    if (person.picture && person.picture !== id.avatarUrl) this.store.linkIdentity(orgId, { ...id, avatarUrl: person.picture });
+    if (changed || (person.picture && person.picture !== id.avatarUrl)) this.ensureHub(orgId).profileChanged(member.id);
+  }
+
+  /** A person's own token (their grant), for posting as them; undefined until they connect. */
+  userToken(orgId: string, memberId: string): string | undefined {
+    return this.store.secret(orgId, SlackService.userTokenKey(memberId));
+  }
+
+  /** Their grant is gone (revoked, uninstalled): back to the app posting for them, and the profile says so. */
+  dropGrant(orgId: string, memberId: string) {
+    const member = this.store.member(orgId, memberId);
+    if (member?.settings.slackStatusSync) this.store.updateMember(orgId, memberId, { settings: { ...member.settings, slackStatusSync: false } });
+    this.store.setSecret(orgId, SlackService.userTokenKey(memberId), null);
+  }
+
   /* ------------------------------------------------------------------ status → Slack */
 
   /** The key a person's own Slack token is kept under (server-side secrets, never sent to clients). */
@@ -259,12 +288,7 @@ export class SlackService {
         await this.provider.api.setUserStatus(token, profile);
       })().catch((e) => {
         console.warn('[slack] status sync failed:', (e as Error).message);
-        if (e instanceof Error && /invalid_auth|token_revoked|account_inactive|missing_scope/.test(e.message)) {
-          // the grant is gone: stop trying until they connect again
-          const member = this.store.member(orgId, memberId);
-          if (member) this.store.updateMember(orgId, memberId, { settings: { ...member.settings, slackStatusSync: false } });
-          this.store.setSecret(orgId, SlackService.userTokenKey(memberId), null);
-        }
+        if (e instanceof Error && /invalid_auth|token_revoked|account_inactive|missing_scope/.test(e.message)) this.dropGrant(orgId, memberId); // the grant is gone
       });
     });
   }

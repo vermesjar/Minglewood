@@ -1021,9 +1021,17 @@ class Game {
 
   /** After "Sync my status to Slack" comes back: say so, once. */
   noteStatusGrant() {
-    if (new URLSearchParams(location.search).get('status') !== 'slack') return;
-    history.replaceState(null, '', location.pathname + location.hash);
-    toast('Your status now mirrors to Slack: what you set here (and the note) shows up there, and Available clears it.', 'info', undefined, 8000);
+    const q = new URLSearchParams(location.search);
+    const status = q.get('status');
+    const notice = q.get('notice');
+    if (status !== 'slack' && notice !== 'slack_connect_declined') return;
+    // tidy only our own params out of the address bar (a ?room= link alongside still counts)
+    q.delete('status');
+    q.delete('notice');
+    const rest = q.toString();
+    history.replaceState(null, '', location.pathname + (rest ? `?${rest}` : '') + location.hash);
+    if (status === 'slack') toast('Your Slack account is connected: what you say in a space is posted as you, and the status you set here mirrors to Slack.', 'info', undefined, 8000);
+    else toast('No problem — you can connect your Slack account later from your profile (posts as you, status mirrored).', 'info', undefined, 8000);
   }
 
   /**

@@ -94,12 +94,61 @@ export function AdminConsole() {
 
 type TabProps = { data: AdminOverview; reload: () => void };
 
+const PLATFORMS: Array<{ id: 'local' | 'discord' | 'slack'; name: string; mark: string; blurb: string }> = [
+  { id: 'local', name: 'Just Minglewood', mark: '🌲', blurb: 'Conversations happen here. No channels, no sign-in through another app. Good for trying it out.' },
+  { id: 'discord', name: 'Discord', mark: '🎮', blurb: 'Spaces are your server’s channels: voice follows you, chat both ways, Activities. Names and pictures come from Discord.' },
+  { id: 'slack', name: 'Slack', mark: '💬', blurb: 'Spaces are your channels: huddles, chat both ways, statuses both ways. Names, titles, pronouns and pictures come from Slack.' },
+];
+
+function PlatformPick({ data, reload }: TabProps) {
+  const [err, setErr] = useState('');
+  const slackReady = !!data.slack.team;
+  const discordReady = data.connections.some((c) => c.provider === 'discord' && c.status === 'active');
+  const pick = async (id: 'local' | 'discord' | 'slack') => {
+    setErr('');
+    try {
+      await api('/admin/org', { method: 'PUT', json: { platform: id } });
+      reload();
+    } catch (e) {
+      setErr((e as Error).message);
+    }
+  };
+  return (
+    <section className="apanel wide">
+      <h2>What runs your conversations?</h2>
+      <p className="amuted">
+        One pick for the whole company. It decides which channels spaces link to, how people sign in, and where their name, title and
+        picture come from. Connect the workspace or server first (its tab), then choose it here.
+      </p>
+      <div className="aplatforms">
+        {PLATFORMS.map((p) => {
+          const ready = p.id === 'local' || (p.id === 'slack' ? slackReady : discordReady);
+          const on = data.platform === p.id;
+          return (
+            <button key={p.id} className={`aplatform ${on ? 'on' : ''}`} disabled={!ready} onClick={() => void pick(p.id)} aria-pressed={on}>
+              <span className="aplatform-mark" aria-hidden>
+                {p.mark}
+              </span>
+              <strong>{p.name}</strong>
+              <span className="amuted">{p.blurb}</span>
+              <span className="aplatform-state">{on ? 'Your pick' : ready ? 'Choose' : `Connect ${p.name} first`}</span>
+            </button>
+          );
+        })}
+      </div>
+      {!data.org.platform && <p className="amuted">Not picked yet — running as {PLATFORMS.find((p) => p.id === data.platform)?.name} from what’s connected.</p>}
+      {err && <p className="aerror">{err}</p>}
+    </section>
+  );
+}
+
 function OrgTab({ data, reload }: TabProps) {
   const [name, setName] = useState(data.org.name);
   const [tagline, setTagline] = useState(data.org.tagline);
   const [saved, setSaved] = useState(false);
   return (
     <div className="agrid">
+      <PlatformPick data={data} reload={reload} />
       <section className="apanel">
         <h2>Organization</h2>
         <label className="afield">
@@ -208,7 +257,8 @@ function ChannelSelect({ list, provider, value, onChange, slot }: { list: Extern
 function SpaceRowView({ space, data, channels, reload }: { space: SpaceRow; data: AdminOverview; channels: Record<string, ExternalChannel[]>; reload: () => void }) {
   const voice = data.bindings.find((b) => b.roomId === space.id && b.kind !== 'text');
   const text = data.bindings.find((b) => b.roomId === space.id && b.kind === 'text');
-  const [provider, setProvider] = useState<Provider>(voice?.provider ?? text?.provider ?? (data.connections.some((c) => c.provider === 'discord') ? 'discord' : 'demo'));
+  // the company's platform decides where channels come from (Organization tab)
+  const provider: Provider = data.platform === 'local' ? 'demo' : data.platform;
   const [voiceId, setVoiceId] = useState(voice?.externalChannelId ?? '');
   const [textId, setTextId] = useState(text?.externalChannelId ?? '');
   const [desc, setDesc] = useState(space.room?.description ?? '');
@@ -251,17 +301,6 @@ function SpaceRowView({ space, data, channels, reload }: { space: SpaceRow; data
           {space.emoji} {space.name}
         </strong>
         <div className="amuted">{space.purpose}</div>
-      </td>
-      <td>
-        <select value={provider} onChange={(e) => (setProvider(e.target.value as Provider), setVoiceId(''), setTextId(''))} disabled={quiet}>
-          <option value="demo">Demo</option>
-          <option value="slack" disabled={!data.slack.team}>
-            Slack
-          </option>
-          <option value="discord" disabled={!data.connections.some((c) => c.provider === 'discord')}>
-            Discord
-          </option>
-        </select>
       </td>
       {quiet ? (
         <td colSpan={2} className="amuted">
@@ -554,18 +593,19 @@ function SlackSetup({ data, reload }: TabProps) {
 
 function RoomsTab({ data, reload }: TabProps) {
   const [channels, setChannels] = useState<Record<string, ExternalChannel[]>>({});
-  const discord = data.connections.some((c) => c.provider === 'discord');
+  const discord = data.platform === 'discord';
+  const platformName = PLATFORMS.find((p) => p.id === data.platform)?.name ?? data.platform;
   useEffect(() => {
     void api<{ channels: ExternalChannel[] }>('/admin/channels?provider=demo').then((r) => setChannels((c) => ({ ...c, demo: r.channels })));
     if (discord)
       void api<{ channels: ExternalChannel[] }>('/admin/channels?provider=discord')
         .then((r) => setChannels((c) => ({ ...c, discord: r.channels })))
         .catch(() => undefined);
-    if (data.slack.team)
+    if (data.platform === 'slack' && data.slack.team)
       void api<{ channels: ExternalChannel[] }>('/admin/channels?provider=slack')
         .then((r) => setChannels((c) => ({ ...c, slack: r.channels })))
         .catch(() => undefined);
-  }, [discord, data.slack.team, data.bindings.length]);
+  }, [discord, data.platform, data.slack.team, data.bindings.length]);
   const spaces: SpaceRow[] = [
     { id: 'town', name: 'Town', emoji: '🏘️', purpose: 'The open world — your “general”' },
     ...data.rooms.map((r) => ({ id: r.id, name: r.name, emoji: r.emoji, purpose: r.purpose, room: r })),
@@ -573,19 +613,18 @@ function RoomsTab({ data, reload }: TabProps) {
   return (
     <>
       {discord && <DiscordSetup reload={reload} />}
-      {data.slack.team && <SlackSetup data={data} reload={reload} />}
+      {data.platform === 'slack' && data.slack.team && <SlackSetup data={data} reload={reload} />}
       <section className="apanel wide">
-        <h2>Spaces & channels</h2>
+        <h2>Spaces & channels · {platformName}</h2>
         <p className="amuted">
           Every space can have a <strong>voice</strong> channel (where you are when you’re there) and a <strong>text</strong>{' '}
-          channel (its conversation, both ways). The world never depends on the platform — these links are the only
-          connection, and the platform stays the record.
+          channel (its conversation, both ways). Channels come from {platformName} — the pick on the Organization tab. The world
+          never depends on the platform; these links are the only connection, and the platform stays the record.
         </p>
         <table className="atable">
           <thead>
             <tr>
               <th>Space</th>
-              <th>Platform</th>
               <th>Voice</th>
               <th>Text</th>
               <th>Description</th>

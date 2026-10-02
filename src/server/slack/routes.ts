@@ -23,7 +23,7 @@ import { authed, requireAdmin, requireMember, type AppContext } from '../context
 import { slug } from '../providers/spaces';
 import { KeyedLimiter } from '../realtime/rateLimit';
 import { SlackApiError, type MockSlack } from './api';
-import { upsertSlackMember } from './members';
+import { personFromSlackUser, upsertSlackMember } from './members';
 import { askToJoin, huddleInvite } from './messages';
 import type { SlackInstall } from './provider';
 import { SlackService, type SlackEvent } from './service';
@@ -132,17 +132,23 @@ export function slackRoutes(ctx: AppContext, mock?: MockSlack): Router {
       const orgId = await ctx.slack.resolveOrg(who.teamId);
       if (!orgId) return res.redirect('/?error=slack_no_install');
       const profile = await ctx.slack.provider.user(who.teamId, who.userId);
+      const fromSlack = profile ? personFromSlackUser(profile) : undefined;
       const member = upsertSlackMember(ctx, orgId, {
         userId: who.userId,
-        name: profile?.profile?.display_name || profile?.real_name || who.name,
+        name: fromSlack?.name || who.name,
         email: who.email,
         emailVerified: who.emailVerified,
-        timezone: profile?.tz,
-        picture: profile?.profile?.image_192 || profile?.profile?.image_72 || who.picture,
-        manager: !!(profile?.is_admin || profile?.is_owner),
+        timezone: fromSlack?.timezone,
+        picture: fromSlack?.picture || who.picture,
+        title: fromSlack?.title,
+        pronouns: fromSlack?.pronouns,
+        manager: !!fromSlack?.manager,
       });
       res.setHeader('Set-Cookie', [sessionCookie(issueToken(member.id, orgId)), cookie('', 0)]);
-      res.redirect('/');
+      // On a Slack company, connecting your account is part of signing in: posts as you, status mirrored.
+      // (Declining lands you in the world anyway; the profile offers it again.)
+      const wantsGrant = ctx.store.platformOf(orgId) === 'slack' && !ctx.slack.hasStatusGrant(orgId, member.id);
+      res.redirect(wantsGrant ? '/api/slack/me/connect' : '/');
     } catch (e) {
       console.error('[slack] sign-in failed', (e as Error).message);
       res.redirect('/?error=slack_failed');
@@ -252,7 +258,17 @@ export function slackRoutes(ctx: AppContext, mock?: MockSlack): Router {
 
   /* ------------------------------------------------------------------ sync my status to Slack */
 
-  /** A person grants Minglewood the right to set their own Slack status (OAuth v2 user scope). */
+  /** "Connect my Slack account": the person's own grant (posts as them, status mirrored) — OAuth v2 user scopes. */
+  r.get('/me/connect', requireMember(ctx), (req, res) => {
+    const { orgId } = authed(req);
+    if (!slackConfigured()) return res.status(404).send('Slack is not configured. See docs/slack.md.');
+    if (!oauthLimiter.allow(req.ip ?? 'x')) return res.status(429).send('Too many attempts');
+    const state = randomBytes(16).toString('hex');
+    res.setHeader('Set-Cookie', cookie(`${STATUS_MARK}${state}`, 600));
+    res.redirect(ctx.slack.provider.statusGrantUrl(state, ctx.slack.teamFor(orgId)));
+  });
+
+  /** (the older name of the same grant) */
   r.get('/status/connect', requireMember(ctx), (req, res) => {
     const { orgId } = authed(req);
     if (!slackConfigured()) return res.status(404).send('Slack is not configured. See docs/slack.md.');
@@ -270,6 +286,8 @@ export function slackRoutes(ctx: AppContext, mock?: MockSlack): Router {
     const state = (parseCookies(req.headers.cookie)[STATE_COOKIE] ?? '').replace(STATUS_MARK, '');
     const code = typeof req.query.code === 'string' ? req.query.code : '';
     res.setHeader('Set-Cookie', cookie('', 0));
+    // they said no on Slack's screen: fine, the world is theirs anyway; the profile offers it again
+    if (req.query.error === 'access_denied') return res.redirect('/?notice=slack_connect_declined');
     if (!state || state !== req.query.state || !code) return res.redirect('/?error=oauth_state');
     try {
       const g = await ctx.slack.provider.statusGrant(code);
@@ -539,9 +557,18 @@ export function slackRoutes(ctx: AppContext, mock?: MockSlack): Router {
   if (mock && !config.isProd) {
     r.get('/dev/outbox', (_req, res) => res.json({ outbox: mock.outbox }));
     r.post('/dev/users', json, (req, res) => {
-      const u = z.object({ id: z.string().regex(/^U[A-Z0-9]{1,20}$/), name: z.string().max(60), is_admin: z.boolean().optional() }).safeParse(req.body);
+      const u = z
+        .object({ id: z.string().regex(/^U[A-Z0-9]{1,20}$/), name: z.string().max(60), is_admin: z.boolean().optional(), title: z.string().max(60).optional(), pronouns: z.string().max(20).optional(), tz: z.string().max(40).optional(), picture: z.string().url().max(300).optional() })
+        .safeParse(req.body);
       if (!u.success) return res.status(400).json({ error: 'invalid user' });
-      mock.users.set(u.data.id, { id: u.data.id, real_name: u.data.name, is_admin: u.data.is_admin, profile: { display_name: u.data.name } });
+      mock.users.set(u.data.id, { id: u.data.id, real_name: u.data.name, is_admin: u.data.is_admin, tz: u.data.tz, profile: { display_name: u.data.name, title: u.data.title, pronouns: u.data.pronouns, image_192: u.data.picture } });
+      res.json({ ok: true });
+    });
+    /** Who the mock's "Sign in with Slack" signs in as. */
+    r.post('/dev/signin-as', json, (req, res) => {
+      const b = z.object({ userId: z.string().regex(/^U[A-Z0-9]{1,20}$/) }).safeParse(req.body);
+      if (!b.success) return res.status(400).json({ error: 'invalid input' });
+      mock.signInAs = b.data.userId;
       res.json({ ok: true });
     });
     /** Sign in as a Slack user of the mock workspace (what the OpenID flow does, minus Slack). */
@@ -564,8 +591,9 @@ export function slackRoutes(ctx: AppContext, mock?: MockSlack): Router {
       const q = b.data.member.toLowerCase();
       const member = ctx.store.members(orgId).find((m) => m.id === b.data.member || m.displayName.toLowerCase().startsWith(q));
       if (!member) return res.status(404).json({ error: `no member named “${b.data.member}”` });
-      ctx.store.linkIdentity(orgId, { provider: 'slack', externalId: b.data.userId, memberId: member.id, linkedAt: new Date().toISOString() });
-      mock.users.set(b.data.userId, { id: b.data.userId, real_name: member.displayName, profile: { display_name: member.displayName } });
+      const known = mock.users.get(b.data.userId);
+      ctx.store.linkIdentity(orgId, { provider: 'slack', externalId: b.data.userId, memberId: member.id, avatarUrl: known?.profile?.image_192, linkedAt: new Date().toISOString() });
+      if (!known) mock.users.set(b.data.userId, { id: b.data.userId, real_name: member.displayName, profile: { display_name: member.displayName } });
       res.json({ memberId: member.id, displayName: member.displayName });
     });
     /** Bind a room to a mock channel, as its huddle and (with `text: true`) its conversation too. */

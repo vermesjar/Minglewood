@@ -8,6 +8,7 @@ import { TOWN_ID } from '@shared/world';
 import type { ChatEntry } from '@shared/domain/types';
 import { setState, toast, useStore } from '../app/store';
 import { openLink } from '../discord/activity';
+import { Photo } from './Photo';
 
 const PROVIDER_NAME: Record<string, string> = { discord: 'Discord', slack: 'Slack', demo: 'demo' };
 
@@ -16,11 +17,12 @@ function time(iso: string) {
   return Number.isNaN(d.getTime()) ? '' : d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 }
 
-function Line({ e, meId }: { e: ChatEntry; meId?: string }) {
+function Line({ e, meId, photo }: { e: ChatEntry; meId?: string; photo?: string }) {
   const mine = e.memberId && e.memberId === meId;
   return (
     <li className={`chat-line ${mine ? 'mine' : ''}`}>
       <span className="chat-who">
+        <Photo url={e.avatarUrl ?? photo} size={16} />
         {e.source !== 'world' && (
           <span className={`chat-src ${e.source}`} title={`Posted in ${PROVIDER_NAME[e.source] ?? e.source}`}>
             {e.source === 'discord' ? 'D' : e.source === 'slack' ? 'S' : '•'}
@@ -124,6 +126,7 @@ export function ChatPanel() {
   const chat = useStore((s) => s.chat);
   const sceneId = useStore((s) => s.sceneId);
   const meId = useStore((s) => s.boot?.me.id);
+  const members = useStore((s) => s.membersById);
   const rooms = useStore((s) => s.boot?.rooms);
   const collapsed = useStore((s) => !!s.prefs.chatCollapsed);
   const list = useRef<HTMLOListElement>(null);
@@ -165,7 +168,7 @@ export function ChatPanel() {
               {channel ? `Nothing in ${channel.name} yet — say hi (Enter).` : 'Quiet so far. What you say is heard by everyone in this space.'}
             </li>
           ) : (
-            entries.slice(-40).map((e) => <Line key={e.id} e={e} meId={meId} />)
+            entries.slice(-40).map((e) => <Line key={e.id} e={e} meId={meId} photo={e.memberId ? members.get(e.memberId)?.avatarUrl : undefined} />)
           )}
         </ol>
       )}

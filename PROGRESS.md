@@ -88,6 +88,14 @@
   https://minglewood.onrender.com. First install ("Minglewood Test") created its world within a minute; the
   installer signed in via Discord and landed as admin. Bot intentionally has only View Channels.
 
+## Slack integration V1.1 (2026-10-02, after the tag)
+- One org-wide platform pick (Admin → Organization): Just Minglewood / Discord / Slack. Spaces & channels follows it
+  (no per-row platform), as does where profiles come from.
+- Profiles inherit from the platform: Slack → display name, title, pronouns, timezone, picture (at sign-in and on
+  `user_change`); Discord → name and picture. Read-only in the game. Pictures show on cards, lists and chat lines.
+- "Connect my Slack account": one per-person grant (`chat:write` + `users.profile:write`) — posts as you, no app
+  tag; status mirrored. Required step of a Slack sign-in (declinable). Bot-with-your-name stays the fallback.
+
 ## Slack integration V1 (tag `slack-v1`, 2026-10-02)
 Everything below this heading up to the end of the day's entries is V1: sign-in, Add to Slack, chat both ways, history,
 one-click channel setup, huddles → rooms, silent-disco badges, huddle actions, status both ways, link previews,

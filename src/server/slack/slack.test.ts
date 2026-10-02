@@ -2,6 +2,10 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import type { AddressInfo } from 'node:net';
 import { ORG_ID } from '@shared/seed/northstar';
 import type { ServerMsg } from '@shared/protocol';
+import { issueToken, sessionCookie } from '../auth/session';
+
+/** A session cookie for a member (what a sign-in leaves in the browser). */
+const issueTokenCookie = (memberId: string) => sessionCookie(issueToken(memberId, ORG_ID)).split(';')[0];
 import { config } from '../config';
 import { createApp, type App } from '../app';
 import { MemoryPersistence } from '../store/jsonFile';
@@ -367,6 +371,103 @@ describe('Slack, end to end (signed requests into a running server, the recordin
   });
 });
 
+describe('A Slack company: the pick, profiles from Slack, the grant at sign-in, posting as you (over HTTP, the mock out)', () => {
+  let app: App;
+  let base: string;
+  const saved = { ...config.slack };
+  const TEAM = 'T0MOCK';
+  const settle = () => new Promise((r) => setTimeout(r, 30));
+  const outbox = () => fetch(`${base}/api/slack/dev/outbox`).then((r) => r.json() as Promise<{ outbox: SlackCall[] }>);
+  const cookiesOf = (r: Response) => r.headers.getSetCookie().map((c) => c.split(';')[0]).join('; ');
+  const ev = (e: Record<string, unknown>) => {
+    const body = JSON.stringify({ type: 'event_callback', team_id: TEAM, event: e });
+    const ts = String(Math.floor(Date.now() / 1000));
+    return fetch(`${base}/api/slack/events`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Slack-Request-Timestamp': ts, 'X-Slack-Signature': slackSignature(config.slack.signingSecret, ts, body) }, body });
+  };
+
+  beforeAll(async () => {
+    Object.assign(config.slack, { signingSecret: 'test-signing-secret', teamId: TEAM, mock: true, botToken: '', clientId: 'c', clientSecret: 's' });
+    app = await createApp({ persistence: new MemoryPersistence(), simulateCoworkers: false });
+    await new Promise<void>((r) => app.server.listen(0, r));
+    base = `http://127.0.0.1:${(app.server.address() as AddressInfo).port}`;
+    await fetch(`${base}/api/slack/dev/users`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: 'U0PAT', name: 'Pat Okafor', title: 'Product Designer', pronouns: 'she/her', tz: 'Europe/Lisbon', picture: 'https://img.test/pat.png' }) });
+    await fetch(`${base}/api/slack/dev/signin-as`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: 'U0PAT' }) });
+  });
+  afterAll(async () => {
+    await app.close();
+    Object.assign(config.slack, saved);
+  });
+
+  it('an admin picks Slack for the company; the pick needs the workspace and is what spaces bind to', async () => {
+    const signin = await fetch(`${base}/api/auth/demo`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Ops3', teamId: 'team-aurora', admin: true }) });
+    const cookie = cookiesOf(signin);
+    const bad = await fetch(`${base}/api/admin/org`, { method: 'PUT', headers: { cookie, 'Content-Type': 'application/json' }, body: JSON.stringify({ platform: 'discord' }) });
+    expect(bad.status).toBe(400); // no Discord server connected
+    const ok = await fetch(`${base}/api/admin/org`, { method: 'PUT', headers: { cookie, 'Content-Type': 'application/json' }, body: JSON.stringify({ platform: 'slack' }) });
+    expect(ok.status).toBe(200);
+    expect(app.store.platformOf(ORG_ID)).toBe('slack');
+    const overview = (await fetch(`${base}/api/admin/overview`, { headers: { cookie } }).then((r) => r.json())) as { platform: string; org: { platform?: string } };
+    expect(overview.platform).toBe('slack');
+    expect(overview.org.platform).toBe('slack');
+  });
+
+  it('signing in with Slack inherits the profile (name, title, pronouns, timezone, picture) and asks for the grant first', async () => {
+    const start = await fetch(`${base}/api/slack/auth/start`, { redirect: 'manual' });
+    const to = new URL(start.headers.get('location')!);
+    const cookie = cookiesOf(start);
+    const cb = await fetch(`${base}/api/slack/auth/callback?code=abc&state=${to.searchParams.get('state')}`, { headers: { cookie }, redirect: 'manual' });
+    expect(cb.status).toBe(302);
+    expect(cb.headers.get('location')).toBe('/api/slack/me/connect'); // a Slack company: connect your account as part of signing in
+    const session = cookiesOf(cb).split('; ').find((c) => c.includes('_session='))!;
+    const id = app.store.identity(ORG_ID, 'slack', 'U0PAT')!;
+    const me = app.store.member(ORG_ID, id.memberId)!;
+    expect(me).toMatchObject({ displayName: 'Pat Okafor', title: 'Product Designer', pronouns: 'she/her', timezone: 'Europe/Lisbon' });
+    expect(id.avatarUrl).toBe('https://img.test/pat.png');
+    // the world sees the picture and knows where the profile comes from
+    const boot = (await fetch(`${base}/api/bootstrap`, { headers: { cookie: session } }).then((r) => r.json())) as { platform: string; linked: string | null; avatarUrl?: string; slackGranted: boolean; members: Array<{ id: string; avatarUrl?: string }> };
+    expect(boot).toMatchObject({ platform: 'slack', linked: 'slack', avatarUrl: 'https://img.test/pat.png', slackGranted: false });
+    expect(boot.members.find((m) => m.id === me.id)?.avatarUrl).toBe('https://img.test/pat.png');
+    // declining the grant on Slack's screen still lands in the world
+    const connect = await fetch(`${base}/api/slack/me/connect`, { headers: { cookie: session }, redirect: 'manual' });
+    const grant = new URL(connect.headers.get('location')!);
+    expect(grant.searchParams.get('user_scope')).toBe('users.profile:write,chat:write');
+    const declined = await fetch(`${base}/api/slack/install/callback?error=access_denied&state=${grant.searchParams.get('state')}`, { headers: { cookie: [session, cookiesOf(connect)].join('; ') }, redirect: 'manual' });
+    expect(declined.headers.get('location')).toBe('/?notice=slack_connect_declined');
+    // a change in Slack reaches the member (title, pronouns, picture)
+    await ev({ type: 'user_change', user: { id: 'U0PAT', real_name: 'Pat Okafor', tz: 'Europe/Lisbon', profile: { display_name: 'Pat Okafor', title: 'Head of Design', pronouns: 'she/they', image_192: 'https://img.test/pat2.png', status_text: '', status_emoji: '' } } });
+    await settle();
+    expect(app.store.member(ORG_ID, me.id)).toMatchObject({ title: 'Head of Design', pronouns: 'she/they' });
+    expect(app.store.identity(ORG_ID, 'slack', 'U0PAT')?.avatarUrl).toBe('https://img.test/pat2.png');
+    // signing in again keeps following Slack's profile of the moment (the world never overrides it)
+    app.store.updateMember(ORG_ID, me.id, { title: 'edited here' });
+    const again = await fetch(`${base}/api/slack/auth/start`, { redirect: 'manual' });
+    const to2 = new URL(again.headers.get('location')!);
+    await fetch(`${base}/api/slack/auth/callback?code=abc&state=${to2.searchParams.get('state')}`, { headers: { cookie: cookiesOf(again) }, redirect: 'manual' });
+    expect(app.store.member(ORG_ID, me.id)?.title).toBe('Product Designer'); // what the mock's users.info says
+  });
+
+  it('with the account connected, what you say is posted as you — your own token, no app-side name', async () => {
+    const hub = app.hubs.get(ORG_ID)!;
+    const id = app.store.identity(ORG_ID, 'slack', 'U0PAT')!;
+    const session = issueTokenCookie(id.memberId);
+    const connect = await fetch(`${base}/api/slack/me/connect`, { headers: { cookie: session }, redirect: 'manual' });
+    const grant = new URL(connect.headers.get('location')!);
+    const cb = await fetch(`${base}/api/slack/install/callback?code=abc&state=${grant.searchParams.get('state')}`, { headers: { cookie: [session, cookiesOf(connect)].join('; ') }, redirect: 'manual' });
+    expect(cb.headers.get('location')).toBe('/?status=slack');
+    app.store.setBinding(ORG_ID, { id: 'bpat', orgId: ORG_ID, roomId: 'cafe', provider: 'slack', kind: 'text', externalGuildId: TEAM, externalChannelId: 'C0CAFE', label: '#cafe' }, 'cafe');
+    hub.connect({ id: 'c-pat', memberId: id.memberId, sceneId: null, send: () => undefined });
+    hub.enter(id.memberId, 'cafe', 'live');
+    hub.say(id.memberId, 'posted as me');
+    await settle();
+    const post = (await outbox()).outbox.filter((c) => c.method === 'chat.postMessage').pop()!;
+    expect(post.token).toBe('xoxp-…');
+    expect(post.args).toMatchObject({ channel: 'C0CAFE', text: 'posted as me' });
+    expect(post.args.username).toBeUndefined();
+    const boot = (await fetch(`${base}/api/bootstrap`, { headers: { cookie: session } }).then((r) => r.json())) as { slackGranted: boolean };
+    expect(boot.slackGranted).toBe(true);
+  });
+});
+
 describe('Huddles with the people at your table (over HTTP, the mock out)', () => {
   let app: App;
   let base: string;
@@ -419,7 +520,7 @@ describe('Huddles with the people at your table (over HTTP, the mock out)', () =
     const start = await fetch(`${base}/api/slack/status/connect`, { headers: { cookie: ari.cookie }, redirect: 'manual' });
     expect(start.status).toBe(302);
     const to = new URL(start.headers.get('location')!);
-    expect(to.searchParams.get('user_scope')).toBe('users.profile:write');
+    expect(to.searchParams.get('user_scope')).toBe('users.profile:write,chat:write');
     const cookie = [ari.cookie, ...start.headers.getSetCookie().map((c) => c.split(';')[0])].join('; ');
     expect(to.searchParams.get('redirect_uri')).toBe(config.slack.statusRedirectUri);
     // it lands on the install callback by default (the redirect Slack already knows), which recognises it

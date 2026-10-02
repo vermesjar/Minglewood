@@ -40,9 +40,15 @@ export function upsertDiscordMember(ctx: AppContext, orgId: string, p: ExternalI
   const existing = ctx.store.identity(orgId, 'discord', p.externalId);
   const known = existing && ctx.store.member(orgId, existing.memberId);
   if (known) {
-    if (admin && known.role === 'member') ctx.store.updateMember(orgId, known.id, { role: 'admin' });
+    // on a Discord company, Discord is the profile of record: the name (nickname there) and picture follow it
+    const inherit = ctx.store.platformOf(orgId) === 'discord' && p.displayName.trim() && p.displayName.trim().slice(0, 40) !== known.displayName;
+    const updated = ctx.store.updateMember(orgId, known.id, {
+      ...(inherit ? { displayName: p.displayName.trim().slice(0, 40) } : {}),
+      ...(admin && known.role === 'member' ? { role: 'admin' as const } : {}),
+    });
     if (p.avatarUrl !== existing.avatarUrl) ctx.store.linkIdentity(orgId, { ...existing, avatarUrl: p.avatarUrl });
-    return known;
+    if (inherit || p.avatarUrl !== existing.avatarUrl) ctx.hubs.get(orgId)?.profileChanged(known.id);
+    return updated;
   }
   const demoOrg = orgId === ORG_ID;
   const team = (demoOrg && data.teams.find((t) => t.id === 'team-aurora')) || data.teams[0];

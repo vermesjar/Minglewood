@@ -25,6 +25,7 @@ export function adminRoutes(ctx: AppContext, onDiscordConnected: (orgId: string)
     const d = ctx.store.get(orgId);
     res.json({
       org: d.org,
+      platform: ctx.store.platformOf(orgId),
       rooms: d.rooms,
       teams: d.teams,
       departments: d.departments,
@@ -47,9 +48,15 @@ export function adminRoutes(ctx: AppContext, onDiscordConnected: (orgId: string)
 
   r.put('/org', (req, res) => {
     const { orgId, member } = authed(req);
-    const body = z.object({ name: z.string().trim().min(1).max(60), tagline: z.string().trim().max(120) }).partial().safeParse(req.body);
+    const body = z
+      .object({ name: z.string().trim().min(1).max(60), tagline: z.string().trim().max(120), platform: z.enum(['local', 'discord', 'slack']) })
+      .partial()
+      .safeParse(req.body);
     if (!body.success) return res.status(400).json({ error: 'invalid input' });
+    if (body.data.platform === 'slack' && !ctx.slack.teamFor(orgId)) return res.status(400).json({ error: 'Connect a Slack workspace first (Slack tab).' });
+    if (body.data.platform === 'discord' && !ctx.store.get(orgId).connections.some((c) => c.provider === 'discord' && c.status === 'active')) return res.status(400).json({ error: 'Connect a Discord server first (Discord tab).' });
     const org = ctx.store.updateOrg(orgId, body.data);
+    if (body.data.platform) ctx.hubs.get(orgId)?.bindingsChanged();
     ctx.store.audit(orgId, member.id, 'org.updated', orgId, JSON.stringify(body.data));
     res.json({ org });
   });

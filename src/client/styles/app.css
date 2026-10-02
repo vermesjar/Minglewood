@@ -886,6 +886,59 @@ code {
 .huddle-line .huddle-icon {
   margin-left: 0;
 }
+.photo {
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #2a1f2d;
+  background: #fff8ec;
+  flex: none;
+  vertical-align: middle;
+}
+.photo.corner {
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+}
+.infostand-avatar,
+.person-row .head,
+.people-list .head {
+  position: relative;
+}
+.chat-who .photo {
+  margin-right: 4px;
+}
+.aplatforms {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin: 8px 0;
+}
+.aplatform {
+  display: grid;
+  gap: 6px;
+  text-align: left;
+  padding: 14px;
+  border: 2px solid #d8d2c8;
+  border-radius: 12px;
+  background: #fff;
+  cursor: pointer;
+  font: inherit;
+}
+.aplatform:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.aplatform.on {
+  border-color: #2a1f2d;
+  box-shadow: 0 0 0 3px rgba(242, 183, 5, 0.45);
+}
+.aplatform-mark {
+  font-size: 22px;
+}
+.aplatform-state {
+  font-size: 12px;
+  font-weight: 700;
+}
 .slack-status-sync {
   display: grid;
   gap: 6px;

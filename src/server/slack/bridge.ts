@@ -36,6 +36,10 @@ export interface SlackBridgeDeps {
   hubFor: (orgId: string) => OrgHub;
   /** The workspace a company's spaces bind to. */
   teamFor: (orgId: string) => string | undefined;
+  /** A person's own Slack token (their grant): what they say is posted *as them*, no app tag. */
+  userTokenFor?: (orgId: string, memberId: string) => string | undefined;
+  /** Their token stopped working: forget it (and tell them, via their profile). */
+  onUserTokenBad?: (orgId: string, memberId: string) => void;
 }
 
 export type InChannel = 'member' | 'joined' | 'private' | 'failed';
@@ -100,8 +104,22 @@ export class SlackBridge {
     setTimeout(() => this.pending.delete(pendingKey), 15_000);
     try {
       const identity = this.deps.store.get(hub.orgId).identities.find((i) => i.provider === 'slack' && i.memberId === memberId);
-      const look = (identity && (await this.lookOf(auth.teamId, identity.externalId))) ?? { name: member.displayName, avatarUrl: identity?.avatarUrl };
-      const posted = await this.post(auth, channel, text, look);
+      // with their own grant, the message is theirs — posted with their token, as them, no app tag
+      const mine = this.deps.userTokenFor?.(hub.orgId, memberId);
+      let posted: { ts: string } | undefined;
+      if (mine) {
+        try {
+          posted = await this.deps.api.postMessage(mine, channel, text);
+        } catch (e) {
+          if (e instanceof SlackApiError && /invalid_auth|token_revoked|account_inactive|missing_scope|not_authed/.test(e.error)) {
+            this.deps.onUserTokenBad?.(hub.orgId, memberId); // back to the app posting for them
+          } else if (!(e instanceof SlackApiError && e.error === 'not_in_channel')) throw e;
+        }
+      }
+      if (!posted) {
+        const look = (identity && (await this.lookOf(auth.teamId, identity.externalId))) ?? { name: member.displayName, avatarUrl: identity?.avatarUrl };
+        posted = await this.post(auth, channel, text, look);
+      }
       if (posted?.ts && localId) hub.relabelChat(sceneId, localId, slackMessageId(channel, posted.ts));
     } catch (e) {
       this.pending.delete(pendingKey);

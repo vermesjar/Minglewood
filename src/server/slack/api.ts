@@ -90,6 +90,9 @@ export interface SlackOpenIdUser {
 export interface SlackProfile {
   display_name?: string;
   real_name?: string;
+  /** What they do, and how they'd like to be referred to — as set in their Slack profile. */
+  title?: string;
+  pronouns?: string;
   email?: string;
   image_72?: string;
   image_192?: string;
@@ -154,6 +157,9 @@ export interface SlackMessage {
 
 export class SlackApi {
   constructor(private readonly transport: SlackTransport = fetchTransport) {}
+
+  /** Test hook: the mock transport echoes this nonce in its id_token (never used by the real transport). */
+  expectNonce?: (nonce: string | undefined) => void;
 
   private async call<T>(method: string, args: Record<string, unknown>, token?: string): Promise<T> {
     const body = await this.transport({ method, token, args });
@@ -297,6 +303,9 @@ export class MockSlack {
   /** The pretend bot user, and the scopes the pretend install granted (all of them unless the simulator says otherwise). */
   botUserId = 'U0MOCKBOT';
   botId = 'B0MOCK';
+  /** Who "Sign in with Slack" signs in as (the simulator sets it), and the nonce the sign-in echoes back. */
+  signInAs = 'U0INSTALLER';
+  nonce = '';
   scopes: string[] = [...SLACK_BOT_SCOPES];
   private nextChannel = 1;
 
@@ -305,8 +314,14 @@ export class MockSlack {
     if (this.outbox.length > 200) this.outbox.shift();
     const channelOf = (id: unknown) => this.channels.find((c) => c.id === String(id));
     switch (call.method) {
+      case 'openid.connect.token':
+        return { ok: true, access_token: 'xoxp-mock-signin', id_token: `e30.${Buffer.from(JSON.stringify({ nonce: this.nonce })).toString('base64url')}.sig` };
+      case 'openid.connect.userInfo': {
+        const u = this.users.get(this.signInAs) ?? { id: this.signInAs, real_name: 'Pat Mock', profile: {} };
+        return { ok: true, sub: u.id, 'https://slack.com/user_id': u.id, 'https://slack.com/team_id': 'T0MOCK', 'https://slack.com/team_name': 'Mock workspace', email: u.profile?.email ?? `${u.id.toLowerCase()}@mock.test`, email_verified: true, name: u.real_name ?? u.name ?? 'Pat', picture: u.profile?.image_192 };
+      }
       case 'oauth.v2.access':
-        return { ok: true, access_token: 'xoxb-mock-installed', bot_user_id: this.botUserId, team: { id: 'T0MOCK', name: 'Mock workspace' }, authed_user: { id: 'U0INSTALLER', access_token: 'xoxp-mock-user', scope: 'users.profile:write' } };
+        return { ok: true, access_token: 'xoxb-mock-installed', bot_user_id: this.botUserId, team: { id: 'T0MOCK', name: 'Mock workspace' }, authed_user: { id: this.signInAs, access_token: 'xoxp-mock-user', scope: 'users.profile:write,chat:write' } };
       case 'users.profile.set':
         return { ok: true, profile: call.args.profile };
       case 'auth.test':

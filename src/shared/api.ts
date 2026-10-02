@@ -6,6 +6,7 @@ import type {
   Member,
   OrgEvent,
   Organization,
+  Platform,
   ProviderConnection,
   Room,
   RoomBinding,
@@ -49,7 +50,8 @@ export interface JoinInstruction {
   explainer: string;
 }
 
-export type PublicMember = Omit<Member, 'settings'>;
+/** A member as everyone sees them: no settings, plus their picture on the company's platform (Slack / Discord). */
+export type PublicMember = Omit<Member, 'settings'> & { avatarUrl?: string };
 export type BindingView = RoomBinding & { join: JoinInstruction };
 
 export interface PublicConfig {
@@ -77,6 +79,14 @@ export interface Bootstrap {
   capabilities: { discord: ProviderCapabilities | null; slack: ProviderCapabilities | null; demo: ProviderCapabilities };
   discordConnected: boolean;
   slackConnected: boolean;
+  /** The company's platform (see Organization.platform), resolved. */
+  platform: Platform;
+  /** Which platform account I signed in with / am linked to, if any: it's where my profile fields come from. */
+  linked: Platform | null;
+  /** My picture on that platform. */
+  avatarUrl?: string;
+  /** Slack: I've granted the app my own token (posts as me, status mirrored). */
+  slackGranted: boolean;
 }
 
 export interface ExternalChannel {
@@ -88,6 +98,8 @@ export interface ExternalChannel {
 
 export interface AdminOverview {
   org: Organization;
+  /** The company's platform, resolved (org.platform, else inferred from the connections). */
+  platform: Platform;
   rooms: Room[];
   teams: Team[];
   departments: Department[];

@@ -7,6 +7,9 @@
 
 export type Id = string;
 
+/** What runs a company's conversations: nothing but Minglewood (local), Discord, or Slack. One pick, org-wide. */
+export type Platform = 'local' | 'discord' | 'slack';
+
 export interface Organization {
   id: Id;
   slug: string;
@@ -15,6 +18,11 @@ export interface Organization {
   timezone: string;
   foundedAt: string; // ISO date
   worldId: Id;
+  /**
+   * The platform this company runs on. Decides which channels spaces bind to, which sign-in people use, and
+   * where profiles (name, title, pronouns, picture) are inherited from. Unset: inferred from the connections.
+   */
+  platform?: Platform;
 }
 
 export interface Department {
