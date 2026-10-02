@@ -15,7 +15,7 @@ import type { SceneDef, SceneObject } from '@shared/world/scene';
 import { seatSpotAt, seatSpots, stepOffTiles } from '@shared/world/seats';
 import { approach } from '@shared/world/interact';
 import { WalkGrid } from '@shared/world/walkGrid';
-import { findPath, type Tile } from '@shared/world/pathfinding';
+import { findPath, reroute, type Tile } from '@shared/world/pathfinding';
 import { heldDelta, KEY_DIRS, planHeldWalk, type ScreenDir } from '@shared/world/heldWalk';
 import { WorldView, type BuildingBadge, type WallSpot } from '../engine/WorldView';
 import { clientArt, loadArt } from '../engine/sprites/art';
@@ -43,6 +43,8 @@ export const QUESTS: Array<{ id: string; label: string; hint: string }> = [
 /** How long after shifting along a couch a click on it still means "the cushion I'm moving to". */
 const SHIFT_SETTLE_MS = 900;
 const SIT_CONFIRM_MS = 1500;
+/** How long an 'enter' we've sent keeps further clicks on that door from sending another. */
+const ENTER_PENDING_MS = 5000;
 
 class Game {
   world: WorldView | null = null;
@@ -53,7 +55,10 @@ class Game {
   /** The current room's NPCs as the server last told us (kept across scene reloads). */
   private npcStates = new Map<string, NpcState>();
   private sceneWaiters = new Map<string, Array<() => void>>();
-  private arrival: { goal: Tile; then: () => void; started: number } | null = null;
+  /** Where our walk is going and what happens there (`scene`: the room whose door we're walking to). */
+  private arrival: { goal: Tile; then: () => void; started: number; scene?: string } | null = null;
+  /** The scene we've asked the server to put us in and haven't been placed in yet. */
+  private pendingScene: { id: string; at: number } | null = null;
   /** Our recently sent paths, so the server's echo of them doesn't restart our own walk. */
   private ownPaths: string[] = [];
   private keyHandler: ((e: KeyboardEvent) => void) | null = null;
@@ -301,7 +306,15 @@ class Game {
           const cur = s.occupants[m.memberId];
           return cur?.sittingOn ? { occupants: { ...s.occupants, [m.memberId]: { ...cur, sittingOn: undefined } } } : {};
         });
-        if (m.memberId === this.meId && this.ownPaths.includes(pathKey(m.path))) break;
+        if (m.memberId === this.meId) {
+          // the echo of a walk we sent is used up here: the same path sent again by the server later is a
+          // resync (it refused a walk of ours) and must be walked
+          const own = this.ownPaths.indexOf(pathKey(m.path));
+          if (own >= 0) {
+            this.ownPaths.splice(own, 1);
+            break;
+          }
+        }
         w?.move(m.memberId, m.path, m.startedAt);
         break;
       case 'moment':
@@ -416,6 +429,8 @@ class Game {
 
   private loadScene(sceneId: string, occupants: Occupant[]) {
     this.lastScene = { sceneId, occupants };
+    if (this.pendingScene?.id === sceneId) this.pendingScene = null;
+    this.arrival = null;
     const prev = getState().sceneId;
     setState({
       sceneId,
@@ -554,18 +569,21 @@ class Game {
       if (!n) return false;
       target = [n.x, n.y];
     }
-    const path = findPath(grid, start, target, { allowGoal: !!seat });
-    if (!path) {
+    // Mid-walk, the step in progress is finished and the new way continues from its end (a figure never snaps
+    // back to a tile's centre, however fast you click); the same destination again sends nothing.
+    const now = this.serverNow();
+    const way = reroute(this.world.actorPath(this.meId), start, now, (from) => findPath(grid, from, target, { allowGoal: !!seat }));
+    if (!way) {
       toast('Can’t get there from here.');
       return false;
     }
     this.arrival = then ? { goal: target, then, started: Date.now() } : null;
-    if (path.length === 1) {
+    if (way.path.length === 1) {
       this.checkArrival();
       return true;
     }
     this.keyWalking = false;
-    this.sendOwnPath(path, this.serverNow());
+    if (!way.same) this.sendOwnPath(way.path, way.startedAt);
     this.world.showDestination(target);
     return true;
   }
@@ -651,8 +669,33 @@ class Game {
   goToScene(sceneId: string, opts: { near?: string; at?: Tile } = {}): Promise<void> {
     return new Promise((resolve) => {
       this.sceneWaiters.set(sceneId, [...(this.sceneWaiters.get(sceneId) ?? []), resolve]);
+      this.pendingScene = { id: sceneId, at: Date.now() };
       this.rt?.send({ t: 'enter', sceneId, near: opts.near, at: opts.at });
     });
+  }
+
+  /**
+   * Already on our way to this scene: walking to its door, or asked the server to put us there and waiting.
+   * Clicking the door again (and again) is then nothing new — one trip, one 'enter', one iris.
+   */
+  private headingTo(sceneId: string) {
+    if (this.arrival?.scene === sceneId) return true;
+    const p = this.pendingScene;
+    return !!p && p.id === sceneId && Date.now() - p.at < ENTER_PENDING_MS;
+  }
+
+  /** Walk to a scene's door if it's near, then go; from further away (or with no way to the door) just go. */
+  private travelTo(sceneId: string, door: Tile | null) {
+    // already there (a click that lands after the iris), or already on the way: nothing to do
+    if (getState().sceneId === sceneId || this.headingTo(sceneId)) return;
+    const go = () => {
+      // (pending from the moment the iris starts closing, not only once 'enter' goes out after it)
+      this.pendingScene = { id: sceneId, at: Date.now() };
+      this.world?.transitionTo(() => this.goToScene(sceneId));
+    };
+    if (door && this.walkTo(door, go)) {
+      if (this.arrival) this.arrival.scene = sceneId;
+    } else go();
   }
 
   /** Go to a room, with the iris transition. From town, nearby doors are walked to first. */
@@ -662,22 +705,18 @@ class Game {
     setState({ selection: null });
     const door = buildingForRoom(roomId)?.door;
     const me = this.world?.actorTile(this.meId);
-    const go = () => this.world?.transitionTo(() => this.goToScene(roomId));
-    if (s.sceneId === TOWN_ID && door && me && Math.hypot(me[0] - door.x, me[1] - door.y) < 9) {
-      if (!this.walkTo([door.x, door.y], go)) go();
-    } else go();
+    const near = s.sceneId === TOWN_ID && door && me && Math.hypot(me[0] - door.x, me[1] - door.y) < 9;
+    this.travelTo(roomId, near ? [door.x, door.y] : null);
   }
 
   exitToTown() {
     const s = getState();
     const scene = s.sceneId ? getScene(s.sceneId) : null;
     if (!scene || scene.kind !== 'interior') return;
-    const go = () => this.world?.transitionTo(() => this.goToScene(TOWN_ID));
     const me = this.world?.actorTile(this.meId);
     const doorY = scene.interior!.doorY;
-    if (me && Math.hypot(me[0], me[1] - doorY) < 6) {
-      if (!this.walkTo([0, doorY], go)) go();
-    } else go();
+    const near = me && Math.hypot(me[0], me[1] - doorY) < 6;
+    this.travelTo(TOWN_ID, near ? [0, doorY] : null);
   }
 
   goTo(sceneId: string) {
@@ -839,8 +878,14 @@ class Game {
     const grid = sceneId ? this.grid(sceneId) : undefined;
     const me = this.world?.actorTile(this.meId);
     if (!grid || !me || !this.world) return;
-    const way = approach(grid, me, o);
-    if (!way) {
+    // (mid-walk: finish the step in progress and approach from its end — see walkTo)
+    let tile: Tile | null = null;
+    const way = reroute(this.world.actorPath(this.meId), me, this.serverNow(), (from) => {
+      const a = approach(grid, from, o);
+      tile = a?.tile ?? null;
+      return a?.path ?? null;
+    });
+    if (!way || !tile) {
       toast('Can’t get there from here.');
       return;
     }
@@ -848,14 +893,14 @@ class Game {
       this.world?.faceObject(this.meId, o);
       then();
     };
-    this.arrival = { goal: way.tile, then: done, started: Date.now() };
+    this.arrival = { goal: tile, then: done, started: Date.now() };
     if (way.path.length === 1) {
       this.checkArrival();
       return;
     }
     this.keyWalking = false;
-    this.sendOwnPath(way.path, this.serverNow());
-    this.world.showDestination(way.tile);
+    if (!way.same) this.sendOwnPath(way.path, way.startedAt);
+    this.world.showDestination(tile);
   }
 
   /**

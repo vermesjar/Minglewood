@@ -164,3 +164,48 @@ export function positionAlong(
   const prev = path[path.length - 2] ?? last;
   return { x: last[0], y: last[1], done: true, dir: [last[0] - prev[0], last[1] - prev[1]] };
 }
+
+/** A walk in progress: the path and the server-epoch ms at which the walker was at path[0]. */
+export interface Walk {
+  path: Tile[];
+  startedAt: number;
+}
+
+/**
+ * The step a walker is in the middle of at `now`: its two tiles, its index in the path, and when the walker
+ * was at its start (the walk's own clock, so the position along [from, to] from `startedAt` is the position
+ * along the whole path). Null once the path is done.
+ */
+export function currentStep(walk: Walk, now: number, speed = WALK_SPEED): { from: Tile; to: Tile; index: number; startedAt: number } | null {
+  const walked = (Math.max(0, now - walk.startedAt) / 1000) * speed;
+  let before = 0;
+  for (let i = 1; i < walk.path.length; i++) {
+    const seg = Math.hypot(walk.path[i][0] - walk.path[i - 1][0], walk.path[i][1] - walk.path[i - 1][1]);
+    if (walked < before + seg) return { from: walk.path[i - 1], to: walk.path[i], index: i - 1, startedAt: walk.startedAt + (before / speed) * 1000 };
+    before += seg;
+  }
+  return null;
+}
+
+/**
+ * A new destination for someone who may already be walking. The step in progress is always finished and the
+ * new route (`find`, from a tile) continues from its end, rebased so the walker's position is unchanged: a
+ * figure never snaps back to a tile's centre and nobody's screen restarts the motion. From a standstill the
+ * route starts on `tile`, now. `same`: the walk already goes exactly this way (nothing to send). Null: no way.
+ */
+export function reroute(
+  cur: Walk | null,
+  tile: Tile,
+  now: number,
+  find: (from: Tile) => Tile[] | null,
+  speed = WALK_SPEED,
+): { path: Tile[]; startedAt: number; same: boolean } | null {
+  const step = cur ? currentStep(cur, now, speed) : null;
+  const route = find(step ? step.to : tile);
+  if (!route || route.length === 0) return null;
+  if (!step) return { path: route, startedAt: now, same: false };
+  const path = [step.from, ...route];
+  const rest = cur!.path.slice(step.index);
+  const same = path.length === rest.length && path.every((t, i) => t[0] === rest[i][0] && t[1] === rest[i][1]);
+  return { path, startedAt: step.startedAt, same };
+}

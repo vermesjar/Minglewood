@@ -95,9 +95,14 @@ export function attachSockets(server: Server, store: Store, hubs: Map<string, Or
           break;
         case 'move':
           if (!hub.move(memberId, msg.path, msg.startedAt)) {
-            // Resync the client with authoritative state.
+            // Resync the client with authoritative state: the walk it's on as we have it, or where it stands.
+            // (a.x/a.y alone is where its current walk *began* — sending that snapped it back along the walk)
             const a = hub.actor(memberId);
-            if (a) client.send({ t: 'updated', memberId, patch: { x: a.x, y: a.y, path: undefined } });
+            if (a) {
+              hub.position(a);
+              if (a.path && a.pathStartedAt !== undefined) client.send({ t: 'moved', memberId, path: a.path, startedAt: a.pathStartedAt });
+              else client.send({ t: 'updated', memberId, patch: { x: a.x, y: a.y, path: undefined } });
+            }
           }
           break;
         case 'sit':

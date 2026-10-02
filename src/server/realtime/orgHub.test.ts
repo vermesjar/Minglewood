@@ -6,7 +6,7 @@ import { getScene } from '@shared/world';
 import { WalkGrid } from '@shared/world/walkGrid';
 import { seatSpots, stepOffTiles } from '@shared/world/seats';
 import { approach } from '@shared/world/interact';
-import type { Tile } from '@shared/world/pathfinding';
+import { findPath, reroute, type Tile } from '@shared/world/pathfinding';
 import { Store } from '../store/store';
 import { MemoryPersistence } from '../store/jsonFile';
 import { OrgHub, type HubClient } from './orgHub';
@@ -113,6 +113,32 @@ describe('OrgHub', () => {
     expect(hub.move(a.id, away, Date.now() - 450)).toBe(false);
     // stamped 450 ms before it reaches us: by now the path says ~1.9 tiles along, but it began where she stood
     expect(hub.move(a.id, line(3), Date.now() - 450)).toBe(true);
+  });
+
+  it('takes a new destination mid-stride as one continuous walk: the step in progress kept, nobody jumps', () => {
+    const a = newMember(store, 'Ada');
+    const cb = client(a.id);
+    hub.connect(client(a.id));
+    hub.connect(cb);
+    hub.enter(a.id, 'cafe', 'live');
+    const { x, y } = hub.actor(a.id)!;
+    const grid = new WalkGrid(getScene('cafe')!);
+    const dir = ([[1, 0], [-1, 0], [0, 1], [0, -1]] as const).find(([dx, dy]) => [1, 2, 3].every((i) => grid.walkable(x + dx * i, y + dy * i)))!;
+    const line = (n: number): Tile[] => Array.from({ length: n + 1 }, (_, i) => [x + dir[0] * i, y + dir[1] * i]);
+    const t0 = Date.now() - 400; // ~1.7 tiles along a 3-tile walk: in the middle of its second step
+    expect(hub.move(a.id, line(3), t0)).toBe(true);
+    const before = hub.position(hub.actor(a.id)!);
+    // the client clicks the tile it started from: a reroute (shared helper) finishes the second step and turns back
+    const r = reroute({ path: line(3), startedAt: t0 }, [x, y], Date.now(), (from) => findPath(grid, from, [x, y]));
+    expect(r && !r.same).toBe(true);
+    expect(r!.path.slice(0, 2)).toEqual(line(3).slice(1, 3));
+    expect(hub.move(a.id, r!.path, r!.startedAt)).toBe(true);
+    const after = hub.position(hub.actor(a.id)!);
+    expect(Math.hypot(after.x - before.x, after.y - before.y)).toBeLessThan(0.05);
+    const moved = cb.msgs.filter((m) => m.t === 'moved').pop();
+    expect(moved && moved.t === 'moved' && moved.startedAt).toBe(r!.startedAt);
+    // the same destination clicked again proposes nothing new
+    expect(reroute({ path: r!.path, startedAt: r!.startedAt }, [x, y], Date.now(), (from) => findPath(grid, from, [x, y]))!.same).toBe(true);
   });
 
   it('hands out a coffee only at the machine, and everyone sees it until it is put down', () => {

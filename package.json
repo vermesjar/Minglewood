@@ -29,7 +29,7 @@
     "seats:audit": "node --no-maglev --import tsx scripts/seat-audit.ts",
     "slack:sim": "tsx --tsconfig tsconfig.json scripts/slack-simulate.ts",
     "playtest": "playwright test",
-    "playtest:gate": "cross-env PLAYTEST_URL=http://localhost:5190 PLAYTEST_TAG=gate playwright test regressions carry late-walk --workers 2 --retries 1"
+    "playtest:gate": "cross-env PLAYTEST_URL=http://localhost:5190 PLAYTEST_TAG=gate playwright test regressions carry late-walk click-spam --workers 2 --retries 1"
   },
   "dependencies": {
     "@discord/embedded-app-sdk": "^2.5.0",
