@@ -84,7 +84,7 @@ function VoiceLink() {
         onClick={() => joinUrl && openLink(joinUrl)}
         title={slack ? (running ? 'Slack can’t move you between huddles — one click here switches you.' : 'Slack can’t move you between huddles — this opens the channel; the headphones button starts its huddle.') : "Open this space's voice channel in Discord"}
       >
-        {canFollow ? '🎧 Moving your voice here…' : slack ? (running ? `🎧 Switch to the huddle in ${name}` : `🎧 Start a huddle in ${name}`) : `🎧 Switch voice to ${name}`}
+        {canFollow ? '🎧 Moving your voice here…' : slack ? (running ? `🎧 Switch to the room’s huddle (${name})` : `🎧 Start the room’s huddle (${name})`) : `🎧 Switch voice to ${name}`}
       </button>
     );
   }
@@ -98,7 +98,7 @@ function VoiceLink() {
       }}
       title={voice.join.explainer}
     >
-      {slack ? (running ? '🎧 Join the huddle' : '🎧 Start a huddle') : '🎧 Join voice'}
+      {slack ? (running ? '🎧 Join the room’s huddle' : '🎧 Start the room’s huddle') : '🎧 Join voice'}
     </button>
   );
   // The demo has no real voice: the talk light can still be tried there.

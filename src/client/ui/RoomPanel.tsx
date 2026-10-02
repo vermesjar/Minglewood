@@ -1,8 +1,11 @@
+import { useState } from 'react';
 import { STATUS_META } from '@shared/presence';
 import { game } from '../app/game';
+import { badgeTitle, callLink, voiceBadge } from '../app/huddles';
 import { setState, toast, useStore } from '../app/store';
 import { openLink } from '../discord/activity';
 import { AvatarCanvas, StatusDot, formatDate } from './common';
+import { HuddleIcon } from './HuddleIcon';
 import type { BindingView } from '@shared/api';
 
 const PURPOSE: Record<string, string> = {
@@ -55,6 +58,7 @@ export function RoomPanel() {
   const occupants = useStore((s) => s.occupants);
   const members = useStore((s) => s.membersById);
   const events = useStore((s) => s.events);
+  const [picked, setPicked] = useState<string[]>([]);
   if (!boot || !sceneId) return null;
   const room = boot.rooms.find((r) => r.id === sceneId);
   if (!room) return null;
@@ -64,6 +68,7 @@ export function RoomPanel() {
   const now = Date.now();
   const ev = events.find((e) => e.roomId === room.id && Date.parse(e.startsAt) <= now && now < Date.parse(e.endsAt));
   const people = Object.values(occupants).sort((a, b) => a.memberId.localeCompare(b.memberId));
+  const slackConnected = !!boot.slackConnected;
   const speaking = people.filter((p) => p.speaking).length;
   const artifacts = boot.artifacts.filter((a) => a.sceneId === room.id);
   const openArtifact = (artifactId: string) => {
@@ -138,8 +143,24 @@ export function RoomPanel() {
           const m = members.get(p.memberId);
           if (!m) return null;
           const me = p.memberId === boot.me.id;
+          const roomChannel = binding && binding.kind !== 'text' ? binding.externalChannelId : undefined;
+          const badge = voiceBadge(p, roomChannel, people);
+          const with_ = badge?.kind === 'other' ? people.filter((o) => o.memberId !== p.memberId && o.voice?.callId === badge.callId).map((o) => members.get(o.memberId)?.displayName.split(' ')[0] ?? '…') : [];
+          const link = badge?.kind === 'other' ? callLink(boot.bindings, p) : undefined;
+          const mine = occupants[boot.me.id]?.voice?.callId;
+          const together = !me && !!mine && mine === p.voice?.callId;
           return (
-            <li key={p.memberId}>
+            <li key={p.memberId} className={picked.includes(p.memberId) ? 'picked' : ''}>
+              {slackConnected && !me && (
+                <input
+                  type="checkbox"
+                  className="pick"
+                  checked={picked.includes(p.memberId)}
+                  onChange={(e) => setPicked((cur) => (e.target.checked ? [...cur, p.memberId] : cur.filter((x) => x !== p.memberId)))}
+                  aria-label={`Huddle with ${m.displayName.split(' ')[0]}`}
+                  title="Pick people to start a huddle with"
+                />
+              )}
               <button
                 className="person-row"
                 onClick={(e) => {
@@ -153,17 +174,35 @@ export function RoomPanel() {
                 <span className="person-text">
                   <strong>
                     {me ? 'You' : m.displayName}
-                    {p.via === 'provider' && <em className="tag">{binding?.provider === 'slack' ? 'in the Slack huddle' : 'in Discord voice'}</em>}
+                    <HuddleIcon badge={badge} title={badgeTitle(badge, with_)} size={15} />
+                    {p.via === 'provider' && <em className="tag">{binding?.provider === 'slack' ? 'from Slack' : 'from Discord'}</em>}
                   </strong>
                   <small>
                     <StatusDot status={p.status} size={8} /> {p.note ?? STATUS_META[p.status].label}
+                    {badge?.kind === 'other' && with_.length > 0 && <span className="muted"> · with {with_.join(', ')}</span>}
                   </small>
                 </span>
               </button>
+              {badge?.kind === 'other' && !me && !together && (
+                <button
+                  className="btn small huddle-act"
+                  style={{ borderColor: badge.color }}
+                  onClick={() => (link ? openLink(link) : void game.askToJoinHuddle(p.memberId))}
+                  title={link ? 'Join their huddle in Slack' : 'They’re in a private huddle — ask, and any of them can invite you from Slack'}
+                >
+                  {link ? '🎧 Join' : '🙋 Ask to join'}
+                </button>
+              )}
             </li>
           );
         })}
       </ul>
+      {slackConnected && picked.length > 0 && (
+        <button className="btn small primary full" onClick={() => void game.startHuddle(picked).then(() => setPicked([]))}>
+          🎧 Start a huddle with {picked.map((id) => members.get(id)?.displayName.split(' ')[0] ?? '…').join(picked.length === 2 ? ' and ' : ', ')}
+        </button>
+      )}
+      {slackConnected && picked.length === 0 && people.length > 1 && <p className="fineprint">Tick people to start a huddle with just them (a table, a one-on-one).</p>}
 
       {artifacts.length > 0 && (
         <>

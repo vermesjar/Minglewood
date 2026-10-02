@@ -167,6 +167,7 @@ function toChange(vs: RawVoiceState): VoiceStateChange {
   return {
     externalUserId: vs.user_id,
     channelId: vs.channel_id,
+    callId: vs.channel_id ?? undefined,
     muted: !!(vs.self_mute || vs.mute),
     video: !!vs.self_video,
   };

@@ -9,6 +9,7 @@ import { isoToScreen, screenToIso } from '@shared/iso';
 import type { Facing, NpcDef, SceneDef, SceneObject } from '@shared/world/scene';
 import type { BoardNote, MomentKind, NpcState } from '@shared/protocol';
 import { carryMeta } from '@shared/carry';
+import { drawHeadphones, type VoiceBadge } from '../app/huddles';
 import { footprint, isSeat } from '@shared/world/scene';
 import { SIT_POSE_OF, seatFacing, seatSpots, seenFromBehind, sitMotion, seatSupportLift, seatSupportExit, seatSupportContains, sitterLift, sitterPoint, type SeatProfile, type SeatSpot } from '@shared/world/seats';
 import { coveredPose, coverRow, FIG, poseDrop } from '@shared/world/seatFigure';
@@ -52,6 +53,8 @@ export interface WorldCallbacks {
   onHoverWall?(spot: WallSpot | null): void;
   onWallClick?(spot: WallSpot): void;
   nameOf(memberId: string): string;
+  /** The headphone badge by someone's name (app/huddles.ts): on the room's call, on another, or on none. */
+  voiceBadge?(memberId: string): VoiceBadge | null;
 }
 
 /** A point on a room's back wall: which wall, tiles along it, wall units up it. */
@@ -2074,16 +2077,26 @@ export class WorldView {
           c.arc(dx, hy + 4, 3, 0, Math.PI * 2);
           c.fill();
         }
+        // the headphone badge: on the room's call (gold), another call (its color), or none (grey, slashed)
+        const badge = this.cb.voiceBadge?.(id) ?? null;
+        if (badge && !(showName || isMe)) {
+          // no name tag: the badge sits where the name would be, so who's hearing what is always visible
+          const br = 7;
+          drawHeadphones(c, hx, top - br - 2, br, badge);
+          const r = { x: hx - br - 2, y: top - 2 * br - 4, w: 2 * br + 4, h: 2 * br + 4 };
+          obstacles.push(r);
+          top = r.y - 3;
+        }
         if (showName || isMe) {
           const name = isMe ? 'You' : this.cb.nameOf(id).split(' ')[0];
-          const voice = a.occ.voice || a.occ.via === 'provider' ? ' 🎧' : '';
           // what they're holding rides along on the tag ("You ☕")
           const held = carryMeta(a.occ.carrying);
-          const r = pill(c, hx, top, name + voice + (held ? ` ${held.emoji}` : ''), {
+          const r = pill(c, hx, top, name + (held ? ` ${held.emoji}` : '') + (badge ? '      ' : ''), {
             size: isMe && !focus ? 10 : 11,
             bg: isMe ? '#ffd23f' : hovered ? '#ffffff' : 'rgba(255,248,236,0.96)',
             padX: isMe && !focus ? 5 : 6,
           });
+          if (badge) drawHeadphones(c, r.x + r.w - r.h / 2 - 2, r.y + r.h / 2, r.h * 0.34, badge);
           obstacles.push(r);
           top = r.y - 3;
         }

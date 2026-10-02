@@ -21,7 +21,10 @@ export interface ExternalIdentityProfile {
 
 export interface VoiceStateChange {
   externalUserId: string;
+  /** The channel they're in, or null: off voice — unless `callId` says they're on a call with no channel we know. */
   channelId: string | null;
+  /** The call itself (a Slack huddle's call id; Discord: the channel). Same id = talking together. */
+  callId?: string;
   muted: boolean;
   video: boolean;
 }

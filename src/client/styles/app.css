@@ -852,6 +852,44 @@ code {
   cursor: pointer;
   text-align: left;
 }
+.people-list li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.people-list li .person-row {
+  flex: 1;
+  min-width: 0;
+}
+.people-list li .pick {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  flex: none;
+  accent-color: #f2b705;
+}
+.people-list li.picked .person-row {
+  background: rgba(242, 183, 5, 0.14);
+}
+.huddle-icon {
+  display: inline-block;
+  vertical-align: -3px;
+  margin-left: 5px;
+}
+.huddle-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 0 6px;
+  font-size: 13px;
+}
+.huddle-line .huddle-icon {
+  margin-left: 0;
+}
+.btn.huddle-act {
+  flex: none;
+  border-width: 2px;
+}
 .person-row:hover {
   background: var(--paper-2);
 }

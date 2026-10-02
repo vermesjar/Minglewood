@@ -255,6 +255,54 @@ describe('Slack bridge: spaces are their channels', () => {
   });
 });
 
+describe('Silent disco: every huddle carries a call id', () => {
+  let store: Store;
+  let hub: OrgHub;
+  let memberId: string;
+  beforeEach(async () => {
+    store = new Store(new MemoryPersistence());
+    await store.init();
+    hub = new OrgHub(ORG_ID, store);
+    const m = store.createMember(ORG_ID, {
+      displayName: 'Jay Tester', title: 'Tester', departmentId: 'dep-eng', teamId: 'team-platform', location: 'Remote', timezone: 'UTC',
+      startDate: '2026-01-01', askMeAbout: [], interests: [], role: 'member', avatar: DEFAULT_LOADOUT, unlockedItems: [],
+      settings: { locationVisibility: 'everyone', knocksWhileFocused: false },
+    });
+    memberId = m.id;
+    store.linkIdentity(ORG_ID, { provider: 'slack', externalId: 'UJAY', memberId, linkedAt: new Date().toISOString() });
+    store.setBinding(ORG_ID, bind('cafe', 'voice', 'CCAFE', '🎧 #cafe'), 'cafe');
+  });
+  afterEach(() => hub.dispose());
+
+  it('shows a DM huddle as a badge with its call id, without placing anyone anywhere', () => {
+    const presence = new SlackPresence(hub, store);
+    hub.connect(client(memberId));
+    hub.enter(memberId, 'cafe', 'live');
+    presence.userHuddle('UJAY', 'in_a_huddle', 'RDM1'); // no huddle_thread ever: a DM huddle
+    expect(hub.presenceOf(memberId).voice).toEqual({ providerChannelId: '', callId: 'RDM1', muted: false, video: false });
+    expect(hub.actor(memberId)?.sceneId).toBe('cafe'); // still where they were
+    presence.userHuddle('UJAY', 'default_unset', undefined);
+    expect(hub.presenceOf(memberId).voice).toBeUndefined();
+  });
+
+  it('keeps someone who is only on a DM huddle online in the directory, and offline once it ends', () => {
+    const presence = new SlackPresence(hub, store);
+    presence.userHuddle('UJAY', 'in_a_huddle', 'RDM2');
+    expect(hub.presenceOf(memberId).voice?.callId).toBe('RDM2');
+    expect(hub.actor(memberId)).toBeUndefined();
+    presence.userHuddle('UJAY', 'default_unset', undefined);
+    expect(hub.presenceOf(memberId).status).toBe('offline');
+  });
+
+  it('a channel huddle carries the call id too, so people on it match', () => {
+    const presence = new SlackPresence(hub, store);
+    presence.userHuddle('UJAY', 'in_a_huddle', 'RCH1');
+    presence.huddleRoom('CCAFE', { id: 'RCH1', participants: ['UJAY'] });
+    expect(hub.presenceOf(memberId).voice).toMatchObject({ providerChannelId: 'CCAFE', callId: 'RCH1' });
+    expect(hub.actor(memberId)?.sceneId).toBe('cafe');
+  });
+});
+
 describe('Slack join links', () => {
   it('goes straight into a running huddle, and to the channel otherwise', async () => {
     const { SlackProvider } = await import('./provider');

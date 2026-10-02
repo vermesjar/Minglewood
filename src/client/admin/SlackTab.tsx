@@ -23,6 +23,7 @@ const EXTRAS: Array<[string, string]> = [
   ['Link previews', `Room and person links to ${BRAND.name} unfurl with who’s there and a way in.`],
   ['Knocks as DMs', 'People can opt in (profile) to get knocks as a Slack DM when they aren’t in the world.'],
   ['Channels follow Slack', 'Rename a linked channel and the space’s label follows; archive or delete it and the link goes.'],
+  ['Silent disco badges', 'A badge by each name: gold on the room’s huddle, a color per other huddle (headphones with someone here, a phone with someone elsewhere), grey when on no call. Start a huddle with the people at your table (opens the DM / group DM); ask to join one you can’t link into.'],
 ];
 
 type Props = { data: AdminOverview; reload: () => void };

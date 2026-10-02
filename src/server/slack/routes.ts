@@ -24,6 +24,7 @@ import { slug } from '../providers/spaces';
 import { KeyedLimiter } from '../realtime/rateLimit';
 import { SlackApiError, type MockSlack } from './api';
 import { upsertSlackMember } from './members';
+import { askToJoin, huddleInvite } from './messages';
 import type { SlackInstall } from './provider';
 import type { SlackEvent } from './service';
 import { readiness, runSlackSetup } from './setup';
@@ -31,6 +32,8 @@ import { verifySlackRequest } from './verify';
 
 const STATE_COOKIE = 'mw_slack_state';
 const oauthLimiter = new KeyedLimiter(60, 600_000);
+/** "Ask to join" is a nudge, not a doorbell: a few per person per couple of minutes. */
+const askLimiter = new KeyedLimiter(4, 120_000);
 
 const cookie = (value: string, maxAge: number) =>
   `${STATE_COOKIE}=${value}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${config.isProd ? '; Secure' : ''}`;
@@ -353,6 +356,79 @@ export function slackRoutes(ctx: AppContext, mock?: MockSlack): Router {
 
   r.use('/admin', admin);
 
+  /* ------------------------------------------------------------------ huddles with the people at your table */
+
+  /**
+   * "Start a huddle with…": Slack can't start one for you, but we can open the right conversation. One person: their
+   * DM. Several: a group DM of them and the app (mpim:write), with a note saying where to click. The headphones
+   * button there starts the huddle; Slack drops you from the room's huddle on its own.
+   */
+  r.post('/huddle', requireMember(ctx), json, async (req, res) => {
+    const { orgId, member } = authed(req);
+    const body = z.object({ memberIds: z.array(z.string().max(40)).min(1).max(8) }).safeParse(req.body);
+    if (!body.success) return res.status(400).json({ error: 'invalid input' });
+    const teamId = ctx.slack.teamFor(orgId);
+    const token = teamId ? ctx.slack.provider.tokens.forTeam(teamId) : '';
+    if (!teamId || !token) return res.status(400).json({ error: 'Slack isn’t connected to this world.' });
+    const ids = [...new Set(body.data.memberIds.filter((id) => id !== member.id))];
+    const people = ids.map((id) => ({ member: ctx.store.member(orgId, id), slack: ctx.store.get(orgId).identities.find((i) => i.provider === 'slack' && i.memberId === id) }));
+    const missing = people.filter((p) => !p.member || !p.slack);
+    if (!ids.length) return res.status(400).json({ error: 'Pick someone to huddle with.' });
+    if (missing.length) return res.status(400).json({ error: `${missing.map((p) => p.member?.displayName.split(' ')[0] ?? 'Someone').join(', ')} hasn’t signed in with Slack yet, so Slack can’t open a huddle with them from here.` });
+    const mine = ctx.store.get(orgId).identities.find((i) => i.provider === 'slack' && i.memberId === member.id);
+    if (!mine) return res.status(400).json({ error: 'Sign in with Slack once, then you can start huddles from here.' });
+    try {
+      let conversation: string;
+      if (people.length === 1) conversation = people[0].slack!.externalId; // app_redirect opens the DM with a user id
+      else {
+        conversation = await ctx.slack.provider.api.openGroupDm(token, [mine.externalId, ...people.map((p) => p.slack!.externalId)]);
+        const hub = ctx.hubs.get(orgId);
+        const sceneId = hub?.actor(member.id)?.sceneId;
+        const room = ctx.store.get(orgId).rooms.find((x) => x.id === sceneId);
+        const note = huddleInvite(member, room?.name, room?.id);
+        await ctx.slack.provider.api.postMessage(token, conversation, note.text, note.blocks).catch((e) => console.warn('[slack] huddle note failed:', (e as Error).message));
+      }
+      res.json({
+        kind: people.length === 1 ? 'dm' : 'group',
+        webUrl: `https://slack.com/app_redirect?team=${encodeURIComponent(teamId)}&channel=${encodeURIComponent(conversation)}`,
+        appUrl: people.length === 1 ? `slack://user?team=${teamId}&id=${conversation}` : `slack://channel?team=${teamId}&id=${conversation}`,
+      });
+    } catch (e) {
+      res.status(502).json({ error: e instanceof SlackApiError && e.error === 'missing_scope' ? 'The Slack app needs the mpim:write scope for group huddles — an admin can re-add it (Admin → Spaces & channels).' : slackError(e) });
+    }
+  });
+
+  /** "Ask to join": everyone on that call hears it — in the world, and as a Slack DM — and any of them can invite you. */
+  r.post('/huddle/ask', requireMember(ctx), json, async (req, res) => {
+    const { orgId, member } = authed(req);
+    const body = z.object({ memberId: z.string().max(40) }).safeParse(req.body);
+    if (!body.success) return res.status(400).json({ error: 'invalid input' });
+    const hub = ctx.hubs.get(orgId);
+    const callId = hub?.presenceOf(body.data.memberId).voice?.callId;
+    if (!hub || !callId) return res.status(400).json({ error: 'They aren’t in a huddle right now.' });
+    if (!askLimiter.allow(member.id)) return res.status(429).json({ error: 'Give them a moment — you’ve already asked.' });
+    const first = member.displayName.split(' ')[0];
+    const on = ctx.store.members(orgId).filter((m) => m.id !== member.id && hub.presenceOf(m.id).voice?.callId === callId);
+    const teamId = ctx.slack.teamFor(orgId);
+    const token = teamId ? ctx.slack.provider.tokens.forTeam(teamId) : '';
+    let dms = 0;
+    for (const m of on) {
+      hub.notify(m.id, `🙋 ${first} would like to join your huddle — in Slack’s huddle window, choose “Invite people” and add them.`);
+      const id = ctx.store.get(orgId).identities.find((i) => i.provider === 'slack' && i.memberId === m.id);
+      if (!id || !token) continue;
+      try {
+        const dm = await ctx.slack.provider.api.openDm(token, id.externalId);
+        const msg = askToJoin(member);
+        await ctx.slack.provider.api.postMessage(token, dm, msg.text, msg.blocks);
+        dms++;
+      } catch (e) {
+        console.warn('[slack] ask-to-join DM failed:', (e as Error).message);
+      }
+    }
+    ctx.store.audit(orgId, member.id, 'huddle.asked', body.data.memberId, `${on.length} people`);
+    res.json({ asked: on.length, dms, names: on.map((m) => m.displayName.split(' ')[0]) });
+  });
+
   /* ------------------------------------------------------------------ me */
 
   r.put('/me/knock-dms', requireMember(ctx), json, (req, res) => {
@@ -413,6 +489,19 @@ export function slackRoutes(ctx: AppContext, mock?: MockSlack): Router {
         );
       }
       ctx.hubs.get(orgId)?.bindingsChanged();
+      res.json({ ok: true });
+    });
+    /** Put a demo coworker in a room (as if a provider placed them), to look at badges and lists. */
+    r.post('/dev/enter', json, (req, res) => {
+      const b = z.object({ member: z.string().min(1).max(40), roomId: z.string().max(40) }).safeParse(req.body);
+      const orgId = ctx.slack.orgForTeam(config.slack.teamId);
+      if (!b.success || !orgId) return res.status(400).json({ error: 'invalid input' });
+      const q = b.data.member.toLowerCase();
+      const member = ctx.store.members(orgId).find((m) => m.id === b.data.member || m.displayName.toLowerCase().startsWith(q));
+      if (!member) return res.status(404).json({ error: 'no such member' });
+      const hub = ctx.hubs.get(orgId)!;
+      hub.enter(member.id, b.data.roomId, 'sim');
+      hub.setStatus(member.id, 'available', undefined, 'default');
       res.json({ ok: true });
     });
     /** Pretend the install granted only these scopes (to see the readiness check complain). */

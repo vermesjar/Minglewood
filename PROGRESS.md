@@ -101,4 +101,13 @@
   specified in docs/HOSTING.md) or the server's SLACK_TEAM_ID workspace; the installer lands as admin. Workspace tokens
   are kept with the company's world state (`secrets`) so a Render redeploy keeps workspaces connected.
 - Code: `src/server/slack/{bridge,setup,render,scopes}.ts`, `providers/spaces.ts` (shared name matching); 36 Slack tests
-  + a cloud install test. Manifest and scope list: docs/slack.md. Not yet exercised against a live workspace.
+  + a cloud install test. Manifest and scope list: docs/slack.md.
+- Live on the "Minglewood" test workspace (app A0C68T250BB) the same day. Fixes from the live run: Slack read methods
+  take form-encoded calls only (JSON → invalid_arguments); the huddle link only works while a huddle runs (now used
+  as `liveWebUrl` when someone's on it, else the channel); newer workspaces have #all-<workspace> (is_general).
+- Silent disco (2026-10-02): every huddle carries its call id (DM huddles included), a badge by each name says who's
+  hearing what (gold = room's huddle, a color per other call — headphones with someone here, a phone with someone
+  elsewhere — grey = none), "start a huddle with…" opens the DM / group DM in Slack (`mpim:write`), "ask to join"
+  nudges everyone on a call we can't link into. Slack can't start, join or move huddles for anyone — documented, not
+  hacked around; Minglewood-hosted voice surfaced in Slack as a call block is the path to a true one-click world
+  (decision pending).

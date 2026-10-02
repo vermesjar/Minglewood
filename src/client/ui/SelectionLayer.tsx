@@ -2,7 +2,10 @@ import { useState } from 'react';
 import { STATUS_META } from '@shared/presence';
 import { carryMeta } from '@shared/carry';
 import { game } from '../app/game';
+import { badgeTitle, callLink, roomVoiceChannel, voiceBadge } from '../app/huddles';
 import { setState, useStore } from '../app/store';
+import { openLink } from '../discord/activity';
+import { HuddleIcon } from './HuddleIcon';
 import { AvatarCanvas, Popover, StatusDot, formatDate, formatTime, localTime, tenureLabel, timeAgo } from './common';
 import { NotesBoard } from './NotesBoard';
 
@@ -28,7 +31,10 @@ function ProfileCard({ id }: { id: string; x: number; y: number }) {
   const m = useStore((s) => s.membersById.get(id));
   const boot = useStore((s) => s.boot);
   const entry = useStore((s) => s.directory[id]);
+  const directory = useStore((s) => s.directory);
+  const sceneId = useStore((s) => s.sceneId);
   const occ = useStore((s) => s.occupants[id]);
+  const occupants = useStore((s) => s.occupants);
   const interior = useStore((s) => !!s.boot?.rooms.some((r) => r.id === s.sceneId));
   const [more, setMore] = useState(false);
   if (!m || !boot) return null;
@@ -45,6 +51,14 @@ function ProfileCard({ id }: { id: string; x: number; y: number }) {
   const first = m.displayName.split(' ')[0];
   const reachable = status !== 'offline';
   const where = room ? `${room.emoji} ${room.name}` : entry?.sceneId === 'town' ? 'Out in town' : null;
+  // their call, as seen from here: the room's (gold), another (its color, with whoever shares it), or none
+  const voiced = occ ?? entry;
+  const badge = voiceBadge(voiced, roomVoiceChannel(boot.bindings, sceneId), Object.values(occupants));
+  const withNames = badge?.kind === 'other' ? Object.values(directory).filter((d) => d.memberId !== id && d.voice?.callId === badge.callId).map((d) => boot.members.find((x) => x.id === d.memberId)?.displayName.split(' ')[0] ?? '…') : [];
+  const link = badge?.kind === 'other' ? callLink(boot.bindings, voiced) : undefined;
+  const myCall = occ && me.id !== id ? directory[me.id]?.voice?.callId : undefined;
+  const together = !!myCall && myCall === voiced?.voice?.callId;
+  const slack = !!boot.slackConnected;
 
   return (
     <aside className={`infostand card ${interior ? 'beside-panel' : ''}`} role="dialog" aria-label={`${m.displayName} profile`}>
@@ -78,6 +92,11 @@ function ProfileCard({ id }: { id: string; x: number; y: number }) {
           {note && <span className="muted"> — “{note}”</span>}
           {entry?.until && <span className="muted"> · until {formatTime(entry.until)}</span>}
         </p>
+        {badge && (
+          <p className="huddle-line">
+            <HuddleIcon badge={badge} title={badgeTitle(badge, withNames)} /> <span>{badgeTitle(badge, withNames)}</span>
+          </p>
+        )}
         <p className="infostand-meta muted small">
           {where && <span>📍 {where}</span>}
           <span>
@@ -124,6 +143,16 @@ function ProfileCard({ id }: { id: string; x: number; y: number }) {
             {!sameRoom && entry?.sceneId && (
               <button className="btn small primary full join" onClick={() => game.goToMember(id)}>
                 📍 {room ? `Join ${first}` : `Go to ${first}`}
+              </button>
+            )}
+            {slack && badge?.kind === 'other' && !together && (
+              <button className="btn small full huddle-act" style={{ borderColor: badge.color }} onClick={() => (link ? openLink(link) : void game.askToJoinHuddle(id))}>
+                {link ? `🎧 Join ${first}’s huddle` : `🙋 Ask to join ${first}’s huddle`}
+              </button>
+            )}
+            {slack && reachable && badge?.kind !== 'other' && !together && (
+              <button className="btn small full" onClick={() => void game.startHuddle([id])} title="Opens your DM in Slack — the headphones button there starts a huddle with just the two of you">
+                🎧 Huddle with {first}
               </button>
             )}
             <div className="profile-actions compact">

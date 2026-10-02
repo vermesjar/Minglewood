@@ -106,6 +106,18 @@ export function dailyNote(hub: OrgHub, store: Store, now = new Date()): { text: 
   };
 }
 
+/** Posted in the group DM "Start a huddle with…" opens: where to click, and a way back to the room. */
+export function huddleInvite(from: Member, roomName: string | undefined, roomId: string | undefined): { text: string; blocks: Block[] } {
+  const text = `🎧 ${from.displayName} wants to huddle with you${roomName ? ` at ${roomName}` : ''} — hit the headphones button here to start it.`;
+  return { text, blocks: [{ type: 'section', text: { type: 'mrkdwn', text } }, ...(roomId ? [button(`Back to ${roomName ?? 'the room'} →`, roomLink(roomId))] : [])] };
+}
+
+/** A DM to someone in a huddle: a person in the world would like to join it. */
+export function askToJoin(from: Member): { text: string; blocks: Block[] } {
+  const text = `🙋 ${from.displayName} would like to join your huddle — in the huddle window, choose *Invite people* and add them.`;
+  return { text, blocks: [{ type: 'section', text: { type: 'mrkdwn', text } }, button(`See ${first(from)} in Minglewood →`, personLink(from.id))] };
+}
+
 /** A knock delivered as a DM when the person isn't in the world. */
 export function knockDm(from: Member, kind: 'chat' | 'coffee'): { text: string; blocks: Block[] } {
   const text = kind === 'coffee' ? `☕ ${from.displayName} knocked — up for a coffee?` : `🚪 ${from.displayName} knocked — they’d like to chat.`;

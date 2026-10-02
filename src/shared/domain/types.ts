@@ -111,8 +111,12 @@ export interface PresenceState {
   sceneId?: Id;
   /** Where the status came from — manual, calendar, or inferred from a provider. */
   source: 'manual' | 'calendar' | 'provider' | 'default';
-  /** Present in a provider's voice context (e.g. a Discord voice channel). */
-  voice?: { providerChannelId: string; muted?: boolean; video?: boolean };
+  /**
+   * On a call: a Discord voice channel, or a Slack huddle. `providerChannelId` is the channel it's in, or '' for a
+   * call with no place in the world (a Slack DM huddle). `callId` groups everyone on the same call — the huddle's
+   * call id, or the Discord channel — so the world can show who is talking with whom ("silent disco" badges).
+   */
+  voice?: { providerChannelId: string; callId?: string; muted?: boolean; video?: boolean };
   until?: string; // ISO — e.g. meeting end
 }
 

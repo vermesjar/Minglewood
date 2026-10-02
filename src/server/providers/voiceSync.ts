@@ -24,18 +24,20 @@ export class VoicePresenceSync {
     const binding = change.channelId
       ? data.bindings.find((b) => b.provider === this.provider && b.externalChannelId === change.channelId)
       : undefined;
+    // On a call at all? A Slack DM huddle has a call id but no channel: a badge, not a place.
+    const onCall = !!(change.channelId || change.callId);
 
     this.hub.setVoice(
       memberId,
-      change.channelId ? { providerChannelId: change.channelId, muted: change.muted, video: change.video } : undefined,
+      onCall ? { providerChannelId: change.channelId ?? '', callId: change.callId ?? change.channelId ?? undefined, muted: change.muted, video: change.video } : undefined,
     );
 
     const actor = this.hub.actor(memberId);
     if (actor?.via === 'live') return; // They're in the world themselves; the badge is enough.
     if (!change.channelId) {
-      // Left voice and not in the world themselves: they've gone, like closing the tab.
+      // Off voice (or on a call with no place here) and not in the world themselves: nowhere to stand.
       if (actor?.via === 'provider') this.hub.removeActor(memberId);
-      if (!this.hub.isLive(memberId)) this.hub.setStatus(memberId, 'offline', undefined, 'default');
+      if (!onCall && !this.hub.isLive(memberId)) this.hub.setStatus(memberId, 'offline', undefined, 'default');
       return;
     }
     if (!binding) {

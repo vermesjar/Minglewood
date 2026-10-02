@@ -24,7 +24,8 @@ import { setWorldClock } from '../engine/weather';
 import { api, ApiError, setActivityTransport } from './api';
 import { Realtime } from './socket';
 import { getState, loadLocal, persistLocal, setState, toast } from './store';
-import { isInDiscordActivity, startActivity } from '../discord/activity';
+import { isInDiscordActivity, openLink, startActivity } from '../discord/activity';
+import { roomVoiceChannel, voiceBadge } from './huddles';
 
 export const QUESTS: Array<{ id: string; label: string; hint: string }> = [
   { id: 'avatar', label: 'Make your avatar yours', hint: 'Open your wardrobe from the top-right.' },
@@ -182,6 +183,10 @@ class Game {
       onHoverWall: (spot) => this.updateWallGhost(spot),
       onWallClick: (spot) => this.onWallClick(spot),
       nameOf: (id) => getState().membersById.get(id)?.displayName ?? 'Someone',
+      voiceBadge: (id) => {
+        const s = getState();
+        return voiceBadge(s.occupants[id], roomVoiceChannel(s.boot?.bindings, s.sceneId), Object.values(s.occupants));
+      },
     });
     this.applyPrefs();
     this.world.setObjStates(this.sceneStates);
@@ -960,6 +965,31 @@ class Game {
 
   setStatus(status: Exclude<PresenceStatus, 'offline'>, note?: string) {
     this.rt?.send({ t: 'status', status, note });
+  }
+
+  /**
+   * "Start a huddle with…": Slack can't start one for us, so this opens the right conversation in Slack (a DM, or a
+   * group DM of the people picked) where the headphones button starts it. Slack drops you from the room's huddle
+   * on its own, and the badges follow within a second.
+   */
+  async startHuddle(memberIds: string[]) {
+    try {
+      const r = await api<{ kind: 'dm' | 'group'; webUrl: string; appUrl: string }>('/slack/huddle', { method: 'POST', json: { memberIds } });
+      openLink(r.webUrl);
+      toast(r.kind === 'group' ? 'Opened a group DM in Slack — hit the headphones button there to start the huddle.' : 'Opened the DM in Slack — hit the headphones button there to start the huddle.', 'info', undefined, 7000);
+    } catch (e) {
+      toast((e as Error).message, 'info', undefined, 7000);
+    }
+  }
+
+  /** Walk-up to a huddle we can't link into (a DM huddle): everyone on it hears you'd like in; any of them can invite you. */
+  async askToJoinHuddle(memberId: string) {
+    try {
+      const r = await api<{ asked: number; names: string[] }>('/slack/huddle/ask', { method: 'POST', json: { memberId } });
+      toast(r.asked ? `Asked ${r.names.join(' and ')} — they can invite you from Slack’s huddle window.` : 'Nobody’s on that call right now.', 'info', undefined, 6000);
+    } catch (e) {
+      toast((e as Error).message, 'info', undefined, 6000);
+    }
   }
 
   knock(targetId: string, kind: KnockKind) {

@@ -29,6 +29,34 @@ record: Minglewood mirrors and drives it, and stores no messages of its own.
 | **Daily "who's around"** — optional; Admin → Slack picks the channel and hour (org timezone). |
 | Quiet rooms have no channels, on purpose. |
 
+## Silent disco: who's hearing what
+
+A space has one voice (its channel's huddle), but the people in it can be on other calls — a table's huddle, a
+one-on-one — or on none. Slack tells us every huddle anyone joins (`user_huddle_changed`, with the huddle's call id,
+for channel *and* DM huddles), so the world can show it. A small badge by each name:
+
+| Badge | Meaning |
+|---|---|
+| **Gold headphones** | On the room's own huddle. Everyone gold is talking together. |
+| **Colored headphones** | On another huddle that someone else in this room is also on (a table). Same call, same color. |
+| **Colored phone** | On a call with nobody in this room — talking to someone elsewhere. |
+| **Grey, slashed** | In the room but on no call. Present, hearing nothing. |
+
+What you can do about it:
+
+- **Start a huddle with…** Tick people in the room panel (or *Huddle with Maya* on her card). Slack can't start a
+  huddle for us, so this opens the right conversation in Slack — the DM for one person, a group DM of the people
+  picked (with the app in it, `mpim:write`) for several, with a note saying where to click. The headphones button
+  there starts it; Slack drops you from the room's huddle on its own, and the badges follow within a second.
+- **Join** a colored huddle that's in a channel we know: one click, straight in (Slack's huddle link).
+- **Ask to join** a huddle we can't link into (a DM huddle): everyone on that call gets a note in the world and a
+  Slack DM; any of them can invite you from Slack's huddle window (*Invite people*). Slack has no invite API, so a
+  walk-up into a private huddle always needs a yes from someone inside.
+- The chat panel's button follows your own state: *Join the room's huddle* when you're grey, *Switch to the room's
+  huddle* when you're colored.
+
+The same model holds for Discord voice channels, with the channel as the call.
+
 **The app has to be in a channel to hear it.** Slack only sends a channel's messages and huddle updates to apps that are
 members. Minglewood joins public channels itself when a space is linked (`channels:join`) and when the one-click setup
 runs; private channels need `/invite @Minglewood`. **Admin → Spaces & channels** shows which linked channels the app
@@ -140,6 +168,7 @@ oauth_config:
       - channels:manage
       - channels:join
       - im:write
+      - mpim:write
       - commands
       - links:read
       - links:write
@@ -189,7 +218,8 @@ click **Retry**.
 | `chat:write`, `chat:write.customize` | Posting what's said in a space to its channel, under the speaker's name and picture; the daily post; knock DMs. |
 | `channels:manage` | The one-click "create a channel for every space". |
 | `channels:join` | Joining the public channels spaces are linked to, so their messages and huddles reach the world. |
-| `im:write` | Knock DMs. |
+| `im:write` | Knock DMs; "ask to join" a huddle. |
+| `mpim:write` | "Start a huddle with…": opens a group DM for the people at your table. |
 | `commands` | `/minglewood`. |
 | `links:read`, `links:write` | Previews for Minglewood links. |
 | `team:read` | Workspace name when connecting. |

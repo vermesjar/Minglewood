@@ -253,6 +253,11 @@ export class SlackApi {
   openDm(botToken: string, user: string) {
     return this.call<{ channel: { id: string } }>('conversations.open', { users: user }, botToken).then((r) => r.channel.id);
   }
+
+  /** Opens (or finds) a group DM of these people and the app (mpim:write) — a place for a table's huddle. */
+  openGroupDm(botToken: string, users: string[]) {
+    return this.call<{ channel: { id: string } }>('conversations.open', { users: users.join(',') }, botToken).then((r) => r.channel.id);
+  }
 }
 
 /* ------------------------------------------------------------------ the local mock */
@@ -325,8 +330,10 @@ export class MockSlack {
         c.is_member = true;
         return { ok: true, channel: c };
       }
-      case 'conversations.open':
-        return { ok: true, channel: { id: `D${String(call.args.users)}` } };
+      case 'conversations.open': {
+        const users = String(call.args.users).split(',');
+        return { ok: true, channel: { id: users.length > 1 ? `G0MPIM${users.length}` : `D${users[0]}` } };
+      }
       case 'chat.postMessage': {
         const ts = `${Math.floor(Date.now() / 1000)}.${String(this.outbox.length).padStart(6, '0')}`;
         const c = channelOf(call.args.channel);

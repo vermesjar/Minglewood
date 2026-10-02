@@ -344,6 +344,80 @@ describe('Slack, end to end (signed requests into a running server, the recordin
   });
 });
 
+describe('Huddles with the people at your table (over HTTP, the mock out)', () => {
+  let app: App;
+  let base: string;
+  const saved = { ...config.slack };
+  const TEAM = 'T0MOCK';
+  const settle = () => new Promise((r) => setTimeout(r, 30));
+  const outbox = () => fetch(`${base}/api/slack/dev/outbox`).then((r) => r.json() as Promise<{ outbox: SlackCall[] }>);
+  const signin = async (userId: string, name: string) => {
+    const r = await fetch(`${base}/api/slack/dev/signin`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId, teamId: TEAM, name }) });
+    const body = (await r.json()) as { memberId: string };
+    return { memberId: body.memberId, cookie: r.headers.getSetCookie().map((c) => c.split(';')[0]).join('; ') };
+  };
+  const post = (path: string, cookie: string, json: unknown) =>
+    fetch(`${base}/api/slack${path}`, { method: 'POST', headers: { cookie, 'Content-Type': 'application/json' }, body: JSON.stringify(json) });
+
+  beforeAll(async () => {
+    Object.assign(config.slack, { signingSecret: 'test-signing-secret', teamId: TEAM, mock: true, botToken: '', clientId: 'c', clientSecret: 's' });
+    app = await createApp({ persistence: new MemoryPersistence(), simulateCoworkers: false });
+    await new Promise<void>((r) => app.server.listen(0, r));
+    base = `http://127.0.0.1:${(app.server.address() as AddressInfo).port}`;
+  });
+  afterAll(async () => {
+    await app.close();
+    Object.assign(config.slack, saved);
+  });
+
+  it('opens the DM for one person, a group DM (with a note) for several, and refuses people who never signed in with Slack', async () => {
+    const ari = await signin('U42', 'Ari');
+    const bo = await signin('U43', 'Bo');
+    const cy = await signin('U44', 'Cy');
+    const one = (await (await post('/huddle', ari.cookie, { memberIds: [bo.memberId] })).json()) as { kind: string; webUrl: string; appUrl: string };
+    expect(one).toEqual({ kind: 'dm', webUrl: `https://slack.com/app_redirect?team=${TEAM}&channel=U43`, appUrl: `slack://user?team=${TEAM}&id=U43` });
+    const group = (await (await post('/huddle', ari.cookie, { memberIds: [bo.memberId, cy.memberId] })).json()) as { kind: string; webUrl: string };
+    expect(group.kind).toBe('group');
+    expect(group.webUrl).toBe(`https://slack.com/app_redirect?team=${TEAM}&channel=G0MPIM3`);
+    const sent = (await outbox()).outbox.slice(-2);
+    expect(sent[0]).toMatchObject({ method: 'conversations.open', args: { users: 'U42,U43,U44' } });
+    expect(sent[1]).toMatchObject({ method: 'chat.postMessage', args: { channel: 'G0MPIM3' } });
+    expect(String(sent[1].args.text)).toContain('headphones');
+    const demo = app.store.members(ORG_ID).find((m) => m.simulated)!;
+    const bad = await post('/huddle', ari.cookie, { memberIds: [demo.id] });
+    expect(bad.status).toBe(400);
+    expect(((await bad.json()) as { error: string }).error).toContain('signed in with Slack');
+  });
+
+  it('"ask to join" reaches everyone on that call, in the world and by DM', async () => {
+    const hub = app.hubs.get(ORG_ID)!;
+    const ari = await signin('U42', 'Ari');
+    const bo = await signin('U43', 'Bo');
+    const cy = await signin('U44', 'Cy');
+    const toasts: string[] = [];
+    hub.connect({ id: 'c-bo', memberId: bo.memberId, sceneId: null, send: (m) => m.t === 'toast' && toasts.push(m.text) });
+    // Bo and Cy are on a DM huddle together (no channel known)
+    const ev = (e: Record<string, unknown>) => {
+      const body = JSON.stringify({ type: 'event_callback', team_id: TEAM, event: e });
+      const ts = String(Math.floor(Date.now() / 1000));
+      return fetch(`${base}/api/slack/events`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Slack-Request-Timestamp': ts, 'X-Slack-Signature': slackSignature(config.slack.signingSecret, ts, body) }, body });
+    };
+    await ev({ type: 'user_huddle_changed', user: { id: 'U43', profile: { huddle_state: 'in_a_huddle', huddle_state_call_id: 'RTABLE' } } });
+    await ev({ type: 'user_huddle_changed', user: { id: 'U44', profile: { huddle_state: 'in_a_huddle', huddle_state_call_id: 'RTABLE' } } });
+    await settle();
+    expect(hub.presenceOf(bo.memberId).voice?.callId).toBe('RTABLE');
+    expect(hub.presenceOf(cy.memberId).voice?.callId).toBe('RTABLE');
+    const r = (await (await post('/huddle/ask', ari.cookie, { memberId: bo.memberId })).json()) as { asked: number; dms: number; names: string[] };
+    expect(r).toMatchObject({ asked: 2, dms: 2 });
+    expect(r.names.sort()).toEqual(['Bo', 'Cy']);
+    expect(toasts.some((t) => t.includes('Ari') && t.includes('Invite people'))).toBe(true);
+    const dms = (await outbox()).outbox.filter((c) => c.method === 'chat.postMessage').slice(-2);
+    expect(dms.map((d) => d.args.channel).sort()).toEqual(['DU43', 'DU44']);
+    // not on a call: nothing to ask
+    expect((await post('/huddle/ask', ari.cookie, { memberId: ari.memberId })).status).toBe(400);
+  });
+});
+
 describe('Slack bridge during boot', () => {
   it('tolerates simulated coworkers chatting before the Slack service exists (no workspace yet → nothing to post)', async () => {
     // Render crashed on 2026-10-02: LifeSim said something while createApp was still awaiting tenants, and the

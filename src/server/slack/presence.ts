@@ -2,10 +2,12 @@
  * Slack presence → the world, for one company:
  *
  * Huddles. Slack tells us two things, separately: `user_huddle_changed` (users:read) says a person is now in a
- * huddle and gives the huddle's call id; the channel's `huddle_thread` message (and its `message_changed`
- * updates, channels:history / groups:history) says which channel that call belongs to and who's in it. We join
- * them: a person in a huddle in a channel bound to a room appears in that room, sitting down — exactly like
- * someone in a bound Discord voice channel (VoicePresenceSync) — and leaves when they drop out.
+ * huddle and gives the huddle's call id — for every huddle, channel or DM; the channel's `huddle_thread` message
+ * (and its `message_changed` updates, channels:history / groups:history) says which channel that call belongs to
+ * and who's in it. We join them: a person in a huddle in a channel bound to a room appears in that room, sitting
+ * down — exactly like someone in a bound Discord voice channel (VoicePresenceSync) — and leaves when they drop
+ * out. A huddle with no known channel (a DM, a table) still shows as a badge, and its call id tells the world who
+ * is talking with whom.
  *
  * Status. `user_change` carries the Slack status (emoji + text + expiry) and `dnd_updated_user` Do Not Disturb;
  * mapSlackStatus turns them into a Minglewood status (source: 'provider'). We only show a status for someone
@@ -48,10 +50,13 @@ export class SlackPresence {
 
   /* ------------------------------------------------------------------ huddles */
 
-  /** Someone is in a huddle in a channel: they appear in its room — and if they're already walking around, they walk over. */
-  private inHuddle(slackUserId: string, channel: string) {
-    this.voice.apply({ externalUserId: slackUserId, channelId: channel, muted: false, video: false });
-    this.walkOver(slackUserId, channel);
+  /**
+   * Someone is in a huddle. In a channel: they appear in its room, and if they're already walking around they walk
+   * over. Without a known channel (a DM huddle): a badge with the call id, so people on the same call match.
+   */
+  private inHuddle(slackUserId: string, channel: string | null, callId: string) {
+    this.voice.apply({ externalUserId: slackUserId, channelId: channel, callId, muted: false, video: false });
+    if (channel) this.walkOver(slackUserId, channel);
   }
 
   /**
@@ -75,9 +80,8 @@ export class SlackPresence {
   userHuddle(slackUserId: string, state: string | undefined, callId: string | undefined) {
     if (state === 'in_a_huddle' && callId) {
       this.inCall.set(slackUserId, callId);
-      const channel = this.callChannel.get(callId);
-      // the huddle's channel may not be known yet: its huddle_thread message will place them
-      if (channel) this.inHuddle(slackUserId, channel);
+      // the huddle's channel may not be known (yet): a DM huddle never has one, a channel's huddle_thread places them
+      this.inHuddle(slackUserId, this.callChannel.get(callId) ?? null, callId);
     } else {
       if (!this.inCall.has(slackUserId)) return;
       this.inCall.delete(slackUserId);
@@ -93,7 +97,7 @@ export class SlackPresence {
     const here = new Set(room.has_ended ? [] : (room.participants ?? []));
     for (const user of here) {
       this.inCall.set(user, room.id);
-      this.inHuddle(user, channel);
+      this.inHuddle(user, channel, room.id);
     }
     for (const [user, call] of [...this.inCall]) {
       if (call === room.id && !here.has(user)) {
