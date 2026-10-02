@@ -23,8 +23,11 @@ function JoinConversation({ binding, speaking, running }: { binding: BindingView
   const slack = binding.provider === 'slack';
   const url = (running && binding.join.liveWebUrl) || binding.join.webUrl;
   const join = () => {
-    if (binding.join.kind === 'deeplink' && url) openLink(url);
-    else toast('Demo mode: in a connected workspace this opens the Discord voice channel for this room. Here the chatter is simulated.', 'info', undefined, 8000);
+    if (binding.join.kind === 'deeplink' && url) {
+      openLink(url);
+      // Slack has no link that starts a huddle: the channel opens, and its headphones button is the one click left
+      if (slack && binding.kind !== 'text' && !running) toast(`Opened ${binding.label.replace(/^🎧\s*/, '')} in Slack. Press the headphones button at the top right there to start its huddle — once it’s running, this button joins it in one click.`, 'info', undefined, 9000);
+    } else toast('Demo mode: in a connected workspace this opens the Discord voice channel for this room. Here the chatter is simulated.', 'info', undefined, 8000);
   };
   return (
     <div className="convo">

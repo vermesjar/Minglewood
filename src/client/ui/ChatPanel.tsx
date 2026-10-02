@@ -47,6 +47,10 @@ function VoiceLink() {
   // Someone in the room is in this channel's call already: the direct link goes straight in (Slack's huddle link).
   const running = Object.values(occupants).some((o) => o.voice?.providerChannelId === voice.externalChannelId);
   const joinUrl = (running && voice.join.liveWebUrl) || voice.join.webUrl;
+  /** Slack has no link that starts a huddle: the channel opens, and its headphones button is the one click left. */
+  const startHint = () => {
+    if (slack && !running) toast(`Opened ${name} in Slack. Press the headphones button at the top right there to start its huddle — once it’s running, this button joins it in one click.`, 'info', undefined, 9000);
+  };
   // Slack can't move you between huddles (Discord can move you between voice channels): there, switching is one click.
   const slack = voice.provider === 'slack';
   const canFollow = follow && voice.provider === 'discord';
@@ -81,10 +85,13 @@ function VoiceLink() {
     return (
       <button
         className="voice-link moving"
-        onClick={() => joinUrl && openLink(joinUrl)}
+        onClick={() => {
+          if (joinUrl) openLink(joinUrl);
+          startHint();
+        }}
         title={slack ? (running ? 'Slack can’t move you between huddles — one click here switches you.' : 'Slack can’t move you between huddles — this opens the channel; the headphones button starts its huddle.') : "Open this space's voice channel in Discord"}
       >
-        {canFollow ? '🎧 Moving your voice here…' : slack ? (running ? `🎧 Switch to the room’s huddle (${name})` : `🎧 Start the room’s huddle (${name})`) : `🎧 Switch voice to ${name}`}
+        {canFollow ? '🎧 Moving your voice here…' : slack ? (running ? `🎧 Switch to the room’s huddle (${name})` : `🎧 Start the room’s huddle in Slack (${name})`) : `🎧 Switch voice to ${name}`}
       </button>
     );
   }
@@ -94,11 +101,12 @@ function VoiceLink() {
       onClick={() => {
         if (joinUrl) openLink(joinUrl);
         else toast(voice.join.explainer, 'info', undefined, 6000);
+        startHint();
         if (canFollow) toast('Join the voice channel in Discord once — after that your voice follows you as you walk between spaces.', 'info', undefined, 7000);
       }}
       title={voice.join.explainer}
     >
-      {slack ? (running ? '🎧 Join the room’s huddle' : '🎧 Start the room’s huddle') : '🎧 Join voice'}
+      {slack ? (running ? '🎧 Join the room’s huddle' : '🎧 Start the room’s huddle in Slack') : '🎧 Join voice'}
     </button>
   );
   // The demo has no real voice: the talk light can still be tried there.
