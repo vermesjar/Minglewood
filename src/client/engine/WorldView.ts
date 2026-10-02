@@ -10,9 +10,9 @@ import type { Facing, NpcDef, SceneDef, SceneObject } from '@shared/world/scene'
 import type { BoardNote, MomentKind, NpcState } from '@shared/protocol';
 import { carryMeta } from '@shared/carry';
 import { footprint, isSeat } from '@shared/world/scene';
-import { SIT_POSE_OF, seatFacing, seatSpots, seenFromBehind, sitMotion, sitterLift, sitterPoint, type SeatProfile, type SeatSpot } from '@shared/world/seats';
-import { coveredPose, coverRow, FIG } from '@shared/world/seatFigure';
-import { localToWorld, placedSize, viewSits, type SitPoint } from '@shared/world/seatModels';
+import { SIT_POSE_OF, seatFacing, seatSpots, seenFromBehind, sitMotion, seatSupportLift, seatSupportExit, seatSupportContains, sitterLift, sitterPoint, type SeatProfile, type SeatSpot } from '@shared/world/seats';
+import { coveredPose, coverRow, FIG, poseDrop } from '@shared/world/seatFigure';
+import { localToWorld, worldToLocal, placedSize, viewSits, type SitPoint } from '@shared/world/seatModels';
 import { legsFor, legsKey, type SitLegs } from '@shared/world/sitLegs';
 import { pathLength, positionAlong, WALK_SPEED, type Tile } from '@shared/world/pathfinding';
 import { Camera } from './camera';
@@ -24,7 +24,7 @@ import { skyAt, windowView, type Sky } from './weather';
 import { drawSurroundings, skyColor } from './surroundings';
 import { artBody, artLight, artSeatModel, artSeatProfile } from './sprites/art';
 import { liftForSit, overlayFor, type ModelView } from './sprites/seatModel';
-import { seatLayers } from './sprites/seatLayers';
+import { seatLayers, sitterMask } from './sprites/seatLayers';
 import { ObjectAnimations } from './animations';
 import { INK_CSS, PAPER, UI_FONT, drawBubble, layoutBubbles, pill, roundRect, type BubbleSpec, type Rect } from './overlays';
 import { AVATAR_CROPS, avatarSprite, usesWheelchair, type Expression, type Pose } from './sprites/avatar';
@@ -108,7 +108,7 @@ interface ActorView {
   /** How high the figure was lifted when last drawn (world px; a seat's lift, a stage's). */
   lift?: number;
   /** After standing up: the step from the seat's tile onto the floor where the server put them. */
-  stepOff?: { x: number; y: number; start: number; objId: string };
+  stepOff?: { x: number; y: number; start: number; objId: string; facing: Facing };
   /** Moved along a seat without a walk (the server shifted them a cushion over): the slide from where they were. */
   glide?: { x: number; y: number; start: number; ms: number };
   /** Next idle blink (performance.now ms) and when the current one ends. */
@@ -226,6 +226,32 @@ function modelViewOf(sp: Sprite, o: SceneObject, facing: Facing, profile: SeatPr
  * A model seat's over layer (seatLayers.ts) as a canvas of its drawing's pixels, worked out once per drawing and facing.
  */
 const layerCanvases = new WeakMap<ModelView, Array<{ cover: number | undefined; canvas: HTMLCanvasElement }>>();
+
+const seatedFigures = new WeakMap<Sprite, Map<Uint8Array, Sprite>>();
+function seatedFigure(sp: Sprite, mv: ModelView, look: AvatarLoadout, facing: Facing, pose: Pose, feet: [number, number], legs: SitLegs | undefined, hipHeight: number): Sprite {
+  const occlusion = sitterMask(mv, look, facing, pose, feet, legs, hipHeight);
+  let memo = seatedFigures.get(sp);
+  if (!memo) seatedFigures.set(sp, (memo = new Map()));
+  const had = memo.get(occlusion);
+  if (had) return had;
+  const canvas = document.createElement('canvas');
+  canvas.width = sp.canvas.width;
+  canvas.height = sp.canvas.height;
+  const c = canvas.getContext('2d')!;
+  c.drawImage(sp.canvas, 0, 0);
+  const px = c.getImageData(0, 0, canvas.width, canvas.height);
+  const mask = sp.mask.slice();
+  for (let i = 0; i < mask.length; i++) if (occlusion[i]) {
+    px.data[i * 4 + 3] = 0;
+    mask[i] = 0;
+  }
+  c.putImageData(px, 0, 0);
+  const out = { ...sp, canvas, mask, highlight: undefined };
+  memo.set(occlusion, out);
+  if (memo.size > 128) memo.delete(memo.keys().next().value!);
+  return out;
+}
+
 function modelLayers(sp: Sprite, mv: ModelView): Array<{ cover: number | undefined; canvas: HTMLCanvasElement }> {
   let out = layerCanvases.get(mv);
   if (out) return out;
@@ -456,6 +482,12 @@ export class WorldView {
   private party = false;
   private raf = 0;
   private last = performance.now();
+  private frameAnimationTime: number | undefined;
+
+  /** One monotonic instant for position, pose, legs and occlusion in a rendered frame. */
+  private animationNow(): number {
+    return this.frameAnimationTime ?? performance.now();
+  }
   private pointer = { down: false, x: 0, y: 0, sx: 0, sy: 0, moved: false, id: -1 };
   private hoverTile: Tile | null = null;
   private ghost: { obj: SceneObject; valid: boolean } | null = null;
@@ -732,9 +764,9 @@ export class WorldView {
       walkClock: 0,
       emotes: [],
       waveUntil: 0,
-      blinkAt: performance.now() + 1000 + Math.random() * 5000,
+      blinkAt: this.animationNow() + 1000 + Math.random() * 5000,
       blinkUntil: 0,
-      nextIdleAt: performance.now() + 5000 + Math.random() * 12000,
+      nextIdleAt: this.animationNow() + 5000 + Math.random() * 12000,
       groove: grooveOf(o.memberId),
       rect: { l: 0, t: 0, r: 0, b: 0 },
       sx: 0,
@@ -858,7 +890,7 @@ export class WorldView {
    * everyone watching. `was`: what they sat on and where they were before the change.
    */
   private seatChanged(a: ActorView, was: { on?: string; x: number; y: number }) {
-    const now = performance.now();
+    const now = this.animationNow();
     const on = a.occ.sittingOn;
     if (on && !a.occ.path) {
       const spot = this.cushion(on, a.x, a.y);
@@ -877,7 +909,7 @@ export class WorldView {
     if (!on && a.seat && a.seat.to === 1 && (was.on !== undefined || a.occ.path)) {
       a.seat = { ...a.seat, from: this.seatK(a, now), to: 0, start: now };
       // put on the floor beside the seat: up first, then the step off (a walk away starts from the seat itself)
-      if (!a.occ.path && (a.x !== was.x || a.y !== was.y)) a.stepOff = { x: was.x, y: was.y, start: now + STAND_UP_MS, objId: a.seat.objId };
+      if (!a.occ.path && (a.x !== was.x || a.y !== was.y)) a.stepOff = { x: was.x, y: was.y, start: now + STAND_UP_MS, objId: a.seat.objId, facing: a.seat.spot.facing };
     }
   }
 
@@ -892,13 +924,13 @@ export class WorldView {
     if (a.seat?.to === 1 && a.seat.spot.x === lx && a.seat.spot.y === ly) return;
     const [px, py] = path[path.length - 2];
     const last = Math.hypot(lx - px, ly - py);
-    // (from the moment their feet are on the seat's tile: past the middle of the last step)
-    if ((elapsedMs / 1000) * WALK_SPEED < pathLength(path) - last / 2) return;
+    // Start outside the seat, leaving time to raise the pelvis before its footprint meets the cushion.
+    if ((elapsedMs / 1000) * WALK_SPEED < pathLength(path) - last) return;
     const at = this.seatSpotAt(lx, ly);
     if (!at) return;
     const spot = { x: at.spot.x, y: at.spot.y, facing: at.spot.facing };
     a.stepOff = undefined;
-    a.seat = { objId: at.seat.id, spot, from: this.seatK(a), to: 1, start: performance.now() };
+    a.seat = { objId: at.seat.id, spot, from: this.seatK(a), to: 1, start: this.animationNow() };
   }
 
   /** A walk ended on a cushion: sitting down, if the last step didn't already start it. */
@@ -909,7 +941,7 @@ export class WorldView {
     a.facing = at.spot.facing;
     a.stepOff = undefined;
     if (a.seat?.to === 1 && a.seat.spot.x === at.spot.x && a.seat.spot.y === at.spot.y) return;
-    a.seat = { objId: at.seat.id, spot: { x: at.spot.x, y: at.spot.y, facing: at.spot.facing }, from: this.seatK(a), to: 1, start: performance.now() };
+    a.seat = { objId: at.seat.id, spot: { x: at.spot.x, y: at.spot.y, facing: at.spot.facing }, from: this.seatK(a), to: 1, start: this.animationNow() };
   }
 
   private tickSeat(a: ActorView, now: number) {
@@ -921,7 +953,7 @@ export class WorldView {
   }
 
   /** How far into their seat someone is: 0 standing … 1 seated. */
-  private seatK(a: ActorView, now = performance.now()): number {
+  private seatK(a: ActorView, now = this.animationNow()): number {
     const s = a.seat;
     if (!s) return 0;
     const ms = (s.to > s.from ? SIT_DOWN_MS : STAND_UP_MS) * Math.abs(s.to - s.from);
@@ -930,7 +962,7 @@ export class WorldView {
   }
 
   /** Where someone stands or walks, mid-step off a seat or sliding along one (tile coordinates of their feet). */
-  private footPoint(a: ActorView, now = performance.now()): { x: number; y: number; stepping: boolean } {
+  private footPoint(a: ActorView, now = this.animationNow()): { x: number; y: number; stepping: boolean } {
     const g = a.stepOff ? { ...a.stepOff, ms: STEP_OFF_MS } : a.glide;
     if (g) {
       const u = Math.min(1, Math.max(0, (now - g.start) / g.ms));
@@ -944,8 +976,19 @@ export class WorldView {
         const dy = a.y - g.y;
         const m = Math.max(Math.abs(dx), Math.abs(dy));
         if (m > 0) {
-          ox += (EXIT_EDGE * dx) / m;
-          oy += (EXIT_EDGE * dy) / m;
+          let edge = EXIT_EDGE;
+          const obj = this.objById(a.stepOff.objId);
+          const facing = a.stepOff.facing;
+          const model = obj && facing ? this.modelOf(obj, facing)?.model : null;
+          if (obj && facing && model) {
+            const bounds = footprint(obj);
+            const start = worldToLocal(model.size, facing, ox - bounds.x0, oy - bounds.y0);
+            const end = worldToLocal(model.size, facing, ox - bounds.x0 + dx / m, oy - bounds.y0 + dy / m);
+            edge = Math.max(edge, seatSupportExit(model.parts, start.u, start.v, end.u - start.u, end.v - start.v));
+          }
+          edge = Math.min(edge, m);
+          ox += (edge * dx) / m;
+          oy += (edge * dy) / m;
         }
       }
       return { x: ox + (a.x + 0.5 - ox) * e, y: oy + (a.y + 0.5 - oy) * e, stepping: !!a.stepOff && u > 0 && u < 1 };
@@ -958,7 +1001,7 @@ export class WorldView {
    * hip point, lifted so the thighs rest on the cushion) and in what pose — a crouch with the feet on the
    * floor, then the seat's sitting style.
    */
-  private seated(a: ActorView, now = performance.now()) {
+  private seated(a: ActorView, now = this.animationNow()) {
     const s = a.seat;
     if (!s || usesWheelchair(a.occ.avatar)) return null;
     const k = this.seatK(a, now);
@@ -975,7 +1018,14 @@ export class WorldView {
     const hip = s.to > 0 ? this.hipUnder(a, obj, s.spot, foot, now) : this.hipOf(obj, s.spot);
     // sitting down: up out of the crouch into the seat, a touch past it, and settling; getting up: lifted off
     // the cushion a touch, then down into the crouch (seats.ts sitMotion)
-    const { inSeat, lift: seatLift } = sitMotion(k, s.to > s.from, lift);
+    const x = foot.x + (hip.x - foot.x) * k;
+    const y = foot.y + (hip.y - foot.y) * k;
+    const model = this.modelOf(obj, s.spot.facing)?.model;
+    const bounds = footprint(obj);
+    const local = model ? worldToLocal(model.size, s.spot.facing, x - bounds.x0, y - bounds.y0) : null;
+    const supportLift = model && local ? seatSupportLift(model.parts, local.u, local.v, k) : -Infinity;
+    const overSupport = model && local ? seatSupportContains(model.parts, local.u, local.v) : true;
+    const { inSeat, lift: seatLift } = sitMotion(k, s.to > s.from, lift, profile.sitStyle, 0, supportLift, overSupport);
     return {
       obj,
       profile,
@@ -983,8 +1033,8 @@ export class WorldView {
       // sorted as its sitter from the moment their feet are on the seat's tile (past the middle of the step
       // onto it) or they're down in it: drawn after it, a backrest seen from behind drawn back over them
       ownSeat: inSeat || (Math.floor(foot.x) === s.spot.x && Math.floor(foot.y) === s.spot.y),
-      x: foot.x + (hip.x - foot.x) * k,
-      y: foot.y + (hip.y - foot.y) * k,
+      x,
+      y,
       lift: seatLift,
       pose: (inSeat ? SIT_POSE_OF[profile.sitStyle] : 'crouch') as Pose,
     };
@@ -1061,7 +1111,7 @@ export class WorldView {
     const sat = this.seated(a);
     if (sat) return sat.pose;
     if (usesWheelchair(a.occ.avatar) && a.occ.sittingOn && !a.moving) return 'sit';
-    if (a.stepOff && this.footPoint(a).stepping) return Math.floor(performance.now() / 125) % 2 ? 'walk1' : 'walk2';
+    if (a.stepOff && this.footPoint(a).stepping) return Math.floor(this.animationNow() / 125) % 2 ? 'walk1' : 'walk2';
     return null;
   }
 
@@ -1137,17 +1187,28 @@ export class WorldView {
     const mine = me?.seat?.to === 1 && me.seat.objId === o.id ? spots.find((s) => s.x === me.seat!.spot.x && s.y === me.seat!.spot.y) : undefined;
     // a click on (or just beside) your own figure is your cushion
     if (me && mine && this.nearFigure(me, sx, sy, 2)) return mine;
-    let best: { s: SeatSpot; d: number } | undefined;
-    for (const s of spots) {
+    const centres = spots.map((s) => {
       const lift = this.modelSit(o, s)?.lift ?? sitterLift(profile);
       const hip = this.hipOf(o, s);
       const p = isoToScreen(hip.x, hip.y, lift);
       const [x, y] = this.camera.toScreen(p.x, p.y, this.vw, this.vh);
+      return { s, x, y };
+    });
+    const own = centres.find((p) => p.s === mine);
+    if (own) {
+      const spacing = Math.min(...centres.filter((p) => p !== own).map((p) => Math.abs(p.x - own.x)));
+      // Protect clicks beside the current sitter, but stop before the next
+      // cushion's centre. A distance multiplier wrongly won again past that
+      // centre, making the outer half of a neighboring bench cushion unclickable.
+      if (Math.abs(sx - own.x) < spacing * 0.79) return mine;
+    }
+    let best: { s: SeatSpot; d: number } | undefined;
+    for (const {s, x, y} of centres) {
       // across the screen only: a couch's cushions sit side by side on screen whichever way it faces, and a
       // click high on its back or low on its skirt is still over the cushion it's above. On the seat you're in,
       // your own cushion wins unless the click is clearly nearer another one (a click beside you never moves you;
       // one on the next cushion does), whatever the seat's spacing — no fixed-width window.
-      const d = (Math.abs(x - sx) + Math.abs(y - sy) * 0.01) * (s === mine ? 0.6 : 1);
+      const d = Math.abs(x - sx) + Math.abs(y - sy) * 0.01;
       if (!best || d < best.d) best = { s, d };
     }
     return best?.s;
@@ -1203,14 +1264,14 @@ export class WorldView {
   say(memberId: string, text: string) {
     const a = this.actors.get(memberId);
     if (!a) return;
-    const now = performance.now();
+    const now = this.animationNow();
     a.bubble = { text, start: now, until: now + 3500 + text.length * 55 };
   }
 
   emote(memberId: string, emote: EmoteId) {
     const a = this.actors.get(memberId);
     if (!a) return;
-    const now = performance.now();
+    const now = this.animationNow();
     a.emotes.push({ emoji: EMOTES[emote].emoji, start: now });
     if (emote === 'wave') a.waveUntil = now + 1400;
     // the body acts it out (standing, hands free); the emoji still floats up
@@ -1227,7 +1288,7 @@ export class WorldView {
   gotItem(memberId: string, emoji: string) {
     const a = this.actors.get(memberId);
     if (!a) return;
-    a.emotes.push({ emoji, start: performance.now() });
+    a.emotes.push({ emoji, start: this.animationNow() });
     const p = isoToScreen(a.x + 0.5, a.y + 0.5, 30);
     this.effects.burst(p.x, p.y, 'sparkle', 10);
   }
@@ -1276,7 +1337,7 @@ export class WorldView {
     if (what === 'toast') {
       // a toast: glasses up round the room — whoever's standing nearby cheers, a beat apart
       const o = this.scene?.objects.find((x) => x.id === objectId);
-      const now = performance.now();
+      const now = this.animationNow();
       for (const [id, p] of this.actors) {
         if (p.npc || p.occ.sittingOn || p.occ.carrying || (o && Math.hypot(p.x - o.x, p.y - o.y) > 9)) continue;
         const start = now + (id === by ? 0 : 250 + Math.random() * 600);
@@ -1287,7 +1348,7 @@ export class WorldView {
       return;
     }
     // whoever used it works it for a moment (hands on the machine, the cue, the keys)
-    if (a && !a.occ.sittingOn && what !== 'brew' && what !== 'ring') a.workUntil = performance.now() + 900;
+    if (a && !a.occ.sittingOn && what !== 'brew' && what !== 'ring') a.workUntil = this.animationNow() + 900;
   }
 
   /** The notes pinned on the room's boards; `pop` when one was just pinned (it pops on). */
@@ -1310,7 +1371,7 @@ export class WorldView {
   }
 
   showDestination(tile: Tile) {
-    this.dest = { x: tile[0], y: tile[1], t: performance.now() };
+    this.dest = { x: tile[0], y: tile[1], t: this.animationNow() };
   }
 
   /** Screen (CSS px) position of an actor's head, for anchoring React popovers. */
@@ -1368,12 +1429,16 @@ export class WorldView {
     // a rAF timestamp is when its frame began, which can be before `last` (set at construction): never negative
     const dt = Math.max(0, Math.min(0.05, (t - this.last) / 1000));
     this.last = t;
+    const previousTime = this.frameAnimationTime;
+    this.frameAnimationTime = this.animationNow();
     try {
       this.update(dt);
       this.draw();
     } catch (e) {
       if (!this.frameError) console.error('[world] frame failed; carrying on', e);
       this.frameError = true;
+    } finally {
+      this.frameAnimationTime = previousTime;
     }
   };
   /** A frame has thrown (reported once, not every frame). */
@@ -1405,14 +1470,14 @@ export class WorldView {
         if (a.occ.sittingOn) a.facing = a.occ.facing;
       }
       a.walkClock = a.moving ? a.walkClock + dt : 0;
-      this.tickSeat(a, performance.now());
-      this.tickLife(a, performance.now());
-      a.emotes = a.emotes.filter((e) => performance.now() - e.start < 1800);
-      if (a.bubble && performance.now() > a.bubble.until) a.bubble = undefined;
+      this.tickSeat(a, this.animationNow());
+      this.tickLife(a, this.animationNow());
+      a.emotes = a.emotes.filter((e) => this.animationNow() - e.start < 1800);
+      if (a.bubble && this.animationNow() > a.bubble.until) a.bubble = undefined;
     }
     // gentle follow
     const me = this.actors.get(this.meId);
-    if (me?.moving && this.scene?.kind === 'outdoor' && performance.now() - this.camera.lastManual > 2500) {
+    if (me?.moving && this.scene?.kind === 'outdoor' && this.animationNow() - this.camera.lastManual > 2500) {
       const p = isoToScreen(me.x + 0.5, me.y + 0.5);
       this.camera.panTo(p.x, p.y - 20);
     }
@@ -1444,8 +1509,8 @@ export class WorldView {
     const seatPose = this.seatPose(a);
     if (seatPose) return seatPose;
     if (doing === 'brew' || doing === 'work') return 'work';
-    if (performance.now() < a.waveUntil) return 'wave';
-    if (!a.moving && !a.occ.sittingOn && a.workUntil && performance.now() < a.workUntil) return 'work';
+    if (this.animationNow() < a.waveUntil) return 'wave';
+    if (!a.moving && !a.occ.sittingOn && a.workUntil && this.animationNow() < a.workUntil) return 'work';
     if (a.moving) {
       // contact, passing, contact, passing: arms swing through, the body bobs on each stride
       const f = Math.floor(a.walkClock * 8) % 4;
@@ -1459,7 +1524,7 @@ export class WorldView {
    * and then a quiet idle moment. Never while carrying something or mid-sentence.
    */
   private lifePose(a: ActorView): Pose | null {
-    const now = performance.now();
+    const now = this.animationNow();
     if (a.act && now < a.act.until) {
       const t = (now - a.act.start) / 1000;
       const alt = (x: Pose, y: Pose, fps: number): Pose => (Math.floor(t * fps) % 2 ? y : x);
@@ -1493,7 +1558,7 @@ export class WorldView {
 
   /** Idle moments come and go on each person's own clock; anything that needs them cancels one. */
   private tickLife(a: ActorView, now: number) {
-    const busy = a.moving || !!a.occ.sittingOn || !!a.occ.carrying || !!a.bubble || !!a.npc || (!!a.act && now < a.act.until);
+    const busy = a.moving || !!a.seat || !!a.occ.sittingOn || !!a.occ.carrying || !!a.bubble || !!a.npc || (!!a.act && now < a.act.until);
     if (busy || this.reducedMotion) {
       a.idle = undefined;
       if (now >= a.nextIdleAt) a.nextIdleAt = now + 4000 + Math.random() * 8000;
@@ -1515,10 +1580,25 @@ export class WorldView {
 
   /** The facing to draw: the way they face, or the way they glanced for a moment. */
   private viewFacing(a: ActorView): Facing {
-    return a.idle?.kind === 'glance' && performance.now() < a.idle.until && a.idle.facing ? a.idle.facing : a.facing;
+    // Entry can finish locally before the server confirms sitting. Keep the body
+    // aligned throughout that interval and the stand-up, including idle glances.
+    if (a.seat) return a.seat.spot.facing;
+    return a.idle?.kind === 'glance' && this.animationNow() < a.idle.until && a.idle.facing ? a.idle.facing : a.facing;
   }
 
   private draw() {
+    // Diagnostics and immediate redraws can draw outside the animation loop.
+    // Nested draws retain its instant; exceptions must not freeze later frames.
+    const previousTime = this.frameAnimationTime;
+    this.frameAnimationTime = this.animationNow();
+    try {
+      this.drawFrame();
+    } finally {
+      this.frameAnimationTime = previousTime;
+    }
+  }
+
+  private drawFrame() {
     const c = this.ctx;
     const { dpr, vw, vh } = this;
     c.setTransform(1, 0, 0, 1, 0, 0);
@@ -1541,7 +1621,7 @@ export class WorldView {
     const sky = skyAt();
     const shell = 'windows' in this.ground ? this.ground : null;
     if (shell) this.drawWindowViews(c, shell, sky);
-    if (outdoor) drawSurroundings(c, this.scene.width, this.scene.height, sky, this.visibleArt(), performance.now() / 1000, this.reducedMotion);
+    if (outdoor) drawSurroundings(c, this.scene.width, this.scene.height, sky, this.visibleArt(), this.animationNow() / 1000, this.reducedMotion);
     const gk = this.ground.scale ?? 1;
     c.drawImage(this.ground.canvas, this.ground.minX, this.ground.minY, this.ground.canvas.width / gk, this.ground.canvas.height / gk);
     if ('water' in this.ground && this.ground.water) this.drawWaterMotion(c, this.ground.water);
@@ -1551,7 +1631,7 @@ export class WorldView {
       // Sunlight through the windows follows the weather; passing clouds make it breathe a little.
       c.save();
       c.globalCompositeOperation = 'screen';
-      const breathe = sky.weather === 'clouds' ? 0.8 + 0.2 * Math.sin(performance.now() / 2600) : 1;
+      const breathe = sky.weather === 'clouds' ? 0.8 + 0.2 * Math.sin(this.animationNow() / 2600) : 1;
       c.globalAlpha = Math.min(1, sky.sun * breathe);
       if (c.globalAlpha > 0.02) c.drawImage(shell.sun, shell.minX, shell.minY, shell.sun.width / gk, shell.sun.height / gk);
       c.globalAlpha = sky.lamp;
@@ -1565,14 +1645,14 @@ export class WorldView {
     // hover tile + destination marker
     if (this.hoverTile && !this.hover) this.diamond(this.hoverTile[0], this.hoverTile[1], 'rgba(255,255,255,0.35)', 1);
     if (this.dest) {
-      const age = (performance.now() - this.dest.t) / 1000;
+      const age = (this.animationNow() - this.dest.t) / 1000;
       if (age > 1.2) this.dest = null;
       else this.diamond(this.dest.x, this.dest.y, `rgba(255,236,140,${1 - age / 1.2})`, 1 - age * 0.3);
     }
     this.effects.drawUnder(c);
 
     // actor shadows, selection and speaking rings
-    const t = performance.now() / 1000;
+    const t = this.animationNow() / 1000;
     for (const a of this.actors.values()) {
       const sat = this.seated(a);
       const foot = this.footPoint(a);
@@ -1623,7 +1703,7 @@ export class WorldView {
 
     // depth-sorted statics + actors
     const order = this.buildDrawOrder();
-    const now = performance.now() / 1000;
+    const now = this.animationNow() / 1000;
     const view = this.visibleArt();
     for (const d of order) {
       if ('obj' in d) {
@@ -1805,7 +1885,7 @@ export class WorldView {
    * mouth while their speech bubble is up.
    */
   private expression(a: ActorView): Expression | undefined {
-    const now = performance.now();
+    const now = this.animationNow();
     if (a.bubble && now < a.bubble.until) return Math.floor(now / 140) % 2 ? 'talk' : undefined;
     if (now >= a.blinkAt) {
       a.blinkUntil = now + 120;
@@ -1819,7 +1899,15 @@ export class WorldView {
    * pose, a sitter's legs laid on their seat (sitLegs.ts).
    */
   private figureOf(a: ActorView, expr?: Expression): Sprite {
-    return avatarSprite(this.look(a), this.viewFacing(a), this.pose(a), expr, this.legsOf(a));
+    const legs = this.legsOf(a);
+    const sprite = avatarSprite(this.look(a), this.viewFacing(a), this.pose(a), expr, legs);
+    const on = a.onSeat;
+    const st = on ? this.staticOf(on.id) : undefined;
+    const mv = st && on ? this.modelOf(st.obj, on.facing) : null;
+    if (!mv || !st || usesWheelchair(a.occ.avatar)) return sprite;
+    const feet: [number, number] = [((a.at?.x ?? a.sx) - st.dx) * 2, ((a.at?.y ?? a.sy) - st.dy) * 2];
+    const hipHeight = (a.lift ?? 0) - (st.obj.z ?? 0) + (FIG.feet - FIG.hip - poseDrop(this.pose(a))) / 2;
+    return seatedFigure(sprite, mv, this.look(a), this.viewFacing(a), this.pose(a), feet, legs, hipHeight);
   }
 
   /**
@@ -1840,6 +1928,10 @@ export class WorldView {
   private drawActor(a: ActorView) {
     const c = this.ctx;
     const sprite = this.figureOf(a, this.reducedMotion ? undefined : this.expression(a));
+    const on = a.onSeat;
+    const st = on ? this.staticOf(on.id) : undefined;
+    const mv = st && on ? this.modelOf(st.obj, on.facing) : null;
+    const composed = !!(mv && st && !usesWheelchair(a.occ.avatar));
     const hovered = this.hover?.kind === 'actor' && this.hover.id === a.occ.memberId;
     const x = a.at?.x ?? Math.round(a.sx);
     const y = a.at?.y ?? Math.round(a.sy);
@@ -1847,7 +1939,7 @@ export class WorldView {
     if (hovered) blit(c, sprite, x, y, highlightOf(sprite), 2);
     else blit(c, sprite, x, y);
     c.globalAlpha = 1;
-    this.drawSeatFront(a);
+    if (!composed) this.drawSeatFront(a);
     if (a.proxy) this.drawProxyFront(a);
   }
 
@@ -1945,7 +2037,7 @@ export class WorldView {
   private drawActorOverlays() {
     const c = this.ctx;
     const z = this.camera.zoom;
-    const now = performance.now();
+    const now = this.animationNow();
     const list = [...this.actors.values()].sort((p, q) => p.sy - q.sy);
     const obstacles: Rect[] = [];
     const bubbles: BubbleSpec[] = [];
@@ -2063,7 +2155,7 @@ export class WorldView {
    * and then it gives off a little sparkle.
    */
   private drawGlints(c: CanvasRenderingContext2D) {
-    const t = performance.now() / 1000;
+    const t = this.animationNow() / 1000;
     for (const st of this.statics) {
       if (!st.obj.sprite.startsWith('heirloom')) continue;
       const seed = (st.obj.x * 7 + st.obj.y * 13) % 10;
@@ -2103,7 +2195,7 @@ export class WorldView {
 
   /** The live view outside each window, painted before the room so it shows through the glass. */
   private drawWindowViews(c: CanvasRenderingContext2D, shell: InteriorLayer, sky: Sky) {
-    const t = performance.now() / 1000;
+    const t = this.animationNow() / 1000;
     shell.windows.forEach((w, i) => {
       const view = windowView(w, `${this.scene?.id}:${i}`, t, sky);
       c.save();
@@ -2126,7 +2218,7 @@ export class WorldView {
    * strength now. The one lamp model: the night shading cuts pools with it, and water catches its light.
    */
   private lampLights(sky: Sky): Lamp[] {
-    const now = performance.now();
+    const now = this.animationNow();
     const flicker = 0.95 + 0.05 * Math.sin(now / 170) * Math.sin(now / 530);
     // indoors lamps glow whenever they're on; street lamps only once the light goes
     const outdoorK = this.scene?.kind === 'outdoor' ? NIGHTNESS[sky.phase] : 1;
@@ -2223,7 +2315,7 @@ export class WorldView {
    */
   private drawWaterMotion(c: CanvasRenderingContext2D, water: NonNullable<GroundLayer['water']>) {
     const n = water.frames.length;
-    const t = this.reducedMotion ? 0 : (performance.now() / 1000) * 0.55;
+    const t = this.reducedMotion ? 0 : (this.animationNow() / 1000) * 0.55;
     const f = Math.floor(t) % n;
     const k = t - Math.floor(t);
     c.save();
@@ -2349,7 +2441,7 @@ export class WorldView {
         right = fx + fw;
       }
       if (b?.event) {
-        const bob = this.reducedMotion ? 0 : Math.sin(performance.now() / 300) * 2;
+        const bob = this.reducedMotion ? 0 : Math.sin(this.animationNow() / 300) * 2;
         const ev = pill(c, sx, main.y - 4 + bob, b.event, { size: 11, bg: '#e24c9c', fg: '#ffffff' });
         this.badgeRects.push({ r: ev, obj: o });
       }

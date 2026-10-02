@@ -10,8 +10,8 @@
 import type { AvatarLoadout } from '@shared/domain/types';
 import type { Facing } from '@shared/world/scene';
 import { SIT_POSE_OF, type SitStyle } from '@shared/world/seats';
-import { FIG, figAx, figSeatRow, isSitPoseName, poseDrop } from '@shared/world/seatFigure';
-import { boxHull, drawingAt, rayBillboard, rayBox, rayPlane, rayThrough, towardCamera, worldToLocal, type Face, type Ray, type SeatModel, type SitPoint } from '@shared/world/seatModels';
+import { FIG, drawingPrint, figAx, figSeatRow, isSitPoseName, poseDrop } from '@shared/world/seatFigure';
+import { boxHull, drawingAt, projectLocal, rayBillboard, rayBox, rayPlane, rayThrough, seatSurfaceShapeProblems, towardCamera, worldToLocal, type Face, type Ray, type SeatModel, type SeatSurfaceMap, type SitPoint } from '@shared/world/seatModels';
 import type { SitLegs } from '@shared/world/sitLegs';
 import { renderAvatarLayers } from './avatarQa';
 import type { Pose } from './avatarFrame';
@@ -28,13 +28,15 @@ export interface ModelView {
 /* ------------------------------------------------------------------ the seat's depth */
 
 export interface SeatDepth {
+  /** Proxy inference is not source-pixel semantic verification. */
+  source: 'semantic' | 'proxy' | 'authored';
   w: number;
   h: number;
   /** Per pixel: the height (world px) at which its ray meets the seat's proxy; NaN where the drawing is clear. */
   z: Float64Array;
   /** The part that depth comes from (−1: none). */
   part: Int16Array;
-  /** 1: the ray meets that part's box; 2: outside every box, on the nearest covered pixel's face extended. */
+  /** 1: proxy ray hit; 2: proxy extrapolation; 3: source-pixel semantic surface; 4: authored curved depth. */
   how: Uint8Array;
   /** The face of the box the ray meets: 0 its top, 1 or 2 a side (always the side toward the camera). */
   face: Uint8Array;
@@ -46,16 +48,109 @@ export interface SeatDepth {
 const FACE_CODE: Record<Face, number> = { top: 0, u: 1, v: 2 };
 const FACES: Face[] = ['top', 'u', 'v'];
 
+/** The serialized parts are deliberately bound exactly: reordered/refitted parts require new labels. */
+export const surfacePartsSignature = (model: Pick<SeatModel, 'parts'>): string => JSON.stringify(model.parts);
+
+export function seatSurfaceMapProblems(map: SeatSurfaceMap, px: Pixels, model: SeatModel): string[] {
+  const problems: string[] = [];
+  if (map.version !== 1 && map.version !== 2) problems.push('Unsupported seating surface map version.');
+  if (map.width !== px.w || map.height !== px.h) problems.push('Surface map dimensions do not match the drawing.');
+  if (map.drawing !== drawingPrint(px.w, px.h, px.d)) problems.push('Surface map drawing fingerprint is stale.');
+  if (map.modelParts !== surfacePartsSignature(model)) problems.push('Surface map model parts are stale.');
+  if (!Array.isArray(map.labels) || map.labels.length !== px.w * px.h) {
+    problems.push('Surface map must contain one label per drawing pixel.');
+    return problems;
+  }
+  let uncovered = 0, extra = 0, invalid = 0;
+  for (let i = 0; i < map.labels.length; i++) {
+    const label = map.labels[i];
+    if (!Number.isInteger(label) || label < 0 || label > model.parts.length * 3) invalid++;
+    else if (px.d[i * 4 + 3] && label === 0) uncovered++;
+    else if (!px.d[i * 4 + 3] && label !== 0) extra++;
+  }
+  if (uncovered) problems.push(`Surface map leaves ${uncovered} opaque pixels unlabeled.`);
+  if (extra) problems.push(`Surface map labels ${extra} transparent pixels.`);
+  if (invalid) problems.push(`Surface map has ${invalid} invalid part/face labels.`);
+  return problems;
+}
+
+const PARTNER: Record<Facing, Facing> = { se: 'sw', sw: 'se', ne: 'nw', nw: 'ne' };
+
+/** Resolve a source map in the exact same raster space as the resolved drawing.
+ * Mirroring is accepted only with matching mirrored art and symmetric corresponding parts.
+ * An asset supplying maps cannot silently fall back on a missing/invalid view.
+ */
+export function resolveSeatSurfaceMap(v: ModelView): SeatSurfaceMap | undefined {
+  const maps = v.model.surfaces;
+  if (maps === undefined) return undefined;
+  const structure = seatSurfaceShapeProblems(v.model);
+  if (structure.length) throw new Error(structure.join(' '));
+  const { px } = v.art;
+  let map = maps[v.facing];
+  if (!map) {
+    const source = maps[PARTNER[v.facing]];
+    if (!source) throw new Error(`Missing seating surface map for ${v.facing} and its mirrored partner.`);
+    if (source.version === 2) throw new Error('Authored depth requires an explicit validated map for every facing.');
+    const mirrored = new Uint8Array(px.d.length);
+    for (let y = 0; y < px.h; y++) for (let x = 0; x < px.w; x++)
+      mirrored.set(px.d.subarray((y * px.w + x) * 4, (y * px.w + x + 1) * 4), (y * px.w + px.w - 1 - x) * 4);
+    const problems = seatSurfaceMapProblems(source, { ...px, d: mirrored }, v.model);
+    if (problems.length) throw new Error(problems.join(' '));
+    const same = (a: number, b: number) => Math.abs(a - b) < 1e-8;
+    const reflected = v.model.parts.map(p => v.model.parts.findIndex(q =>
+      q.part === p.part && same(q.u[0], v.model.size[0] - p.u[1]) && same(q.u[1], v.model.size[0] - p.u[0]) &&
+      p.v.every((n, i) => same(n, q.v[i])) && p.z.every((n, i) => same(n, q.z[i]))));
+    const labels = new Array<number>(px.w * px.h);
+    for (let y = 0; y < px.h; y++) for (let x = 0; x < px.w; x++) {
+      const code = source.labels[y * px.w + px.w - 1 - x];
+      if (!code) { labels[y * px.w + x] = 0; continue; }
+      const part = reflected[Math.floor((code - 1) / 3)];
+      if (part < 0) throw new Error('Surface map cannot mirror an asymmetric model part; supply this view explicitly.');
+      labels[y * px.w + x] = 1 + part * 3 + (code - 1) % 3;
+    }
+    map = { ...source, drawing: drawingPrint(px.w, px.h, px.d), labels };
+  }
+  const problems = seatSurfaceMapProblems(map, px, v.model);
+  if (map.version === 2 && (map.authored.anchor[0] !== v.art.ax || map.authored.anchor[1] !== v.art.ay || map.authored.style !== v.style))
+    problems.push('Authored surface anchor or sitting style is stale.');
+  if (problems.length) throw new Error(problems.join(' '));
+  return map;
+}
+
+function depthFromSurfaceMap(v: ModelView, map: SeatSurfaceMap): SeatDepth {
+  const { px, ax, ay } = v.art, n = px.w * px.h;
+  const z = new Float64Array(n).fill(NaN), part = new Int16Array(n).fill(-1), how = new Uint8Array(n), face = new Uint8Array(n);
+  const u = new Float64Array(n), vv = new Float64Array(n);
+  for (let i = 0; i < n; i++) {
+    if (!map.labels[i]) continue;
+    const code = map.labels[i] - 1, k = Math.floor(code / 3), f = code % 3, p = v.model.parts[k];
+    const r = rayThrough([ax, ay], v.model.size, v.facing, i % px.w + 0.5, Math.floor(i / px.w) + 0.5);
+    part[i] = k; face[i] = f; how[i] = map.version === 2 ? 4 : 3;
+    // Explicit surface identity does not let an undersized proxy substitute another part.
+    // Its own face can extend to painted fringe, bounded by that part's actual height.
+    z[i] = map.version === 2 ? map.authored.z[i]! : Math.max(p.z[0], Math.min(p.z[1], rayPlane(r, p, FACES[f])));
+    u[i] = r.u0 + r.du * z[i]; vv[i] = r.v0 + r.dv * z[i];
+  }
+  return { source: map.version === 2 ? 'authored' : 'semantic', w: px.w, h: px.h, z, part, how, face, u, v: vv };
+}
+
 const depthCache = new WeakMap<object, Map<string, SeatDepth>>();
 
 /** The seat's depth map in a view (cached per drawing and model). */
 export function seatDepth(v: ModelView): SeatDepth {
   const { px, ax, ay } = v.art;
+  const surfaceMap = resolveSeatSurfaceMap(v);
   let memo = depthCache.get(px.d);
   if (!memo) depthCache.set(px.d, (memo = new Map()));
-  const key = `${v.facing}|${ax},${ay}|${JSON.stringify(v.model.size)}|${JSON.stringify(v.model.parts)}`;
+  const key = `${v.facing}|${ax},${ay}|${JSON.stringify(v.model.size)}|${JSON.stringify(v.model.parts)}|${surfaceMap ? JSON.stringify(surfaceMap) : 'proxy'}`;
   const had = memo.get(key);
   if (had) return had;
+  if (surfaceMap) {
+    const out = depthFromSurfaceMap(v, surfaceMap);
+    memo.set(key, out);
+    if (memo.size > 24) memo.delete(memo.keys().next().value!);
+    return out;
+  }
   const W = px.w;
   const H = px.h;
   const z = new Float64Array(W * H).fill(NaN);
@@ -109,8 +204,76 @@ export function seatDepth(v: ModelView): SeatDepth {
     if (!px.d[i * 4 + 3] || how[i] === 1 || src[i] < 0) continue;
     const s = src[i];
     part[i] = part[s];
+    face[i] = face[s];
     how[i] = 2;
-    z[i] = rayPlane(rays[i], parts[part[s]], FACES[face[s]]);
+    const p = parts[part[s]];
+    // Extending a side face must not turn cushion fringe into a surface above
+    // the cushion top (or grow a frame through the seated pelvis).
+    z[i] = Math.max(p.z[0], Math.min(p.z[1], rayPlane(rays[i], p, FACES[face[s]])));
+  }
+  // A box around an open back also encloses the cushion visible through it.
+  // Resolve that overlap from the drawing's own materials: learn the cushion
+  // from unobstructed top pixels and the frame from pixels above the cushion.
+  // Only use this evidence for a back with actual enclosed transparent holes;
+  // a solid upholstered back must remain solid.
+  const cushionZ = Math.max(0, ...parts.filter(p => p.part === 'seat').map(p => p.z[1]));
+  const filled = filledSilhouette(px);
+  const openBack = parts.some(p => p.part === 'back') && part.some((k, i) =>
+    k >= 0 && parts[k].part === 'back' && !px.d[i * 4 + 3] && filled[i] &&
+    (rayBox(rays[i], parts[k])?.hi ?? 0) > cushionZ + 3);
+  if (openBack) {
+    const seatColors = new Map<number, number[]>(), backColors = new Map<number, number[]>();
+    const seatHits: Array<{ part: number; z: number; face: Face } | undefined> = new Array(W * H);
+    const colorAt = (i: number) => [px.d[i * 4], px.d[i * 4 + 1], px.d[i * 4 + 2]];
+    for (let i = 0; i < W * H; i++) {
+      if (!px.d[i * 4 + 3] || part[i] < 0) continue;
+      parts.forEach((p, k) => {
+        if (p.part !== 'seat') return;
+        const hit = rayBox(rays[i], p);
+        if (hit && (!seatHits[i] || hit.hi > seatHits[i]!.z)) seatHits[i] = { part: k, z: hit.hi, face: hit.face };
+      });
+      const color = colorAt(i), code = color[0] * 65536 + color[1] * 256 + color[2];
+      if (parts[part[i]].part === 'seat' && face[i] === 0) seatColors.set(code, color);
+      if (parts[part[i]].part === 'back' && !seatHits[i] && z[i] > cushionZ + 3) backColors.set(code, color);
+    }
+    const distance = (color: number[], palette: Map<number, number[]>) => {
+      let best = Infinity;
+      for (const c of palette.values()) best = Math.min(best, c.reduce((sum, v, k) => sum + (v - color[k]) ** 2, 0));
+      return best;
+    };
+    if (seatColors.size && backColors.size) for (let i = 0; i < W * H; i++) {
+      const seat = seatHits[i];
+      if (!seat || part[i] < 0 || parts[part[i]].part !== 'back') continue;
+      const color = colorAt(i), ds = distance(color, seatColors), db = distance(color, backColors);
+      // Ambiguous colours retain their geometric owner. A clearly distinct
+      // cushion material continues through the opening behind the frame.
+      if (ds < 3 * 28 ** 2 && ds + 100 < db * 0.5) {
+        part[i] = seat.part; z[i] = seat.z; face[i] = FACE_CODE[seat.face]; how[i] = 1;
+      }
+    }
+  }
+  // The horizontal cap of a backrest proxy spans the open seat well of
+  // curved furniture. Where that cap projects over a real cushion top, the
+  // visible interior supports the sitter; the vertical back faces still occlude.
+  // Arms remain separate foreground pieces, including their horizontal rails.
+  if (v.facing === 'ne' || v.facing === 'nw') for (let i = 0; i < W * H; i++) {
+    if (!px.d[i * 4 + 3] || part[i] < 0 || face[i] !== 0 || parts[part[i]].part !== 'back') continue;
+    let support = -1, height = -Infinity;
+    parts.forEach((p, k) => {
+      if (p.part !== 'seat') return;
+      const hit = rayBox(rays[i], p);
+      // Fitted boxes stop between painted pixels. A top surface's fringe must
+      // not jump to the height of the backrest when it misses the fitted seat
+      // by one or two drawing pixels. Measure the miss in drawing pixels,
+      // rather than stretching every surface or changing the sitter's height.
+      const r = rays[i], zTop = p.z[1];
+      const u = r.u0 + r.du * zTop, vv = r.v0 + r.dv * zTop;
+      const nearest = projectLocal([ax, ay], v.model.size, v.facing,
+        Math.max(p.u[0], Math.min(p.u[1], u)), Math.max(p.v[0], Math.min(p.v[1], vv)), zTop);
+      const fringe = Math.hypot(nearest[0] - (i % W + 0.5), nearest[1] - (Math.floor(i / W) + 0.5)) <= 2;
+      if ((hit?.face === 'top' || fringe) && zTop > height) { support = k; height = zTop; }
+    });
+    if (support >= 0) { part[i] = support; z[i] = height; face[i] = 0; how[i] = 1; }
   }
   for (let i = 0; i < W * H; i++) if (!px.d[i * 4 + 3]) part[i] = -1;
   const u = new Float64Array(W * H);
@@ -121,7 +284,7 @@ export function seatDepth(v: ModelView): SeatDepth {
     u[i] = r.u0 + r.du * z[i];
     vv[i] = r.v0 + r.dv * z[i];
   }
-  const out = { w: W, h: H, z, part, how, face, u, v: vv };
+  const out: SeatDepth = { source: 'proxy', w: W, h: H, z, part, how, face, u, v: vv };
   memo.set(key, out);
   if (memo.size > 24) memo.delete(memo.keys().next().value!);
   return out;
@@ -307,4 +470,3 @@ export function silhouetteFit(v: ModelView): SilhouetteFit {
   });
   return { iou: uni ? inter / uni : 0, tops };
 }
-

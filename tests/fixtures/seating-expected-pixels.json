@@ -1,0 +1,63 @@
+{
+  "status": "Independently inspected regression pixels; partial coverage only",
+  "points": [
+    {
+      "x": 49,
+      "y": 20,
+      "reason": "Thin diagonal upholstery line crosses the visible thigh in NE couch capture.",
+      "case": "cafe-30/ne/0",
+      "winner": "avatar",
+      "source": "[2,[2,1],10.15,\"lounge\",true,true,\"couch\",[[\"se\",64,30,\"80eacd83\"],[\"sw\",32,30,\"4e3ab12f\"],[\"ne\",32,28,\"b9f02086\"],[\"nw\",64,28,\"0f839b86\"]]]",
+      "context": "[{\"skin\":\"#eab58d\",\"hair\":\"hair.pixie\",\"hairColor\":\"#5a3825\",\"hairHighlight\":\"\",\"eyes\":\"eyes.sleepy\",\"eyeColor\":\"#5a3825\",\"brows\":\"brows.soft\",\"mouth\":\"mouth.grin\",\"facialHair\":\"fh.mustache\",\"faceDetail\":\"fd.none\",\"headwear\":\"hat.none\",\"headwearColor\":\"#3a3a46\",\"eyewear\":\"eye.monocle\",\"neck\":\"neck.bandana\",\"neckColor\":\"#fff1a8\",\"top\":\"top.cardigan\",\"topColor\":\"#2bb3a3\",\"topAccent\":\"#2bb3a3\",\"topPattern\":\"pat.solid\",\"bottom\":\"bottom.joggers\",\"bottomColor\":\"#3a3a46\",\"shoes\":\"shoes.slippers\",\"shoesColor\":\"#9fe3e0\",\"accessory\":\"acc.none\",\"held\":\"held.popcorn\",\"heldColor\":\"#fff1a8\",\"pet\":\"pet.none\",\"petColor\":\"#e8a15a\",\"mobility\":\"mob.none\",\"body\":\"body.a\"},\"sit-lounge\",{\"reach\":0.4,\"rise\":0.5,\"drop\":11,\"toe\":0.05,\"hang\":1.15},[42,34],11.65]"
+    },
+    {
+      "x": 33,
+      "y": 17,
+      "reason": "Inner cushion edge cuts into the visible pants in NW mustard chair capture.",
+      "case": "cafe-32/nw/0",
+      "winner": "avatar",
+      "source": "[2,[1,1],12,\"chair\",true,true,\"armchair\",[[\"se\",32,32,\"d433604e\"],[\"sw\",32,32,\"b26df38e\"],[\"ne\",32,32,\"61eebc5d\"],[\"nw\",32,32,\"3a8c3bcd\"]]]",
+      "context": "[{\"skin\":\"#eab58d\",\"hair\":\"hair.pixie\",\"hairColor\":\"#5a3825\",\"hairHighlight\":\"\",\"eyes\":\"eyes.sleepy\",\"eyeColor\":\"#5a3825\",\"brows\":\"brows.soft\",\"mouth\":\"mouth.grin\",\"facialHair\":\"fh.mustache\",\"faceDetail\":\"fd.none\",\"headwear\":\"hat.none\",\"headwearColor\":\"#3a3a46\",\"eyewear\":\"eye.monocle\",\"neck\":\"neck.bandana\",\"neckColor\":\"#fff1a8\",\"top\":\"top.cardigan\",\"topColor\":\"#2bb3a3\",\"topAccent\":\"#2bb3a3\",\"topPattern\":\"pat.solid\",\"bottom\":\"bottom.joggers\",\"bottomColor\":\"#3a3a46\",\"shoes\":\"shoes.slippers\",\"shoesColor\":\"#9fe3e0\",\"accessory\":\"acc.none\",\"held\":\"held.popcorn\",\"heldColor\":\"#fff1a8\",\"pet\":\"pet.none\",\"petColor\":\"#e8a15a\",\"mobility\":\"mob.none\",\"body\":\"body.a\"},\"sit\",{\"reach\":0.35,\"rise\":0,\"drop\":11,\"toe\":0.03,\"hang\":2.5},[29,36],13.5]"
+    },
+    {
+      "x": 35,
+      "y": 12,
+      "reason": "Far couch arm must remain behind the left sleeve in the NE left-cushion view.",
+      "case": "cafe-30/ne/0",
+      "winner": "avatar",
+      "source": "[2,[2,1],10.15,\"lounge\",true,true,\"couch\",[[\"se\",64,30,\"80eacd83\"],[\"sw\",32,30,\"4e3ab12f\"],[\"ne\",32,28,\"b9f02086\"],[\"nw\",64,28,\"0f839b86\"]]]",
+      "context": "[{\"skin\":\"#eab58d\",\"hair\":\"hair.pixie\",\"hairColor\":\"#5a3825\",\"hairHighlight\":\"\",\"eyes\":\"eyes.sleepy\",\"eyeColor\":\"#5a3825\",\"brows\":\"brows.soft\",\"mouth\":\"mouth.grin\",\"facialHair\":\"fh.mustache\",\"faceDetail\":\"fd.none\",\"headwear\":\"hat.none\",\"headwearColor\":\"#3a3a46\",\"eyewear\":\"eye.monocle\",\"neck\":\"neck.bandana\",\"neckColor\":\"#fff1a8\",\"top\":\"top.cardigan\",\"topColor\":\"#2bb3a3\",\"topAccent\":\"#2bb3a3\",\"topPattern\":\"pat.solid\",\"bottom\":\"bottom.joggers\",\"bottomColor\":\"#3a3a46\",\"shoes\":\"shoes.slippers\",\"shoesColor\":\"#9fe3e0\",\"accessory\":\"acc.none\",\"held\":\"held.popcorn\",\"heldColor\":\"#fff1a8\",\"pet\":\"pet.none\",\"petColor\":\"#e8a15a\",\"mobility\":\"mob.none\",\"body\":\"body.a\"},\"sit-lounge\",{\"reach\":0.4,\"rise\":0.5,\"drop\":11,\"toe\":0.05,\"hang\":1.15},[42,34],11.65]"
+    },
+    {
+      "x": 35,
+      "y": 55,
+      "case": "seatlab-bench-se/se/1",
+      "winner": "furniture",
+      "source": "[2,[2,1],10.5,\"chair\",true,true,\"bench\",[[\"se\",68,49,\"b09bdbe3\"],[\"sw\",36,49,\"9cf9126b\"],[\"ne\",36,39,\"2a4d20a1\"],[\"nw\",68,39,\"697b58b1\"]]]",
+      "reason": "The near cast-iron bench arm remains in front of the sitter.",
+      "context": "[{\"skin\":\"#eab58d\",\"hair\":\"hair.pixie\",\"hairColor\":\"#5a3825\",\"hairHighlight\":\"\",\"eyes\":\"eyes.sleepy\",\"eyeColor\":\"#5a3825\",\"brows\":\"brows.soft\",\"mouth\":\"mouth.grin\",\"facialHair\":\"fh.mustache\",\"faceDetail\":\"fd.none\",\"headwear\":\"hat.none\",\"headwearColor\":\"#3a3a46\",\"eyewear\":\"eye.monocle\",\"neck\":\"neck.bandana\",\"neckColor\":\"#fff1a8\",\"top\":\"top.cardigan\",\"topColor\":\"#2bb3a3\",\"topAccent\":\"#2bb3a3\",\"topPattern\":\"pat.solid\",\"bottom\":\"bottom.joggers\",\"bottomColor\":\"#3a3a46\",\"shoes\":\"shoes.slippers\",\"shoesColor\":\"#9fe3e0\",\"accessory\":\"acc.none\",\"held\":\"held.popcorn\",\"heldColor\":\"#fff1a8\",\"pet\":\"pet.none\",\"petColor\":\"#e8a15a\",\"mobility\":\"mob.none\",\"body\":\"body.a\"},\"sit\",{\"reach\":0.26,\"rise\":0,\"drop\":11,\"toe\":0.03,\"hang\":1},[46,75],12]"
+    },
+    {
+      "case": "cafe-30/ne/0",
+      "x": 51,
+      "y": 21,
+      "winner": "avatar",
+      "source": "[2,[2,1],10.15,\"lounge\",true,true,\"couch\",[[\"se\",64,30,\"80eacd83\"],[\"sw\",32,30,\"4e3ab12f\"],[\"ne\",32,28,\"b9f02086\"],[\"nw\",64,28,\"0f839b86\"]]]",
+      "reason": "Independently reviewed connected pants row: cushion pixels interrupt thigh silhouette between surviving adjacent avatar pixels",
+      "context": "[{\"skin\":\"#eab58d\",\"hair\":\"hair.pixie\",\"hairColor\":\"#5a3825\",\"hairHighlight\":\"\",\"eyes\":\"eyes.sleepy\",\"eyeColor\":\"#5a3825\",\"brows\":\"brows.soft\",\"mouth\":\"mouth.grin\",\"facialHair\":\"fh.mustache\",\"faceDetail\":\"fd.none\",\"headwear\":\"hat.none\",\"headwearColor\":\"#3a3a46\",\"eyewear\":\"eye.monocle\",\"neck\":\"neck.bandana\",\"neckColor\":\"#fff1a8\",\"top\":\"top.cardigan\",\"topColor\":\"#2bb3a3\",\"topAccent\":\"#2bb3a3\",\"topPattern\":\"pat.solid\",\"bottom\":\"bottom.joggers\",\"bottomColor\":\"#3a3a46\",\"shoes\":\"shoes.slippers\",\"shoesColor\":\"#9fe3e0\",\"accessory\":\"acc.none\",\"held\":\"held.popcorn\",\"heldColor\":\"#fff1a8\",\"pet\":\"pet.none\",\"petColor\":\"#e8a15a\",\"mobility\":\"mob.none\",\"body\":\"body.a\"},\"sit-lounge\",{\"reach\":0.4,\"rise\":0.5,\"drop\":11,\"toe\":0.05,\"hang\":1.15},[42,34],11.65]"
+    },
+    {
+      "case": "cafe-30/ne/0",
+      "x": 52,
+      "y": 21,
+      "winner": "furniture",
+      "source": "[2,[2,1],10.15,\"lounge\",true,true,\"couch\",[[\"se\",64,30,\"80eacd83\"],[\"sw\",32,30,\"4e3ab12f\"],[\"ne\",32,28,\"b9f02086\"],[\"nw\",64,28,\"0f839b86\"]]]",
+      "reason": "Independent original-avatar geometry: source figure (55,91) is descending shin outside rounded pelvis and its outline; conservative ray maximum z7.9963 is below cushion z10.15. Adjacent (51,21) remains pelvis-outline avatar. Proof: tests/fixtures/seating-pelvis-corner-proof.json",
+      "context": "[{\"skin\":\"#eab58d\",\"hair\":\"hair.pixie\",\"hairColor\":\"#5a3825\",\"hairHighlight\":\"\",\"eyes\":\"eyes.sleepy\",\"eyeColor\":\"#5a3825\",\"brows\":\"brows.soft\",\"mouth\":\"mouth.grin\",\"facialHair\":\"fh.mustache\",\"faceDetail\":\"fd.none\",\"headwear\":\"hat.none\",\"headwearColor\":\"#3a3a46\",\"eyewear\":\"eye.monocle\",\"neck\":\"neck.bandana\",\"neckColor\":\"#fff1a8\",\"top\":\"top.cardigan\",\"topColor\":\"#2bb3a3\",\"topAccent\":\"#2bb3a3\",\"topPattern\":\"pat.solid\",\"bottom\":\"bottom.joggers\",\"bottomColor\":\"#3a3a46\",\"shoes\":\"shoes.slippers\",\"shoesColor\":\"#9fe3e0\",\"accessory\":\"acc.none\",\"held\":\"held.popcorn\",\"heldColor\":\"#fff1a8\",\"pet\":\"pet.none\",\"petColor\":\"#e8a15a\",\"mobility\":\"mob.none\",\"body\":\"body.a\"},\"sit-lounge\",{\"reach\":0.4,\"rise\":0.5,\"drop\":11,\"toe\":0.05,\"hang\":1.15},[42,34],11.65]",
+      "supersedes": {
+        "winner": "avatar",
+        "reason": "Independently reviewed connected pants row: cushion pixels interrupt thigh silhouette between surviving adjacent avatar pixels"
+      }
+    }
+  ]
+}

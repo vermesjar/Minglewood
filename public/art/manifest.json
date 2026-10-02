@@ -476,7 +476,8 @@
         "actions": [
           "sit"
         ]
-      }
+      },
+      "seatKind": "armchair"
     },
     "armchair.mustard": {
       "name": "Mustard armchair",
@@ -526,7 +527,8 @@
             32
           ]
         }
-      }
+      },
+      "seatKind": "armchair"
     },
     "armchair.rust": {
       "footprint": [
@@ -573,7 +575,8 @@
         "actions": [
           "sit"
         ]
-      }
+      },
+      "seatKind": "armchair"
     },
     "backbar": {
       "footprint": [
@@ -854,7 +857,8 @@
         "actions": [
           "sit"
         ]
-      }
+      },
+      "seatKind": "beanbag"
     },
     "beanbag.orange": {
       "footprint": [
@@ -902,7 +906,8 @@
         "actions": [
           "sit"
         ]
-      }
+      },
+      "seatKind": "beanbag"
     },
     "beanbag.pink": {
       "footprint": [
@@ -949,7 +954,8 @@
         "actions": [
           "sit"
         ]
-      }
+      },
+      "seatKind": "beanbag"
     },
     "beanbag.purple": {
       "footprint": [
@@ -997,7 +1003,8 @@
         "actions": [
           "sit"
         ]
-      }
+      },
+      "seatKind": "beanbag"
     },
     "bench": {
       "footprint": [
@@ -1046,7 +1053,9 @@
           "sit",
           "artifact"
         ]
-      }
+      },
+      "seatKind": "bench",
+      "arms": true
     },
     "bench-garden.teal": {
       "name": "Teal garden bench",
@@ -1095,7 +1104,9 @@
             44
           ]
         }
-      }
+      },
+      "seatKind": "bench",
+      "arms": true
     },
     "bench.navy": {
       "footprint": [
@@ -1143,7 +1154,9 @@
         "actions": [
           "sit"
         ]
-      }
+      },
+      "seatKind": "bench",
+      "arms": false
     },
     "bike-rack": {
       "footprint": [
@@ -2083,7 +2096,8 @@
             45
           ]
         }
-      }
+      },
+      "seatKind": "chair"
     },
     "chair.cafe": {
       "footprint": [
@@ -2111,7 +2125,7 @@
       "sitStyle": "chair",
       "backrest": true,
       "rotation": "mirror",
-      "name": "Caf\u00e9 chair",
+      "name": "Café chair",
       "category": "seating",
       "tags": [
         "chair",
@@ -2132,7 +2146,8 @@
         "actions": [
           "sit"
         ]
-      }
+      },
+      "seatKind": "chair"
     },
     "chair.office": {
       "footprint": [
@@ -2183,7 +2198,8 @@
           "sit"
         ]
       },
-      "arms": true
+      "arms": true,
+      "seatKind": "chair"
     },
     "chair.red": {
       "footprint": [
@@ -2230,7 +2246,8 @@
         "actions": [
           "sit"
         ]
-      }
+      },
+      "seatKind": "chair"
     },
     "chair.wood": {
       "footprint": [
@@ -2277,7 +2294,8 @@
         "actions": [
           "sit"
         ]
-      }
+      },
+      "seatKind": "chair"
     },
     "claw-machine": {
       "footprint": [
@@ -2544,7 +2562,8 @@
         "actions": [
           "sit"
         ]
-      }
+      },
+      "seatKind": "couch"
     },
     "couch.green": {
       "name": "Green couch",
@@ -2593,7 +2612,8 @@
             28
           ]
         }
-      }
+      },
+      "seatKind": "couch"
     },
     "couch.purple": {
       "footprint": [
@@ -2640,7 +2660,8 @@
         "actions": [
           "sit"
         ]
-      }
+      },
+      "seatKind": "couch"
     },
     "cups": {
       "footprint": [
@@ -4218,7 +4239,7 @@
       "sitStyle": "chair",
       "backrest": true,
       "rotation": "mirror",
-      "name": "Founders\u2019 throne",
+      "name": "Founders’ throne",
       "category": "seating",
       "tags": [
         "heirloom",
@@ -4237,7 +4258,8 @@
         "actions": [
           "sit"
         ]
-      }
+      },
+      "seatKind": "throne"
     },
     "heirloom-trophy": {
       "footprint": [
@@ -5096,7 +5118,8 @@
         "actions": [
           "sit"
         ]
-      }
+      },
+      "seatKind": "ottoman"
     },
     "paper-bin": {
       "footprint": [
@@ -6756,7 +6779,8 @@
         "actions": [
           "sit"
         ]
-      }
+      },
+      "seatKind": "stool"
     },
     "stool.drafting": {
       "footprint": [
@@ -6804,7 +6828,8 @@
         "actions": [
           "sit"
         ]
-      }
+      },
+      "seatKind": "stool"
     },
     "stool.neon": {
       "footprint": [
@@ -6843,7 +6868,8 @@
         "actions": [
           "sit"
         ]
-      }
+      },
+      "seatKind": "stool"
     },
     "stump": {
       "footprint": [

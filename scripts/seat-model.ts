@@ -25,10 +25,12 @@
  *   --review KEY          the lead reviewer passes a model (stamps the day and its drawings' fingerprints)
  *   --list                every seat kind and its model's state
  *
- * All writes go through art/seat-models.json's lock, one key at a time (scripts/lib/models.ts withModels): agents
- * working on different seats never clobber each other.
+ * Edits default to diagnostic art/review/model-edits/models.json (--out FILE overrides).
+ * --write requires the common publication gate; supply --verification-contract FILE and --verification-bundle FILE.
+ * A legacy --review timestamp never substitutes for source-bound independent evidence.
  */
-import { existsSync, mkdirSync } from 'node:fs';
+import { dirname } from 'node:path';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import type { Facing } from '../src/shared/world/scene';
 import {
   boxEdges,
@@ -55,7 +57,7 @@ import { loadManifest } from './lib/manifest';
 import { blank, writePng, type Img } from './lib/png';
 import { text } from './lib/font';
 import { line, paste, plot, rect, row, stack, type RGB } from './lib/draw';
-import { modelView, readModels, withModels } from './lib/models';
+import { formatModels, modelView, readModels, requireDiagnosticModelPath, withModels } from './lib/models';
 import { profileOf, seatKeys, viewArt, type Sprites } from './lib/seats';
 
 const M = loadManifest().sprites as unknown as Sprites;
@@ -309,15 +311,37 @@ function check(models: SeatModels, keys = KEYS): string[] {
 
 /* ------------------------------------------------------------------ editing (one key at a time, under the lock) */
 
+let editedModels: SeatModels | undefined;
+function editModels(fn: (models: SeatModels) => void) {
+  if (process.argv.includes('--write')) {
+    const contract = arg('--verification-contract'), bundle = arg('--verification-bundle');
+    const evidence = contract && bundle ? Object.fromEntries(KEYS.map(key => [key, { contract, bundle }])) : {};
+    withModels(fn, undefined, evidence);
+    return;
+  }
+  const path = arg('--out') ?? 'art/review/model-edits/models.json';
+  requireDiagnosticModelPath(path);
+  // A new command starts from the catalog unless explicitly continuing a staged file.
+  const models = editedModels ?? (arg('--out') && existsSync(path) ? readModels(path) : readModels());
+  fn(models);
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, formatModels(models));
+  editedModels = models;
+  console.log(`Staged diagnostic model: ${path}. Not published or pixel-verified.`);
+}
+
 /** Change one seat's model under the lock; a changed model is no longer reviewed. */
 function edit(key: string, fn: (m: SeatModel) => void) {
   if (!KEYS.includes(key)) throw new Error(`no seat ${key}`);
-  withModels((ms) => {
+  editModels((ms) => {
     const m = ms[key];
     if (!m) throw new Error(`${key}: no model yet (--fit ${key})`);
+    const prior = JSON.stringify({ ...m, note: undefined, reviewed: undefined, fitted: undefined });
     fn(m);
-    delete m.reviewed;
-    delete m.drawings;
+    if (prior !== JSON.stringify({ ...m, note: undefined, reviewed: undefined, fitted: undefined })) {
+      delete m.reviewed;
+      delete m.drawings;
+    }
     const e = M[key];
     const problems = modelShapeProblems(m, Math.round(e.footprint[0] * e.footprint[1]));
     if (problems.length) throw new Error(`${key}: ${problems.join('; ')}`);
@@ -327,7 +351,7 @@ function edit(key: string, fn: (m: SeatModel) => void) {
 
 /** One seat's state in text: its parts, sitting points, and per facing its fit and problems. */
 function show(key: string) {
-  const m = readModels()[key];
+  const m = (editedModels ?? readModels())[key];
   if (!m) {
     console.log(`${key}: no model`);
     return;
@@ -366,8 +390,8 @@ if (cmd('--fit')) {
     }
     const t0 = Date.now();
     const r = fitModel(fitInput(key), refine && had ? had.parts : undefined);
-    const model: SeatModel = { ...r.model, sits: refine && had ? had.sits : r.model.sits, fitted: today(), ...(had?.note ? { note: had.note } : {}) };
-    withModels((ms) => {
+    const model: SeatModel = { ...r.model, ...(had?.surfaces ? { surfaces: structuredClone(had.surfaces) } : {}), sits: refine && had ? had.sits : r.model.sits, fitted: today(), ...(had?.note ? { note: had.note } : {}) };
+    editModels((ms) => {
       ms[key] = tidyModel(model);
     });
     console.log(`${key}: fitted in ${((Date.now() - t0) / 1000).toFixed(1)}s  IoU ${MODEL_FACINGS.map((f) => `${f} ${r.ious[f]?.toFixed(3)}`).join('  ')}`);
@@ -429,13 +453,13 @@ if (cmd('--fit')) {
 } else if (cmd('--review')) {
   const key = arg('--review') ?? '';
   if (!KEYS.includes(key)) throw new Error(`no seat ${key}`);
-  withModels((ms) => {
+  editModels((ms) => {
     const m = ms[key];
     if (!m) throw new Error(`${key}: no model`);
     m.reviewed = today();
     m.drawings = Object.fromEntries(MODEL_FACINGS.map((f) => [f, modelView(M, key, f, m).print]));
   });
-  console.log(`${key}: reviewed ${today()}`);
+  console.log(`${key}: review metadata dated ${today()}; independent pixel evidence remains required for publication.`);
 } else if (cmd('--list')) {
   const models = readModels();
   for (const key of KEYS) {

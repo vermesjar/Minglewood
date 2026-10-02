@@ -121,12 +121,21 @@ describe('drafts on disk', () => {
     // the day it's passed is the draft's; the model's own stamps are written at publish (scripts/lab-model.ts)
     expect(kept.model.reviewed).toBeUndefined();
     expect(cleanSeatModel({ model: { ...model, parts: [] }, for: 'sig' })).toBeNull();
+    // A body-contact policy without semantic surfaces must be rejected, not silently erased.
+    expect(() => cleanSeatModel({ model: { ...model, bodyContact: { version: 1 } }, for: 'sig' })).toThrow();
   });
 
   it('keeps nothing of how seats were rigged and calibrated before their models', () => {
     // a draft saved by the old Lab: its rig, its calibration and the catalog's hip depths go on its next save
     const f = cleanFurniture({ category: 'seating', seatRig: { views: {} }, seatCalibration: { cushion: [1, 2] }, catalogProfile: { seatDepth: 0 } } as never);
-    expect(Object.keys(f).filter((k) => /seat|profile|calibration/i.test(k)).sort()).toEqual(['seat', 'seatModel']);
+    expect(Object.keys(f).filter((k) => /seat|profile|calibration/i.test(k)).sort()).toEqual(['seat', 'seatKind', 'seatModel']);
+  });
+
+  it('supplies mechanics from a seating type without calibration fields', () => {
+    expect(cleanFurniture({ category: 'seating', seatKind: 'beanbag' })).toMatchObject({ seat: 6, sitStyle: 'floor', backrest: true, arms: false });
+    expect(cleanFurniture({ category: 'seating', seatKind: 'couch' })).toMatchObject({ footprint: [2, 1], seat: 10, sitStyle: 'lounge', arms: true });
+    expect(cleanFurniture({ category: 'seating', seatKind: 'floor-cushion' })).toMatchObject({ height: 3, seat: 3, sitStyle: 'floor', backrest: false });
+    expect(cleanFurniture({ category: 'seating', seatKind: 'chair', arms: true })).toMatchObject({ arms: true });
   });
 
   it('clamps a spec to what the pipeline accepts', () => {
@@ -141,6 +150,32 @@ describe('drafts on disk', () => {
 describe('checks on one draft never overlap', () => {
   let root: string;
   afterEach(() => rmSync(root, { recursive: true, force: true }));
+
+  it('resumes seating checks on existing beauty and returns pending quality as structured progress', async () => {
+    root = mkdtempSync(join(tmpdir(), 'lab-'));
+    const store = new DraftStore(root);
+    const seat = store.create({ kind: 'furniture', key: 'seat-retry', furniture: { category: 'seating' } });
+    const lamp = store.create({ kind: 'furniture', key: 'lamp-retry' });
+    const calls: string[][] = [];
+    const run = async (args: string[]) => {
+      calls.push(args);
+      return { code: 1, result: { problems: ['Transition visual evidence remains pending.'] } };
+    };
+    const server = express().use('/lab', devLabRoutes(root, { run })).listen(0);
+    try {
+      const port = (server.address() as AddressInfo).port;
+      const headers = { 'x-lab': '1', origin: 'http://localhost:5196' };
+      const response = await fetch(`http://127.0.0.1:${port}/lab/drafts/${seat.id}/seat-review`, { method: 'POST', headers });
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ problems: ['Transition visual evidence remains pending.'] });
+      expect(calls[0][0]).toBe('furniture-surfaces');
+      expect(calls[0]).toContain('http://localhost:5196');
+      expect(calls[0]).not.toContain('furniture-generate');
+      const unsupported = await fetch(`http://127.0.0.1:${port}/lab/drafts/${lamp.id}/seat-review`, { method: 'POST', headers });
+      expect(unsupported.status).toBe(400);
+      expect(calls).toHaveLength(1);
+    } finally { server.close(); }
+  });
 
   it('five checks fired at once all answer, and the art tool never runs two at a time', async () => {
     root = mkdtempSync(join(tmpdir(), 'lab-'));

@@ -11,12 +11,12 @@
  * before anyone passes it. Pure: pixels in, a model out (the model tools and the Design Lab's auto-fit share it).
  */
 import type { Facing } from '@shared/world/scene';
-import type { SitStyle } from '@shared/world/seats';
-import { boxHull, cushionTop, seatSpan, standardSitV, tidyModel, type ModelPart, type PartKind, type SeatModel, type SitPoint } from '@shared/world/seatModels';
+import type { SitStyle, SeatKind } from '@shared/world/seats';
+import { backFace, boxHull, cushionTop, seatSpan, standardSitV, SIT_GAP, tidyModel, type ModelPart, type PartKind, type SeatModel, type SitPoint } from '@shared/world/seatModels';
 import { filledSilhouette } from './seatModel';
 import type { Pixels } from './footing';
 
-export type Family = 'chair' | 'armchair' | 'couch' | 'stool' | 'bench' | 'beanbag' | 'ottoman' | 'throne';
+export type Family = SeatKind;
 
 export function familyOf(key: string): Family {
   if (/^heirloom-throne/.test(key)) return 'throne';
@@ -36,6 +36,8 @@ export interface FitView {
 
 export interface FitInput {
   key: string;
+  /** Semantic family; arbitrary catalog names must not change the mechanics. */
+  family?: Family;
   size: [number, number];
   /** The cushion's height (the seat profile's `seat`, world px). */
   seat: number;
@@ -59,6 +61,8 @@ interface TBox {
   fixed?: Array<'u0' | 'u1' | 'v0' | 'v1' | 'z0' | 'z1'>;
   /** A leg that runs on up past the seat (a bentwood chair's back legs become the back's posts). */
   post?: boolean;
+  /** Two silhouette pieces of ONE arched back, never independent obstacles. */
+  arch?: { group: number; cap: boolean };
 }
 
 /** The family's boxes, in proportions a first look at the catalog suggests (the fit moves them). */
@@ -101,6 +105,7 @@ export function template(f: Family, W: number, D: number, zc: number, height: nu
       T.push({ part: 'seat', u: [0.36, W - 0.36], v: [0.28, D - 0.28], z: [zc - 3, zc], sym: 'centre', fixed: ['z1'] });
       legs(0.3, 0.3, D - 0.3, 0.04, zc - 3);
       if (backrest) T.push({ part: 'back', u: [0.3, W - 0.3], v: [D - 0.34, D - 0.28], z: [zc, top], sym: 'centre' });
+      if (arms) T.push({ part: 'arm', u: [0.2, 0.28], v: [0.24, D - 0.3], z: [zc, zc + 6], sym: 'pair' });
       break;
     }
     case 'bench': {
@@ -121,6 +126,10 @@ export function template(f: Family, W: number, D: number, zc: number, height: nu
       legs(0.22, 0.22, D - 0.22, 0.04, 1.5);
       break;
     }
+    case 'floor-cushion': {
+      T.push({ part: 'seat', u: [0.15, W - 0.15], v: [0.15, D - 0.15], z: [0, zc], sym: 'centre', fixed: ['z0', 'z1'] });
+      break;
+    }
   }
   return T;
 }
@@ -132,6 +141,7 @@ export function template(f: Family, W: number, D: number, zc: number, height: nu
 export interface Variant {
   roundSeat?: boolean;
   archBack?: boolean;
+  stoolBase?: 'pedestal' | 'splayed' | 'casters';
 }
 
 export function applyVariant(T: TBox[], v: Variant): TBox[] {
@@ -144,8 +154,9 @@ export function applyVariant(T: TBox[], v: Variant): TBox[] {
       out.push({ ...b, u: [b.u[0] + du, b.u[1] - du], v: [b.v[0], b.v[1]], fixed: [...(b.fixed ?? [])] });
     } else if (v.archBack && b.part === 'back' && b.sym === 'centre') {
       const zm = b.z[0] + (b.z[1] - b.z[0]) * 0.65;
-      out.push({ ...b, u: [b.u[0], b.u[1]], v: [b.v[0], b.v[1]], z: [b.z[0], zm], fixed: [...(b.fixed ?? [])] });
-      out.push({ ...b, u: [b.u[0] + 0.06, b.u[1] - 0.06], v: [b.v[0], b.v[1]], z: [zm, b.z[1]], fixed: [...(b.fixed ?? [])] });
+      const group = out.length;
+      out.push({ ...b, arch: { group, cap: false }, u: [b.u[0], b.u[1]], v: [b.v[0], b.v[1]], z: [b.z[0], zm], fixed: [...(b.fixed ?? [])] });
+      out.push({ ...b, arch: { group, cap: true }, u: [b.u[0] + 0.06, b.u[1] - 0.06], v: [b.v[0], b.v[1]], z: [zm, b.z[1]], fixed: [...(b.fixed ?? [])] });
     } else out.push({ ...b, u: [b.u[0], b.u[1]], v: [b.v[0], b.v[1]], z: [b.z[0], b.z[1]], fixed: [...(b.fixed ?? [])] });
   }
   return out;
@@ -186,6 +197,22 @@ export function asTemplate(parts: ModelPart[], W: number): TBox[] {
       T.push({ part: p.part, u: [lo.u[0], lo.u[1]], v: [p.v[0], p.v[1]], z: [p.z[0], p.z[1]], sym: 'pair', fixed, post });
     } else T.push({ part: p.part, u: [p.u[0], p.u[1]], v: [p.v[0], p.v[1]], z: [p.z[0], p.z[1]], sym: 'free', fixed, post });
   });
+  // A saved valid stack retains its topology when refined. Do not infer this
+  // relation from merely nearby or intersecting backs: those may be reclined
+  // surfaces, or an already-invalid legacy fit requiring a fresh compilation.
+  for (let i = 0; i < T.length; i++) {
+    const base = T[i];
+    if (base.part !== 'back' || base.sym !== 'centre' || base.arch) continue;
+    const caps = T.filter(p => p !== base && p.part === 'back' && p.sym === 'centre' && !p.arch &&
+      Math.abs(p.z[0] - base.z[1]) < 1e-8 && p.u[0] >= base.u[0] &&
+      p.v.every((v, j) => Math.abs(v - base.v[j]) < 1e-8));
+    if (caps.length === 1) {
+      base.arch = { group: i, cap: false };
+      caps[0].arch = { group: i, cap: true };
+      caps[0].v = [...base.v];
+      caps[0].z[0] = base.z[1];
+    }
+  }
   return T;
 }
 
@@ -337,8 +364,9 @@ export function placeSits(parts: ModelPart[], size: [number, number], hintU?: nu
 export function fitModel(input: FitInput, from?: ModelPart[], opts: { rounds?: number; shakes?: number; variant?: Variant } = {}): FitResult {
   if (from || opts.variant) return fitOnce(input, from, opts);
   let best: FitResult | null = null;
-  const fam = familyOf(input.key);
+  const fam = input.family ?? familyOf(input.key);
   const variants: Variant[] = [{}];
+  if (fam === 'stool') variants.push({ stoolBase: 'pedestal' }, { stoolBase: 'splayed' }, { stoolBase: 'casters' });
   if (fam === 'chair' || fam === 'stool' || fam === 'throne') variants.push({ roundSeat: fam !== 'stool' });
   if (input.backrest && fam !== 'beanbag') variants.push({ archBack: true }, { roundSeat: fam === 'chair', archBack: true });
   for (const variant of variants) {
@@ -360,11 +388,50 @@ function fitOnce(input: FitInput, from: ModelPart[] | undefined, opts: { rounds?
     // the back vertex is at the anchor on the floor; the far top corner of a box of height h draws 2h above it
     if (Number.isFinite(top)) height = Math.max(height, (P.anchor[1] - top) / 2);
   }
-  const T = from ? asTemplate(from, W) : applyVariant(template(familyOf(input.key), W, D, input.seat, height, input.backrest, input.arms), opts.variant ?? {});
+  const T = from ? asTemplate(from, W) : applyVariant(template(input.family ?? familyOf(input.key), W, D, input.seat, height, input.backrest, input.arms), opts.variant ?? {});
+  if (!from && opts.variant?.stoolBase) {
+    // Round seats have a narrow axis at the tips and a broad centre. Their support
+    // may be a column, splayed legs, or a caster base; choose by the drawings.
+    for (let i = T.length - 1; i >= 0; i--) if (T[i].part === 'leg') T.splice(i, 1);
+    const zc = input.seat;
+    const base = opts.variant.stoolBase;
+    const box = (part: PartKind, u: [number, number], v: [number, number], z: [number, number], sym: TBox['sym'] = 'centre') => T.push({ part, u, v, z, sym, fixed: z[0] === 0 ? ['z0'] : [] });
+    const disc = (radius: number, z: [number, number]) => {
+      box('base', [W / 2 - radius, W / 2 + radius], [D / 2 - radius * 0.6, D / 2 + radius * 0.6], z);
+      box('base', [W / 2 - radius * 0.6, W / 2 + radius * 0.6], [D / 2 - radius, D / 2 + radius], z);
+    };
+    disc(0.2, [zc * 0.33, zc * 0.33 + 1.2]);
+    if (base === 'splayed') {
+      for (let level = 0; level < 3; level++) {
+        const inset = 0.24 + level * 0.025;
+        for (const v of [inset, D - inset - 0.045]) box('leg', [inset, inset + 0.045], [v, v + 0.045], [level * (zc - 2.5) / 3, (level + 1) * (zc - 2.5) / 3], 'pair');
+      }
+    } else {
+      box('base', [W / 2 - 0.045, W / 2 + 0.045], [D / 2 - 0.045, D / 2 + 0.045], [1, zc - 2.5]);
+      if (base === 'pedestal') disc(0.29, [0, 1.5]);
+      else {
+        box('leg', [0.2, 0.5], [0.47, 0.53], [0, 2], 'pair');
+        for (const v of [0.28, 0.66]) box('leg', [0.25, 0.44], [v, v + 0.06], [0, 2], 'pair');
+      }
+    }
+  }
   const bufs = views.map((P) => new Uint8Array(P.w * P.h));
   const topBufs = views.map((P) => new Array(T.length * 2 + 2).fill(0).map(() => new Int16Array(P.w)));
   const evaluate = () => {
     const parts = expand(T, W);
+    // Silhouette agreement cannot buy an unsupported sitting pose. A proxy
+    // can otherwise grow its cushion forward to explain an arm/base outline,
+    // then silently pull the sitter away from the back to satisfy thigh reach.
+    // Keep infeasible candidates below every image score, with a continuous
+    // distance so an initially infeasible template can descend toward support.
+    if (parts.some(p => p.part === 'back')) {
+      let unsupported = 0;
+      for (const [u, v, z] of placeSits(parts, input.size, input.hintU)) {
+        const back = backFace({ parts }, u, z);
+        if (back !== null) unsupported += Math.max(0, Math.abs(back - v - SIT_GAP) - 1 / 32);
+      }
+      if (unsupported > 0) return -100 - unsupported;
+    }
     let sum = 0;
     let worst = 1;
     let terr = 0;
@@ -382,11 +449,17 @@ function fitOnce(input: FitInput, from: ModelPart[] | undefined, opts: { rounds?
     for (const k of ['u0', 'u1', 'v0', 'v1', 'z0', 'z1'] as Key[]) {
       if (b.fixed?.includes(k)) continue;
       if (b.sym === 'centre' && k === 'u1') continue;
+      if (b.arch?.cap && (k === 'v0' || k === 'v1' || k === 'z0')) continue;
       params.push({ b, k });
     }
   const get = (b: TBox, k: Key) => (k[0] === 'u' ? b.u : k[0] === 'v' ? b.v : b.z)[k[1] === '0' ? 0 : 1];
   const set = (b: TBox, k: Key, x: number) => {
     ((k[0] === 'u' ? b.u : k[0] === 'v' ? b.v : b.z) as number[])[k[1] === '0' ? 0 : 1] = x;
+    if (b.arch) {
+      const peer = T.find(p => p !== b && p.arch?.group === b.arch!.group)!;
+      if (k === 'v0' || k === 'v1') peer.v[k === 'v0' ? 0 : 1] = x;
+      if (!b.arch.cap && k === 'z1') peer.z[0] = x;
+    }
   };
   // the seat's structure holds whatever the silhouettes say: legs stand under the seat (a post may run on up into
   // the back), a back stands behind the front of the cushion and rises above it, arms rise above it
@@ -395,12 +468,24 @@ function fitOnce(input: FitInput, from: ModelPart[] | undefined, opts: { rounds?
     if (b.u[0] >= b.u[1] - 0.01 || b.v[0] >= b.v[1] - 0.01 || b.z[0] >= b.z[1] - 0.3) return false;
     if (b.sym === 'centre' && (b.u[0] < -0.3 || b.u[0] > W / 2 - 0.01)) return false;
     if (b.u[0] < -0.3 || b.u[1] > W + 0.3 || b.v[0] < -0.3 || b.v[1] > D + 0.3 || b.z[0] < 0) return false;
-    if (b.part === 'seat' && b.z[1] < 1) return false;
+    if (b.part === 'seat' && (b.z[1] < 1 || b.v[1] - b.v[0] < (seats.length === 1 ? 0.3 : 0.08) || (b.sym === 'centre' ? W - 2 * b.u[0] : b.u[1] - b.u[0]) < (seats.length === 1 ? Math.max(0.36, W - 0.8) : 0.08))) return false;
     const seatBottom = Math.min(...seats.map((s) => s.z[0]));
     const seatFront = Math.min(...seats.map((s) => s.v[0]));
     if (b.part === 'leg' && !b.post && b.z[1] > seatBottom + 1) return false;
+    // A frame supports the cushion; it cannot grow up through its occupant to
+    // explain pixels that belong to the arms or back.
+    if (b.part === 'base' && b.z[1] > input.seat) return false;
     if (b.part === 'back' && (b.v[0] < seatFront + 0.2 || b.z[1] < input.seat + 3)) return false;
     if (b.part === 'arm' && b.z[1] < input.seat + 1) return false;
+    // Arms remain at the outer ends. Silhouette overlap must never be improved by
+    // sliding an arm through the sitter or across to its mirrored partner.
+    if (b.part === 'arm' && b.sym === 'pair' && (b.u[1] > Math.min(0.34, W / 2 - 0.17) || b.u[0] < -0.15)) return false;
+    if (b.arch) {
+      const base = T.find(p => p.arch?.group === b.arch!.group && !p.arch.cap)!;
+      const cap = T.find(p => p.arch?.group === b.arch!.group && p.arch.cap)!;
+      if (cap.u[0] < base.u[0] || cap.z[0] !== base.z[1] || cap.z[1] <= cap.z[0] + 0.3 || base.z[1] <= base.z[0] + 0.3) return false;
+      if (cap.v[0] !== base.v[0] || cap.v[1] !== base.v[1]) return false;
+    }
     return true;
   };
   const allValid = () => T.every(valid);

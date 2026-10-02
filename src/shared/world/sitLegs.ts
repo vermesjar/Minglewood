@@ -11,10 +11,8 @@
  *   toe    how far forward of the knees the feet are (tiles): the shins lean out a little
  *   hang   how far the soles are off the floor (world px): 0 when the shins reach it, else they hang (a stool)
  *   hidden seen from behind, the seat's back rises past the sitter's head (BACK_HIDES: a throne), hiding them
- * Seen from behind the legs run away from the camera: the thighs lie out along the seat to the knees whatever the
- * seat, so a sitter reads as facing the way the seat does (without them, someone in a single chair seen from behind
- * looked turned against it), and nothing shows below the knees (avatarFrame BackLegs). A back that hides the sitter,
- * or a chair tall enough that the feet hang, tucks the legs out of sight.
+ * Seen from behind the thighs run away from the camera. The shins and shoes remain complete; furniture depth
+ * determines which pixels are visible through an open frame or behind solid upholstery.
  * The avatar kit projects these with the world's own projection (32 px across and 16 px down per tile, 2 px up per
  * world px), so a thigh pointing toward the camera reads foreshortened at the floor's 2:1, never as a leg stuck out
  * sideways.
@@ -80,11 +78,21 @@ export function legsFor(m: Pick<SeatModel, 'parts'>, s: SitPoint, style: SitStyl
   const [u, v, z] = s;
   const base = NATURAL_LEGS[style];
   const kneeZ = z + THIGH_R + base.rise;
-  const drop = Math.max(2, Math.min(SHIN_MAX, kneeZ));
+  let drop = Math.max(2, Math.min(SHIN_MAX, kneeZ));
   const knee = frontAt(m, u, v, kneeZ - drop, kneeZ) - KNEE_OUT;
   const reach = Math.max(REACH_MIN, Math.min(REACH_MAX, v - knee));
+  let toe = base.toe;
+  if (style === 'stool') {
+    // A broad, shallow platform below a tall seat is a footring, not its stem.
+    // Rest the feet on it only when both the shin length and ankle reach allow it.
+    const rest = m.parts.filter((p) => p.part === 'base' && p.u[1] - p.u[0] >= 0.24 && p.v[1] - p.v[0] >= 0.24
+      && p.z[1] - p.z[0] <= 3 && p.z[1] > 1 && p.z[1] <= kneeZ - 2 && p.z[1] >= kneeZ - SHIN_MAX
+      && u >= p.u[0] && u <= p.u[1] && Math.abs(v - reach - p.v[0]) <= 0.18)
+      .sort((a, b) => b.z[1] - a.z[1])[0];
+    if (rest) { drop = kneeZ - rest.z[1]; toe = v - reach - rest.v[0]; }
+  }
   const hidden = m.parts.some((p) => (p.part === 'back' || p.part === 'wrap') && u >= p.u[0] && u <= p.u[1] && p.z[1] - z >= BACK_HIDES);
-  return { reach: round(reach, 100), rise: base.rise, drop: round(drop, 2), toe: base.toe, hang: round(Math.max(0, kneeZ - drop), 2), ...(hidden ? { hidden } : {}) };
+  return { reach: round(reach, 100), rise: base.rise, drop: round(drop, 20), toe: round(toe, 1000), hang: round(Math.max(0, kneeZ - drop), 20), ...(hidden ? { hidden } : {}) };
 }
 
 /** Where the knees are in the seat's depth (local v) for someone sitting at `s` with these legs. */

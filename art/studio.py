@@ -44,6 +44,7 @@ import json
 import os
 import shutil
 import subprocess
+import tempfile
 import sys
 import time
 from pathlib import Path
@@ -1057,6 +1058,9 @@ def cmd_build(a):
                 raise SystemExit("refusing to publish: the pieces above break the model spec (docs/furniture.md): "
                                  "add their missing views, fix their placement, or give their \"model\" "
                                  "(category, rooms); --partial publishes one side of a turnaround at a time")
+            compile_publication_seats({key: m["sprites"][key] for key in touched}, stage=stage)
+            for key in touched:
+                m["sprites"][key].pop("seatVerification", None)
             write_staged(stage)
             save_manifest(m)
     if previews:
@@ -1109,6 +1113,8 @@ def cmd_publish(a):
             for p_ in problems:
                 print("  !", p_)
             raise SystemExit("refusing to publish (see docs/furniture.md); --partial to publish one side of a turnaround")
+        compile_publication_seats({a.key: e}, stage=stage)
+        e.pop("seatVerification", None)
         write_staged(stage)
         save_manifest(manifest)
     print(f"published {a.key}{' (' + a.facing + ')' if a.facing else ''} -> sprites/{fname} {im.size}")
@@ -1125,8 +1131,23 @@ VIEWS = {"radial": [None], "flat": [None], "fixed": [None], "mirror": ["se", "nw
 DRAW_FIELDS = ("key", "prompt", "prompts", "width", "fill", "fit", "colors", "quality", "nudge")
 
 
-def seat_family(key: str) -> str:
+def seat_family(key: str, spec: dict | None = None) -> str:
     """The seat family a key belongs to (seatModelFit.ts familyOf): which SEATING TYPE it is drawn and fitted as."""
+    if spec is not None:
+        if spec.get("seatKind") in ("chair", "armchair", "couch", "bench", "stool", "ottoman", "beanbag", "floor-cushion", "throne"):
+            return spec["seatKind"]
+        style = spec.get("sitStyle", "chair")
+        if style == "floor":
+            return "beanbag" if spec.get("backrest") else "floor-cushion"
+        if style == "stool":
+            return "stool"
+        if spec.get("footprint", [1, 1])[0] > 1:
+            return "couch" if style == "lounge" else "bench"
+        if style == "lounge":
+            return "armchair"
+        if not spec.get("backrest") and not spec.get("arms"):
+            return "ottoman"
+        return "chair"
     if key.startswith("heirloom-throne"):
         return "throne"
     for fam in ("armchair", "couch", "sofa", "stool", "bench", "beanbag", "ottoman", "pouf"):
@@ -1152,7 +1173,7 @@ def cmd_lab_generate(a):
     if seating:
         sys.path.insert(0, str(HERE))
         from prompts import SEAT_FAMILIES  # noqa: PLC0415
-        fam = seat_family(key)
+        fam = seat_family(key, spec)
     items = []
     for f in views:
         # each view is drawn on the tiles it covers facing that way (models.ts footprintFacing)
@@ -1235,6 +1256,40 @@ def cmd_check(a):
     emit(res, 0 if res["ok"] else 1)
 
 
+def compile_publication_seats(entries: dict, sprites: Path | None = None, stage: list | None = None):
+    """All publication paths compile seating before touching public drawings.
+
+    A failed compilation stops publication. The catalog build independently checks
+    drawing/declaration fingerprints, so a partial filesystem failure cannot ship.
+    """
+    seats = {k: e for k, e in entries.items() if e.get("walk") == "seat" or e.get("seat") is not None}
+    if not seats:
+        return
+    with tempfile.TemporaryDirectory(prefix="minglewood-seats-") as temporary:
+        root = Path(temporary)
+        staged = root / "sprites"
+        staged.mkdir()
+        if sprites:
+            for e in seats.values():
+                for rec in [e, *(e.get("facings") or {}).values()]:
+                    if rec.get("file"):
+                        target = staged / rec["file"]
+                        target.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.copyfile(sprites / rec["file"], target)
+        for path, img in stage or []:
+            target = staged / Path(path).relative_to(PUBLIC / "sprites")
+            target.parent.mkdir(parents=True, exist_ok=True)
+            img.save(target)
+        entry_file = root / "entries.json"
+        entry_file.write_text(json.dumps(seats), encoding="utf-8")
+        result = subprocess.run(["node", "--no-maglev", *TSX, "scripts/seat-compile.ts",
+                                 "--entries", str(entry_file), "--sprites", str(staged),
+                                 "--keys", ",".join(seats), "--out", str(root / "review"), "--write"],
+                                cwd=REPO, capture_output=True, text=True, encoding="utf-8")
+        if result.returncode:
+            raise RuntimeError("Seating publication refused: " + (result.stderr or result.stdout)[-2000:])
+
+
 def cmd_lab_publish(a):
     entries = json.loads(Path(a.entries).read_text(encoding="utf-8"))
     sprites = Path(a.sprites)
@@ -1246,6 +1301,7 @@ def cmd_lab_publish(a):
         res = model_check(entries=entries, sprites=sprites)
         if not res["ok"]:
             emit({"ok": False, "published": [], "problems": res["problems"]}, 1)
+        compile_publication_seats(entries, sprites=sprites)
         for key, e in entries.items():
             for rec in [e, *(e.get("facings") or {}).values()]:
                 for f in (rec.get("file"), rec.get("glow")):
@@ -1253,7 +1309,7 @@ def cmd_lab_publish(a):
                         dst = PUBLIC / "sprites" / f
                         dst.parent.mkdir(parents=True, exist_ok=True)
                         shutil.copyfile(sprites / f, dst)
-            m["sprites"][key] = e
+            m["sprites"][key] = {k: v for k, v in e.items() if k != "seatVerification"}
         save_manifest(m)
     emit({"ok": True, "published": sorted(entries), "problems": {}})
 

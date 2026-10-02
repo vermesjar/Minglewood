@@ -47,16 +47,18 @@ watermark."""
 # cushion at the far edge of the footprint (never beside it), arms at the sides, legs inside the footprint. The back
 # view is the same three-quarter 2:1 view turned round, never a straight-on rear view.
 SEAT_FAMILIES = {
+    "floor-cushion": "A soft low floor cushion or meditation pillow, resting directly on the floor with no legs or back. "
+                     "The top is the green sitting plane. Leave clear floor in front for bent knees and feet.",
     "chair": "A single chair for one person: a cushion or seat pan filling most of the footprint with its top exactly at "
              "the green cushion plane, four legs inside the footprint, a backrest rising from the cushion's back edge, "
              "no arms unless described.",
     "armchair": "A single armchair for one person: a deep cushion with its top exactly at the green cushion plane, a thick "
                 "padded backrest rising from the cushion's back edge, padded arms of equal height along both sides, "
                 "short feet inside the footprint.",
-    "couch": "A two-seat sofa filling its two-tile footprint: one long cushion (or two side by side) with its top exactly "
+    "couch": "A sofa with one sitting place per tile across its footprint: one long cushion or individual cushions with its top exactly "
              "at the green cushion plane, a padded backrest along the whole back edge, matching arms at both ends, "
              "short feet inside the footprint.",
-    "bench": "A two-seat bench filling its two-tile footprint: a long flat seat with its top exactly at the green cushion "
+    "bench": "A bench with one sitting place per tile across its footprint: a long flat seat with its top exactly at the green cushion "
              "plane, on legs or a frame inside the footprint; a backrest along the back edge only if described.",
     "stool": "A round stool for one person, no back and no arms: a small round seat with its top exactly at the green "
              "cushion plane, on legs or a column centred in the footprint.",

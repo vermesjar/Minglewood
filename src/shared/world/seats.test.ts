@@ -86,7 +86,7 @@ describe('seat profiles', () => {
   });
 
   it('names every field the manifest carries for a seat', () => {
-    expect([...SEAT_FIELDS]).toEqual(['seat', 'sitStyle', 'backrest', 'arms']);
+    expect([...SEAT_FIELDS]).toEqual(['seat', 'sitStyle', 'backrest', 'arms', 'seatKind']);
   });
 });
 
@@ -124,32 +124,33 @@ describe('where each view sits you (seat models)', () => {
     sits: [[0.5, 0.35, 10]],
   };
 
-  it('sits you forward from the front and, from behind, by the kind of seat: in front of a thin back, inside a padded one, forward on a long one', async () => {
-    const { backSitV, BACK_GAP, seatKind, viewSits } = await import('./seatModels');
-    expect(viewSits(m, 'se')[0]).toEqual([0.5, 0.35, 10]);
-    expect(viewSits(m, 'ne')[0]).toEqual([0.5, backSitV(m, 0.5, 10), 10]);
-    // m's back is 0.25 deep: padded (a wingback) — the pelvis at the middle of its padding
-    expect(seatKind(m, 0.5, 10)).toBe('padded');
-    expect(backSitV(m, 0.5, 10)).toBeCloseTo((0.7 + 0.95) / 2);
-    // a thin back (a dining chair): just in front of it
-    const thin: SeatModel = { ...m, parts: [m.parts[0], { part: 'back', u: [0.1, 0.9], v: [0.7, 0.8], z: [10, 22] }] };
-    expect(seatKind(thin, 0.5, 10)).toBe('open');
-    expect(backSitV(thin, 0.5, 10)).toBeCloseTo(0.7 - BACK_GAP);
-    // a couch: forward onto the cushion, at the middle of its depth
-    const couch: SeatModel = { size: [2, 1], parts: [{ part: 'seat', u: [0, 2], v: [0.1, 0.7], z: [4, 10] }, { part: 'back', u: [0, 2], v: [0.7, 0.95], z: [10, 22] }], sits: [[0.5, 0.35, 10], [1.5, 0.35, 10]] };
-    expect(seatKind(couch, 0.5, 10)).toBe('long');
-    expect(backSitV(couch, 0.5, 10)).toBeCloseTo(0.4);
-    const stool: SeatModel = { size: [1, 1], parts: [{ part: 'seat', u: [0.3, 0.7], v: [0.3, 0.7], z: [20, 22] }], sits: [[0.5, 0.5, 22]] };
-    expect(seatKind(stool, 0.5, 22)).toBe('backless');
-    const own: SeatModel = { ...m, views: { ne: [[0.45, 0.6]] } };
-    expect(viewSits(own, 'ne')[0]).toEqual([0.45, 0.6, 10]);
-    expect(viewSits(own, 'nw')[0]).toEqual([0.5, backSitV(m, 0.5, 10), 10]);
+  it('projects the same sitting points in all four views', async () => {
+    const { viewSits } = await import('./seatModels');
+    for (const facing of ['se', 'sw', 'ne', 'nw'] as const) expect(viewSits(m, facing)[0]).toEqual(m.sits[0]);
   });
 
   it('puts the pelvis forward on a seat deeper than a thigh, knees at its front', async () => {
     const { standardSitV, SEAT_REACH } = await import('./seatModels');
-    // back against the backrest would leave the knees 0.6 tile behind the front: forward instead
-    expect(standardSitV(m, 0.5, 10)).toBeCloseTo(0.05 - 0.04 + SEAT_REACH);
+    const deep = structuredClone(m);
+    deep.parts[1].v = [0.95, 1];
+    expect(standardSitV(deep, 0.5, 10)).toBeCloseTo(0.05 - 0.04 + SEAT_REACH);
+  });
+
+  it('uses the original pelvis width for back contact without a contradictory short-thigh limit', async () => {
+    const { standardSitV, SIT_GAP, seatPlacementProblems } = await import('./seatModels');
+    const { legsFor, kneeV, KNEE_OUT } = await import('./sitLegs');
+    const chair: SeatModel = { size: [1, 1], parts: [
+      { part: 'seat', u: [0.2, 0.8], v: [0.2, 0.77], z: [9, 11.3] },
+      { part: 'back', u: [0.2, 0.8], v: [0.78, 0.86], z: [11.05, 21] },
+    ], sits: [] };
+    const v = standardSitV(chair, 0.5, 11.3)!;
+    expect(v + SIT_GAP).toBeCloseTo(0.78);
+    expect(v).toBeGreaterThan(0.56);
+    const sit: [number, number, number] = [0.5, v, 11.3];
+    expect(kneeV(sit, legsFor(chair, sit, 'chair'))).toBeCloseTo(0.2 - KNEE_OUT, 2);
+    expect(seatPlacementProblems({ ...chair, sits: [sit] })).toEqual([]);
+    expect(seatPlacementProblems({ ...chair, sits: [[0.5, 0.48, 11.3]] }).join()).toContain('too far forward');
+    expect(seatPlacementProblems({ ...chair, sits: [[0.5, 0.62, 11.3]] }).join()).toContain('intersects');
   });
 
   it('lays the legs from the seat: knees just past its front, feet on the floor when a shin reaches it', async () => {
@@ -181,27 +182,26 @@ describe('where each view sits you (seat models)', () => {
     expect(placeSits([{ ...couch[0], u: [0, 1] }], [1, 1])[0][0]).toBe(0.5);
   });
 
-  it('shows the legs from behind in every seat, so a sitter faces the way it does, unless its back hides them', async () => {
-    const { legsFor, BACK_HIDES } = await import('./sitLegs');
+  it('keeps complete bent legs in every view, even when the backrest will hide them', async () => {
+    const { legsFor } = await import('./sitLegs');
     const { frameFor } = await import('../../client/engine/sprites/avatarFrame');
-    const legs = legsFor(m, [0.5, 0.66, 10], 'chair');
-    expect(legs.hidden).toBeUndefined();
-    const back = frameFor('back', 'sit', 'a', false, legs);
-    // the thigh runs away from us (up the screen) out to the knee, and nothing below it
-    const reach = (f: ReturnType<typeof frameFor>) => f.legNear.m[0] - f.legNear.a[0];
-    expect(reach(back)).toBeGreaterThan(4);
-    expect(back.legNear.b).toEqual(back.legNear.m);
-    // a stool too
-    const stool = frameFor('back', 'sit-stool', 'a', false, { reach: 0.3, rise: -1.5, drop: 11, toe: 0.02, hang: 9 });
-    expect(reach(stool)).toBeGreaterThan(4);
-    expect(stool.legNear.b).toEqual(stool.legNear.m);
-    // a chair tall enough that the feet hang (a café chair), and a throne whose back rises past the sitter's head:
-    // the legs tucked out of sight
-    const tall = frameFor('back', 'sit', 'a', false, { reach: 0.3, rise: 0, drop: 11, toe: 0.03, hang: 7.5 });
-    expect(reach(tall)).toBeLessThan(reach(back));
-    const throne: SeatModel = { ...m, parts: [m.parts[0], { part: 'back', u: [0.1, 0.9], v: [0.7, 0.95], z: [10, 10 + BACK_HIDES + 1] }] };
-    const hid = legsFor(throne, [0.5, 0.66, 10], 'chair');
-    expect(hid.hidden).toBe(true);
-    expect(reach(frameFor('back', 'sit', 'a', false, hid))).toBeLessThan(reach(back));
+    for (const style of ['chair', 'stool', 'lounge', 'floor'] as const) {
+      const legs = legsFor(m, [0.5, 0.4, 10], style);
+      const pose = { chair: 'sit', stool: 'sit-stool', lounge: 'sit-lounge', floor: 'sit-floor' } as const;
+      for (const view of ['front', 'back'] as const) {
+        const F = frameFor(view, pose[style], 'a', false, { ...legs, hidden: true });
+        for (const l of [F.legNear, F.legFar]) {
+          expect(l.m[0]).toBeGreaterThan(l.a[0]);
+          expect(l.b[1]).toBeGreaterThan(l.m[1]);
+          expect(l.b[1] + 5 - l.m[1]).toBeCloseTo(2 * legs.drop + (view === 'back' ? -16 : 16) * legs.toe);
+        }
+      }
+    }
+  });
+
+  it('rotating a seat never moves the pelvis inside the backrest', async () => {
+    const { sitFor } = await import('./seatModels');
+    const s: [number, number, number] = [0.5, 0.35, 10];
+    for (const f of ['se', 'sw', 'ne', 'nw'] as const) expect(sitFor(m, s, f)).toEqual(s);
   });
 });

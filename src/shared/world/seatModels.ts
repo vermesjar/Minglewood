@@ -16,11 +16,8 @@
  *   wrap  what wraps round a sitter (a beanbag's rolled back)
  *   other anything else (a throne's crest)
  * `sits`: one sitting point per cushion, [u, v, z] — the middle of the underside of the sitter's pelvis, z the
- * cushion top under it — as the seat is seen from the FRONT. The figure's seat point (FIG seat row) is drawn exactly
- * where it projects. `backV`: per cushion, the pelvis's depth seen from BEHIND. The figure is small for its furniture, so
- * no one depth serves both views: from the front a sitter sits forward, knees at the front edge (the legs show); from
- * behind, deep under the backrest (it hides their hips; their head and shoulders show) — each view composed on its
- * own, as sprite games do (sitFor).
+ * cushion top under it. The figure's seat point is projected from that same physical point in every facing.
+ * Furniture occlusion, rather than a view-specific pelvis shift, determines what is visible.
  *
  * LOCAL → WORLD. Placed facing f, the seat covers w × d tiles (placedSize) from its footprint's back vertex, its
  * front edge on the side it faces (FACING_VEC), u turning with it (a rotation, never a mirror):
@@ -42,6 +39,8 @@
  */
 import type { AvatarLoadout } from '../domain/types';
 import type { Facing } from './scene';
+import { authoredMapProblems, type AuthoredSeatDepth } from './seatSurfaceAuthored';
+import { KNEE_OUT, REACH_MAX } from './sitLegs';
 
 /**
  * The people every seat is shown and checked with (sheets, checks, the live spec): short hair and a tee; long hair;
@@ -76,10 +75,77 @@ export interface ModelPart {
 
 export type SitPoint = [number, number, number];
 
+/** Source-pixel surface identity emitted with an asset, independent of its silhouette proxy.
+ * 0 means transparent; otherwise 1 + partIndex * 3 + face (0 top, 1 u side, 2 v side).
+ * All opaque pixels must be covered. Binding both the drawing and parts prevents stale labels.
+ */
+interface SeatSurfaceIdentity {
+  width: number;
+  height: number;
+  drawing: string;
+  modelParts: string;
+  labels: number[];
+}
+
+export type SeatSurfaceMap = (SeatSurfaceIdentity & { version: 1 }) |
+  (SeatSurfaceIdentity & { version: 2; authored: AuthoredSeatDepth });
+
+const authoredShapeCache = new WeakMap<SeatModel, { signature: string; problems: string[] }>();
+
+/** Structural transport validation; the drawing-aware renderer/compiler additionally checks alpha and pixels. */
+export function seatSurfaceShapeProblems(model: SeatModel): string[] {
+  const contactProblems = seatBodyContactProblems(model);
+  if (contactProblems.length) return contactProblems;
+  if (model.surfaces === undefined) return [];
+  if (!model.surfaces || typeof model.surfaces !== 'object' || Array.isArray(model.surfaces)) return ['Malformed seating surface maps.'];
+  const entries = Object.entries(model.surfaces);
+  if (!entries.length) return ['Seating surface maps are empty.'];
+  // Maps remain mutable in the Design Lab. Key by complete content, not object
+  // identity, so a warmed renderer never bypasses edited depth/profile validation.
+  const authored = entries.some(([, map]) => map?.version === 2);
+  // JSON serializes NaN/undefined array entries as null. Depth is nullable at
+  // transparent pixels, so reject that collision before looking up a cache key.
+  if (authored && entries.some(([, map]) => map?.version === 2 && Array.isArray(map.authored?.z) &&
+      map.authored.z.some(z => z !== null && (typeof z !== 'number' || !Number.isFinite(z)))))
+    return ['Authored depth contains a non-finite or malformed height.'];
+  const signature = authored ? JSON.stringify([model.size, model.parts, model.sits, model.views, model.over,
+    model.compiler, model.drawings, model.surfaces]) : '';
+  const cached = authored ? authoredShapeCache.get(model) : undefined;
+  if (cached?.signature === signature) return [...cached.problems];
+  const problems: string[] = [];
+  for (const [facing, map] of entries) {
+    if (!['se', 'sw', 'ne', 'nw'].includes(facing)) { problems.push(`Unknown surface map facing ${facing}.`); continue; }
+    if (!map || typeof map !== 'object' || (map.version !== 1 && map.version !== 2) ||
+        !Number.isInteger(map.width) || !Number.isInteger(map.height) || map.width < 1 || map.height < 1 || map.width * map.height > 1048576 ||
+        typeof map.drawing !== 'string' || !/^[a-f0-9]{8}$/.test(map.drawing) ||
+        map.modelParts !== JSON.stringify(model.parts) || !Array.isArray(map.labels) || map.labels.length !== map.width * map.height ||
+        !map.labels.every(n => Number.isInteger(n) && n >= 0 && n <= model.parts.length * 3))
+      problems.push(`${facing}: malformed or stale seating surface map.`);
+    else if (map.version === 2) problems.push(...authoredMapProblems(map, model, facing as Facing).map(p => `${facing}: ${p}`));
+  }
+  if (authored) {
+    const authoredMaps = entries.filter(([, map]) => map?.version === 2);
+    if (entries.length !== 4 || authoredMaps.length !== 4) problems.push('Authored depth requires all four explicit source views.');
+    const identities = authoredMaps.map(([, map]) => map.version === 2 ? JSON.stringify([map.authored?.profile, map.authored?.geometry, map.authored?.style, map.authored?.generatorSha256, map.authored?.sourceInputsSha256]) : '');
+    if (new Set(identities).size > 1) problems.push('Authored source views disagree on their physical profile or provenance.');
+    authoredShapeCache.set(model, { signature, problems: [...problems] });
+  }
+  return problems;
+}
+
 export interface SeatModel {
+  /** Rebuild automatically when compiler or source pixels/declaration change. */
+  compiler?: { version: number; source: string };
+  /** Explicit reviewed migration of legacy geometry to original-body rear support depth.
+   * Does not claim that the fitted geometry was recompiled. New compiler v4 models
+   * already use this policy. Every change belongs to the mechanical identity.
+   */
+  bodyContact?: { version: 1 };
   /** [W, D]: the footprint as the catalog gives it (width across the front, depth front to back), tiles. */
   size: [number, number];
   parts: ModelPart[];
+  /** Generated surface maps for source views. Mirrored partner views resolve automatically. */
+  surfaces?: Partial<Record<Facing, SeatSurfaceMap>>;
   /** One per cushion: [u, v, z], seen from the front. */
   sits: SitPoint[];
   /**
@@ -105,6 +171,15 @@ export interface SeatModel {
 }
 
 export type SeatModels = Record<string, SeatModel>;
+
+export function seatBodyContactProblems(model: Partial<SeatModel>): string[] {
+  const policy = model.bodyContact;
+  if (policy === undefined) return [];
+  if (!policy || typeof policy !== 'object' || Array.isArray(policy) || policy.version !== 1 ||
+      Object.keys(policy).some(k => k !== 'version')) return ['Unsupported original-body seat contact policy.'];
+  if (!model.surfaces || !Object.keys(model.surfaces).length) return ['Original-body seat contact policy requires source-bound surface maps.'];
+  return [];
+}
 
 export const MODEL_FACINGS: Facing[] = ['se', 'sw', 'ne', 'nw'];
 /** Seen from behind: the camera looks from the south, so a sitter facing ne or nw has their back to it. */
@@ -307,60 +382,13 @@ export function sitsByCushion(m: Pick<SeatModel, 'size' | 'sits'>, f: Facing): A
   });
 }
 
-/**
- * THE KINDS OF SEAT, read off the model — what decides how a sitter is composed seen from BEHIND, where a square-on
- * figure meets the seat's own drawing of its back (no per-seat numbers: a new seat from the Lab gets the same
- * treatment as the catalog's):
- *   long     the cushion runs LONG_CUSHION or more across (a couch, a bench): the sitter forward onto the cushion,
- *            at the middle of its depth, their thighs out along it
- *   padded   a thick back (PADDED_BACK deep or more): a tub chair, a wingback, a throne — the drawing's padding
- *            wraps the sitter, so the pelvis sits inside the back's box, at its middle, and the torso rises out of
- *            the padding (a tub's rim is low but thick: it still swallows the hips)
- *   open     everything else (a dining chair, an office chair, a beanbag): on the cushion just in front of the back's
- *            face (BACK_GAP), the back rail across the lower back
- *   backless a stool, an ottoman: a little behind the cushion's middle
- * (Fitted to what read right in game across the catalog, 2026-09-30: sunk into a thin back a sitter read as standing
- * in the chair; perched in front of a thick one, as sitting too far forward with the padding behind them.)
- */
-export type SeatKind = 'long' | 'padded' | 'open' | 'backless';
-export const LONG_CUSHION = 1.2;
-export const PADDED_BACK = 0.25;
-export const BACK_GAP = 0.04;
-
-/** The back (or wrap) part behind a sitter at u on a cushion at z whose front face backFace found, if any. */
-function backPart(m: Pick<SeatModel, 'parts'>, u: number, z: number): ModelPart | null {
-  const face = backFace(m, u, z);
-  if (face === null) return null;
-  return m.parts.find((p) => (p.part === 'back' || p.part === 'wrap') && u >= p.u[0] - 0.02 && u <= p.u[1] + 0.02 && p.z[1] > z + 2 && p.v[0] === face) ?? null;
-}
-
-export function seatKind(m: Pick<SeatModel, 'parts'>, u: number, z: number): SeatKind {
-  const blocks = m.parts.filter((p) => p.part === 'seat' && p.z[1] >= z - 0.5 && u >= p.u[0] - 0.05 && u <= p.u[1] + 0.05);
-  if (blocks.length && Math.max(...blocks.map((p) => p.u[1])) - Math.min(...blocks.map((p) => p.u[0])) >= LONG_CUSHION) return 'long';
-  const back = backPart(m, u, z);
-  if (!back) return 'backless';
-  return back.v[1] - back.v[0] >= PADDED_BACK ? 'padded' : 'open';
-}
-
-/** Where the standard puts a sitter's pelvis in depth seen from BEHIND, at u on a cushion at z, by the seat's kind. */
-export function backSitV(m: Pick<SeatModel, 'parts'>, u: number, z: number): number | null {
-  const s = seatSpan(m, u);
-  if (!s) return null;
-  const kind = seatKind(m, u, z);
-  if (kind === 'padded') {
-    const b = backPart(m, u, z)!;
-    return (b.v[0] + b.v[1]) / 2;
-  }
-  if (kind === 'long') return (s.v0 + s.v1) / 2;
-  const back = backFace(m, u, z);
-  const v = kind === 'open' && back !== null ? back - BACK_GAP : (s.v0 + s.v1) / 2 + 0.1;
-  return Math.min(v, s.v1 - 0.05);
-}
-
-/** The sitting point a facing draws a cushion's sitter with, by the standard: its own from the front, just in front of the backrest from behind. */
+/** A rotation preserves the physical sitting point. */
 export function sitFor(m: Pick<SeatModel, 'parts'>, s: SitPoint, f: Facing): SitPoint {
-  if (!behindView(f)) return s;
-  return [s[0], backSitV(m, s[0], s[2]) ?? s[1], s[2]];
+  // A rotation cannot move someone's pelvis into the backrest. The same physical
+  // sitting point is projected in every view; occlusion is the renderer's job.
+  void m;
+  void f;
+  return s;
 }
 
 /**
@@ -412,11 +440,14 @@ export function frontEdge(m: Pick<SeatModel, 'parts'>, u: number): number {
 
 /**
  * HOW PEOPLE SIT (the standard): bottom back against the backrest, knees at the seat's front. A sitter's pelvis is
- * SIT_GAP (a torso's half-depth) in front of the back's front face, so their back rests against it; on a backless
+ * SIT_GAP (the authored pelvis's rear radius) in front of the back's front face, so their back rests against it; on a backless
  * seat, halfway across the seat block. Their knees are at the front of the seat, so their shins and feet hang in front
  * of it whatever the figure's own (short) thighs say; the thighs lie on the cushion between.
  */
-export const SIT_GAP = 0.1;
+// The original pelvis is 19 source pixels across. Convert its 9.5px radius
+// through the same authored body/world scales used by avatarSurfaceDepth.
+// A fixed .3-tile clearance left a visible unused strip behind the sitter.
+export const SIT_GAP = 9.5 / (4 / Math.sqrt(3)) / Math.sqrt(384);
 
 /** The front face of the back (or wrap) behind a sitter at u, sitting on a cushion at z: null for a backless seat. */
 export function backFace(m: Pick<SeatModel, 'parts'>, u: number, z: number): number | null {
@@ -440,9 +471,9 @@ export function seatSpan(m: Pick<SeatModel, 'parts'>, u: number): { v0: number; 
  * for its furniture, so on a seat deeper than that they sit forward, knees at the front, rather than back against the
  * backrest with their legs lost in the cushion.
  */
-export const SEAT_REACH = 0.36;
+export const SEAT_REACH = REACH_MAX;
 /** The knees stand this far past the seat's front (tiles): the shins clear its front face (sitLegs.ts KNEE_OUT). */
-const KNEE_PAST = 0.04;
+const KNEE_PAST = KNEE_OUT;
 
 /**
  * Where the standard puts a sitter's pelvis in depth, at u on a cushion at z: back against the backrest (SIT_GAP in
@@ -452,12 +483,35 @@ const KNEE_PAST = 0.04;
 export function standardSitV(m: Pick<SeatModel, 'parts'>, u: number, z: number): number | null {
   const back = backFace(m, u, z);
   const s = seatSpan(m, u);
-  const ideal = back !== null ? back - SIT_GAP : s ? (s.v0 + s.v1) / 2 : null;
+  const gap = m.parts.some(p => p.part === 'back') ? SIT_GAP : 0.1;
+  const ideal = back !== null ? back - gap : s ? (s.v0 + s.v1) / 2 : null;
   if (ideal === null || !s) return ideal;
   // the front of the cushion they sit on (the seat blocks level with it)
   const cushion = m.parts.filter((p) => p.part === 'seat' && u >= p.u[0] - 0.02 && u <= p.u[1] + 0.02 && p.z[1] >= z - 0.5);
   const front = cushion.length ? Math.min(...cushion.map((p) => p.v[0])) : s.v0;
-  return Math.min(ideal, front - KNEE_PAST + SEAT_REACH);
+  return Math.max(front + 0.02, Math.min(ideal, front - KNEE_PAST + SEAT_REACH));
+}
+
+/** Whole-pose support check, independent of a renderer's overlap winners.
+ * Curved authored wells use their declared contact surface and visual review.
+ * This checks rigid backrests against the original avatar's posterior radius. */
+export function seatPlacementProblems(m: SeatModel): string[] {
+  if (!m.parts.some(p => p.part === 'back') || Object.values(m.surfaces ?? {}).some(s => s.version === 2)) return [];
+  const problems: string[] = [];
+  const sourcePixel = 1 / 32;
+  m.sits.forEach(([u, v, z], cushion) => {
+    const back = backFace(m, u, z);
+    if (back === null) return;
+    const posteriorGap = back - v - SIT_GAP;
+    if (posteriorGap > sourcePixel)
+      problems.push(`cushion ${cushion}: the sitter is too far forward of the backrest (${posteriorGap.toFixed(3)} tile of unsupported posterior clearance)`);
+    else if (posteriorGap < -sourcePixel)
+      problems.push(`cushion ${cushion}: the pelvis intersects the rigid backrest by ${(-posteriorGap).toFixed(3)} tile`);
+    const span = seatSpan(m, u);
+    if (span && v - span.v0 + KNEE_OUT > REACH_MAX + sourcePixel)
+      problems.push(`cushion ${cushion}: the current leg pose cannot reach beyond the cushion front from this sitting point`);
+  });
+  return problems;
 }
 
 /**
@@ -524,6 +578,7 @@ export function modelShapeProblems(x: unknown, cushions?: number): string[] {
   const out: string[] = [];
   const m = x as Partial<SeatModel> | null;
   if (!m || typeof m !== 'object') return ['not an object'];
+  out.push(...seatBodyContactProblems(m));
   const num = (n: unknown) => typeof n === 'number' && Number.isFinite(n);
   const span = (s: unknown) => Array.isArray(s) && s.length === 2 && s.every(num) && (s[0] as number) <= (s[1] as number);
   if (!Array.isArray(m.size) || m.size.length !== 2 || !m.size.every((n) => num(n) && n > 0)) out.push('size: [W, D] in tiles');
@@ -551,7 +606,10 @@ export function tidyModel(m: SeatModel): SeatModel {
   const z = (n: number) => Math.round(n * 20) / 20;
   return {
     size: [m.size[0], m.size[1]],
+    ...(m.compiler ? { compiler: m.compiler } : {}),
+    ...(m.bodyContact ? { bodyContact: m.bodyContact } : {}),
     parts: m.parts.map((p) => ({ part: p.part, u: [t(p.u[0]), t(p.u[1])], v: [t(p.v[0]), t(p.v[1])], z: [z(p.z[0]), z(p.z[1])] })),
+    ...(m.surfaces ? { surfaces: m.surfaces } : {}),
     sits: m.sits.map(([u, v, h]) => [t(u), t(v), z(h)] as SitPoint),
     ...(m.over && Object.keys(m.over).length
       ? { over: Object.fromEntries(MODEL_FACINGS.filter((f) => m.over![f]).map((f) => [f, m.over![f]!.map((poly) => poly.map(([x, y]) => [Math.round(x * 2) / 2, Math.round(y * 2) / 2] as [number, number]))])) }

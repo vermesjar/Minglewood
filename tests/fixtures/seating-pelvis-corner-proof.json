@@ -1,0 +1,640 @@
+{
+  "context": {
+    "case": "cafe-30/ne/0",
+    "key": "couch.green",
+    "facing": "ne",
+    "pose": "sit-lounge",
+    "look": {
+      "skin": "#eab58d",
+      "hair": "hair.pixie",
+      "hairColor": "#5a3825",
+      "hairHighlight": "",
+      "eyes": "eyes.sleepy",
+      "eyeColor": "#5a3825",
+      "brows": "brows.soft",
+      "mouth": "mouth.grin",
+      "facialHair": "fh.mustache",
+      "faceDetail": "fd.none",
+      "headwear": "hat.none",
+      "headwearColor": "#3a3a46",
+      "eyewear": "eye.monocle",
+      "neck": "neck.bandana",
+      "neckColor": "#fff1a8",
+      "top": "top.cardigan",
+      "topColor": "#2bb3a3",
+      "topAccent": "#2bb3a3",
+      "topPattern": "pat.solid",
+      "bottom": "bottom.joggers",
+      "bottomColor": "#3a3a46",
+      "shoes": "shoes.slippers",
+      "shoesColor": "#9fe3e0",
+      "accessory": "acc.none",
+      "held": "held.popcorn",
+      "heldColor": "#fff1a8",
+      "pet": "pet.none",
+      "petColor": "#e8a15a",
+      "mobility": "mob.none",
+      "body": "body.a"
+    },
+    "legs": {
+      "reach": 0.4,
+      "rise": 0.5,
+      "drop": 11,
+      "toe": 0.05,
+      "hang": 1.15
+    },
+    "feet": [
+      42,
+      34
+    ],
+    "height": 11.65
+  },
+  "method": "Original fixture avatar only, rounded pelvis mask and its original4-neighbor outline; independent Euclidean orthographic ray intersections with conservative limb capsules. No seating renderer mask, depth map, or post-fix pixels used.",
+  "jointHeights": {
+    "hip": 11.65,
+    "knee": 12.15,
+    "ankle": 3.6500000000000004
+  },
+  "F": {
+    "view": "back",
+    "pose": "sit-lounge",
+    "body": "a",
+    "hold": [
+      59,
+      70
+    ],
+    "holdInFront": true,
+    "head": [
+      34,
+      43,
+      56,
+      65
+    ],
+    "hx": 45,
+    "hy": 54,
+    "crown": [
+      45,
+      43
+    ],
+    "hairline": 49,
+    "eyeNear": [
+      43,
+      54
+    ],
+    "eyeFar": [
+      49,
+      54
+    ],
+    "browY": 51,
+    "nose": [
+      52,
+      55
+    ],
+    "noseTip": [
+      56,
+      55
+    ],
+    "mouth": [
+      47,
+      59
+    ],
+    "ear": [
+      55,
+      53
+    ],
+    "chin": [
+      47,
+      64
+    ],
+    "collar": [
+      46,
+      65
+    ],
+    "shoulderY": 65,
+    "waistY": 83,
+    "hipY": 89,
+    "torso": [
+      [
+        37,
+        65
+      ],
+      [
+        54,
+        65
+      ],
+      [
+        56,
+        68
+      ],
+      [
+        54,
+        83
+      ],
+      [
+        37,
+        83
+      ],
+      [
+        35,
+        68
+      ]
+    ],
+    "armNear": {
+      "a": [
+        36,
+        68
+      ],
+      "m": [
+        36,
+        76
+      ],
+      "b": [
+        42,
+        81
+      ]
+    },
+    "armFar": {
+      "a": [
+        55,
+        68
+      ],
+      "m": [
+        58,
+        74
+      ],
+      "b": [
+        59,
+        68
+      ]
+    },
+    "handNear": [
+      42,
+      83
+    ],
+    "handFar": [
+      59,
+      70
+    ],
+    "legNear": {
+      "a": [
+        41,
+        89
+      ],
+      "m": [
+        53.8,
+        81.6
+      ],
+      "b": [
+        55.4,
+        97.8
+      ]
+    },
+    "legFar": {
+      "a": [
+        49,
+        88
+      ],
+      "m": [
+        61.8,
+        80.6
+      ],
+      "b": [
+        63.4,
+        96.8
+      ]
+    },
+    "heelNear": false,
+    "heelFar": false,
+    "sitting": true
+  },
+  "segments": [
+    {
+      "name": "nearthigh",
+      "a": [
+        10.594043137537245,
+        6.9198085233624775,
+        11.65
+      ],
+      "b": [
+        10.594043137537241,
+        -0.9185586535436939,
+        12.15
+      ],
+      "radius": 1.9052558883257649
+    },
+    {
+      "name": "nearshin",
+      "a": [
+        10.594043137537241,
+        -0.9185586535436939,
+        12.15
+      ],
+      "b": [
+        10.594043137537254,
+        -1.8983545506569572,
+        4.15
+      ],
+      "radius": 1.775352077758099
+    },
+    {
+      "name": "farthigh",
+      "a": [
+        12.431160444624629,
+        3.8579463448835054,
+        11.65
+      ],
+      "b": [
+        12.431160444624624,
+        -3.9804208320226664,
+        12.15
+      ],
+      "radius": 1.9052558883257649
+    },
+    {
+      "name": "farshin",
+      "a": [
+        12.431160444624624,
+        -3.9804208320226664,
+        12.15
+      ],
+      "b": [
+        12.431160444624638,
+        -4.960216729135929,
+        4.15
+      ],
+      "radius": 1.775352077758099
+    }
+  ],
+  "points": [
+    {
+      "x": 49,
+      "y": 20,
+      "figure": [
+        52,
+        90
+      ],
+      "owner": 20,
+      "rgba": [
+        53,
+        49,
+        64,
+        255
+      ],
+      "hipTouches": [
+        {
+          "figure": [
+            52,
+            90
+          ],
+          "insideOriginalPelvis": true
+        },
+        {
+          "figure": [
+            51,
+            90
+          ],
+          "insideOriginalPelvis": true
+        },
+        {
+          "figure": [
+            53,
+            90
+          ],
+          "insideOriginalPelvis": true
+        },
+        {
+          "figure": [
+            52,
+            89
+          ],
+          "insideOriginalPelvis": true
+        },
+        {
+          "figure": [
+            52,
+            91
+          ],
+          "insideOriginalPelvis": true
+        }
+      ],
+      "hits": [
+        {
+          "segment": "nearthigh",
+          "z": null
+        },
+        {
+          "segment": "nearshin",
+          "z": 8.409107202265009
+        },
+        {
+          "segment": "farthigh",
+          "z": 10.971625262967123
+        },
+        {
+          "segment": "farshin",
+          "z": null
+        }
+      ],
+      "frontmostLimbZ": 10.971625262967123,
+      "seatZ": 10.15,
+      "margin": -0.8216252629671228,
+      "winner": "avatar"
+    },
+    {
+      "x": 51,
+      "y": 21,
+      "figure": [
+        54,
+        91
+      ],
+      "owner": 6,
+      "rgba": [
+        53,
+        49,
+        64,
+        255
+      ],
+      "hipTouches": [
+        {
+          "figure": [
+            54,
+            91
+          ],
+          "insideOriginalPelvis": false
+        },
+        {
+          "figure": [
+            53,
+            91
+          ],
+          "insideOriginalPelvis": true
+        },
+        {
+          "figure": [
+            55,
+            91
+          ],
+          "insideOriginalPelvis": false
+        },
+        {
+          "figure": [
+            54,
+            90
+          ],
+          "insideOriginalPelvis": true
+        },
+        {
+          "figure": [
+            54,
+            92
+          ],
+          "insideOriginalPelvis": false
+        }
+      ],
+      "hits": [
+        {
+          "segment": "nearthigh",
+          "z": null
+        },
+        {
+          "segment": "nearshin",
+          "z": 8.022171311935566
+        },
+        {
+          "segment": "farthigh",
+          "z": null
+        },
+        {
+          "segment": "farshin",
+          "z": null
+        }
+      ],
+      "frontmostLimbZ": 8.022171311935566,
+      "seatZ": 10.15,
+      "margin": 2.127828688064435,
+      "winner": "avatar"
+    },
+    {
+      "x": 52,
+      "y": 21,
+      "figure": [
+        55,
+        91
+      ],
+      "owner": 6,
+      "rgba": [
+        53,
+        49,
+        64,
+        255
+      ],
+      "hipTouches": [
+        {
+          "figure": [
+            55,
+            91
+          ],
+          "insideOriginalPelvis": false
+        },
+        {
+          "figure": [
+            54,
+            91
+          ],
+          "insideOriginalPelvis": false
+        },
+        {
+          "figure": [
+            56,
+            91
+          ],
+          "insideOriginalPelvis": false
+        },
+        {
+          "figure": [
+            55,
+            90
+          ],
+          "insideOriginalPelvis": false
+        },
+        {
+          "figure": [
+            55,
+            92
+          ],
+          "insideOriginalPelvis": false
+        }
+      ],
+      "hits": [
+        {
+          "segment": "nearthigh",
+          "z": null
+        },
+        {
+          "segment": "nearshin",
+          "z": 7.9962927515866555
+        },
+        {
+          "segment": "farthigh",
+          "z": null
+        },
+        {
+          "segment": "farshin",
+          "z": null
+        }
+      ],
+      "frontmostLimbZ": 7.9962927515866555,
+      "seatZ": 10.15,
+      "margin": 2.153707248413345,
+      "winner": "furniture"
+    },
+    {
+      "x": 53,
+      "y": 22,
+      "figure": [
+        56,
+        92
+      ],
+      "owner": 6,
+      "rgba": [
+        53,
+        49,
+        64,
+        255
+      ],
+      "hipTouches": [
+        {
+          "figure": [
+            56,
+            92
+          ],
+          "insideOriginalPelvis": false
+        },
+        {
+          "figure": [
+            55,
+            92
+          ],
+          "insideOriginalPelvis": false
+        },
+        {
+          "figure": [
+            57,
+            92
+          ],
+          "insideOriginalPelvis": false
+        },
+        {
+          "figure": [
+            56,
+            91
+          ],
+          "insideOriginalPelvis": false
+        },
+        {
+          "figure": [
+            56,
+            93
+          ],
+          "insideOriginalPelvis": false
+        }
+      ],
+      "hits": [
+        {
+          "segment": "nearthigh",
+          "z": null
+        },
+        {
+          "segment": "nearshin",
+          "z": 7.39014073161097
+        },
+        {
+          "segment": "farthigh",
+          "z": null
+        },
+        {
+          "segment": "farshin",
+          "z": null
+        }
+      ],
+      "frontmostLimbZ": 7.39014073161097,
+      "seatZ": 10.15,
+      "margin": 2.7598592683890306,
+      "winner": "furniture"
+    },
+    {
+      "x": 54,
+      "y": 22,
+      "figure": [
+        57,
+        92
+      ],
+      "owner": 6,
+      "rgba": [
+        31,
+        25,
+        32,
+        255
+      ],
+      "hipTouches": [
+        {
+          "figure": [
+            57,
+            92
+          ],
+          "insideOriginalPelvis": false
+        },
+        {
+          "figure": [
+            56,
+            92
+          ],
+          "insideOriginalPelvis": false
+        },
+        {
+          "figure": [
+            58,
+            92
+          ],
+          "insideOriginalPelvis": false
+        },
+        {
+          "figure": [
+            57,
+            91
+          ],
+          "insideOriginalPelvis": false
+        },
+        {
+          "figure": [
+            57,
+            93
+          ],
+          "insideOriginalPelvis": false
+        }
+      ],
+      "hits": [
+        {
+          "segment": "nearthigh",
+          "z": null
+        },
+        {
+          "segment": "nearshin",
+          "z": 7.221834957580172
+        },
+        {
+          "segment": "farthigh",
+          "z": null
+        },
+        {
+          "segment": "farshin",
+          "z": null
+        }
+      ],
+      "frontmostLimbZ": 7.221834957580172,
+      "seatZ": 10.15,
+      "margin": 2.9281650424198284,
+      "winner": "furniture"
+    }
+  ]
+}

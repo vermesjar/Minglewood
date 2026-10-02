@@ -1,6 +1,7 @@
 /** The Design Lab shell: drafts, the library, and the spend meter. The URL hash remembers where you are. */
 import { useCallback, useEffect, useState } from 'react';
 import { CATEGORIES, type ModelCategory } from '@shared/models';
+import { SEAT_TYPES } from '@shared/world/seatTypes';
 import { lab, NAME_MAX, type DraftSummary, type PartKind, type Rotation, type Usage } from './api';
 import { usd } from './common';
 import { FurnitureEditor } from './FurnitureEditor';
@@ -46,6 +47,7 @@ function NewFurniture({ onMade }: { onMade: (id: string) => void }) {
   const [describe, setDescribe] = useState('');
   const [key, setKey] = useState('');
   const [category, setCategory] = useState<ModelCategory>('seating');
+  const [seatKind, setSeatKind] = useState(SEAT_TYPES[0].kind);
   const [rotation, setRotation] = useState<Rotation>('mirror');
   const [fp, setFp] = useState<[number, number]>([1, 1]);
   const [err, setErr] = useState<string | null>(null);
@@ -63,7 +65,9 @@ function NewFurniture({ onMade }: { onMade: (id: string) => void }) {
             kind: 'furniture',
             key: k,
             // the name is a short label of its own (blank: from the key); the description is the prompt
-            furniture: { name: name.trim(), prompt: describe.trim(), category: flat ? 'wall-art' : category, rotation, footprint: fp, height: category === 'seating' ? 34 : 40 },
+            furniture: { name: name.trim(), prompt: describe.trim(), category: flat ? 'wall-art' : category, rotation, footprint: fp,
+              height: category === 'seating' ? SEAT_TYPES.find(t => t.kind === seatKind)!.height : 40,
+              ...(category === 'seating' && !flat ? { seatKind, ...SEAT_TYPES.find(t => t.kind === seatKind)!.profile } : {}) },
           })
           .then((d) => onMade(d.id), (x: Error) => setErr(x.message));
       }}
@@ -73,7 +77,11 @@ function NewFurniture({ onMade }: { onMade: (id: string) => void }) {
       <input placeholder={`catalog key: ${k || 'bench-park.oak'}`} value={key} onChange={(e) => setKey(e.target.value.toLowerCase())} className="mono" />
       <textarea rows={2} placeholder="Describe it for the drawing (optional; you can add this later): materials, colours, details…" value={describe} onChange={(e) => setDescribe(e.target.value)} />
       <div className="row">
-        <select value={rotation === 'flat' ? 'wall-art' : category} disabled={rotation === 'flat'} onChange={(e) => setCategory(e.target.value as ModelCategory)} style={{ width: 'auto' }}>
+        <select value={rotation === 'flat' ? 'wall-art' : category} disabled={rotation === 'flat'} onChange={(e) => {
+          const next = e.target.value as ModelCategory;
+          setCategory(next);
+          if (next === 'seating') setFp([SEAT_TYPES.find(t => t.kind === seatKind)!.width, 1]);
+        }} style={{ width: 'auto' }}>
           {CATEGORIES.filter((c) => c !== 'building' && c !== 'wall-art').map((c) => (
             <option key={c}>{c}</option>
           ))}
@@ -86,21 +94,26 @@ function NewFurniture({ onMade }: { onMade: (id: string) => void }) {
             </button>
           ))}
         </div>
-        <div className="seg">
-          {(
-            [
+        {(category !== 'seating' || seatKind === 'couch' || seatKind === 'bench') && <div className="seg">
+          {((category === 'seating' ? [[2, 1], [3, 1], [4, 1]] : [
               [1, 1],
               [2, 1],
               [2, 2],
               [3, 1],
-            ] as Array<[number, number]>
-          ).map((f) => (
+            ]) as Array<[number, number]>).map((f) => (
             <button type="button" key={f.join()} className={fp.join() === f.join() ? 'on' : ''} onClick={() => setFp(f)}>
               {f.join('×')}
             </button>
           ))}
-        </div>
+        </div>}
       </div>
+      {category === 'seating' && rotation !== 'flat' && <label>Seating type
+        <select value={seatKind} onChange={e => {
+          const type = SEAT_TYPES.find(t => t.kind === e.target.value)!;
+          setSeatKind(type.kind); setFp([type.width, 1]);
+          if (type.profile.backrest) setRotation('mirror');
+        }}>{SEAT_TYPES.map(t => <option key={t.kind} value={t.kind}>{t.label}</option>)}</select>
+      </label>}
       {err && <p className="bad small">{err}</p>}
       <button className="btn primary" disabled={!k}>
         Start the draft

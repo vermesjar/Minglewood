@@ -17,7 +17,7 @@ every one of them**, and every model declares what it is, how it stands and how 
 | **Walking** | `walk` | `blocked`, `seat` (blocked, but the path ends on it to sit) or `open` (rugs, and wall art, which isn't on the floor). |
 | **Layer** | `layer` | `floor` is drawn beneath everything (rugs, blankets). `object` stands on the floor and is depth-sorted by its footprint. `surface` stands on another model's `surface`, is placed with that z and is drawn after its host (an espresso machine on a counter); it never goes on the bare floor. `wall` is painted into the wall. |
 | **Surfaces** | `surface?` | Things can stand on it at this z, in art px (a counter top is 20.5, `COUNTER_TOP`). |
-| **Seats** | the seat standard's `SEAT_FIELDS` | `seat` (the cushion's height, which seeds the fit), `sitStyle`, `backrest` and `arms` (`src/shared/world/seats.ts`). Seating has `walk: 'seat'` and `use` includes `sit`. A colour variant borrows its family's profile. How people sit in it is its entry in `art/seat-models.json`: a 3D model shared by all four facings, with per-drawing overrides where needed ([seats](#seats-how-people-sit)). |
+| **Seats** | the seat standard's `SEAT_FIELDS` | `seat` (the cushion's height, which seeds the fit), `sitStyle`, `backrest` and `arms` (`src/shared/world/seats.ts`). Seating has `walk: 'seat'` and `use` includes `sit`. A colour variant borrows its family's profile. How people sit in it is its entry in `art/seat-models.json`: a 3D model shared by all four facings, compiled automatically without per-drawing overrides ([seats](#seats-how-people-sit)). |
 | **Use** | `use?: { face, actions }` | `actions` lists the kinds of action it offers (`ObjectAction['kind']`). With `face: 'front'` it's used from the tiles in front of its working face, which is the way it faces. With `face: 'any'` it's used from any side (a bell, a pool table). |
 | **Light and life** | `light`, `glow`, `emitters`, `animated`, `still` | These are points in each drawing's own px. A model with more than one real drawing puts them on every drawing (`facings.nw.light`, …); the entry's own apply only to its first drawing. Mirrored sides reflect them. Animations are keyed by drawing file (`src/client/engine/animations.ts`). An `animated` model animates in every drawing except the ones listed in `still` (the back of an arcade cabinet). |
 | **Wall** | `wall: { v, walls?, text?, floor? }` | Wall art has `rotation: 'flat'`, `category: 'wall-art'` and `layer: 'wall'`, `footprint: [span, 1]`. It hangs on either wall (or only on `walls`) and is never mirrored: the left wall draws it reversed, so text and logos read the right way round. Its size is its drawing's (the wall art standard, below): `v` is [bottom, bottom + height/2]. `floor`: it stands on the floor like a door (the lift). `margin` is retired. |
@@ -131,66 +131,31 @@ reachable, and so does the piece's working face.
 
 ## Seats: how people sit
 
-Every seat kind has one entry in **`art/seat-models.json`** (format and helpers: `src/shared/world/seatModels.ts`),
-and people are drawn into it by one path, **`src/client/engine/sprites/seatLayers.ts`**, the same in the game, the
-review tools and the Design Lab. It's Habbo's way: the seat's drawing in two layers, one behind its sitters and one
-over them.
+Seating is compiled automatically from its drawings and declaration. `seatKind` selects construction independently
+of the asset name; `sitStyle` selects the character pose. `seat`, `backrest`, and `arms` complete the profile.
+Design Lab supplies these mechanics from its seating-type presets.
 
-**The model.** A few boxes in 3D (`parts`: seat, back, arm, leg, base, wrap, other) in a local frame shared by all
-four facings: `u` across the seat (0 … W tiles), `v` the depth from its front edge (0) to its back (D tiles), `z` up in
-world px. `sits` has one sitting point per cushion, `[u, v, z]`: the middle of the underside of the pelvis on the
-cushion top, as the seat is seen from the front. `size` is the catalog footprint `[W, D]`. Placed facing se:
-x = w − v, y = u; sw: x = w − u, y = d − v; ne: x = u, y = v; nw: x = v, y = d − u; then the drawing's projection
-(ax + 32 (x − y), ay + 16 (x + y) − 2 z).
+`art/seat-models.json` stores one model per catalog seat: boxes describing its cushion, back, arms, supports, and
+soft wrapping, plus one physical sitting point per cushion. Local `u` runs across the seat, `v` runs front to back,
+and `z` is height in world pixels. Rotating a seat rotates these points; it does not move the pelvis into its backrest.
 
-**What goes over a sitter** (`overParts`). Every pixel of a drawing is labelled with the part its view ray meets first
-(`seatModel.ts seatDepth`), and whole parts go over the people sitting in it: the arm on the camera's side, and seen
-from behind the back, a wrap or a crest. The split follows the drawing's own pixels. Over a sitter the layer stops at
-their shoulders, so their head always shows.
+`seatCompiler.ts` fits all four views together and validates the result through `seatProblems`. Arms stay at the
+ends, bases stay below the cushion, and no solid part may intersect the sitter's torso. Complete bent legs are
+rendered in every direction. `sitterMask` masks each figure independently against the original furniture pixels,
+including during entry and exit, so drawing a second sitter cannot repaint furniture over the first one.
 
-**Where a sitter sits** (`viewSits`). The figure is small for its furniture, so no one depth serves every view. From the
-front a sitter sits forward so their knees reach the front edge (`standardSitV`); from behind, by the kind of seat the
-model reads off itself (`seatKind`: long → forward at the cushion's middle; padded → the pelvis inside the padding at
-the back box's middle; open → just in front of the back's face; backless → a little behind the middle; `backSitV`).
-Each view is composed on its own, as sprite games do. There are no per-seat numbers: a seat that looks wrong wants a
-better model or a redrawn view, never a nudge (the tuned overrides of 2026-09-30 were removed once the rules matched
-them).
+New models have compilation fingerprints and no hand-authored `views` or `over` overrides. Legacy fields remain
+readable for compatibility; recompiling a Design Lab draft replaces them. Normal authoring never requires tuning.
 
-**The legs** (`src/shared/world/sitLegs.ts`). The thighs run from the hip toward the camera, foreshortened at the
-floor's 2:1, to just past the front of whatever the shins would hang through; the shins drop to the floor when they
-can reach it (`SHIN_MAX`), else hang. Seen from behind the thighs lie out along the cushion in every seat, so a sitter
-faces the way the seat does, and nothing below the knees (every way of showing the feet from behind read wrong at play
-scale: a foot pointing down, a leg held out, someone standing beside the chair); a back that rises past the sitter's
-head (`BACK_HIDES`, a throne), or a chair tall enough that the feet hang, tucks the legs out of sight. The avatar kit draws the figure with these
-legs (`frameFor(…, legs)`), so every sitter's legs fit the seat they're in.
+- `npm run seats:compile`: compile all catalog seats from scratch, installing only if all pass.
+- `npm run seats:check`: validate every catalog cushion in all four directions.
+- `npm run seats:audit -- --url http://localhost:5195`: capture the actual renderer at both scales, all directions,
+  three outfits, each cushion alone, and full occupancy.
+- `scripts/seat-lab-check.py`: run renamed existing artwork through Design Lab staging and compilation with no rig.
+- `tests/e2e/seat-models.spec.ts`: live clicks, sitting, cushion shifts, and standing for each seat and facing.
 
-**Per-drawing overrides.** Generated drawings aren't exact 3D, and a drawing sometimes needs its sitters or its over
-layer somewhere the boxes don't say. A model may carry, per facing, `views` (a sitting point per cushion, `[u, v]`) and
-`over` (polygons in that facing's drawing px, traced along the drawing's edges). The catalog's came from its audited
-per-view rigs; tune them by eye, never by rule. A player's "forward" and "back" are the seat's own (back is toward the
-backrest), whichever way it faces on screen; when a direction is ambiguous, show labelled candidates and let them pick.
-
-**Getting in and out.** Sitting down, a person turns, crouches and settles into the seat; getting up, they rise just
-past the seat's edge on the side they'll step off by (never inside it) and step away.
-
-### Making and checking a seat
-
-- **Fit**: `node --no-maglev --import tsx scripts/seat-model.ts --fit KEY --force` fits the family's boxes to every
-  facing's silhouette, the cushion at the manifest's `seat` height, and places the sitting points. `--show KEY` prints
-  the parts, sitting points, per-view overrides and problems; `--part`, `--sit` and `--set` edit it (under the file's
-  lock); `--sheet KEY --views` draws `art/review/models/KEY.png` (boxes, silhouette fit, depth, and every look seated
-  at play scale and 4×).
-- **Check** (the gate): `scripts/seat-layers.ts --check` runs `seatProblems` on every seat kind in every facing: the
-  model's silhouette fits the drawing (IoU ≥ 0.8), every cushion has a sitting point, on its cushion from the front,
-  the legs stay above the floor and come off the cushion's front, and from behind a seat with a back hides something.
-  `scripts/seat-layers.ts` without `--check` draws each view with its over layer tinted and each cushion's hip, knees
-  and feet marked (`art/review/seat-layers/`).
-- **Look at it the way it's played**: `scripts/seat-shots.ts` sits someone on every cushion of every seat kind in all
-  four facings through the real WorldView (`art/review/seat-shots/`); `lab.roomShot` (via `scripts/lab-call.ts`) fills
-  a real room's seats and crops each. Review at play scale and 4×, the back views as closely as the front ones. A
-  green check isn't proof it looks right.
-- **New seats** come through the Design Lab (`docs/design-lab.md`): auto-fit, the same check, the sandbox, review,
-  publish.
+See [seating.md](seating.md) for the supported shapes, audit evidence, and limitations. Old `seat-model.ts` editing
+commands are diagnostic tools, not the Design Lab authoring workflow.
 
 ## Depth by proxy: people around every piece (proposal and prototype)
 

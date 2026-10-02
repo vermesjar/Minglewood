@@ -10,7 +10,7 @@
  * emitters) are drawing px. Heights and surface z are ART px (1×: a floor tile is 32×16), like SceneObject.z.
  */
 import type { Facing, ObjectAction } from './world/scene';
-import { SEAT_FIELDS, type SeatProfile } from './world/seats';
+import { SEAT_FIELDS, SEAT_KINDS, type SeatProfile } from './world/seats';
 
 export const FACINGS: readonly Facing[] = ['se', 'sw', 'ne', 'nw'];
 /** A missing facing is drawn as the mirror image of its partner. */
@@ -383,6 +383,7 @@ const isPt = (v: unknown): v is [number, number] => Array.isArray(v) && v.length
 export function validateModel(key: string, spec: Partial<ModelSpec>): string[] {
   const out: string[] = [];
   const bad = (m: string) => out.push(m);
+  if (spec.seatKind !== undefined && !SEAT_KINDS.includes(spec.seatKind)) bad(`seatKind must be one of ${SEAT_KINDS.join(', ')}`);
   if (!KEY_RE.test(key)) bad(`key "${key}" isn't lowercase words joined by - (variants after a dot)`);
   for (const f of Object.keys(spec)) if (!SPEC_FIELDS.has(f)) bad(`unknown field "${f}"`);
 

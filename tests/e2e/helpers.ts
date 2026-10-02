@@ -3,9 +3,10 @@
  * on what they see (a pixel of the sprite that the game's own hit test resolves to that thing), walking,
  * waiting to arrive — and checked against the game's live state (the dev hook window.__mw and the store).
  */
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
 import { test as base, expect, type Page } from '@playwright/test';
 import { botState, TAG } from './global-setup';
+import { motionCandidate, routeMotionCandidate } from '../../scripts/lib/seat-motion-candidate';
 
 export { expect };
 
@@ -170,6 +171,10 @@ export class Player {
 
   /** Into the world. If the bot's member is gone (the dev server lost it), sign in again and keep the new session. */
   async boot(botFile?: string, botName = 'Playtest Bot') {
+    // Exercise staged mechanics with actual clicks/motion before publication.
+    // This affects only this browser, preserving the live catalog and artwork.
+    const candidate = motionCandidate();
+    if (candidate) await routeMotionCandidate(this.page, candidate);
     await this.page.goto('/');
     const where = await this.page
       .waitForFunction(
@@ -443,7 +448,12 @@ export class Player {
 
   /** Wait until I've stopped walking (and a moment for the server to confirm). */
   async still(ms = 12_000) {
-    await this.until((m) => !m.moving, ms);
+    // walkTo queues a path synchronously, but `moving` changes on the next
+    // animation frame. Do not mistake that first frame for arrival.
+    await this.page.waitForFunction(() => {
+      const g = (window as any).__mw, a = g?.world?.actors.get(g.meId);
+      return !!a && !a.moving && !a.occ.path;
+    }, undefined, { timeout: ms });
     await this.page.waitForTimeout(350);
     return this.me();
   }

@@ -202,7 +202,7 @@ function seatProfileOf(o: SceneObject): SeatProfile {
       ? Object.entries(manifest.sprites).find(([k, e]) => (k === o.sprite || k.startsWith(`${o.sprite}.`)) && e.seat !== undefined)?.[1]
       : undefined;
   const e = own?.seat !== undefined ? own : (sibling ?? own);
-  return seatProfile(o.sprite, { seat: e?.seat, sitStyle: e?.sitStyle, backrest: e?.backrest, arms: e?.arms });
+  return seatProfile(o.sprite, { seat: e?.seat, sitStyle: e?.sitStyle, backrest: e?.backrest, arms: e?.arms, seatKind: e?.seatKind });
 }
 
 /** Where a lamp's light comes from, relative to the sprite's anchor, in art px (follows mirroring). */

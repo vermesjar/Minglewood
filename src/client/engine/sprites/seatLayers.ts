@@ -1,37 +1,27 @@
 /**
- * SEAT LAYERS: how people are drawn into a seat — Habbo's way, the seat's drawing in two layers, one behind its
- * sitters and one over them — worked out from the seat's 3D model (src/shared/world/seatModels.ts), the same for
- * every facing — unless a view's drawing needs its over layer traced by eye (the model's over).
+ * Per-sitter composition against the original furniture pixels. The fitted model
+ * labels the visible back, arms, cushion and frame. Upper-body coverage follows
+ * those painted part edges; lower-body coverage compares the surface height to
+ * the projected thigh, shin and foot, including entry and exit poses.
  *
- * Every pixel of the drawing is labelled with the part of the model it shows (its view ray cast into the model's
- * boxes: seatModel.ts seatDepth). A WHOLE PART goes over the people sitting in it or behind them, by where it stands:
- *   the arm on the camera's side      over (it's between them and us, seen from any side)
- *   the back, a wrap, a crest          over when the seat is seen from behind, else behind them
- *   the seat's and base's flanks       over when seen from behind (their side faces toward the camera wrap the sitter)
- *   everything else                    behind them (the cushion they sit on, the base, legs, the far arm)
- * The split follows the drawing's own pixels, so its edges are the artist's. Nothing is decided pixel by pixel
- * against a body, so a box a little off the drawing never cuts into a person: it can only move an edge between parts.
- *
- * Over them, a seat never hides a sitter's head: the over layer stops at their shoulders (COVER), so a wingback seen
- * from behind shows who's in it — unless its back rises past the head anyway (sitLegs `hidden`: a throne), when it
- * covers exactly what it covers and the head shows over its top on its own.
- *
- * Each cushion's sitter sits on its sitting point (the model's `sits`), drawn with its figure's seat point exactly
- * where the point projects, and their legs laid on the seat by sitLegs.ts: thighs to just past the front edge,
- * shins down toward the floor.
- *
- * Pure (pixels in, masks and points out): the renderer (WorldView), the seat tools and the Design Lab share it.
+ * Each occupant gets an individual mask. Furniture is drawn once, so a foreground
+ * arm cannot repaint over another occupant. The renderer, compiler checks and
+ * Design Lab use this same implementation.
  */
 import type { Facing } from '@shared/world/scene';
 import type { AvatarLoadout } from '@shared/domain/types';
-import { behindView, cushionTiles, cushionTop, projectLocal, towardCamera, viewSits, type ModelPart, type PartKind, type SitPoint } from '@shared/world/seatModels';
-import { SIT_POSE_OF } from '@shared/world/seats';
+import { behindView, bodyVolume, intrusions, cushionTiles, cushionTop, projectLocal, towardCamera, viewSits, type ModelPart, type PartKind, type SitPoint } from '@shared/world/seatModels';
+import { SIT_POSE_OF, seatSupportLift } from '@shared/world/seats';
 import { kneeV, legsFor, THIGH_R, type SitLegs } from '@shared/world/sitLegs';
-import { coverRow, FIG, figAx, hipFeet, polyMask } from '@shared/world/seatFigure';
-import { seatDepth, silhouetteFit, type ModelView } from './seatModel';
+import { coverRow, FIG, figAx, hipFeet, isSitPoseName, polyMask } from '@shared/world/seatFigure';
+import { avatarSurfaceDepth } from './avatarSurfaceDepth';
+import { seatDepth, silhouetteFit, type ModelView, type SeatDepth } from './seatModel';
 import { renderAvatarLayers } from './avatarQa';
 import type { Pose } from './avatarFrame';
 import type { Pixels } from './footing';
+import { kitFrame, LAYER } from './avatarKit';
+import { M } from './pixkit';
+import { legsKey } from '@shared/world/sitLegs';
 
 export type Pt = [number, number];
 
@@ -64,6 +54,7 @@ export const COVER = FIG.hip + FIG.thigh - 58;
 export const OVER_ABOVE_CUSHION = 0;
 
 const OVER_FROM_BEHIND: ReadonlySet<PartKind> = new Set(['back', 'wrap', 'other']);
+const sideWrap = (p: ModelPart, width: number) => p.part === 'wrap' && (p.u[1] <= width / 2 || p.u[0] >= width / 2);
 
 /** Which parts of a model go over its sitters seen in a facing (see the header). */
 export function overParts(v: Pick<ModelView, 'model' | 'facing'>): boolean[] {
@@ -71,23 +62,28 @@ export function overParts(v: Pick<ModelView, 'model' | 'facing'>): boolean[] {
   const cam = Math.sign(towardCamera(v.facing).u);
   const mid = v.model.size[0] / 2;
   return v.model.parts.map((p) => {
-    // from the front the near arm is in front of the sitter and the far one behind them; from behind the sitter is
-    // inside the arms, so both are in front (an elbow beside the far arm showed over it)
-    if (p.part === 'arm') return behind || ((p.u[0] + p.u[1]) / 2 - mid) * cam > 0;
+    // Camera-side arms cover the sitter. Turning the chair around does not
+    // make its opposite arm jump in front of the sitter's shoulder or hips.
+    if (p.part === 'arm' || sideWrap(p, v.model.size[0])) return ((p.u[0] + p.u[1]) / 2 - mid) * cam > 0;
     return behind && OVER_FROM_BEHIND.has(p.part);
   });
 }
 
 const cache = new WeakMap<object, Map<string, SeatLayers>>();
+const layerRevision = (v: ModelView) => `${v.facing}|${v.art.ax},${v.art.ay}|${v.style}|${JSON.stringify(v.model)}`;
 
 /** A seat's layers in a view (cached per drawing, facing and model). */
 export function seatLayers(v: ModelView): SeatLayers {
+  // Validate source bindings even on a warm layer cache. A stale semantic map
+  // must not remain drawable simply because the old version rendered once.
+  return layersForDepth(v, seatDepth(v), layerRevision(v));
+}
+
+function layersForDepth(v: ModelView, D: SeatDepth, key: string): SeatLayers {
   let memo = cache.get(v.art.px.d);
   if (!memo) cache.set(v.art.px.d, (memo = new Map()));
-  const key = `${v.facing}|${v.art.ax},${v.art.ay}|${v.style}|${JSON.stringify(v.model)}`;
   const had = memo.get(key);
   if (had) return had;
-  const D = seatDepth(v);
   const ov = overParts(v);
   const traced = v.model.over?.[v.facing];
   let over: Uint8Array;
@@ -177,6 +173,10 @@ export function seatProblems(v: ModelView): string[] {
       return;
     }
     const legs = L.legs[i]!;
+    const supportHeight = seatSupportLift(m.parts, s[0], s[1], 1) + 8;
+    if (supportHeight > s[2] + 0.5) out.push(`cushion ${i}: a raised neighbouring cushion intersects the pelvis (support ${supportHeight}, sitting height ${s[2]})`);
+    const collisions = intrusions(m, bodyVolume(s, legs.reach, 13.5, 3));
+    if (collisions.length) out.push(`cushion ${i}: furniture intrudes into the sitter (${collisions.map((c) => `${m.parts[c.part].part}/${c.into}`).join(', ')})`);
     const kneeZ = s[2] + THIGH_R + legs.rise;
     if (kneeZ - legs.drop < -0.01) out.push(`cushion ${i}: the feet go through the floor`);
     // (from behind a sitter is drawn deeper, under the backrest: the cushion and knee rules are the front's)
@@ -200,6 +200,171 @@ export interface SeatSitter {
   cushion: number;
 }
 
+const sitterMasks = new WeakMap<ModelView, { revision: string; depth: SeatDepth; masks: Map<string, Uint8Array> }>();
+
+/**
+ * Furniture occlusion belongs to an individual figure, never to the entire couch.
+ * Upper-body overlap follows the authored furniture parts. Below the hips we compare
+ * the seat surface with the actual bent legs, including shins and shoes in rear views.
+ * This keeps the original painted edges while allowing feet through open chair frames.
+ */
+export function sitterMask(v: ModelView, look: AvatarLoadout, facing: Facing, pose: Pose, feet: Pt, legs: SitLegs | undefined, hipHeight = legs ? legs.hang + legs.drop - legs.rise : 0): Uint8Array {
+  const D = seatDepth(v);
+  const revision = layerRevision(v);
+  let memo = sitterMasks.get(v);
+  if (!memo || memo.revision !== revision || memo.depth !== D)
+    sitterMasks.set(v, (memo = { revision, depth: D, masks: new Map() }));
+  const fx = Math.round(feet[0]);
+  const fy = Math.round(feet[1]);
+  const key = `${JSON.stringify(look)}|${facing}|${pose}|${fx},${fy}|${legsKey(legs)}|${hipHeight}`;
+  const had = memo.masks.get(key);
+  if (had) return had;
+  const L = layersForDepth(v, D, revision);
+  const fig = renderAvatarLayers(look, facing, pose, legs);
+  if (D.source === 'authored') {
+    const body = avatarSurfaceDepth(look, facing, pose, legs);
+    const mask = new Uint8Array(FIG.w * FIG.h);
+    const x0 = fx - figAx(facing), y0 = fy - FIG.feet;
+    for (let y = 0; y < FIG.h; y++) for (let x = 0; x < FIG.w; x++) {
+      const i = y * FIG.w + x, X = x0 + x, Y = y0 + y;
+      if (!fig.px[i * 4 + 3] || X < 0 || Y < 0 || X >= D.w || Y >= D.h) continue;
+      const j = Y * D.w + X;
+      if (!v.art.px.d[j * 4 + 3]) continue;
+      if (!Number.isFinite(body.z[i]) || !Number.isFinite(D.z[j]))
+        throw new Error(`Unresolved authored seating depth at furniture ${X},${Y}, avatar ${x},${y}`);
+      mask[i] = D.z[j] > hipHeight + body.z[i] ? 1 : 0;
+    }
+    memo.masks.set(key, mask);
+    if (memo.masks.size > 128) memo.masks.delete(memo.masks.keys().next().value!);
+    return mask;
+  }
+  const F = kitFrame(look, behindView(facing) ? 'back' : 'front', pose, legs);
+  const hips = M().rrect(F.hx - 9, F.waistY - 1, F.hx + 10, F.hipY + 3, 2);
+  const mirrored = facing === 'sw' || facing === 'nw';
+  const x0 = fx - figAx(facing);
+  const y0 = fy - FIG.feet;
+  const cap = L.cover === undefined ? -Infinity : coverRow(pose, L.cover);
+  const hipZ = hipHeight;
+  // Rear upholstery must compare against the actual painted body surface.
+  // A nearest-joint height misses the rounded knee; expanding the hip patch
+  // also incorrectly promotes descending shin pixels into the pelvis.
+  // Compiler v4 introduces the new placement/body-contact contract. Published
+  // older rigs retain their reviewed rendering until a specific visual defect
+  // justifies migration; a shared fix must not silently rewrite accepted seats.
+  const rearSupportBody = D.source === 'semantic' &&
+    ((v.model.compiler?.version ?? 0) >= 4 || v.model.bodyContact?.version === 1) && behindView(v.facing)
+    ? avatarSurfaceDepth(look, facing, pose, legs) : undefined;
+  // A settled sitter is supported by the cushion, with thighs above its top
+  // and shins beyond its front. Comparing only vertical heights at the shin
+  // loses that front/back relationship and cuts a cushion-shaped wedge from
+  // the leg. Apply this relation only when placement and knee clearance prove
+  // it; approaching/crouching figures and rear views still need depth tests.
+  const settled = legs && isSitPoseName(pose) && facing === v.facing && !behindView(v.facing)
+    ? L.sits.find((s, c) => {
+      if (!s || !L.hips[c]) return false;
+      const placed = hipFeet(L.hips[c]!, v.style);
+      return placed[0] === fx && placed[1] === fy && Math.abs(hipZ - s[2] - THIGH_R) < 0.01;
+    }) : undefined;
+  const supporting = v.model.parts.map(p => !!settled && !!legs && p.part === 'seat' &&
+    settled[0] >= p.u[0] && settled[0] <= p.u[1] && settled[1] >= p.v[0] && settled[1] <= p.v[1] &&
+    Math.abs(settled[2] - p.z[1]) <= 0.5 && kneeV(settled, legs) < p.v[0]);
+  const segments = [F.legFar, F.legNear].flatMap((leg) => {
+    // During the step and crouch the upright frame supplies actual joint
+    // heights. Those feet must not flash through an upholstered seat's skirt.
+    const kneeZ = legs ? hipZ + legs.rise : hipZ - (leg.m[1] - leg.a[1]) / 2;
+    const ankleZ = legs ? kneeZ - legs.drop + 2.5 : hipZ - (leg.b[1] - leg.a[1]) / 2;
+    return [
+    { a: leg.a, b: leg.m, za: hipZ, zb: kneeZ },
+    { a: leg.m, b: leg.b, za: kneeZ, zb: ankleZ },
+    { a: leg.b, b: [leg.b[0], leg.b[1] + 5] as Pt, za: ankleZ, zb: ankleZ - 2.5 },
+  ]; });
+  const mask = new Uint8Array(FIG.w * FIG.h);
+  for (let y = 0; y < FIG.h; y++) for (let x = 0; x < FIG.w; x++) {
+    const i = y * FIG.w + x;
+    if (!fig.px[i * 4 + 3]) continue;
+    const X = x0 + x;
+    const Y = y0 + y;
+    if (X < 0 || Y < 0 || X >= D.w || Y >= D.h) continue;
+    const j = Y * D.w + X;
+    if (!v.art.px.d[j * 4 + 3]) continue;
+    const partIndex = D.part[j];
+    if (partIndex >= 0 && supporting[partIndex]) continue;
+    // A backrest is behind a settled sitter seen from the front, including
+    // their pelvis. Its tall proxy cannot promote its painted lower fringe
+    // over the pants while the upper-body branch correctly keeps it behind.
+    if (settled && partIndex >= 0 && v.model.parts[partIndex].part === 'back') continue;
+    // An explicitly identified outside back or wrap is the foreground shell
+    // in a rear view. Its low fitted box must not let pelvis pixels punch
+    // through the painted shell. The open supporting well has its own seat
+    // label and continues to use support/depth rules; proxy guesses do not
+    // receive this stronger source-surface relation.
+    if (D.source === 'semantic' && behindView(v.facing) && partIndex >= 0 &&
+        ['back', 'wrap'].includes(v.model.parts[partIndex].part) && !sideWrap(v.model.parts[partIndex], v.model.size[0])) {
+      mask[i] = y >= cap ? 1 : 0;
+      continue;
+    }
+    // A near arm is a foreground rail, for the pelvis and legs as well as
+    // the torso. Do not let a limb-height approximation punch through it.
+    if (partIndex >= 0 && (v.model.parts[partIndex].part === 'arm' ||
+        D.source === 'semantic' && sideWrap(v.model.parts[partIndex], v.model.size[0]))) {
+      mask[i] = L.overParts[partIndex] && y >= cap ? 1 : 0;
+      continue;
+    }
+    const owner = fig.owner[i];
+    if (rearSupportBody && partIndex >= 0 &&
+        ['seat', 'base'].includes(v.model.parts[partIndex].part)) {
+      const bodyZ = hipZ + rearSupportBody.z[i];
+      if (!Number.isFinite(bodyZ) || !Number.isFinite(D.z[j]))
+        throw new Error(`Unresolved seating support depth at furniture ${X},${Y}, avatar ${x},${y}`);
+      mask[i] = D.z[j] > bodyZ ? 1 : 0;
+      continue;
+    }
+    const bodyX = mirrored ? FIG.w - 1 - x : x;
+    // Preserve the actual rounded pelvis and its one-pixel outline. A bounding
+    // rectangle also includes empty rounded corners, where a descending shin
+    // can legitimately pass behind the cushion.
+    const hipVolume = owner === LAYER.legs && (hips.has(bodyX, y) ||
+      hips.has(bodyX - 1, y) || hips.has(bodyX + 1, y) || hips.has(bodyX, y - 1) || hips.has(bodyX, y + 1));
+    const pelvis = hipVolume || owner === LAYER.pelvis || (owner === LAYER.outline &&
+      [i - 1, i + 1, i - FIG.w, i + FIG.w].some(k => k >= 0 && k < fig.owner.length && fig.owner[k] === LAYER.pelvis));
+    if (pelvis) {
+      // The pants' hip patch is painted over the leg strokes. It must retain
+      // its own height when the rear-view shin projects into the same pixels.
+      const z = hipZ + (F.hipY - y) / 2;
+      mask[i] = D.z[j] > z + 1.25 ? 1 : 0;
+      continue;
+    }
+    const lower = owner === LAYER.legs || owner === LAYER.shoes || (owner === LAYER.outline && y >= F.hipY - 2);
+    if (!lower || y < F.hipY - 2) {
+      const part = D.part[j] >= 0 ? v.model.parts[D.part[j]].part : undefined;
+      const support = part === 'seat' || part === 'base';
+      const bodyZ = hipZ + (F.hipY - y) / 2;
+      // A visible cushion under an open back is still below the body. Its
+      // proximity to the back/arm cannot promote it into a torso occluder.
+      mask[i] = y >= cap && (!support || D.z[j] > bodyZ + 1.25) ? L.over[j] : 0;
+      continue;
+    }
+    const px = mirrored ? FIG.w - 1 - x : x;
+    let distance = Infinity;
+    let z = hipZ;
+    for (const s of segments) {
+      const dx = s.b[0] - s.a[0];
+      const dy = s.b[1] - s.a[1];
+      const t = Math.max(0, Math.min(1, ((px - s.a[0]) * dx + (y - s.a[1]) * dy) / (dx * dx + dy * dy || 1)));
+      const d = (px - s.a[0] - t * dx) ** 2 + (y - s.a[1] - t * dy) ** 2;
+      if (d < distance) {
+        distance = d;
+        z = s.za + t * (s.zb - s.za);
+      }
+    }
+    // Give the limb its thickness; equal-depth upholstery supports it, rather than cutting into it.
+    mask[i] = D.z[j] > z + 1.25 ? 1 : 0;
+  }
+  memo.masks.set(key, mask);
+  if (memo.masks.size > 128) memo.masks.delete(memo.masks.keys().next().value!);
+  return mask;
+}
+
 /**
  * A seat and its sitters composed the way the game draws them (WorldView): the seat's drawing, each sitter's figure
  * (their legs laid on it) with its seat point on their cushion's hip, back to front, then the over layer — kept off
@@ -210,17 +375,15 @@ export function composeSeat(v: ModelView, sitters: SeatSitter[], pad = 48): { px
   const W = art.w + pad * 2;
   const H = art.h + pad * 2;
   const d = new Uint8ClampedArray(W * H * 4);
-  const who = new Int16Array(W * H).fill(-1);
-  const put = (x: number, y: number, src: ArrayLike<number>, i: number, k: number) => {
+  const put = (x: number, y: number, src: ArrayLike<number>, i: number) => {
     if (x < 0 || y < 0 || x >= W || y >= H || !src[i + 3]) return;
     const o = (y * W + x) * 4;
     d[o] = src[i];
     d[o + 1] = src[i + 1];
     d[o + 2] = src[i + 2];
     d[o + 3] = 255;
-    who[y * W + x] = k;
   };
-  for (let y = 0; y < art.h; y++) for (let x = 0; x < art.w; x++) put(x + pad, y + pad, art.d, (y * art.w + x) * 4, -1);
+  for (let y = 0; y < art.h; y++) for (let x = 0; x < art.w; x++) put(x + pad, y + pad, art.d, (y * art.w + x) * 4);
   const L = seatLayers(v);
   const tiles = layerTiles(v);
   const pose = SIT_POSE_OF[v.style] as Pose;
@@ -228,27 +391,17 @@ export function composeSeat(v: ModelView, sitters: SeatSitter[], pad = 48): { px
     .map((s, k) => ({ s, k }))
     .filter(({ s }) => L.hips[s.cushion])
     .sort((a, b) => tiles[a.s.cushion].x + tiles[a.s.cushion].y - (tiles[b.s.cushion].x + tiles[b.s.cushion].y));
-  const figs: Array<{ x0: number; y0: number; px: ArrayLike<number> }> = [];
-  for (const { s, k } of placed) {
-    const [fx, fy] = hipFeet(L.hips[s.cushion]!, v.style);
-    const x0 = fx - figAx(v.facing) + pad;
-    const y0 = fy - FIG.feet + pad;
-    const fig = renderAvatarLayers(s.look, v.facing, pose, L.legs[s.cushion] ?? undefined).px;
-    for (let y = 0; y < FIG.h; y++) for (let x = 0; x < FIG.w; x++) put(x0 + x, y0 + y, fig, (y * FIG.w + x) * 4, k);
-    figs[k] = { x0, y0, px: fig };
-  }
-  const capRow = L.cover === undefined ? -Infinity : coverRow(pose, L.cover);
-  for (let y = 0; y < art.h; y++)
-    for (let x = 0; x < art.w; x++) {
-      const i = y * art.w + x;
-      if (!L.over[i]) continue;
-      const X = x + pad;
-      const Y = y + pad;
-      // above the cover, a sitter's own pixels show over the seat
-      const k = who[Y * W + X];
-      const f = k >= 0 ? figs[k] : undefined;
-      if (f && Y - f.y0 < capRow) continue;
-      put(X, Y, art.d, i * 4, -1);
+  for (const { s } of placed) {
+    const feet = hipFeet(L.hips[s.cushion]!, v.style);
+    const x0 = feet[0] - figAx(v.facing) + pad;
+    const y0 = feet[1] - FIG.feet + pad;
+    const legs = L.legs[s.cushion]!;
+    const fig = renderAvatarLayers(s.look, v.facing, pose, legs).px;
+    const mask = sitterMask(v, s.look, v.facing, pose, feet, legs);
+    for (let y = 0; y < FIG.h; y++) for (let x = 0; x < FIG.w; x++) {
+      const i = y * FIG.w + x;
+      if (!mask[i]) put(x0 + x, y0 + y, fig, i * 4);
     }
+  }
   return { px: { w: W, h: H, d }, origin: [pad, pad] };
 }

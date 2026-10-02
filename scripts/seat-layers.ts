@@ -12,13 +12,13 @@
  */
 import { mkdirSync } from 'node:fs';
 import type { Facing } from '../src/shared/world/scene';
-import { cushionTop, localToWorld, modelShapeProblems, projectLocal, type SeatModel } from '../src/shared/world/seatModels';
+import { localToWorld, modelShapeProblems, projectLocal, type SeatModel } from '../src/shared/world/seatModels';
 import { kneeV } from '../src/shared/world/sitLegs';
-import { seatLayers } from '../src/client/engine/sprites/seatLayers';
-import { silhouetteFit } from '../src/client/engine/sprites/seatModel';
+import { seatLayers, seatProblems } from '../src/client/engine/sprites/seatLayers';
 import { loadManifest } from './lib/manifest';
 import { modelView, readModels } from './lib/models';
-import { seatKeys, type Sprites } from './lib/seats';
+import { seatKeys, profileOf, viewArt, type Sprites } from './lib/seats';
+import { publishedSeatSourceStatus } from '../src/client/engine/sprites/seatCompiler';
 import { blank, writePng, type Img } from './lib/png';
 import { plot, rect, row, stack, type RGB } from './lib/draw';
 import { text } from './lib/font';
@@ -81,41 +81,22 @@ function view(key: string, model: SeatModel, f: Facing): Img {
 /* ------------------------------------------------------------------ the check (the gate) */
 
 /** A model's silhouette must cover each drawing this well (IoU against the drawing with its gaps filled). */
-const FIT_MIN = 0.8;
 
 function problemsOf(key: string, model: SeatModel | undefined): string[] {
   const e = M[key];
-  if (!model) return [`${key}: no model (node --no-maglev --import tsx scripts/seat-model.ts --fit ${key})`];
+  if (!model) return [`${key}: no model (npm run seats:compile)`];
   const out: string[] = [];
+  const p = profileOf(M, key);
+  const sourceStatus = publishedSeatSourceStatus(model, { key, family: p.seatKind, size: e.footprint, seat: p.seat,
+    style: p.sitStyle, backrest: p.backrest, arms: !!p.arms,
+    views: FACINGS.map(facing => ({ facing, art: viewArt(M, key, facing).art })) });
+  if (sourceStatus === 'legacy-v2' || sourceStatus === 'legacy-v3') console.log(`  ${key}: unchanged ${sourceStatus} source; validating existing geometry, not current compilation.`);
+  if (sourceStatus === 'stale')
+    out.push(`${key}: stale or manually overridden model; run npm run seats:compile`);
   const shape = modelShapeProblems(model);
   if (shape.length) return shape.map((p) => `${key}: ${p}`);
   if (model.size[0] !== e.footprint[0] || model.size[1] !== e.footprint[1]) out.push(`${key}: the model is ${model.size.join('×')}, the catalog footprint ${e.footprint.join('×')}`);
-  for (const f of FACINGS) {
-    const v = modelView(M, key, f, model);
-    const fit = silhouetteFit(v);
-    if (fit.iou < FIT_MIN) out.push(`${key} ${f}: the model's silhouette misses the drawing (IoU ${fit.iou.toFixed(2)} < ${FIT_MIN}): refit it (seat-model.ts --fit ${key} --force)`);
-    const L = seatLayers(v);
-    L.sits.forEach((s, i) => {
-      if (!s) {
-        out.push(`${key} ${f}: cushion ${i} has no sitting point over its tile`);
-        return;
-      }
-      const top = cushionTop(model, s[0], s[1]);
-      // (from behind a sitter is drawn deeper, under the backrest: only the front view's point is on the cushion)
-      if (!(f === 'ne' || f === 'nw') && (top === null || Math.abs(top - s[2]) > 0.5)) out.push(`${key} ${f}: cushion ${i}'s sitting point isn't on the cushion (z ${s[2]}, cushion ${top ?? 'none'})`);
-      const legs = L.legs[i]!;
-      const kneeZ = s[2] + 1.5 + legs.rise;
-      const sole = kneeZ - legs.drop;
-      if (sole < -0.01) out.push(`${key} ${f}: cushion ${i}: the feet go through the floor (${sole.toFixed(1)})`);
-      // the legs come off the front of the cushion they sit on: the knees clear of the cushion block under them
-      const kv = kneeV(s, legs);
-      const cushion = model.parts.filter((p) => p.part === 'seat' && s[0] >= p.u[0] && s[0] <= p.u[1] && s[1] >= p.v[0] && s[1] <= p.v[1] && p.z[1] >= s[2] - 0.5);
-      const front = Math.min(...cushion.map((p) => p.v[0]));
-      if (!(f === 'ne' || f === 'nw') && cushion.length && kv > front - 0.01) out.push(`${key} ${f}: cushion ${i}: the knees are inside the cushion (knees at v ${kv.toFixed(2)}, its front at ${front.toFixed(2)})`);
-    });
-    // from behind, a seat with a back hides some of its sitters (else its back isn't in the model)
-    if ((f === 'ne' || f === 'nw') && model.parts.some((p) => p.part === 'back') && !L.over.some((x) => x)) out.push(`${key} ${f}: from behind, nothing of it goes over its sitters`);
-  }
+  for (const f of FACINGS) for (const problem of seatProblems(modelView(M, key, f, model))) out.push(`${key} ${f}: ${problem}`);
   return out;
 }
 

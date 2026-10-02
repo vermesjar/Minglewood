@@ -1,5 +1,6 @@
 /** The Design Lab's client for /api/dev/lab (localhost only; every write carries the lab header). */
 import type { ModelCategory, RoomKind, Theme } from '@shared/models';
+import type { SeatKind } from '@shared/world/seats';
 import type { SeatModel } from '@shared/world/seatModels';
 
 /**
@@ -36,6 +37,7 @@ export interface FurnitureSpec {
   sameFromBehind: boolean;
   /** The cushion's height (art px), how it's sat in, and whether it has a back and arms: what Auto-fit starts from. */
   seat: number | null;
+  seatKind?: SeatKind;
   sitStyle: 'chair' | 'stool' | 'lounge' | 'floor';
   backrest: boolean;
   arms?: boolean;
@@ -79,6 +81,8 @@ export interface DraftView {
 }
 
 export interface Draft {
+  seatMotionReview?: { result?: string; state: string; visualApproval: boolean };
+  seatingSurfaceReview?: { status: 'INCOMPLETE' | 'FAILED' | 'UNREVIEWED'; error?: string; contract?: string };
   id: string;
   kind: 'furniture' | 'part';
   key: string;
@@ -119,6 +123,28 @@ export interface CheckResult {
   placement: Array<{ facing: Facing; ok: boolean; notes: string[] }>;
 }
 
+export interface SeatReviewStatus {
+  checkedAt: string;
+  draftSignature: string;
+  accepted: boolean;
+  problems: string[];
+  failures: number;
+  unresolved: number;
+  reviewedPixels: number;
+  rendererReceipt: string;
+  motion: { state: string; invariantsPassed: boolean; visualApproved: boolean; films: number; problems: string[] };
+  wardrobe?: { accepted: boolean; looks: number; contexts: number; problems: string[] };
+  contexts: Array<{ facing: Facing; cushion: number; look: number; captured: boolean; reviewed: boolean; unresolved: number }>;
+  evidence: Array<{ label: string; path: string }>;
+}
+export interface SeatReviewFrame {
+  facing: Facing; look: number; rect: { x: number; y: number; width: number; height: number }; rgba: number[]; capture: string;
+}
+export interface SeatMotionFrames {
+  facing: Facing; look: number; filmSha256: string; resultSha256: string; scope: string;
+  frames: Array<{ png: string; rect: SeatReviewFrame['rect']; phase: string; pose: string; cushion: number | null; renderedFrame: number }>;
+}
+
 export interface LibraryPiece {
   key: string;
   name: string | null;
@@ -127,6 +153,7 @@ export interface LibraryPiece {
   wall: boolean;
   footprint: [number, number];
   seat: number | null;
+  seatKind?: SeatKind;
   facings: string[];
   issues: string[];
   /** A seat's model in art/seat-models.json: none, fitted but not passed, or passed by the reviewer. */
@@ -165,6 +192,10 @@ export const lab = {
   generate: (id: string, v: { view?: string; note?: string; quality?: string }) =>
     call<{ draft: Draft; usd: number }>(`/drafts/${id}/generate`, { method: 'POST', body: body(v) }),
   check: (id: string) => call<CheckResult>(`/drafts/${id}/check`, { method: 'POST', body: '{}' }),
+  retrySeatReview: (id: string) => call<{ draft: Draft; problems: string[] }>(`/drafts/${id}/seat-review`, { method: 'POST', body: '{}' }),
+  seatReview: (id: string) => call<SeatReviewStatus>(`/drafts/${id}/seat-review`),
+  seatReviewFrame: (id: string, facing: Facing, look: number) => call<SeatReviewFrame>(`/drafts/${id}/seat-review/frame?facing=${facing}&look=${look}`),
+  seatMotionFrames: (id: string, facing: Facing, look: number) => call<SeatMotionFrames>(`/drafts/${id}/seat-review/motion?facing=${facing}&look=${look}`),
   publish: (id: string, overwrite = false) => call<Record<string, unknown>>(`/drafts/${id}/publish`, { method: 'POST', body: body({ overwrite }) }),
   fromCatalog: (key: string) => call<Draft>(`/from-catalog/${encodeURIComponent(key)}`, { method: 'POST', body: '{}' }),
   library: () => call<{ scale: number; pieces: LibraryPiece[] }>('/library'),

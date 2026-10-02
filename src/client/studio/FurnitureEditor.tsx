@@ -1,3 +1,4 @@
+import { SEAT_TYPES } from '@shared/world/seatTypes';
 /** A furniture draft: its spec, references, every view with its checks, the sandbox, and publishing. */
 import { useEffect, useRef, useState } from 'react';
 import { CATEGORIES, heightClass, ROOM_KINDS, THEMES } from '@shared/models';
@@ -42,8 +43,8 @@ export function FurnitureEditor({ id, usage, onUsage, onClose }: { id: string; u
   if (!draft) return <div className="lab-empty">{error ?? 'Opening the draft…'}</div>;
   const f = draft.furniture!;
   const version = `${draft.updated}|${draft.takes.length}`;
-  const needed = drawnViews(f);
   const have = Object.keys(draft.views);
+  const needed = drawnViews(f, have);
   const allAccepted = needed.every((v) => draft.views[v]?.accepted);
 
   function patch(p: Partial<FurnitureSpec>) {
@@ -79,7 +80,7 @@ export function FurnitureEditor({ id, usage, onUsage, onClose }: { id: string; u
     try {
       const r = await lab.generate(id, { view, note: noteText });
       setDraft(r.draft);
-      setNote(`Done — $${r.usd.toFixed(3)}. Look at every view, nudge anchors if the footprint is off, then accept.`);
+      setNote(`Done — $${r.usd.toFixed(3)}. ${f.category === 'seating' ? 'Seating is built automatically. Review the drawings and occupied previews, then accept.' : 'Look at every view, nudge anchors if the footprint is off, then accept.'}`);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -109,7 +110,7 @@ export function FurnitureEditor({ id, usage, onUsage, onClose }: { id: string; u
   const placementBad = (checks?.placement ?? []).filter((p) => !p.ok);
   const seating = f.category === 'seating' && f.rotation !== 'flat';
   // a seat publishes with its model (How people sit in it): holding in every facing by the gate's check
-  // (seatLayers.ts seatProblems) and passed by the reviewer; the publish checks it again on the staged drawings
+  // (seatLayers.ts seatProblems); publishing checks it again on the staged drawings
   // (scripts/lab-model.ts) and stores it in art/seat-models.json
   const seatOk = !seating || modelStatus === 'ok';
   const canPublish = allAccepted && !problems.length && !placementBad.length && seatOk && !busy;
@@ -176,15 +177,15 @@ export function FurnitureEditor({ id, usage, onUsage, onClose }: { id: string; u
 
         <h4>Size and turning</h4>
         <div className="row">
-          <Field label="Footprint: width × depth" hint="tiles, as seen facing sw">
+          {f.category !== 'seating' && <Field label="Footprint: width × depth" hint="tiles, as seen facing sw">
             <div className="pair">
               <input type="number" min={1} max={4} value={f.footprint[0]} onChange={(e) => patch({ footprint: [Number(e.target.value), f.footprint[1]] })} />
               <span>×</span>
               <input type="number" min={1} max={4} value={f.footprint[1]} onChange={(e) => patch({ footprint: [f.footprint[0], Number(e.target.value)] })} />
             </div>
-          </Field>
+          </Field>}
           <Field label={`Height · ${heightClass(f.height)}`} hint="art px: a chair ≈ 34, a person ≈ 50, a shelf ≈ 70; measured from the drawing">
-            <input type="number" min={4} max={200} value={f.height} onChange={(e) => patch({ height: Number(e.target.value) })} />
+            <input type="number" min={1} max={200} value={f.height} onChange={(e) => patch({ height: Number(e.target.value) })} />
           </Field>
         </div>
         <Field label="Drawn width (px, optional)" hint="the model doesn't keep scale: this fixes it; blank = footprint width">
@@ -228,24 +229,25 @@ export function FurnitureEditor({ id, usage, onUsage, onClose }: { id: string; u
           </Field>
         )}
         {f.category === 'seating' && (
-          <div className="row">
-            <Field label="Seat height" hint="cushion above the floor, art px: where Auto-fit puts the cushion (How people sit in it)">
-              <input type="number" value={f.seat ?? 12} onChange={(e) => patch({ seat: Number(e.target.value) })} />
-            </Field>
-            <Field label="Sat in as">
-              <select value={f.sitStyle} onChange={(e) => patch({ sitStyle: e.target.value as FurnitureSpec['sitStyle'] })}>
-                <option value="chair">a chair</option>
-                <option value="stool">a stool (perched)</option>
-                <option value="lounge">a lounge (sunk in)</option>
-                <option value="floor">the floor (beanbag)</option>
+          <div className="seat-profile">
+            <Field label="Seating type" hint="Sitting poses and furniture overlap are built automatically.">
+              <select value={f.seatKind ?? ''} onChange={(e) => {
+                const type = SEAT_TYPES.find((t) => t.kind === e.target.value);
+                if (type) patch({ seatKind: type.kind, ...type.profile, arms: !!type.profile.arms, footprint: [type.width, 1], height: type.height, seatModel: f.seatModel?.model.surfaces !== undefined ? f.seatModel : null });
+              }}>
+                {!f.seatKind && <option value="">Choose a seating type</option>}
+                {SEAT_TYPES.map((t) => <option key={t.kind} value={t.kind}>{t.label}</option>)}
               </select>
             </Field>
-            <label className="check">
-              <input type="checkbox" checked={f.backrest} onChange={(e) => patch({ backrest: e.target.checked })} /> backrest
-            </label>
-            <label className="check">
-              <input type="checkbox" checked={!!f.arms} onChange={(e) => patch({ arms: e.target.checked })} /> arms
-            </label>
+            {(f.seatKind === 'couch' || f.seatKind === 'bench') && <Field label="Number of seats">
+              <select value={f.footprint[0]} onChange={(e) => patch({ footprint: [Number(e.target.value), 1], seatModel: f.seatModel?.model.surfaces !== undefined ? f.seatModel : null })}>
+                {[2, 3, 4].map((n) => <option key={n} value={n}>{n}</option>)}
+              </select>
+            </Field>}
+            {(f.seatKind === 'chair' || f.seatKind === 'bench' || f.seatKind === 'stool') && <div className="row">
+              <label className="check"><input type="checkbox" checked={f.backrest} onChange={(e) => patch({ backrest: e.target.checked, seatModel: f.seatModel?.model.surfaces !== undefined ? f.seatModel : null })} /> Backrest</label>
+              <label className="check"><input type="checkbox" checked={!!f.arms} onChange={(e) => patch({ arms: e.target.checked, seatModel: f.seatModel?.model.surfaces !== undefined ? f.seatModel : null })} /> Armrests</label>
+            </div>}
           </div>
         )}
         <Field label="Surface height (optional)" hint="things stand on it at this z (a counter ≈ 20.5)">
@@ -385,16 +387,10 @@ export function FurnitureEditor({ id, usage, onUsage, onClose }: { id: string; u
               {seating && (
                 <li className={modelStatus === 'ok' ? 'good' : modelStatus === 'unreviewed' || modelStatus === 'loading' || modelStatus === 'stale' ? 'warn' : 'bad'}>
                   {modelStatus === 'ok'
-                    ? 'Seat model: holds in every facing, passed by the reviewer'
-                    : modelStatus === 'none'
-                      ? 'Seat model: none yet; Auto-fit it in How people sit in it'
-                      : modelStatus === 'bad'
-                        ? 'Seat model: some facings don’t hold (see How people sit in it)'
-                        : modelStatus === 'unreviewed'
-                          ? 'Seat model: holds in every facing; waiting for the reviewer to pass it'
-                          : modelStatus === 'stale'
-                            ? 'Seat model: the drawings changed; checking it again'
-                            : 'Seat model: loading…'}
+                    ? 'Seating checks passed in every direction'
+                    : modelStatus === 'bad'
+                      ? 'Seating needs another take; see How people sit'
+                      : 'Building and checking seating automatically?'}
                 </li>
               )}
               <li className={allAccepted ? 'good' : 'warn'}>{allAccepted ? 'Every view accepted' : `Accept: ${needed.filter((v) => !draft.views[v]?.accepted).join(', ') || '—'}`}</li>
@@ -505,7 +501,7 @@ function ViewCell(props: {
       <div className="view-canvas">{src ? <canvas ref={canvas} /> : <div className="lab-empty small">not drawn</div>}</div>
       {drawn && v && (
         <div className="view-tools">
-          <div className={`nudge ${centred ? 'off' : ''}`} title={centred ? 'Centred automatically: nudging only matters for pieces that fill their footprint' : 'Move the drawing on its footprint (anchor, sprite px)'}>
+          {f.category !== 'seating' && <div className={`nudge ${centred ? 'off' : ''}`} title={centred ? 'Centred automatically: nudging only matters for pieces that fill their footprint' : 'Move the drawing on its footprint (anchor, sprite px)'}>
             <button onClick={() => props.onNudge(src!.view, [nudge[0] + 1, nudge[1]])}>←</button>
             <button onClick={() => props.onNudge(src!.view, [nudge[0], nudge[1] + 1])}>↑</button>
             <button onClick={() => props.onNudge(src!.view, [nudge[0], nudge[1] - 1])}>↓</button>
@@ -513,7 +509,7 @@ function ViewCell(props: {
             <span className="muted">
               {nudge[0]},{nudge[1]}
             </span>
-          </div>
+          </div>}
           <label className="check">
             <input type="checkbox" checked={!!v.accepted} onChange={(e) => props.onAccept(src!.view, e.target.checked)} /> Accept
           </label>

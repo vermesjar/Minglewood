@@ -79,7 +79,7 @@ function placement(footprint: readonly [number, number], f: Facing): { w: number
  * The drawing the game uses for a seat facing `f` (art.ts; scripts/lib/seats.ts viewArt): its own, else its partner's
  * mirrored, else the one drawing (mirrored when a long piece turns); a small seat is centred on its footprint.
  */
-export function seatArt(drawings: Drawings, footprint: readonly [number, number], f: Facing): { art: SeatArt; mirrored: boolean; drawn: Facing } | null {
+export function seatArt(drawings: Drawings, footprint: readonly [number, number], f: Facing, sameFromBehind = false): { art: SeatArt; mirrored: boolean; drawn: Facing } | null {
   const { w, d } = placement(footprint, f);
   let rec = drawings.one;
   let mirror = !!rec && footprint[0] !== footprint[1] && w === footprint[1] && d === footprint[0];
@@ -91,12 +91,11 @@ export function seatArt(drawings: Drawings, footprint: readonly [number, number]
       mirror = true;
       drawn = MIRROR[f];
     }
-    if (!rec) {
+    if (!rec && sameFromBehind) {
       const first = MODEL_FACINGS.find((g) => drawings[g]);
-      if (!first) return null;
-      rec = drawings[first];
-      drawn = first;
+      if (first) { rec = drawings[first]; drawn = first; }
     }
+    if (!rec) return null;
   }
   const px = mirror ? mirrorPixels(rec!.px) : rec!.px;
   const c = centredAnchor(px, w, d, 2);

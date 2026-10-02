@@ -20,33 +20,47 @@ import type { SitLegs } from '@shared/world/sitLegs';
 import { ITEM_BY_ID, normalizeLoadout } from '@shared/avatar';
 import { LAYER, bodyOf, drawAvatarV2, headMaskOf } from './avatarKit';
 import { LIFE_POSES, frameFor, type Frame, type Pose } from './avatarFrame';
-import { H, M, W, type Mask } from './pixkit';
+import { H, M, W, type Mask, type LowerGarmentSource } from './pixkit';
 
 export const FACINGS: Facing[] = ['se', 'sw', 'ne', 'nw'];
 export const POSES: Pose[] = ['stand', 'walk1', 'walk2', 'sit', 'sit-stool', 'sit-lounge', 'sit-floor', 'crouch', 'wave', 'work', ...LIFE_POSES];
 
 export interface Rendered {
+  lowerGarment?: LowerGarmentSource;
   /** RGBA, W × H, exactly what the game blits. */
   px: Uint8ClampedArray;
   /** Layer id per pixel (LAYER). */
   owner: Uint8Array;
+  /** Exact source construction provenance, mirrored with the original pixels. */
+  sealed?: Uint8Array;
+  sourceMetadataVersion: 2;
+  shoeLimb?: Uint8Array;
+  bodyPocket?: Uint8Array;
 }
 
 /** A look rendered as the game does it (kit + mirroring for sw/nw), with its layer map. */
 export function renderAvatarLayers(look: AvatarLoadout, facing: Facing, pose: Pose, legs?: SitLegs): Rendered {
   const view = facing === 'se' || facing === 'sw' ? 'front' : 'back';
   const P = drawAvatarV2(look, view, pose, undefined, legs);
-  if (facing === 'se' || facing === 'ne') return { px: P.d, owner: P.owner };
+  if (facing === 'se' || facing === 'ne') return { px: P.d, owner: P.owner, sealed: P.sealed, sourceMetadataVersion: 2, shoeLimb: P.shoeLimb, bodyPocket: P.bodyPocket,lowerGarment:P.lowerGarment };
   const px = new Uint8ClampedArray(P.d.length);
   const owner = new Uint8Array(P.owner.length);
+  const sealed = P.sealed ? new Uint8Array(P.sealed.length) : undefined;
+  const shoeLimb = P.shoeLimb ? new Uint8Array(P.shoeLimb.length) : undefined;
+  const bodyPocket = P.bodyPocket ? new Uint8Array(P.bodyPocket.length) : undefined;
+  const lowerGarment=P.lowerGarment?{...P.lowerGarment,vertices:P.lowerGarment.vertices.map(v=>({...v,point:[W-v.point[0],v.point[1]] as [number,number]})),mask:new Uint8Array(P.lowerGarment.mask.length)}:undefined;
   for (let y = 0; y < H; y++)
     for (let x = 0; x < W; x++) {
       const s = y * W + x;
       const d = y * W + (W - 1 - x);
       owner[d] = P.owner[s];
+      if (sealed) sealed[d] = P.sealed![s];
+      if (shoeLimb) shoeLimb[d] = P.shoeLimb![s];
+      if (bodyPocket) bodyPocket[d] = P.bodyPocket![s];
+      if (lowerGarment) lowerGarment.mask[d]=P.lowerGarment!.mask[s];
       for (let k = 0; k < 4; k++) px[d * 4 + k] = P.d[s * 4 + k];
     }
-  return { px, owner };
+  return { px, owner, sealed, sourceMetadataVersion: 2, shoeLimb, bodyPocket,lowerGarment };
 }
 
 export function renderAvatar(look: AvatarLoadout, facing: Facing, pose: Pose): Uint8ClampedArray {
@@ -156,14 +170,14 @@ export function lintAvatar(look: AvatarLoadout, facing: Facing, pose: Pose, r = 
     if (y < H - 1) stack.push(i + W);
   }
   // body: tops cover the chest, nothing shows through at the waist, shoes cover the feet
-  const chestGap = count(Z.chest, (o) => o === LAYER.none || o === LAYER.armBack || (o === LAYER.legs && !F.sitting));
+  const chestGap = count(Z.chest, (o) => o === LAYER.none || o === LAYER.armBack || ((o === LAYER.legs || o === LAYER.pelvis) && !F.sitting));
   if (chestGap > 0) issues.push({ kind: 'torso-gap', detail: `${chestGap} chest px not covered by the top` });
   const waistGap = count(Z.waist, (o) => o === LAYER.none || o === LAYER.armBack);
   if (waistGap > 0) issues.push({ kind: 'waist-gap', detail: `${waistGap} see-through px at the waist` });
   // (seated and seen from behind, the feet are on the far side of the body and don't show)
   if (L.shoes !== 'shoes.none' && L.mobility !== 'mob.wheelchair' && !(F.sitting && F.view === 'back')) {
     // bare = leg (skin / trouser) or nothing where a shoe belongs; hair or a held thing hiding the feet is fine
-    const bare = count(Z.feet, (o) => o === LAYER.legs || o === LAYER.none);
+    const bare = count(Z.feet, (o) => o === LAYER.legs || o === LAYER.pelvis || o === LAYER.none);
     if (bare > 2) issues.push({ kind: 'bare-feet', detail: `${bare} foot px not covered by shoes` });
   }
 
