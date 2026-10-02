@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import type { MemberSettings } from '@shared/domain/types';
 import { api } from '../app/api';
 import { game } from '../app/game';
@@ -14,7 +14,6 @@ const list = (s: string) =>
 export function ProfilePanel() {
   const me = useStore((s) => s.boot?.me);
   const prefs = useStore((s) => s.prefs);
-  const slackConnected = useStore((s) => s.boot?.slackConnected);
   const linked = useStore((s) => s.boot?.linked ?? null);
   const platform = useStore((s) => s.boot?.platform ?? 'local');
   // on a Slack company your name, title, pronouns and timezone are your Slack profile's; on Discord, your name there
@@ -22,11 +21,7 @@ export function ProfilePanel() {
   const inherited = (field: 'displayName' | 'title' | 'pronouns') => (fromPlatform === 'slack' ? true : fromPlatform === 'discord' ? field === 'displayName' : false);
   const sourceName = fromPlatform === 'slack' ? 'Slack' : 'Discord';
   const [knockDms, setKnockDms] = useState(me?.settings.slackKnockDms ?? false);
-  const [statusSync, setStatusSync] = useState<{ enabled: boolean; granted: boolean } | null>(null);
-  useEffect(() => {
-    if (slackConnected) api<{ enabled: boolean; granted: boolean }>('/slack/me/status-sync').then(setStatusSync).catch(() => setStatusSync(null));
-  }, [slackConnected]);
-  const discordLinked = useStore((s) => !!s.boot?.discordConnected);
+  const slackGranted = useStore((s) => !!s.boot?.slackGranted);
   const [f, setF] = useState(() => ({
     displayName: me?.displayName ?? '',
     title: me?.title ?? '',
@@ -118,51 +113,31 @@ export function ProfilePanel() {
               <input type="checkbox" checked={f.knocksWhileFocused} onChange={(e) => setF({ ...f, knocksWhileFocused: e.target.checked })} />
               <span>Let knocks through even when I’m focused</span>
             </label>
-            {(discordLinked || slackConnected) && (
+            {(platform === 'discord' || platform === 'slack') && (
               <label className="check">
                 <input type="checkbox" checked={f.voiceFollow} onChange={(e) => setF({ ...f, voiceFollow: e.target.checked })} />
                 <span>
-                  {discordLinked
+                  {platform === 'discord'
                     ? 'Voice follows me — while I’m in Discord voice, walking into a space moves me into its voice channel; switching channels in Discord walks me over'
                     : 'Voice follows me — when I join a huddle in Slack, my avatar walks into that huddle’s space'}
                 </span>
               </label>
             )}
-            {slackConnected && (
-              <div className="slack-status-sync">
-                {statusSync?.granted ? (
-                  <label className="check">
-                    <input
-                      type="checkbox"
-                      checked={statusSync.enabled}
-                      onChange={(e) => {
-                        const enabled = e.target.checked;
-                        setStatusSync({ ...statusSync, enabled });
-                        api('/slack/me/status-sync', { method: 'PUT', json: { enabled } }).catch((x) => (setStatusSync({ ...statusSync, enabled: !enabled }), toast(`Couldn’t save: ${(x as Error).message}`)));
-                      }}
-                    />
-                    <span>Mirror my status to Slack — the status and note I set here become my Slack status (emoji + text); Available clears it. (What you say in a space is posted as you, with your own account.)</span>
-                  </label>
+            {platform === 'slack' && (
+              <p className="check slack-account">
+                {slackGranted ? (
+                  <span>✅ Your Slack account is connected: what you say in a space is posted as you, and the status you set here is your Slack status.</span>
                 ) : (
-                  <p className="check">
+                  <>
                     <a className="btn small slack" href="/api/slack/me/connect">
                       💬 Connect my Slack account
                     </a>
-                    <span className="muted small"> One-time grant, your own account: what you say in a space is posted as you (no app tag), and the status you set here is mirrored to Slack. Slack → here already works.</span>
-                  </p>
+                    <span className="muted small"> Part of being here: posts as you, status both ways.</span>
+                  </>
                 )}
-                {statusSync?.granted && (
-                  <button
-                    type="button"
-                    className="btn small ghost"
-                    onClick={() => api('/slack/me/status-sync', { method: 'DELETE' }).then(() => setStatusSync({ enabled: false, granted: false })).catch((x) => toast(`Couldn’t disconnect: ${(x as Error).message}`))}
-                  >
-                    Disconnect my Slack account (posts go back to the app, status stops mirroring)
-                  </button>
-                )}
-              </div>
+              </p>
             )}
-            {slackConnected && (
+            {platform === 'slack' && (
               <label className="check">
                 <input
                   type="checkbox"

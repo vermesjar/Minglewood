@@ -939,6 +939,64 @@ code {
   font-size: 12px;
   font-weight: 700;
 }
+.photo {
+  cursor: zoom-in;
+}
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  background: rgba(20, 14, 24, 0.72);
+}
+.lightbox figure {
+  position: relative;
+  margin: 0;
+  padding: 10px;
+  background: #fff8ec;
+  border: 3px solid #2a1f2d;
+  border-radius: 16px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+}
+.lightbox img {
+  width: min(70vw, 420px);
+  height: min(70vw, 420px);
+  object-fit: cover;
+  border-radius: 12px;
+  image-rendering: auto;
+}
+.lightbox figcaption {
+  font-weight: 800;
+}
+.gate {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  display: grid;
+  place-items: center;
+  background: rgba(20, 14, 24, 0.78);
+  backdrop-filter: blur(3px);
+}
+.gate-card {
+  max-width: 520px;
+  padding: 28px;
+  display: grid;
+  gap: 12px;
+}
+.gate-list {
+  margin: 0;
+  padding-left: 20px;
+}
+.gate .btn.big {
+  justify-self: start;
+}
+.slack-account {
+  display: block;
+}
 .slack-status-sync {
   display: grid;
   gap: 6px;

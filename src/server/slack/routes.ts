@@ -558,10 +558,21 @@ export function slackRoutes(ctx: AppContext, mock?: MockSlack): Router {
     r.get('/dev/outbox', (_req, res) => res.json({ outbox: mock.outbox }));
     r.post('/dev/users', json, (req, res) => {
       const u = z
-        .object({ id: z.string().regex(/^U[A-Z0-9]{1,20}$/), name: z.string().max(60), is_admin: z.boolean().optional(), title: z.string().max(60).optional(), pronouns: z.string().max(20).optional(), tz: z.string().max(40).optional(), picture: z.string().url().max(300).optional() })
+        .object({ id: z.string().regex(/^U[A-Z0-9]{1,20}$/), name: z.string().max(60), is_admin: z.boolean().optional(), title: z.string().max(60).optional(), pronouns: z.string().max(20).optional(), tz: z.string().max(40).optional(), picture: z.string().url().max(300).optional(), huddleCall: z.string().max(40).nullable().optional() })
         .safeParse(req.body);
       if (!u.success) return res.status(400).json({ error: 'invalid user' });
-      mock.users.set(u.data.id, { id: u.data.id, real_name: u.data.name, is_admin: u.data.is_admin, tz: u.data.tz, profile: { display_name: u.data.name, title: u.data.title, pronouns: u.data.pronouns, image_192: u.data.picture } });
+      const prev = mock.users.get(u.data.id);
+      const huddle = u.data.huddleCall === undefined ? {} : u.data.huddleCall ? { huddle_state: 'in_a_huddle', huddle_state_call_id: u.data.huddleCall } : { huddle_state: 'default_unset' };
+      mock.users.set(u.data.id, { id: u.data.id, real_name: u.data.name, is_admin: u.data.is_admin, tz: u.data.tz, profile: { ...prev?.profile, display_name: u.data.name, title: u.data.title, pronouns: u.data.pronouns, image_192: u.data.picture, ...huddle } });
+      res.json({ ok: true });
+    });
+    /** A huddle thread in a mock channel's history (what the reconcile reads). */
+    r.post('/dev/huddle-thread', json, (req, res) => {
+      const b = z.object({ channel: z.string().regex(/^[CG][A-Z0-9]{2,20}$/), call: z.string().max(40), participants: z.array(z.string().max(20)).max(50), ended: z.boolean().optional() }).safeParse(req.body);
+      if (!b.success) return res.status(400).json({ error: 'invalid input' });
+      const list = mock.history.get(b.data.channel) ?? [];
+      list.push({ type: 'message', subtype: 'huddle_thread', ts: `${Math.floor(Date.now() / 1000)}.${String(list.length).padStart(6, '0')}`, user: mock.botUserId, text: '', ...({ room: { id: b.data.call, participants: b.data.participants, has_ended: !!b.data.ended } } as object) });
+      mock.history.set(b.data.channel, list);
       res.json({ ok: true });
     });
     /** Who the mock's "Sign in with Slack" signs in as. */

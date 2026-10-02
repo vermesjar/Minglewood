@@ -554,8 +554,8 @@ describe('Huddles with the people at your table (over HTTP, the mock out)', () =
     hub.setStatus(ari.memberId, 'meeting', 'from calendar', 'calendar');
     await settle();
     expect((await outbox()).outbox.filter((c) => c.method === 'users.profile.set').length).toBe(before);
-    // off: nothing goes out
-    await fetch(`${base}/api/slack/me/status-sync`, { method: 'PUT', headers: { cookie: ari.cookie, 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: false }) });
+    // the grant is the switch: forgetting it stops the mirror
+    await fetch(`${base}/api/slack/me/status-sync`, { method: 'DELETE', headers: { cookie: ari.cookie } });
     hub.setStatus(ari.memberId, 'focused', undefined);
     await settle();
     expect((await outbox()).outbox.filter((c) => c.method === 'users.profile.set').length).toBe(before);
@@ -587,6 +587,54 @@ describe('Huddles with the people at your table (over HTTP, the mock out)', () =
     expect(dms.map((d) => d.args.channel).sort()).toEqual(['DU43', 'DU44']);
     // not on a call: nothing to ask
     expect((await post('/huddle/ask', ari.cookie, { memberId: ari.memberId })).status).toBe(400);
+  });
+});
+
+describe('Reconcile: Slack is asked, not only listened to', () => {
+  let app: App;
+  let base: string;
+  const saved = { ...config.slack };
+  const TEAM = 'T0MOCK';
+  const dev = (path: string, json: unknown) => fetch(`${base}/api/slack/dev/${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(json) });
+
+  beforeAll(async () => {
+    Object.assign(config.slack, { signingSecret: 'test-signing-secret', teamId: TEAM, mock: true, botToken: '', clientId: 'c', clientSecret: 's' });
+    app = await createApp({ persistence: new MemoryPersistence(), simulateCoworkers: false });
+    await new Promise<void>((r) => app.server.listen(0, r));
+    base = `http://127.0.0.1:${(app.server.address() as AddressInfo).port}`;
+  });
+  afterAll(async () => {
+    await app.close();
+    Object.assign(config.slack, saved);
+  });
+
+  it('places someone whose huddle events never arrived, and takes them out when Slack says they left', async () => {
+    const hub = app.hubs.get(ORG_ID)!;
+    const maya = app.store.members(ORG_ID).find((m) => m.displayName.startsWith('Maya'))!;
+    await dev('users', { id: 'U1', name: 'Maya Chen', huddleCall: 'RMISSED' });
+    await dev('link', { userId: 'U1', member: 'maya' });
+    app.store.setBinding(ORG_ID, { id: 'br', orgId: ORG_ID, roomId: 'design', provider: 'slack', kind: 'voice', externalGuildId: TEAM, externalChannelId: 'C0DESIGN', label: '🎧 #design' }, 'design');
+    // Maya is in the world; no event ever said she joined a huddle — but Slack's history and profile say so
+    hub.connect({ id: 'c-maya-r', memberId: maya.id, sceneId: null, send: () => undefined });
+    hub.enter(maya.id, 'cafe', 'live');
+    await dev('huddle-thread', { channel: 'C0DESIGN', call: 'RMISSED', participants: ['U1'] });
+    await app.ctx.slack.reconcileHuddles();
+    expect(hub.presenceOf(maya.id).voice).toMatchObject({ providerChannelId: 'C0DESIGN', callId: 'RMISSED' });
+    expect(hub.actor(maya.id)?.sceneId).toBe('design'); // walked over, as a live join would
+    // Slack says she left (profile cleared); the room's thread ended — no event for either
+    await dev('users', { id: 'U1', name: 'Maya Chen', huddleCall: null });
+    await dev('huddle-thread', { channel: 'C0DESIGN', call: 'RMISSED', participants: [], ended: true });
+    await app.ctx.slack.reconcileHuddles();
+    expect(hub.presenceOf(maya.id).voice).toBeUndefined();
+    expect(hub.actor(maya.id)?.sceneId).toBe('design'); // still in the world herself; just off the call
+  });
+
+  it('is cheap: only linked channels are read and only people who are around are asked about', async () => {
+    const before = ((await (await fetch(`${base}/api/slack/dev/outbox`)).json()) as { outbox: SlackCall[] }).outbox.length;
+    await app.ctx.slack.reconcileHuddles();
+    const calls = ((await (await fetch(`${base}/api/slack/dev/outbox`)).json()) as { outbox: SlackCall[] }).outbox.slice(before);
+    expect(calls.filter((c) => c.method === 'conversations.history').map((c) => c.args.channel)).toEqual(['C0DESIGN']);
+    expect(calls.filter((c) => c.method === 'users.info').map((c) => c.args.user)).toEqual(['U1']); // Maya is in the world; nobody else linked is around
   });
 });
 

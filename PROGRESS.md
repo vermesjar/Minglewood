@@ -94,7 +94,11 @@
 - Profiles inherit from the platform: Slack → display name, title, pronouns, timezone, picture (at sign-in and on
   `user_change`); Discord → name and picture. Read-only in the game. Pictures show on cards, lists and chat lines.
 - "Connect my Slack account": one per-person grant (`chat:write` + `users.profile:write`) — posts as you, no app
-  tag; status mirrored. Required step of a Slack sign-in (declinable). Bot-with-your-name stays the fallback.
+  tag; status mirrored. Not a setting: a gate before the world on a Slack company (no toggle, no disconnect); the
+  app posts for you only while a token is dead.
+- Huddle reconcile: every 15 s the server asks Slack (linked channels' huddle threads, `users.info` for everyone
+  around) so a missed/out-of-order event corrects itself. Huddle events are traced in the server log.
+- Pictures: click any to enlarge. Profile wording follows the company's platform.
 
 ## Slack integration V1 (tag `slack-v1`, 2026-10-02)
 Everything below this heading up to the end of the day's entries is V1: sign-in, Add to Slack, chat both ways, history,
