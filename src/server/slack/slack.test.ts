@@ -325,7 +325,7 @@ describe('Slack, end to end (signed requests into a running server, the recordin
     const cookie = start.headers.getSetCookie().map((c) => c.split(';')[0]).join('; ');
     const cb = await fetch(`${base}/api/slack/install/callback?code=abc&state=${to.searchParams.get('state')}`, { headers: { cookie }, redirect: 'manual' });
     expect(cb.status).toBe(302);
-    expect(cb.headers.get('location')).toBe('/');
+    expect(cb.headers.get('location')).toBe('/?welcome=slack'); // the first real connection of this workspace
     expect(app.ctx.slack.connection(ORG_ID)).toMatchObject({ externalWorkspaceId: TEAM, displayName: 'Mock workspace', status: 'active' });
     // the token is kept server-side with the company (never in anything a client sees), and the installer is an admin
     expect(app.store.secret(ORG_ID, 'slackBotToken')).toBe('xoxb-mock-installed');

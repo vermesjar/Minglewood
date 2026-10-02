@@ -202,7 +202,8 @@ export function slackRoutes(ctx: AppContext, mock?: MockSlack): Router {
     if (!state || state !== req.query.state || !code) return res.redirect(admin ? back : '/?error=oauth_state');
     try {
       const inst = await ctx.slack.provider.install(code);
-      const owner = await ctx.slack.resolveOrg(inst.teamId);
+      // a world this workspace is really connected to (SLACK_TEAM_ID alone doesn't claim it)
+      const owner = await ctx.slack.connectedOrg(inst.teamId);
       res.setHeader('Set-Cookie', cookie('', 0));
       if (admin) {
         // from the admin console: this workspace is the admin's company's

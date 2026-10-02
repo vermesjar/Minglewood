@@ -74,6 +74,19 @@ export class SlackService {
     });
   }
 
+  /**
+   * The world a workspace is actually connected to (an install here, or a company on Minglewood Cloud) — unlike
+   * resolveOrg, SLACK_TEAM_ID doesn't count: it only says which world sign-ins land in before anyone connects.
+   */
+  async connectedOrg(teamId: string): Promise<string | undefined> {
+    const local = this.store.orgForWorkspace('slack', teamId);
+    if (local) return local;
+    return this.tenants?.forSlackTeam(teamId).catch((e) => {
+      console.warn('[cloud] slack team lookup failed:', (e as Error).message);
+      return undefined;
+    });
+  }
+
   /** A new company from an Add-to-Slack install (through Minglewood Cloud). */
   createCompany(t: NewSlackTenant): Promise<string> {
     if (!this.tenants) return Promise.reject(new Error('no control plane'));

@@ -8,6 +8,8 @@ import type { ControlPlane } from './controlPlane';
 import type { PersistedOrg } from '../store/store';
 import { pickOrg, upsertDiscordMember } from '../routes/auth';
 import { config } from '../config';
+import { issueToken, sessionCookie } from '../auth/session';
+import { DEFAULT_LOADOUT } from '@shared/avatar';
 
 /** In-memory stand-in for Minglewood Cloud. */
 function fakeCloud(tenants: TenantInfo[]) {
@@ -109,6 +111,53 @@ describe('multi-tenant worlds from Minglewood Cloud', () => {
     app = await createApp({ persistence: persistence(), simulateCoworkers: false, demo: false, cloud: cloud as unknown as ControlPlane });
     expect(app.store.get(orgId).rooms.find((r) => r.id === 'cafe')?.name).toBe('The Watering Hole');
     expect(app.store.get(orgId).artifacts.filter((a) => a.title === 'We moved into Minglewood')).toHaveLength(1);
+  });
+});
+
+describe('Add to Slack from the admin console of a company', () => {
+  const saved = { ...config.slack };
+  afterEach(() => Object.assign(config.slack, saved));
+
+  it('connects the workspace to the admin’s world even when SLACK_TEAM_ID points sign-ins at the demo world', async () => {
+    // Live on 2026-10-02: the admin of a Discord-installed company got "already connected to another Minglewood"
+    // because SLACK_TEAM_ID alone was taken as a connection to the demo world.
+    Object.assign(config.slack, { mock: true, signingSecret: 'test', clientId: 'c', clientSecret: 's', teamId: 'T0MOCK', botToken: '' });
+    const cloud = fakeCloud([acme]);
+    app = await createApp({
+      persistence: new CloudPersistence(new MemoryPersistence(), cloud as unknown as ControlPlane),
+      simulateCoworkers: false,
+      demo: true,
+      cloud: cloud as unknown as ControlPlane,
+    });
+    await new Promise<void>((r) => app!.server.listen(0, r));
+    const base = `http://127.0.0.1:${(app.server.address() as AddressInfo).port}`;
+    const orgId = `t-${acme.id}`;
+    const admin = app.store.createMember(orgId, {
+      displayName: 'Acme Admin', title: 'Ops', departmentId: 'dep-company', teamId: 'team-everyone', location: 'Remote', timezone: 'UTC',
+      startDate: '2026-01-01', askMeAbout: [], interests: [], role: 'admin', avatar: DEFAULT_LOADOUT, unlockedItems: [],
+      settings: { locationVisibility: 'everyone', knocksWhileFocused: false },
+    });
+    const session = sessionCookie(issueToken(admin.id, orgId)).split(';')[0];
+    const start = await fetch(`${base}/api/slack/install/start`, { headers: { cookie: session }, redirect: 'manual' });
+    expect(start.status).toBe(302);
+    const to = new URL(start.headers.get('location')!);
+    const cookie = [session, ...start.headers.getSetCookie().map((c) => c.split(';')[0])].join('; ');
+    const cb = await fetch(`${base}/api/slack/install/callback?code=abc&state=${to.searchParams.get('state')}`, { headers: { cookie }, redirect: 'manual' });
+    expect(cb.status).toBe(302);
+    expect(cb.headers.get('location')).toBe('/#/admin');
+    expect(app.ctx.slack.connection(orgId)).toMatchObject({ externalWorkspaceId: 'T0MOCK', connectedBy: admin.id, status: 'active' });
+    expect(app.store.secret(orgId, 'slackBotToken')).toBe('xoxb-mock-installed');
+    expect(app.ctx.slack.connection('org-northstar')).toBeUndefined();
+    // from now on, events for that workspace reach the company, not the demo
+    expect(await app.ctx.slack.resolveOrg('T0MOCK')).toBe(orgId);
+    // a second company's admin can't take it over
+    const other = app.store.createMember('org-northstar', { ...admin, id: undefined as unknown as string, orgId: undefined as unknown as string, departmentId: 'dep-eng', teamId: 'team-platform' } as never);
+    const s2 = sessionCookie(issueToken(other.id, 'org-northstar')).split(';')[0];
+    const start2 = await fetch(`${base}/api/slack/install/start`, { headers: { cookie: s2 }, redirect: 'manual' });
+    const to2 = new URL(start2.headers.get('location')!);
+    const cookie2 = [s2, ...start2.headers.getSetCookie().map((c) => c.split(';')[0])].join('; ');
+    const cb2 = await fetch(`${base}/api/slack/install/callback?code=abc&state=${to2.searchParams.get('state')}`, { headers: { cookie: cookie2 }, redirect: 'manual' });
+    expect(cb2.status).toBe(409);
   });
 });
 
