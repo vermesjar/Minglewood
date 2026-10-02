@@ -162,7 +162,8 @@ export class SlackProvider implements CommunicationProvider {
     return {
       kind: 'deeplink',
       label: huddle ? `Join the huddle in #${name}` : `Open #${name} in Slack`,
-      webUrl: `https://app.slack.com/client/${team}/${channel}`,
+      // app_redirect hands off to the desktop app ("Open Slack"), with the web client as the fallback
+      webUrl: `https://slack.com/app_redirect?team=${encodeURIComponent(team)}&channel=${encodeURIComponent(channel)}`,
       appUrl: `slack://channel?team=${team}&id=${channel}`,
       ...(huddle ? { liveWebUrl: `https://app.slack.com/huddle/${team}/${channel}` } : {}),
       explainer: huddle

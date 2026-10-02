@@ -314,7 +314,7 @@ describe('Slack join links', () => {
     const { SlackApi } = await import('./api');
     const p = new SlackProvider(new SlackApi(async () => ({ ok: true })), new SlackTokens(() => ''));
     const huddle = p.joinInstruction({ id: 'b', orgId: ORG_ID, roomId: 'cafe', provider: 'slack', kind: 'voice', externalGuildId: 'T1', externalChannelId: 'C1', label: '🎧 #cafe' });
-    expect(huddle).toMatchObject({ webUrl: 'https://app.slack.com/client/T1/C1', liveWebUrl: 'https://app.slack.com/huddle/T1/C1', appUrl: 'slack://channel?team=T1&id=C1' });
+    expect(huddle).toMatchObject({ webUrl: 'https://slack.com/app_redirect?team=T1&channel=C1', liveWebUrl: 'https://app.slack.com/huddle/T1/C1', appUrl: 'slack://channel?team=T1&id=C1' });
     const text = p.joinInstruction({ id: 'b', orgId: ORG_ID, roomId: 'cafe', provider: 'slack', kind: 'text', externalGuildId: 'T1', externalChannelId: 'C1', label: '#cafe' });
     expect(text.liveWebUrl).toBeUndefined();
     expect(text.label).toBe('Open #cafe in Slack');
