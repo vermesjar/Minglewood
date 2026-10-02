@@ -71,6 +71,7 @@ export async function createApp(opts: AppOptions): Promise<App> {
       const orgId = store.orgForWorkspace('slack', teamId);
       if (orgId) store.setSecret(orgId, 'slackBotToken', token);
     },
+    any: () => store.orgIds().some((orgId) => !!store.secret(orgId, 'slackBotToken')),
   });
   const slackApi = new SlackApi(slackMock?.transport);
   const slackProvider = new SlackProvider(slackApi, slackTokens);

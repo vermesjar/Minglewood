@@ -298,6 +298,32 @@ export function slackRoutes(ctx: AppContext, mock?: MockSlack): Router {
     }
   });
 
+  /**
+   * Put everyone who has signed in with Slack into every linked channel (a channel the setup created holds only
+   * the app; a huddle can't be started in a channel you're not in). Already-members are fine with Slack.
+   */
+  admin.post('/invite-all', async (req, res) => {
+    const { orgId, member } = authed(req);
+    const w = workspace(orgId);
+    if (!w) return res.status(400).json({ error: 'connect a Slack workspace first' });
+    const d = ctx.store.get(orgId);
+    const people = d.identities.filter((i) => i.provider === 'slack').map((i) => i.externalId);
+    const channels = [...new Set(d.bindings.filter((b) => b.provider === 'slack').map((b) => b.externalChannelId))];
+    if (!people.length) return res.json({ invited: 0, channels: 0, failed: [] });
+    const failed: Array<{ channelId: string; error: string }> = [];
+    for (const channelId of channels) {
+      try {
+        await ctx.slack.provider.api.conversationsInvite(w.token, channelId, people);
+      } catch (e) {
+        // already_in_channel is Slack saying "done" for everyone; anything else is worth showing
+        const err = e instanceof SlackApiError ? e.error : (e as Error).message;
+        if (err !== 'already_in_channel') failed.push({ channelId, error: err });
+      }
+    }
+    ctx.store.audit(orgId, member.id, 'slack.invited', w.teamId, `${people.length} people into ${channels.length} channels`);
+    res.json({ invited: people.length, channels: channels.length, failed });
+  });
+
   /** Join a bound public channel the app isn't in yet. */
   admin.post('/join', json, async (req, res) => {
     const { orgId, member } = authed(req);

@@ -66,6 +66,11 @@ function fakeApi() {
       api.channels.push(made);
       return made;
     }),
+    invited: [] as Array<{ channel: string; users: string[] }>,
+    conversationsInvite: vi.fn(async (_t: string, channel: string, users: string[]) => {
+      api.invited.push({ channel, users });
+      return api.channels.find((c) => c.id === channel)!;
+    }),
     authTest: vi.fn(async () => ({ user_id: 'UBOT', bot_id: 'BBOT', team_id: TEAM, team: 'Northstar', scopes: api.scopes })),
   };
   return api;
@@ -370,9 +375,14 @@ describe('Slack channel setup for every space', () => {
     const store = new Store(new MemoryPersistence());
     await store.init();
     const fake = fakeApi();
+    store.linkIdentity(ORG_ID, { provider: 'slack', externalId: 'UJAY', memberId: 'm1', linkedAt: '' });
+    store.linkIdentity(ORG_ID, { provider: 'slack', externalId: 'USAM', memberId: 'm2', linkedAt: '' });
     const { plan, failed } = await runSlackSetup({ store, orgId: ORG_ID, teamId: TEAM, token: 't', create: true, api: fake });
     expect(failed).toEqual([]);
     expect(fake.conversationsCreate).toHaveBeenCalled();
+    // everyone who signed in with Slack is put into the channels it created (a new channel holds only the app)
+    expect(fake.invited.length).toBe(fake.conversationsCreate.mock.calls.length);
+    expect(fake.invited[0].users).toEqual(['UJAY', 'USAM']);
     expect(fake.joined).toEqual(['CENG']);
     expect(store.bindingFor(ORG_ID, TOWN_ID, 'text')).toMatchObject({ externalChannelId: 'CGENERAL', label: '#general' });
     expect(store.bindingFor(ORG_ID, TOWN_ID, 'voice')).toMatchObject({ externalChannelId: 'CGENERAL', label: '🎧 #general' });

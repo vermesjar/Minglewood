@@ -13,6 +13,8 @@ import { dirname } from 'node:path';
 export interface TokenVault {
   get(teamId: string): string | undefined;
   set(teamId: string, token: string | null): void;
+  /** Is any workspace's token stored? (for capability flags, which aren't per workspace) */
+  any?(): boolean;
 }
 
 export class SlackTokens {
@@ -44,6 +46,11 @@ export class SlackTokens {
 
   has(teamId: string | undefined): boolean {
     return !!this.forTeam(teamId);
+  }
+
+  /** Any bot token at all: the env one, or one saved by an install here. */
+  hasAny(): boolean {
+    return !!this.envToken() || this.byTeam.size > 0 || !!this.vault?.any?.();
   }
 
   set(teamId: string, token: string) {

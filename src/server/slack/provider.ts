@@ -41,7 +41,7 @@ export class SlackProvider implements CommunicationProvider {
   ) {}
 
   get capabilities(): ProviderCapabilities {
-    const bot = this.tokens.has(undefined);
+    const bot = this.tokens.hasAny();
     return {
       identity: slackConfigured(),
       channelListing: bot,

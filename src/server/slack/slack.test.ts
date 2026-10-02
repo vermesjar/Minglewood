@@ -321,6 +321,19 @@ describe('Slack, end to end (signed requests into a running server, the recordin
     expect(ready.channels.every((c) => c.inChannel)).toBe(true);
   });
 
+  it('admin: puts everyone who signed in with Slack into every linked channel', async () => {
+    const signin = await fetch(`${base}/api/auth/demo`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Ops2', teamId: 'team-aurora', admin: true }) });
+    const cookie = signin.headers.getSetCookie().map((c) => c.split(';')[0]).join('; ');
+    const r = (await fetch(`${base}/api/slack/admin/invite-all`, { method: 'POST', headers: { cookie } }).then((x) => x.json())) as { invited: number; channels: number; failed: unknown[] };
+    expect(r.failed).toEqual([]);
+    expect(r.invited).toBeGreaterThan(0); // U1 (Maya) and U42 (Ari) at least
+    expect(r.channels).toBeGreaterThan(3);
+    // (the setup above already invited people into the channels it created; these are this action's calls)
+    const calls = (await outbox()).outbox.filter((c) => c.method === 'conversations.invite').slice(-r.channels);
+    expect(calls.length).toBe(r.channels);
+    expect(calls.every((c) => String(c.args.users).includes('U1'))).toBe(true);
+  });
+
   it('Add to Slack from the landing page connects the server’s workspace and signs the installer in as an admin', async () => {
     const start = await fetch(`${base}/api/slack/add`, { redirect: 'manual' });
     expect(start.status).toBe(302);

@@ -439,6 +439,16 @@ function SlackSetup({ data, reload }: TabProps) {
       setErr((e as Error).message);
     }
   };
+  const [invited, setInvited] = useState('');
+  const inviteAll = async () => {
+    setInvited('…');
+    try {
+      const r = await api<{ invited: number; channels: number; failed: Array<{ channelId: string; error: string }> }>('/slack/admin/invite-all', { method: 'POST' });
+      setInvited(r.failed.length ? `${r.invited} people into ${r.channels - r.failed.length} channels; ${r.failed.map((f) => f.error).join(', ')}` : `${r.invited} people are in all ${r.channels} linked channels.`);
+    } catch (e) {
+      setInvited((e as Error).message);
+    }
+  };
   const verb: Record<SlackSetupItem['action'], string> = { kept: 'kept', matched: 'linked', create: 'created', skip: 'no match' };
   const missing = ready?.scopes?.filter((s) => s.ok === false) ?? [];
   const notIn = ready?.channels?.filter((c) => c.inChannel === false) ?? [];
@@ -458,6 +468,14 @@ function SlackSetup({ data, reload }: TabProps) {
           Link, and create what’s missing
         </button>
         <span className="amuted">Creates a public channel per space that has none, and joins every channel it links. Existing links are kept.</span>
+      </div>
+      <div className="arow">
+        <button className="abtn" onClick={() => void inviteAll()}>
+          Add everyone to the linked channels
+        </button>
+        <span className="amuted">
+          Everyone who has signed in with Slack joins every linked channel (a channel the setup created holds only the app, and a huddle can’t be started in a channel you’re not in). {invited}
+        </span>
       </div>
       {result && (
         <ul className="alist">

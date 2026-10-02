@@ -239,6 +239,11 @@ export class SlackApi {
     return this.call<{ channel: SlackChannel }>('conversations.create', { name, is_private: false }, botToken).then((r) => r.channel);
   }
 
+  /** Invite people to a channel the app is in (channels:manage) — a channel the setup created has only the app in it. */
+  conversationsInvite(botToken: string, channel: string, users: string[]) {
+    return this.call<{ channel: SlackChannel }>('conversations.invite', { channel, users: users.join(',') }, botToken).then((r) => r.channel);
+  }
+
   /** Join a public channel (channels:join), so its messages and huddles reach us. Private ones need /invite. */
   conversationsJoin(botToken: string, channel: string) {
     return this.call<{ channel: SlackChannel }>('conversations.join', { channel }, botToken).then((r) => r.channel);
@@ -322,6 +327,10 @@ export class MockSlack {
         const made: SlackChannel = { id: `C0NEW${this.nextChannel++}`, name, is_member: true };
         this.channels.push(made);
         return { ok: true, channel: made };
+      }
+      case 'conversations.invite': {
+        const c = channelOf(call.args.channel);
+        return c ? { ok: true, channel: c } : { ok: false, error: 'channel_not_found' };
       }
       case 'conversations.join': {
         const c = channelOf(call.args.channel);

@@ -44,11 +44,16 @@ export function planSlackSetup(spaces: Space[], channels: SlackChannel[], bindin
   });
 }
 
-type Api = Pick<SlackApi, 'conversations' | 'conversationsCreate' | 'conversationsJoin'>;
+type Api = Pick<SlackApi, 'conversations' | 'conversationsCreate' | 'conversationsJoin' | 'conversationsInvite'>;
 
-/** Perform a plan: create what's missing, join public channels, and bind every space (text + huddle). */
+/**
+ * Perform a plan: create what's missing (and invite everyone who has signed in with Slack — a new channel holds
+ * only the app, and a huddle can't be started in a channel you're not in), join public channels, and bind every
+ * space (text + huddle).
+ */
 export async function runSlackSetup(opts: { store: Store; orgId: string; teamId: string; token: string; create: boolean; api: Api }): Promise<{ plan: SlackSetupItem[]; failed: Array<SlackSetupItem & { error: string }> }> {
   const d = opts.store.get(opts.orgId);
+  const people = d.identities.filter((i) => i.provider === 'slack').map((i) => i.externalId);
   const channels = await opts.api.conversations(opts.token);
   const plan = planSlackSetup(spacesOf(d.rooms), channels, d.bindings, opts.create);
   const failed: Array<SlackSetupItem & { error: string }> = [];
@@ -61,6 +66,7 @@ export async function runSlackSetup(opts: { store: Store; orgId: string; teamId:
         item.channelName = made.name;
         item.inChannel = true;
         item.isPrivate = false;
+        if (people.length) await opts.api.conversationsInvite(opts.token, made.id, people).catch((e) => console.warn(`[slack] inviting people to #${made.name}:`, (e as Error).message));
       } else if (item.inChannel === false && !item.isPrivate) {
         await opts.api.conversationsJoin(opts.token, item.channelId!);
         item.inChannel = true;
