@@ -15,11 +15,12 @@ const PURPOSE: Record<string, string> = {
   recreation: 'Recreation',
 };
 
-function JoinConversation({ binding, speaking }: { binding: BindingView; speaking: number }) {
+function JoinConversation({ binding, speaking, running }: { binding: BindingView; speaking: number; running: boolean }) {
   const demo = binding.provider === 'demo';
   const slack = binding.provider === 'slack';
+  const url = (running && binding.join.liveWebUrl) || binding.join.webUrl;
   const join = () => {
-    if (binding.join.kind === 'deeplink' && binding.join.webUrl) openLink(binding.join.webUrl);
+    if (binding.join.kind === 'deeplink' && url) openLink(url);
     else toast('Demo mode: in a connected workspace this opens the Discord voice channel for this room. Here the chatter is simulated.', 'info', undefined, 8000);
   };
   return (
@@ -41,7 +42,7 @@ function JoinConversation({ binding, speaking }: { binding: BindingView; speakin
         </div>
       </div>
       <button className="btn primary full" onClick={join}>
-        {slack ? (binding.kind === 'text' ? 'Open in Slack' : 'Join in Slack') : binding.kind === 'text' ? 'Open channel' : 'Join the conversation'}
+        {slack ? (binding.kind === 'text' ? 'Open in Slack' : running ? 'Join the huddle' : 'Start a huddle in Slack') : binding.kind === 'text' ? 'Open channel' : 'Join the conversation'}
       </button>
       <p className="fineprint">{binding.join.explainer}</p>
     </div>
@@ -126,7 +127,7 @@ export function RoomPanel() {
           <p className="muted small">Everyone here shows as focused. Knocks wait until they come up for air. No voice channel — on purpose.</p>
         </div>
       ) : binding ? (
-        <JoinConversation binding={binding} speaking={speaking} />
+        <JoinConversation binding={binding} speaking={speaking} running={people.some((p) => p.voice?.providerChannelId === binding.externalChannelId)} />
       ) : (
         <p className="muted small">No conversation channel is bound to this room yet. Admins can add one.</p>
       )}

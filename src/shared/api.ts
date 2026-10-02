@@ -40,6 +40,11 @@ export interface JoinInstruction {
   label: string;
   webUrl?: string;
   appUrl?: string;
+  /**
+   * A link that goes straight into the conversation while one is running (Slack: the huddle link, which only
+   * works once a huddle exists in the channel). The client uses it when someone in the room is already in it.
+   */
+  liveWebUrl?: string;
   /** Plain-language explanation of what happens next (shown in the UI). */
   explainer: string;
 }
