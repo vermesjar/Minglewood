@@ -75,8 +75,8 @@ export const config = {
     teamId: env.SLACK_TEAM_ID || (slackMock ? 'T0MOCK' : ''),
     signInRedirectUri: env.SLACK_REDIRECT_URI ?? `${env.PUBLIC_URL ?? 'http://localhost:5173'}/api/slack/auth/callback`,
     installRedirectUri: env.SLACK_INSTALL_REDIRECT_URI ?? `${env.PUBLIC_URL ?? 'http://localhost:5173'}/api/slack/install/callback`,
-    /** Where a person's "sync my status" grant lands (user scopes, their own token). */
-    statusRedirectUri: env.SLACK_STATUS_REDIRECT_URI ?? `${env.PUBLIC_URL ?? 'http://localhost:5173'}/api/slack/status/callback`,
+    /** Where a person's "sync my status" grant lands: the install redirect (already registered with Slack) unless overridden. */
+    statusRedirectUri: env.SLACK_STATUS_REDIRECT_URI ?? env.SLACK_INSTALL_REDIRECT_URI ?? `${env.PUBLIC_URL ?? 'http://localhost:5173'}/api/slack/install/callback`,
     adminUserIds: (env.SLACK_ADMIN_USER_IDS ?? '').split(',').map((s) => s.trim()).filter(Boolean),
     /** Local development without a workspace: outgoing Slack calls are recorded instead of sent. */
     mock: slackMock,

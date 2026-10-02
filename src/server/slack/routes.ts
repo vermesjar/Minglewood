@@ -151,6 +151,11 @@ export function slackRoutes(ctx: AppContext, mock?: MockSlack): Router {
 
   /* ------------------------------------------------------------------ add to a workspace */
 
+  /** A status grant's state cookie is marked, so the install callback (where it lands by default) knows it. */
+  const STATUS_MARK = 'status.';
+  const finishStatusGrantRef: { fn: (req: Request, res: Response) => Promise<unknown> } = { fn: async () => undefined };
+  const finishStatusGrant = (req: Request, res: Response) => void finishStatusGrantRef.fn(req, res);
+
   const startInstall = (res: Response) => {
     const state = randomBytes(16).toString('hex');
     res.setHeader('Set-Cookie', cookie(state, 600));
@@ -197,6 +202,8 @@ export function slackRoutes(ctx: AppContext, mock?: MockSlack): Router {
   };
 
   r.get('/install/callback', async (req, res) => {
+    // a person's status grant lands here too (the redirect Slack already knows); its state cookie says so
+    if ((parseCookies(req.headers.cookie)[STATE_COOKIE] ?? '').startsWith(STATUS_MARK)) return requireMember(ctx)(req, res, () => finishStatusGrant(req, res));
     const state = parseCookies(req.headers.cookie)[STATE_COOKIE] ?? '';
     const code = typeof req.query.code === 'string' ? req.query.code : '';
     const session = sessionFromRequest(req);
@@ -245,25 +252,24 @@ export function slackRoutes(ctx: AppContext, mock?: MockSlack): Router {
 
   /* ------------------------------------------------------------------ sync my status to Slack */
 
-  const STATUS_COOKIE = 'mw_slack_status_state';
-  const statusCookie = (value: string, maxAge: number) =>
-    `${STATUS_COOKIE}=${value}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${config.isProd ? '; Secure' : ''}`;
-
   /** A person grants Minglewood the right to set their own Slack status (OAuth v2 user scope). */
   r.get('/status/connect', requireMember(ctx), (req, res) => {
     const { orgId } = authed(req);
     if (!slackConfigured()) return res.status(404).send('Slack is not configured. See docs/slack.md.');
     if (!oauthLimiter.allow(req.ip ?? 'x')) return res.status(429).send('Too many attempts');
     const state = randomBytes(16).toString('hex');
-    res.setHeader('Set-Cookie', statusCookie(state, 600));
+    res.setHeader('Set-Cookie', cookie(`${STATUS_MARK}${state}`, 600));
     res.redirect(ctx.slack.provider.statusGrantUrl(state, ctx.slack.teamFor(orgId)));
   });
 
-  r.get('/status/callback', requireMember(ctx), async (req, res) => {
+  r.get('/status/callback', requireMember(ctx), finishStatusGrant);
+
+  /** (declared above the install callback, which is where the grant lands by default) */
+  async function finishStatusGrantImpl(req: Request, res: Response) {
     const { orgId, member } = authed(req);
-    const state = parseCookies(req.headers.cookie)[STATUS_COOKIE] ?? '';
+    const state = (parseCookies(req.headers.cookie)[STATE_COOKIE] ?? '').replace(STATUS_MARK, '');
     const code = typeof req.query.code === 'string' ? req.query.code : '';
-    res.setHeader('Set-Cookie', statusCookie('', 0));
+    res.setHeader('Set-Cookie', cookie('', 0));
     if (!state || state !== req.query.state || !code) return res.redirect('/?error=oauth_state');
     try {
       const g = await ctx.slack.provider.statusGrant(code);
@@ -280,7 +286,8 @@ export function slackRoutes(ctx: AppContext, mock?: MockSlack): Router {
       console.error('[slack] status grant failed', (e as Error).message);
       res.redirect('/?error=slack_failed');
     }
-  });
+  }
+  finishStatusGrantRef.fn = finishStatusGrantImpl;
 
   r.put('/me/status-sync', requireMember(ctx), json, (req, res) => {
     const { orgId, member } = authed(req);

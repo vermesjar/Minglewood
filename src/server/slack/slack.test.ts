@@ -421,7 +421,9 @@ describe('Huddles with the people at your table (over HTTP, the mock out)', () =
     const to = new URL(start.headers.get('location')!);
     expect(to.searchParams.get('user_scope')).toBe('users.profile:write');
     const cookie = [ari.cookie, ...start.headers.getSetCookie().map((c) => c.split(';')[0])].join('; ');
-    const cb = await fetch(`${base}/api/slack/status/callback?code=abc&state=${to.searchParams.get('state')}`, { headers: { cookie }, redirect: 'manual' });
+    expect(to.searchParams.get('redirect_uri')).toBe(config.slack.statusRedirectUri);
+    // it lands on the install callback by default (the redirect Slack already knows), which recognises it
+    const cb = await fetch(`${base}/api/slack/install/callback?code=abc&state=${to.searchParams.get('state')}`, { headers: { cookie }, redirect: 'manual' });
     expect(cb.headers.get('location')).toBe('/?status=slack');
     expect(app.store.member(ORG_ID, ari.memberId)?.settings.slackStatusSync).toBe(true);
     expect(app.store.secret(ORG_ID, `slackUser:${ari.memberId}`)).toBe('xoxp-mock-user');

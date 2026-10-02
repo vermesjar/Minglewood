@@ -150,7 +150,6 @@ oauth_config:
   redirect_urls:
     - https://HOST/api/slack/auth/callback
     - https://HOST/api/slack/install/callback
-    - https://HOST/api/slack/status/callback
   scopes:
     user:
       - openid
@@ -238,7 +237,7 @@ Set these in `.env` locally, or in Render → the service → **Environment**. N
 | `SLACK_BOT_TOKEN` | Optional. OAuth & Permissions → **Install to Workspace** → *Bot User OAuth Token* (`xoxb-…`), for a single-workspace server. Not needed when workspaces are added with **Add to Slack** (their tokens are kept server-side, see below). |
 | `SLACK_TEAM_ID` | Optional. Your workspace id (`T…`, the first id in `app.slack.com/client/T…/…`). Ties this server's single world to that workspace, so people can sign in before an admin connects anything, and lets **Add to Slack** on the landing page connect it. |
 | `SLACK_ADMIN_USER_IDS` | Optional, comma-separated Slack user ids (`U…`) that become Minglewood admins. Workspace owners and admins, and whoever installs the app, already do. |
-| `SLACK_REDIRECT_URI`, `SLACK_INSTALL_REDIRECT_URI`, `SLACK_STATUS_REDIRECT_URI` | Optional. They default to `PUBLIC_URL` + `/api/slack/auth/callback`, `/api/slack/install/callback` and `/api/slack/status/callback`. |
+| `SLACK_REDIRECT_URI`, `SLACK_INSTALL_REDIRECT_URI`, `SLACK_STATUS_REDIRECT_URI` | Optional. They default to `PUBLIC_URL` + `/api/slack/auth/callback` and `/api/slack/install/callback`; the status grant lands on the install redirect too (no extra URL to register), unless you set its own. |
 
 Restart. The startup line says `slack: configured`.
 
