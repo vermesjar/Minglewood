@@ -112,11 +112,16 @@ describe('Slack OAuth', () => {
     const posted = fetchTransport({ method: 'chat.postMessage', token: 'xoxb-1', args: { channel: 'C1', text: 'hi' } });
     await vi.advanceTimersByTimeAsync(1000);
     await posted;
+    // read methods don't take JSON (Slack answers invalid_arguments): form-encoded, non-strings serialised
+    await fetchTransport({ method: 'conversations.info', token: 'xoxb-1', args: { channel: 'C1' } });
+    await fetchTransport({ method: 'conversations.list', token: 'xoxb-1', args: { types: 'public_channel', exclude_archived: true, limit: 200 } });
     vi.useRealTimers();
     expect(seen[0]).toMatchObject({ url: 'https://slack.com/api/oauth.v2.access', type: 'application/x-www-form-urlencoded', body: 'client_id=c&code=x' });
-    expect(seen[1]).toMatchObject({ url: 'https://slack.com/api/chat.postMessage', auth: 'Bearer xoxb-1' });
+    expect(seen[1]).toMatchObject({ url: 'https://slack.com/api/chat.postMessage', auth: 'Bearer xoxb-1', type: 'application/json; charset=utf-8' });
     expect(JSON.parse(seen[1].body)).toEqual({ channel: 'C1', text: 'hi' });
-    expect(seen).toHaveLength(3);
+    expect(seen[3]).toMatchObject({ url: 'https://slack.com/api/conversations.info', type: 'application/x-www-form-urlencoded', auth: 'Bearer xoxb-1', body: 'channel=C1' });
+    expect(seen[4].body).toBe('types=public_channel&exclude_archived=true&limit=200');
+    expect(seen).toHaveLength(5);
   });
 });
 

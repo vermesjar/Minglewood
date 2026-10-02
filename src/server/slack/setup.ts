@@ -28,9 +28,10 @@ export function planSlackSetup(spaces: Space[], channels: SlackChannel[], bindin
       const ch = live.find((c) => c.id === bound.externalChannelId);
       return { spaceId: space.id, spaceName: space.name, action: 'kept', channelId: bound.externalChannelId, channelName: ch?.name ?? bound.label.replace(/^(🎧\s*)?#/, ''), inChannel: ch?.is_member, isPrivate: ch?.is_private };
     }
+    // The town is the workspace's default channel: #general, or #all-<workspace> in newer workspaces (is_general).
     const best = live
       .filter((c) => !used.has(c.id))
-      .map((c) => ({ c, s: scoreChannelName(space, c.name) }))
+      .map((c) => ({ c, s: space.id === TOWN_ID && c.is_general ? 4 : scoreChannelName(space, c.name) }))
       .filter((x) => x.s > 0)
       .sort((a, b) => b.s - a.s || a.c.name.localeCompare(b.c.name))[0];
     if (best) {

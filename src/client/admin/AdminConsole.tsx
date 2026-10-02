@@ -175,8 +175,9 @@ function OrgTab({ data, reload }: TabProps) {
 }
 
 type Provider = 'demo' | 'discord' | 'slack';
-/** Slack bindings are channels whose huddle is the room's voice; Discord's are voice channels. */
-const channelMark = (provider: Provider, c: ExternalChannel) => (c.kind === 'text' ? '#' : provider === 'slack' ? '🎧 #' : '🔊 ');
+/** A binding's label prefix: Discord by channel type; Slack by slot (a channel is both a space's text and its huddle). */
+const channelMark = (provider: Provider, c: ExternalChannel, slot: 'voice' | 'text') =>
+  provider === 'slack' ? (slot === 'text' ? '#' : '🎧 #') : c.kind === 'text' ? '#' : '🔊 ';
 
 /** A place in the world that can have channels: the town (the company's "general") and every room. */
 interface SpaceRow {
@@ -196,7 +197,7 @@ function ChannelSelect({ list, provider, value, onChange, slot }: { list: Extern
       {options.map((c) => (
         <option key={c.id} value={c.id}>
           {c.parentName ? `${c.parentName} / ` : ''}
-          {slot === 'voice' && provider === 'slack' ? '🎧 #' : channelMark(provider, c)}
+          {channelMark(provider, c, slot)}
           {c.name}
         </option>
       ))}
@@ -228,7 +229,7 @@ function SpaceRowView({ space, data, channels, reload }: { space: SpaceRow; data
         provider,
         kind: slot === 'text' ? 'text' : ch?.kind === 'stage' ? 'stage' : 'voice',
         externalChannelId: id,
-        label: ch ? `${slot === 'voice' && provider === 'slack' ? '🎧 #' : channelMark(provider, ch)}${ch.name}` : id,
+        label: ch ? `${channelMark(provider, ch, slot)}${ch.name}` : id,
       },
     });
   };

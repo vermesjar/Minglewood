@@ -12,7 +12,7 @@ const CAPS: Array<[keyof ProviderCapabilities, string, string, boolean]> = [
   ['speakingIndicators', 'Live speaking indicators', 'Slack exposes no audio or speaking state for huddles.', false],
   ['directVoiceJoin', 'Put people into a huddle automatically', 'No Slack API starts or joins a huddle for someone. We deep-link instead.', false],
   ['voiceFollow', 'Move you between huddles as you walk', 'No Slack API moves someone between huddles. Walking into a space shows a one-click “Switch to the huddle in #…” instead.', false],
-  ['deepLinkJoin', 'Open the channel’s huddle in Slack', 'app.slack.com/huddle/{team}/{channel} — one click to join.', true],
+  ['deepLinkJoin', 'Open the channel in Slack', 'app.slack.com/client/{team}/{channel}; the headphones button there starts or joins the huddle (Slack has no reliable link straight into a huddle).', true],
   ['embeddedApp', 'Run inside Slack', 'Slack has no embedded-app surface like Discord Activities; link previews and /minglewood cover it.', false],
 ];
 

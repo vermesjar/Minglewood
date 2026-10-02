@@ -298,6 +298,8 @@ describe('Slack channel setup for every space', () => {
       ['cafe', 'matched', 'cafe', false],
       ['eng', 'create', 'engineering-studio', undefined],
     ]);
+    // newer workspaces call the default channel #all-<workspace>: Slack's is_general flag wins for the town
+    expect(planSlackSetup(spaces, [{ id: '9', name: 'all-acme', is_general: true }, ...channels.slice(1)], [], false)[0]).toMatchObject({ action: 'matched', channelId: '9' });
     // without creating, a space with no match is skipped; the town is never "created" (Slack always has #general)
     expect(planSlackSetup(spaces, channels.slice(1), [], false).map((p) => p.action)).toEqual(['skip', 'matched', 'skip']);
     expect(planSlackSetup(spaces, channels.slice(1), [], true)[0].action).toBe('skip');

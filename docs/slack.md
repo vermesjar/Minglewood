@@ -8,7 +8,8 @@ world engine doesn't know which one is connected. This document records what Sla
 ## Spaces are channels
 
 Every space in the world is a Slack channel. In Slack a channel is both a conversation and a huddle, so each space has
-**one** channel: the town is the workspace's **#general**, each room has a channel named after it. Slack is the book of
+**one** channel: the town is the workspace's default channel (**#general**, or **#all-<workspace>** in newer
+workspaces), each room has a channel named after it. Slack is the book of
 record: Minglewood mirrors and drives it, and stores no messages of its own.
 
 | | |
@@ -19,7 +20,7 @@ record: Minglewood mirrors and drives it, and stores no messages of its own.
 | **Rename, archive or delete a channel in Slack → the space follows** (label updated / link removed). |
 | **Join a huddle in Slack → you appear in its space**, sitting down, even if you never opened Minglewood — the way Discord voice works. If you were already walking around, your avatar walks over (Profile → *Voice follows me* turns that off). |
 | **Walk into a space while you're in a huddle elsewhere → one click to switch.** Slack has no API that moves someone between huddles (Discord does, for voice), so the chat panel shows **🎧 Switch to the huddle in #café** instead of moving you. |
-| **Join the huddle** — a room bound to a channel shows the huddle link (`app.slack.com/huddle/{team}/{channel}`); you click Join in Slack. |
+| **Join the huddle** — a room bound to a channel opens that channel in Slack; the headphones button at the top starts or joins its huddle. (Slack has no reliable link that opens a huddle: `app.slack.com/huddle/…` answers "Server Error" when none is running.) |
 | **Talk light (opt-in)** — Slack doesn't tell apps who's speaking, so members can let their own browser watch their mic *level* while in a huddle (🎙️ in the chat panel). Only "talking yes/no" leaves the page. |
 | **Status → status** — Calendar "In a meeting" → *In a meeting*. Do Not Disturb, headphones, "focus" → *Focused*. Vacation, lunch, sick, commuting → *Away*. 👋 or "say hi" → *Open to chat*. Anything else shows as a note. Status only applies while someone is around (in the world or in a huddle). |
 | **/minglewood** — `who` · `where @maya` · `join @maya` · `wave @maya` · `knock @maya` · `room design` · `help`. Replies are private (ephemeral). |

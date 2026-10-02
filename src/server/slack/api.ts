@@ -26,16 +26,23 @@ export interface SlackCall {
 /** Sends one Web API call and returns Slack's JSON body. */
 export type SlackTransport = (call: SlackCall) => Promise<Record<string, unknown>>;
 
-/** The real transport: form-encoded for OAuth exchanges, JSON for everything else; waits out one 429. */
+/**
+ * Methods that accept a JSON body (https://api.slack.com/web#posting_json): the ones with nested arguments
+ * (blocks, unfurls). Every other method is sent form-encoded — Slack answers `invalid_arguments` to JSON on
+ * read methods like conversations.info.
+ */
+const JSON_METHODS = new Set(['chat.postMessage', 'chat.unfurl', 'chat.update', 'conversations.open']);
+
+/** The real transport: JSON only where Slack takes it, form-encoded otherwise; waits out one 429. */
 export const fetchTransport: SlackTransport = async (call) => {
-  const oauth = call.method.startsWith('oauth.') || call.method === 'openid.connect.token';
+  const json = JSON_METHODS.has(call.method);
   const headers: Record<string, string> = {
-    'Content-Type': oauth ? 'application/x-www-form-urlencoded' : 'application/json; charset=utf-8',
+    'Content-Type': json ? 'application/json; charset=utf-8' : 'application/x-www-form-urlencoded',
   };
   if (call.token) headers.Authorization = `Bearer ${call.token}`;
-  const body = oauth
-    ? new URLSearchParams(Object.entries(call.args).map(([k, v]) => [k, String(v)])).toString()
-    : JSON.stringify(call.args);
+  const body = json
+    ? JSON.stringify(call.args)
+    : new URLSearchParams(Object.entries(call.args).map(([k, v]) => [k, typeof v === 'string' ? v : JSON.stringify(v)])).toString();
   for (let attempt = 0; ; attempt++) {
     const res = await fetch(`${SLACK_API}/${call.method}`, { method: 'POST', headers, body });
     if (res.status === 429 && attempt === 0) {
@@ -108,6 +115,8 @@ export interface SlackUser {
 export interface SlackChannel {
   id: string;
   name: string;
+  /** The workspace's default channel (#general, or #all-<workspace> in newer workspaces). */
+  is_general?: boolean;
   is_private?: boolean;
   is_member?: boolean;
   is_archived?: boolean;
@@ -259,7 +268,7 @@ export class MockSlack {
   readonly users = new Map<string, SlackUser>();
   readonly channels: SlackChannel[] = [
     { id: 'C0CAFE', name: 'cafe', is_member: true },
-    { id: 'C0HQ', name: 'general', is_member: true },
+    { id: 'C0HQ', name: 'general', is_member: true, is_general: true },
     { id: 'C0ENG', name: 'eng', is_member: false },
     { id: 'C0LAUNCH', name: 'launch-war-room', is_member: true },
     { id: 'C0EVENTS', name: 'all-hands', is_member: true },

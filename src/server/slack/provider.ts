@@ -132,14 +132,16 @@ export class SlackProvider implements CommunicationProvider {
     const channel = binding.externalChannelId;
     const name = binding.label.replace(/^[^#\w]*#?/, '');
     const huddle = binding.kind !== 'text';
+    // Slack has no reliable link that opens a huddle (app.slack.com/huddle/… answers "Server Error" when none is
+    // running), so both open the channel; the headphones button at the top starts or joins its huddle.
     return {
       kind: 'deeplink',
       label: huddle ? `Join the huddle in #${name}` : `Open #${name} in Slack`,
-      webUrl: huddle ? `https://app.slack.com/huddle/${team}/${channel}` : `https://app.slack.com/client/${team}/${channel}`,
+      webUrl: `https://app.slack.com/client/${team}/${channel}`,
       appUrl: `slack://channel?team=${team}&id=${channel}`,
       explainer: huddle
-        ? 'Opens the channel’s huddle in Slack — click Join there. Slack doesn’t let apps put you into a huddle automatically.'
-        : 'Opens the channel in Slack.',
+        ? 'Opens the channel in Slack — click the headphones (Huddle) button at the top to start or join its huddle. Slack doesn’t let apps put you into a huddle automatically.'
+        : 'Opens the channel in Slack. What’s said here in the world is posted there too.',
     };
   }
 }
