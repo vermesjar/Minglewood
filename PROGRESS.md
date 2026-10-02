@@ -88,6 +88,12 @@
   https://minglewood.onrender.com. First install ("Minglewood Test") created its world within a minute; the
   installer signed in via Discord and landed as admin. Bot intentionally has only View Channels.
 
+## Slack integration V1 (tag `slack-v1`, 2026-10-02)
+Everything below this heading up to the end of the day's entries is V1: sign-in, Add to Slack, chat both ways, history,
+one-click channel setup, huddles → rooms, silent-disco badges, huddle actions, status both ways, link previews,
+/minglewood, knock DMs. Live on the Minglewood test workspace. Known limits are Slack's (no API to start/join/move
+huddles, no audio) and are documented in docs/slack.md.
+
 ## Slack — spaces are their channels (2026-10-02)
 - Slack now matches the Discord bridge: what's said in a space is posted to its channel under the speaker's Slack name and
   picture (`chat:write.customize`, with a bot fallback); channel messages show in the space and as a bubble over the
