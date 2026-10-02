@@ -5,7 +5,7 @@ import { game } from '../app/game';
 import { setState, useStore } from '../app/store';
 import { AvatarCanvas, Modal, StatusDot } from './common';
 
-type Filter = 'all' | 'open' | 'here' | 'team';
+type Filter = 'all' | 'available' | 'here' | 'team';
 
 /** Accessible, list-based equivalent of the world: everyone, where they are, how to reach them. */
 export function PeoplePanel() {
@@ -21,7 +21,7 @@ export function PeoplePanel() {
     const list = [...members.values()].filter((m) => {
       const d = directory[m.id];
       if (query && !`${m.displayName} ${m.title}`.toLowerCase().includes(query)) return false;
-      if (filter === 'open') return d?.online && d.status === 'open';
+      if (filter === 'available') return d?.online && (d.status === 'available' || d.status === 'open');
       if (filter === 'here') return d?.online && !!d.sceneId;
       if (filter === 'team') return m.teamId === boot.me.teamId;
       return true;
@@ -56,7 +56,7 @@ export function PeoplePanel() {
             {(
               [
                 ['all', 'Everyone'],
-                ['open', 'Open to chat'],
+                ['available', 'Available'],
                 ['here', 'Around now'],
                 ['team', 'My team'],
               ] as Array<[Filter, string]>

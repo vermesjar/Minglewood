@@ -11,21 +11,22 @@ export interface StatusMeta {
 }
 
 export const STATUS_META: Record<PresenceStatus, StatusMeta> = {
+  /** Legacy alias of Available (older clients and Slack's 👋 still send it); the hub folds it into Available. */
   open: {
-    label: 'Open to chat',
-    short: 'Open',
+    label: 'Available',
+    short: 'Available',
     color: '#2fbf71',
-    emoji: '💬',
+    emoji: '🙂',
     interruptible: true,
-    description: 'Come say hi — I’d love the company.',
+    description: 'Around — come say hi.',
   },
   available: {
     label: 'Available',
     short: 'Available',
-    color: '#5fb0ff',
+    color: '#2fbf71',
     emoji: '🙂',
     interruptible: true,
-    description: 'Around and reachable.',
+    description: 'Around — come say hi.',
   },
   focused: {
     label: 'Focused',
@@ -61,7 +62,7 @@ export const STATUS_META: Record<PresenceStatus, StatusMeta> = {
   },
 };
 
-export const SETTABLE_STATUSES: PresenceStatus[] = ['open', 'available', 'focused', 'meeting', 'away'];
+export const SETTABLE_STATUSES: PresenceStatus[] = ['available', 'focused', 'meeting', 'away'];
 
 export const EMOTES = {
   wave: { emoji: '👋', label: 'Wave' },

@@ -725,6 +725,7 @@ export class OrgHub extends EventEmitter<HubEvents> {
   /* ------------------------------------------------------------------ presence & social */
 
   setStatus(memberId: string, status: PresenceStatus, note: string | undefined, source: PresenceState['source'] = 'manual', until?: string) {
+    if (status === 'open') status = 'available'; // "open to chat" is what Available means
     const p = this.presenceOf(memberId);
     const wasInterruptible = STATUS_META[p.status].interruptible;
     p.status = status;

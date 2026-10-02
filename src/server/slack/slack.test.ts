@@ -41,12 +41,12 @@ describe('Slack status → Minglewood status', () => {
     expect(mapSlackStatus({ emoji: ':palm_tree:', text: 'Vacationing' })?.status).toBe('away');
     expect(mapSlackStatus({ text: 'out sick' })?.status).toBe('away');
     expect(mapSlackStatus({ emoji: ':headphones:', text: 'heads down' })?.status).toBe('focused');
-    expect(mapSlackStatus({ emoji: ':wave:', text: 'come say hi' })?.status).toBe('open');
+    expect(mapSlackStatus({ emoji: ':wave:', text: 'come say hi' })).toMatchObject({ status: 'available', note: 'come say hi' });
     expect(mapSlackStatus({ emoji: ':taco:', text: 'taco tuesday' })).toEqual({ status: 'available', note: 'taco tuesday', until: undefined });
   });
 
   it('maps a Minglewood status to a Slack status that reads back as the same status', () => {
-    for (const s of ['open', 'focused', 'meeting', 'away'] as const) {
+    for (const s of ['focused', 'meeting', 'away'] as const) {
       const out = slackStatusFor(s, undefined, undefined)!;
       expect(mapSlackStatus({ text: out.status_text, emoji: out.status_emoji })?.status).toBe(s);
     }

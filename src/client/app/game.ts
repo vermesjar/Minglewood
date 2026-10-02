@@ -25,7 +25,7 @@ import { api, ApiError, setActivityTransport } from './api';
 import { Realtime } from './socket';
 import { getState, loadLocal, persistLocal, setState, toast } from './store';
 import { isInDiscordActivity, openLink, startActivity } from '../discord/activity';
-import { roomVoiceChannel, voiceBadge } from './huddles';
+import { badgeTitle, roomVoiceChannel, voiceBadge } from './huddles';
 
 export const QUESTS: Array<{ id: string; label: string; hint: string }> = [
   { id: 'avatar', label: 'Make your avatar yours', hint: 'Open your wardrobe from the top-right.' },
@@ -191,7 +191,13 @@ class Game {
       nameOf: (id) => getState().membersById.get(id)?.displayName ?? 'Someone',
       voiceBadge: (id) => {
         const s = getState();
-        return voiceBadge(s.occupants[id], roomVoiceChannel(s.boot?.bindings, s.sceneId), Object.values(s.occupants));
+        const all = Object.values(s.occupants);
+        const badge = voiceBadge(s.occupants[id], roomVoiceChannel(s.boot?.bindings, s.sceneId), all);
+        if (badge?.kind === 'other') {
+          const names = all.filter((o) => o.memberId !== id && o.voice?.callId === badge.callId).map((o) => s.membersById.get(o.memberId)?.displayName.split(' ')[0] ?? '…');
+          badge.title = badgeTitle(badge, names);
+        } else if (badge) badge.title = badgeTitle(badge, []);
+        return badge;
       },
     });
     this.applyPrefs();
@@ -493,7 +499,7 @@ class Game {
         name: r.name,
         emoji: r.emoji,
         count: here.length,
-        openCount: here.filter((d) => d.status === 'open').length,
+        openCount: here.filter((d) => d.status === 'available' || d.status === 'open').length,
         faces: here.map((d) => s.membersById.get(d.memberId)?.avatar).filter((a): a is AvatarLoadout => !!a),
         event: ev ? `${ev.kind === 'birthday' ? '🎂' : '🎉'} ${ev.kind === 'birthday' ? 'Party now!' : 'Happening now'}` : undefined,
       });
@@ -1263,7 +1269,7 @@ class Game {
 }
 
 function rank(s: PresenceStatus) {
-  return ['open', 'available', 'meeting', 'focused', 'away', 'offline'].indexOf(s);
+  return ['available', 'open', 'meeting', 'focused', 'away', 'offline'].indexOf(s);
 }
 
 function pathKey(p: Tile[]) {

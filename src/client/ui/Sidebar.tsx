@@ -103,7 +103,7 @@ export function Sidebar() {
     if (!d.online || !d.sceneId) continue;
     const c = counts.get(d.sceneId) ?? { n: 0, open: 0 };
     c.n++;
-    if (d.status === 'open') c.open++;
+    if (d.status === 'available' || d.status === 'open') c.open++;
     counts.set(d.sceneId, c);
   }
   const townCount = counts.get(TOWN_ID)?.n ?? 0;

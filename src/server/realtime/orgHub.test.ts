@@ -322,11 +322,11 @@ describe('OrgHub', () => {
   it('marks people in quiet rooms as focused', () => {
     const a = newMember(store, 'Ada');
     hub.connect(client(a.id));
-    hub.setStatus(a.id, 'open', 'say hi');
+    hub.setStatus(a.id, 'available', 'say hi');
     hub.enter(a.id, 'focus', 'live');
     expect(hub.presenceOf(a.id).status).toBe('focused');
     hub.enter(a.id, 'town', 'live');
-    expect(hub.presenceOf(a.id)).toMatchObject({ status: 'open', note: 'say hi' });
+    expect(hub.presenceOf(a.id)).toMatchObject({ status: 'available', note: 'say hi' });
   });
 
   it('refuses chat bubbles in quiet rooms', () => {

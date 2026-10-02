@@ -83,8 +83,16 @@ interface ActorView {
   walkClock: number;
   /** A walk that reached us late, being caught up on: `debt` ms behind at `at`, paid off over `span` ms. */
   catchUp?: { at: number; debt: number; span: number };
-  bubble?: { text: string; start: number; until: number };
+  /**
+   * What they've said lately, oldest first. Bubbles linger (the chat is the point of being in a room) and the
+   * layout lifts older ones above newer ones, so a busy conversation reads top-down like a chat column.
+   */
+  bubbles: Array<{ text: string; start: number; until: number }>;
   emotes: Array<{ emoji: string; start: number }>;
+  /** Their last headphone badge (kind/colour/shape), to notice when it changes. */
+  lastBadge?: string;
+  /** A badge just changed: a ring in the new colour bursts from the head and a line floats up saying what happened. */
+  pulse?: { start: number; color: string; text: string; slash: boolean };
   waveUntil: number;
   /** Briefly working something they used (the jukebox, the cue, the watering can). */
   workUntil?: number;
@@ -766,6 +774,7 @@ export class WorldView {
       moving: false,
       walkClock: 0,
       emotes: [],
+      bubbles: [],
       waveUntil: 0,
       blinkAt: this.animationNow() + 1000 + Math.random() * 5000,
       blinkUntil: 0,
@@ -1264,11 +1273,28 @@ export class WorldView {
     return !!a && this.livePos(a).moving;
   }
 
+  /** How long a line stays up: long enough to come back to, longer for a longer line, never past half a minute. */
+  static bubbleLife(text: string) {
+    return Math.min(30_000, 14_000 + text.length * 70);
+  }
+  /** The newest line is being *spoken* for this long (mouth, no idling); after that it just stays up. */
+  static talkingFor(text: string) {
+    return 2_500 + text.length * 45;
+  }
+  static readonly MAX_BUBBLES = 4;
+
   say(memberId: string, text: string) {
     const a = this.actors.get(memberId);
     if (!a) return;
     const now = this.animationNow();
-    a.bubble = { text, start: now, until: now + 3500 + text.length * 55 };
+    a.bubbles.push({ text, start: now, until: now + WorldView.bubbleLife(text) });
+    if (a.bubbles.length > WorldView.MAX_BUBBLES) a.bubbles.splice(0, a.bubbles.length - WorldView.MAX_BUBBLES);
+  }
+
+  /** The line they're saying right now (a fresh bubble), if any. */
+  private talking(a: ActorView, now: number) {
+    const last = a.bubbles[a.bubbles.length - 1];
+    return last && now - last.start < WorldView.talkingFor(last.text) ? last : undefined;
   }
 
   emote(memberId: string, emote: EmoteId) {
@@ -1476,7 +1502,7 @@ export class WorldView {
       this.tickSeat(a, this.animationNow());
       this.tickLife(a, this.animationNow());
       a.emotes = a.emotes.filter((e) => this.animationNow() - e.start < 1800);
-      if (a.bubble && this.animationNow() > a.bubble.until) a.bubble = undefined;
+      if (a.bubbles.length) a.bubbles = a.bubbles.filter((b) => this.animationNow() <= b.until);
     }
     // gentle follow
     const me = this.actors.get(this.meId);
@@ -1549,7 +1575,7 @@ export class WorldView {
       }
     }
     if (this.reducedMotion || a.npc) return null;
-    if (this.party && a.groove.dances && !a.occ.carrying && !a.bubble) return this.dancePose(a, now);
+    if (this.party && a.groove.dances && !a.occ.carrying && !this.talking(a, now)) return this.dancePose(a, now);
     if (a.idle && now < a.idle.until && a.idle.kind !== 'glance') return a.idle.kind;
     return null;
   }
@@ -1561,7 +1587,7 @@ export class WorldView {
 
   /** Idle moments come and go on each person's own clock; anything that needs them cancels one. */
   private tickLife(a: ActorView, now: number) {
-    const busy = a.moving || !!a.seat || !!a.occ.sittingOn || !!a.occ.carrying || !!a.bubble || !!a.npc || (!!a.act && now < a.act.until);
+    const busy = a.moving || !!a.seat || !!a.occ.sittingOn || !!a.occ.carrying || !!this.talking(a, now) || !!a.npc || (!!a.act && now < a.act.until);
     if (busy || this.reducedMotion) {
       a.idle = undefined;
       if (now >= a.nextIdleAt) a.nextIdleAt = now + 4000 + Math.random() * 8000;
@@ -1889,7 +1915,7 @@ export class WorldView {
    */
   private expression(a: ActorView): Expression | undefined {
     const now = this.animationNow();
-    if (a.bubble && now < a.bubble.until) return Math.floor(now / 140) % 2 ? 'talk' : undefined;
+    if (this.talking(a, now)) return Math.floor(now / 140) % 2 ? 'talk' : undefined;
     if (now >= a.blinkAt) {
       a.blinkUntil = now + 120;
       a.blinkAt = now + 2500 + Math.random() * 3500;
@@ -2044,6 +2070,7 @@ export class WorldView {
     const list = [...this.actors.values()].sort((p, q) => p.sy - q.sy);
     const obstacles: Rect[] = [];
     const bubbles: BubbleSpec[] = [];
+    const pulses: Array<{ x: number; y: number; top: number; pulse: NonNullable<ActorView['pulse']> }> = [];
     const emotes: Array<{ a: ActorView; x: number; top: number }> = [];
     // the bubble's little head: a 24 × 24 crop of the sprite at 1:1, crown to chin
     const headCrop = { x: 33, y: 33, w: 24, h: 24 };
@@ -2079,10 +2106,22 @@ export class WorldView {
         }
         // the headphone badge: on the room's call (gold), another call (its color), or none (grey, slashed)
         const badge = this.cb.voiceBadge?.(id) ?? null;
+        const badgeKey = badge ? `${badge.kind}:${badge.color}:${badge.shape ?? ''}` : '';
+        if (a.lastBadge !== undefined && badgeKey !== a.lastBadge && badge && !a.npc) {
+          // a change worth a glance: on the room's call, on another one, or off every call
+          const words = badge.title ? badge.title.charAt(0).toLowerCase() + badge.title.slice(1) : badge.kind === 'none' ? 'off the call' : 'in a huddle';
+          const text = badge.kind === 'none' ? '🔇 off the call' : `${badge.shape === 'phone' ? '📱' : '🎧'} ${words.replace(/ — .*$/, '')}`;
+          a.pulse = { start: now, color: badge.color, text, slash: badge.kind === 'none' };
+        }
+        a.lastBadge = badgeKey;
+        const pulse = a.pulse && now - a.pulse.start < 2200 ? a.pulse : undefined;
+        if (a.pulse && !pulse) a.pulse = undefined;
+        const pop = pulse ? 1 + 0.6 * Math.max(0, 1 - (now - pulse.start) / 500) : 1;
+        if (pulse) pulses.push({ x: hx, y: hy + 4, top, pulse });
         if (badge && !(showName || isMe)) {
           // no name tag: the badge sits where the name would be, so who's hearing what is always visible
           const br = 7;
-          drawHeadphones(c, hx, top - br - 2, br, badge);
+          drawHeadphones(c, hx, top - br - 2, br * pop, badge);
           const r = { x: hx - br - 2, y: top - 2 * br - 4, w: 2 * br + 4, h: 2 * br + 4 };
           obstacles.push(r);
           top = r.y - 3;
@@ -2096,7 +2135,7 @@ export class WorldView {
             bg: isMe ? '#ffd23f' : hovered ? '#ffffff' : 'rgba(255,248,236,0.96)',
             padX: isMe && !focus ? 5 : 6,
           });
-          if (badge) drawHeadphones(c, r.x + r.w - r.h / 2 - 2, r.y + r.h / 2, r.h * 0.34, badge);
+          if (badge) drawHeadphones(c, r.x + r.w - r.h / 2 - 2, r.y + r.h / 2, r.h * 0.34 * pop, badge);
           obstacles.push(r);
           top = r.y - 3;
         }
@@ -2106,26 +2145,56 @@ export class WorldView {
         obstacles.push(r);
         top = r.y - 3;
       }
-      if (a.bubble && now < a.bubble.until) {
-        const age = now - a.bubble.start;
+      if (a.bubbles.length) {
         const spr = avatarSprite(this.look(a), 'se', 'stand');
-        bubbles.push({
-          key: id,
-          anchorX: hx,
-          anchorY: top,
-          name: a.npc ? a.npc.def.name : isMe ? 'You' : this.cb.nameOf(id).split(' ')[0],
-          text: a.bubble.text,
-          start: a.bubble.start,
-          alpha: Math.max(0, Math.min(1, age / 150, (a.bubble.until - now) / 400)),
-          accent: a.npc ? '#2f5d46' : undefined,
-          head: { img: spr.canvas, sx: headCrop.x, sy: headCrop.y, sw: headCrop.w, sh: headCrop.h },
-        });
+        const name = a.npc ? a.npc.def.name : isMe ? 'You' : this.cb.nameOf(id).split(' ')[0];
+        for (const b of a.bubbles) {
+          if (now >= b.until) continue;
+          const age = now - b.start;
+          bubbles.push({
+            key: `${id}:${b.start}`,
+            anchorX: hx,
+            anchorY: top,
+            name,
+            text: b.text,
+            start: b.start,
+            alpha: Math.max(0, Math.min(1, age / 150, (b.until - now) / 700)),
+            accent: a.npc ? '#2f5d46' : undefined,
+            head: { img: spr.canvas, sx: headCrop.x, sy: headCrop.y, sw: headCrop.w, sh: headCrop.h },
+          });
+        }
       }
       if (a.emotes.length) emotes.push({ a, x: hx, top });
     }
     // every bubble placed at once (so none covers another), drawn oldest first so the newest reads on top
     const placed = layoutBubbles(c, bubbles, obstacles, this.vw, this.bubbleMemory);
     for (const b of placed.sort((p, q) => p.start - q.start)) drawBubble(c, b);
+    // badge changes: a ring bursts outward in the new colour, and a line floats up saying what happened
+    for (const { x, y, top, pulse } of pulses) {
+      const k = (now - pulse.start) / 2200;
+      const ring = Math.min(1, k * 2.4);
+      if (ring < 1) {
+        c.save();
+        c.globalAlpha = (1 - ring) * 0.9;
+        c.strokeStyle = pulse.color;
+        c.lineWidth = 3 - ring * 2;
+        c.beginPath();
+        c.arc(x, y, 10 + ring * 42, 0, Math.PI * 2);
+        c.stroke();
+        if (pulse.slash) {
+          c.strokeStyle = '#e0453b';
+          c.beginPath();
+          c.arc(x, y, 6 + ring * 30, 0, Math.PI * 2);
+          c.stroke();
+        }
+        c.restore();
+      }
+      const rise = (this.reducedMotion ? 0.3 : Math.min(1, k)) * 26;
+      c.save();
+      c.globalAlpha = Math.max(0, Math.min(1, k * 6, (1 - k) * 3));
+      pill(c, x, top - 6 - rise, pulse.text, { size: 10, bg: pulse.color, fg: pulse.slash ? '#f4efe6' : '#2a1f2d', padX: 6, border: '#2a1f2d' });
+      c.restore();
+    }
     for (const { a, x, top } of emotes)
       for (const e of a.emotes) {
         const k = (now - e.start) / 1800;

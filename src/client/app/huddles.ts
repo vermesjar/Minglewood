@@ -33,6 +33,8 @@ export interface VoiceBadge {
   callId?: string;
   /** 'other' only: on the phone — nobody else in this room is on that call. */
   shape?: 'headphones' | 'phone';
+  /** What it means, in words (set by the caller who knows the names). */
+  title?: string;
 }
 
 type Voiced = Pick<Occupant, 'voice'> | { voice?: Occupant['voice'] } | undefined;

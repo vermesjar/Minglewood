@@ -98,7 +98,7 @@ export interface ExternalIdentity {
  */
 export type PresenceStatus =
   | 'available'
-  | 'open' // open to chat
+  | 'open' // legacy: the same as 'available' (the hub folds it in)
   | 'focused'
   | 'meeting'
   | 'away'

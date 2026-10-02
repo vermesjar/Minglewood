@@ -113,5 +113,5 @@
   (decision pending).
 - Status both ways (2026-10-02): Slack → world as before; world → Slack after a one-time per-person grant (Profile →
   Sync my status to Slack, user scope `users.profile:write`, token kept server-side): the status + note you set here
-  become your Slack status (emoji + text + expiry), Available clears it, the echo is recognised so neither side
+  become your Slack status (👋 🎧 📅 🚶 + text + expiry), Available clears it, the echo is recognised so neither side
   fights the other. Only self-set statuses are mirrored.

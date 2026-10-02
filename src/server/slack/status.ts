@@ -22,12 +22,12 @@ export interface MappedStatus {
 }
 
 const MEETING_EMOJI = new Set([':spiral_calendar_pad:', ':calendar:', ':date:', ':spiral_calendar:', ':telephone_receiver:', ':phone:']);
-const AWAY_EMOJI = new Set([':palm_tree:', ':airplane:', ':face_with_thermometer:', ':thermometer:', ':bus:', ':car:', ':knife_fork_plate:', ':hamburger:', ':sandwich:', ':sleeping:', ':baby_bottle:']);
+const AWAY_EMOJI = new Set([':walking:', ':palm_tree:', ':airplane:', ':face_with_thermometer:', ':thermometer:', ':bus:', ':car:', ':knife_fork_plate:', ':hamburger:', ':sandwich:', ':sleeping:', ':baby_bottle:']);
 const FOCUS_EMOJI = new Set([':headphones:', ':no_bell:', ':brain:', ':male-technologist:', ':female-technologist:', ':technologist:', ':computer:']);
 const OPEN_EMOJI = new Set([':wave:', ':coffee:', ':speech_balloon:']);
 
 const MEETING_TEXT = /\b(in a meeting|meeting|on a call|in a call|interview|1:1|standup|stand-up)\b/i;
-const AWAY_TEXT = /\b(vacation|vacationing|ooo|out of (the )?office|out sick|sick|holiday|pto|parental leave|lunch|brb|be right back|commuting|away|afk)\b/i;
+const AWAY_TEXT = /\b(vacation|vacationing|ooo|out of (the )?office|out sick|sick|holiday|pto|parental leave|lunch|brb|be right back|stepped (away|out)|commuting|away|afk)\b/i;
 const FOCUS_TEXT = /\b(focus|focusing|heads[ -]?down|deep work|do not disturb|dnd|writing)\b/i;
 const OPEN_TEXT = /\b(open to chat|say hi|come say hi|ping me|happy to chat)\b/i;
 
@@ -36,16 +36,16 @@ export function slackStatusFor(status: PresenceStatus, note: string | undefined,
   const expiration = until ? Math.max(0, Math.floor(Date.parse(until) / 1000)) || 0 : 0;
   const text = (note ?? '').trim().slice(0, 100);
   switch (status) {
-    case 'open':
-      return { status_emoji: ':wave:', status_text: text || 'Open to chat', status_expiration: expiration };
+    case 'open': // legacy alias of available
+    case 'available':
+      return text ? { status_emoji: ':speech_balloon:', status_text: text, status_expiration: expiration } : null;
     case 'focused':
       return { status_emoji: ':headphones:', status_text: text || 'Focused', status_expiration: expiration };
     case 'meeting':
       return { status_emoji: ':spiral_calendar_pad:', status_text: text || 'In a meeting', status_expiration: expiration };
     case 'away':
-      return { status_emoji: ':palm_tree:', status_text: text || 'Away', status_expiration: expiration };
-    case 'available':
-      return text ? { status_emoji: ':speech_balloon:', status_text: text, status_expiration: expiration } : null;
+      // "Stepped away" — not a holiday (🌴 reads as vacation)
+      return { status_emoji: ':walking:', status_text: text || 'Stepped away', status_expiration: expiration };
     default:
       return null;
   }
@@ -61,6 +61,6 @@ export function mapSlackStatus(s: SlackStatusInput): MappedStatus | null {
   if (MEETING_EMOJI.has(emoji) || MEETING_TEXT.test(text)) return { status: 'meeting', note, until };
   if (AWAY_EMOJI.has(emoji) || AWAY_TEXT.test(text)) return { status: 'away', note, until };
   if (FOCUS_EMOJI.has(emoji) || FOCUS_TEXT.test(text)) return { status: 'focused', note, until };
-  if (OPEN_EMOJI.has(emoji) || OPEN_TEXT.test(text)) return { status: 'open', note, until };
+  if (OPEN_EMOJI.has(emoji) || OPEN_TEXT.test(text)) return { status: 'available', note, until };
   return { status: 'available', note, until };
 }
