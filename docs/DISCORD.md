@@ -33,7 +33,9 @@ record: Minglewood mirrors and drives it, and stores no messages of its own.
   would take your personal token, which Discord bans.
 - **Talk light (opt-in).** Discord doesn't tell apps who's speaking, so members can let their own
   browser watch their mic *level* while in voice (🎙️ in the chat panel, or Profile). Only "talking
-  yes/no" leaves the page; no audio is recorded or sent. Hidden while muted in Discord.
+  yes/no" leaves the page; no audio is recorded or sent — the audio graph is microphone → analyser with no
+  output, recorder, peer connection or upload (`micActivity.test.ts` fails if the detector ever names one), and
+  the server's schema for the message keeps nothing but the boolean. Hidden while muted in Discord.
 - Quiet rooms have no channels, on purpose.
 
 Code: `src/server/providers/discord/bridge.ts` (chat, history, voice follow, channel sync),

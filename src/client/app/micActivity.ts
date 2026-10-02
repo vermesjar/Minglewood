@@ -5,12 +5,19 @@
  * letting their own browser watch their mic level while they're in voice. Only a yes/no ("talking now")
  * ever leaves the page — no audio is recorded, stored or sent. Works best with headphones: with speakers,
  * other people's voices coming out of them can be heard by the mic.
+ *
+ * The guarantee, in code: the audio graph is microphone → AnalyserNode and nothing else (no destination, no
+ * MediaRecorder, no peer connection, no upload — micActivity.test.ts asserts this file never names one), and
+ * the only thing handed out is the boolean below; the wire message for it is `{ t: 'speaking', on: boolean }`,
+ * which the server validates with a schema that carries no other field.
  */
 export class MicActivity {
   private stream: MediaStream | null = null;
   private ctx: AudioContext | null = null;
   private timer: number | null = null;
   private talking = false;
+  /** How often the level is sampled (ms); the attack and release below are in these samples. */
+  static readonly SAMPLE_MS = 25;
   /** Running estimate of the room's background level. */
   private floor = 0.008;
   private loudFrames = 0;
@@ -44,23 +51,23 @@ export class MicActivity {
       let sum = 0;
       for (const v of buf) sum += v * v;
       this.tick(Math.sqrt(sum / buf.length), performance.now());
-    }, 50);
+    }, MicActivity.SAMPLE_MS);
     return true;
   }
 
   /** One level sample (RMS, 0–1). Exposed for tests. */
   tick(rms: number, now: number) {
     // The floor follows quiet stretches quickly and loud ones very slowly, so talking doesn't raise it.
-    if (rms < this.floor * 1.6) this.floor = this.floor * 0.95 + rms * 0.05;
-    else this.floor *= 1.0015;
+    if (rms < this.floor * 1.6) this.floor = this.floor * 0.975 + rms * 0.025;
+    else this.floor *= 1.00075;
     this.floor = Math.min(Math.max(this.floor, 0.002), 0.05);
     const loud = rms > Math.max(0.012, this.floor * 3.2);
     if (loud) {
       this.loudFrames++;
       this.lastLoud = now;
     } else this.loudFrames = 0; // starting needs an unbroken run of voice
-    // Start after ~150 ms of unbroken voice (a click or a keypress isn't talking); stop ~450 ms after it goes quiet.
-    const next = this.talking ? now - this.lastLoud < 450 : this.loudFrames >= 3;
+    // Start after ~75 ms of unbroken voice (a click or a keypress isn't talking); stop ~300 ms after it goes quiet.
+    const next = this.talking ? now - this.lastLoud < 300 : this.loudFrames >= 3;
     if (next !== this.talking) {
       this.talking = next;
       this.onChange(next);
