@@ -339,6 +339,24 @@ describe('Slack, end to end (signed requests into a running server, the recordin
   });
 });
 
+describe('Slack bridge during boot', () => {
+  it('tolerates simulated coworkers chatting before the Slack service exists (no workspace yet → nothing to post)', async () => {
+    // Render crashed on 2026-10-02: LifeSim said something while createApp was still awaiting tenants, and the
+    // bridge touched the not-yet-assigned service. The app must boot with the sim on and a say must not throw.
+    const app = await createApp({ persistence: new MemoryPersistence(), simulateCoworkers: true });
+    try {
+      const hub = app.hubs.get(ORG_ID)!;
+      const sim = app.store.members(ORG_ID).find((m) => m.simulated)!;
+      hub.enter(sim.id, 'cafe', 'sim');
+      expect(() => hub.say(sim.id, 'morning!')).not.toThrow();
+      await new Promise((r) => setTimeout(r, 20));
+      expect(app.ctx.slack).toBeDefined();
+    } finally {
+      await app.close();
+    }
+  });
+});
+
 // keep the mock's defaults honest: every method it's asked for in the flows above answers ok
 describe('MockSlack', () => {
   it('answers the Web API calls Minglewood makes', async () => {

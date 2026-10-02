@@ -74,13 +74,16 @@ export async function createApp(opts: AppOptions): Promise<App> {
   });
   const slackApi = new SlackApi(slackMock?.transport);
   const slackProvider = new SlackProvider(slackApi, slackTokens);
+  // The service is built once tenants are known (below); until then the bridge has no workspace to talk to.
+  // (Simulated coworkers start chatting during boot, so this must never throw.)
+  let slack: SlackService | null = null;
   // Each space *is* its Slack channel too: chat both ways, history, renames followed.
   const slackBridge = new SlackBridge({
     store,
     api: slackApi,
     tokens: slackTokens,
     hubFor: (orgId) => ensureHub(orgId),
-    teamFor: (orgId) => slack.teamFor(orgId),
+    teamFor: (orgId) => slack?.teamFor(orgId),
   });
   // Each space *is* its Discord channels: chat both ways, history, voice that follows you (needs the bot).
   const bridge = discordBotConfigured()
@@ -126,7 +129,7 @@ export async function createApp(opts: AppOptions): Promise<App> {
     return undefined;
   };
 
-  const slack: SlackService = new SlackService(store, ensureHub, slackProvider, slackBridge, tenants);
+  slack = new SlackService(store, ensureHub, slackProvider, slackBridge, tenants);
   slack.start();
 
   const ctx: AppContext = { store, hubs, discord: new DiscordProvider(), demo: new DemoProvider(), slack, resolveGuild, discordBridge: bridge };
