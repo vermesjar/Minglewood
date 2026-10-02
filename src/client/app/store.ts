@@ -65,6 +65,8 @@ export interface State {
   welcomeOpen: boolean;
   prefs: Prefs;
   hoverLabel: string | null;
+  /** A picture opened large (click on any small one). */
+  photoView: { url: string; name: string } | null;
   inDiscord: boolean;
   announce: string;
   /**
@@ -105,6 +107,7 @@ let state: State = {
   events: [],
   selection: null,
   panel: null,
+  photoView: null,
   toasts: [],
   knocks: [],
   greeted: [],

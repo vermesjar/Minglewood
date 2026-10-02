@@ -36,17 +36,23 @@ Connect the workspace or server first (its tab), then choose it. The pick decide
 (Spaces & channels shows only that platform), how people are expected to sign in, and where profiles are inherited
 from. Unpicked, the company runs as whatever is connected (Slack first), then local.
 
-**Your account.** Signing in with Slack on a Slack company sends you, once, to *Connect my Slack account* — a grant
-of your own token with `chat:write` and `users.profile:write`. With it, what you say in a space is posted **as you**
-(your account, no app tag, in your own Slack history), and the status you set here is mirrored to Slack. Decline and
-you still land in the world; the profile offers it again. Without it, posts go out from the app under your name and
-picture. A revoked token turns both off and the profile says so. Tokens live server-side with the world, keyed by
-member, never in anything a client receives.
+**Your account is your character.** Signing in with Slack on a Slack company sends you to *Connect my Slack
+account* — a grant of your own token with `chat:write` and `users.profile:write` — and the world stays behind a gate
+until it's done. With it, what you say in a space is posted **as you** (your account, no app tag, in your own Slack
+history), and the status you set here is your Slack status. It isn't a setting: there's no toggle and no disconnect.
+If the token stops working (revoked in Slack), the app posts for you under your name until you connect again, and
+the profile shows the gate's button. Tokens live server-side with the world, keyed by member, never in anything a
+client receives.
+
+**Events, and asking.** Huddle and status changes arrive as events, but events can be missed or land out of order
+(Slack sends "you're in a huddle" and "which channel" separately). So every 15 s the server also *asks*: a linked
+channel's recent history for its huddle thread (which call, who's on it), and `users.info` for everyone who is
+around (in the world or on a call). A drift corrects itself within one reconcile; nobody has to leave and rejoin.
 
 **Your profile is your Slack profile.** Display name, title, pronouns, timezone and picture are read from Slack at
 every sign-in and whenever Slack says they changed (`user_change`); those fields are read-only in the game ("edit it
 in Slack"). On a Discord company the name (your nickname there) and picture follow Discord the same way. Pictures show
-on cards, in room and people lists, and by chat lines.
+on cards, in room and people lists, and by chat lines; click any to see it large.
 
 ## Silent disco: who's hearing what
 

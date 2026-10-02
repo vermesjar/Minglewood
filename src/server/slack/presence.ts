@@ -71,6 +71,7 @@ export class SlackPresence {
     const member = d.members.get(memberId);
     const actor = this.hub.actor(memberId);
     if (!binding || !member || member.settings.voiceFollow === false || actor?.via !== 'live' || actor.sceneId === binding.roomId) return;
+    console.log(`[slack] huddle: walking ${memberId} into ${binding.roomId} (${channel})`);
     this.hub.enter(memberId, binding.roomId, 'live');
     const place = binding.roomId === TOWN_ID ? 'town' : (d.rooms.find((r) => r.id === binding.roomId)?.name ?? 'the room');
     this.hub.notify(memberId, `🎧 You joined the huddle in ${binding.label.replace(/^🎧\s*/, '')} — walked you over to ${place}.`);

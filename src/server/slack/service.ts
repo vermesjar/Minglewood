@@ -145,15 +145,22 @@ export class SlackService {
         }
         return;
       case 'user_huddle_changed':
-        if (typeof ev.user === 'object') presence.userHuddle(ev.user.id, ev.user.profile?.huddle_state, ev.user.profile?.huddle_state_call_id);
+        if (typeof ev.user === 'object') {
+          console.log(`[slack] huddle: ${ev.user.id} ${ev.user.profile?.huddle_state ?? '?'} ${ev.user.profile?.huddle_state_call_id ?? ''}`);
+          presence.userHuddle(ev.user.id, ev.user.profile?.huddle_state, ev.user.profile?.huddle_state_call_id);
+        }
         return;
       case 'dnd_updated_user':
         if (typeof ev.user === 'string' && ev.dnd_status) presence.dnd(ev.user, ev.dnd_status);
         return;
       case 'message':
-        if (ev.subtype === 'huddle_thread' && ev.room && channelId) presence.huddleRoom(channelId, ev.room);
-        else if (ev.subtype === 'message_changed' && ev.message?.subtype === 'huddle_thread' && ev.message.room && channelId)
+        if (ev.subtype === 'huddle_thread' && ev.room && channelId) {
+          console.log(`[slack] huddle thread in ${channelId}: ${ev.room.id} [${(ev.room.participants ?? []).join(',')}]${ev.room.has_ended ? ' ended' : ''}`);
+          presence.huddleRoom(channelId, ev.room);
+        } else if (ev.subtype === 'message_changed' && ev.message?.subtype === 'huddle_thread' && ev.message.room && channelId) {
+          console.log(`[slack] huddle thread in ${channelId}: ${ev.message.room.id} [${(ev.message.room.participants ?? []).join(',')}]${ev.message.room.has_ended ? ' ended' : ''}`);
           presence.huddleRoom(channelId, ev.message.room);
+        }
         else if (channelId && ev.ts && typeof ev.user !== 'object') await this.bridge.onMessage(orgId, { ...ev, user: ev.user, channel: channelId, ts: ev.ts });
         return;
       case 'channel_rename':
@@ -282,7 +289,7 @@ export class SlackService {
         const member = this.store.member(orgId, memberId);
         const token = this.store.secret(orgId, SlackService.userTokenKey(memberId));
         const id = this.store.get(orgId).identities.find((i) => i.provider === 'slack' && i.memberId === memberId);
-        if (!member?.settings.slackStatusSync || !token || !id) return;
+        if (!member || !token || !id) return; // the grant is the switch: connected means mirrored
         const profile = slackStatusFor(p.status, p.note, p.until) ?? { status_text: '', status_emoji: '', status_expiration: 0 };
         this.pushed.set(id.externalId, { text: profile.status_text, emoji: profile.status_emoji, at: Date.now() });
         await this.provider.api.setUserStatus(token, profile);
@@ -338,15 +345,62 @@ export class SlackService {
     }
   }
 
+  /* ------------------------------------------------------------------ reconcile: events can be missed or arrive out of order */
+
+  /** How often Slack is asked what it knows (huddle state of everyone around, the huddle thread of every linked channel). */
+  static readonly RECONCILE_MS = 15_000;
+  private reconcileTimer: ReturnType<typeof setInterval> | null = null;
+
+  /**
+   * Ask Slack, rather than wait for it: `users.info` carries each person's huddle state (the same fields the
+   * event does), and a linked channel's recent history carries its huddle thread (which call is in it, who's on
+   * it). Only people who are around are asked about, and only linked channels are read, so a small team costs a
+   * handful of calls a minute. A missed or out-of-order event corrects itself here within a reconcile.
+   */
+  async reconcileHuddles() {
+    for (const orgId of this.store.orgIds()) {
+      const teamId = this.teamFor(orgId);
+      const token = teamId ? this.provider.tokens.forTeam(teamId) : '';
+      if (!teamId || !token) continue;
+      const hub = this.ensureHub(orgId);
+      const presence = this.presenceFor(orgId);
+      const d = this.store.get(orgId);
+      // the channels first: a huddle thread names the call's channel, which the people's state alone can't
+      const channels = [...new Set(d.bindings.filter((b) => b.provider === 'slack' && b.kind !== 'text').map((b) => b.externalChannelId))];
+      for (const channel of channels) {
+        try {
+          const msgs = await this.provider.api.conversationsHistory(token, channel, 8);
+          const thread = msgs.find((m) => m.subtype === 'huddle_thread' && (m as { room?: HuddleRoom }).room);
+          if (thread) presence.huddleRoom(channel, (thread as unknown as { room: HuddleRoom }).room);
+        } catch (e) {
+          console.warn(`[slack] reconcile ${channel}:`, (e as Error).message);
+        }
+      }
+      // then the people: everyone with a Slack account who is around (in the world, or on a call we know of)
+      const around = d.identities.filter((i) => i.provider === 'slack' && (hub.isLive(i.memberId) || !!hub.presenceOf(i.memberId).voice || hub.actor(i.memberId)));
+      for (const i of around) {
+        try {
+          const u = await this.provider.api.usersInfo(token, i.externalId);
+          if (u.profile && 'huddle_state' in u.profile) presence.userHuddle(u.id, u.profile.huddle_state, u.profile.huddle_state_call_id);
+        } catch (e) {
+          console.warn(`[slack] reconcile ${i.externalId}:`, (e as Error).message);
+        }
+      }
+    }
+  }
+
   start() {
     if (this.timer) return;
     this.watch(this.store.orgIds());
     for (const orgId of this.store.orgIds()) if (this.teamFor(orgId)) this.mirrorStatus(orgId);
     this.timer = setInterval(() => void this.postDailyNotes(), 60_000);
+    this.reconcileTimer = setInterval(() => void this.reconcileHuddles().catch((e) => console.warn('[slack] reconcile failed:', (e as Error).message)), SlackService.RECONCILE_MS);
   }
 
   stop() {
     if (this.timer) clearInterval(this.timer);
     this.timer = null;
+    if (this.reconcileTimer) clearInterval(this.reconcileTimer);
+    this.reconcileTimer = null;
   }
 }

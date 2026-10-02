@@ -5,6 +5,8 @@ import { game } from './app/game';
 import { Landing } from './ui/Landing';
 import { WorldScreen } from './ui/WorldScreen';
 import { AdminConsole } from './admin/AdminConsole';
+import { ConnectGate } from './ui/ConnectGate';
+import { PhotoLightbox } from './ui/Photo';
 
 export function App() {
   const phase = useStore((s) => s.phase);
@@ -37,5 +39,11 @@ export function App() {
     );
   }
   if (phase === 'landing') return <Landing />;
-  return view === 'admin' ? <AdminConsole /> : <WorldScreen />;
+  return (
+    <>
+      {view === 'admin' ? <AdminConsole /> : <WorldScreen />}
+      <ConnectGate />
+      <PhotoLightbox />
+    </>
+  );
 }
