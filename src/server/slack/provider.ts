@@ -25,6 +25,9 @@ export interface SlackSignIn {
   picture?: string;
 }
 
+/** What a person grants so the world can set their Slack status: users.profile:write. */
+export const SLACK_STATUS_USER_SCOPES = ['users.profile:write'];
+
 export interface SlackInstall {
   teamId: string;
   teamName: string;
@@ -74,6 +77,26 @@ export class SlackProvider implements CommunicationProvider {
     return `https://slack.com/openid/connect/authorize?${p}`;
   }
 
+  /** "Sync my status to Slack": a person's own grant (OAuth v2 user scopes), so the world can set their status. */
+  statusGrantUrl(state: string, team?: string): string {
+    const p = new URLSearchParams({
+      client_id: config.slack.clientId,
+      scope: '',
+      user_scope: SLACK_STATUS_USER_SCOPES.join(','),
+      redirect_uri: config.slack.statusRedirectUri,
+      state,
+    });
+    if (team) p.set('team', team);
+    return `https://slack.com/oauth/v2/authorize?${p}`;
+  }
+
+  /** Finish a status grant: the person's user token (never a bot token here). */
+  async statusGrant(code: string): Promise<{ userId: string; teamId: string; userToken: string }> {
+    const r = await this.api.oauthAccess(config.slack.clientId, config.slack.clientSecret, code, config.slack.statusRedirectUri);
+    if (!r.authed_user.access_token) throw new Error('no user token in the grant');
+    return { userId: r.authed_user.id, teamId: r.team.id, userToken: r.authed_user.access_token };
+  }
+
   /** Add Minglewood to a workspace (OAuth v2): the bot token that powers presence, chat, previews and DMs. */
   installUrl(state: string): string {
     const p = new URLSearchParams({
@@ -106,6 +129,7 @@ export class SlackProvider implements CommunicationProvider {
 
   async install(code: string): Promise<SlackInstall> {
     const r = await this.api.oauthAccess(config.slack.clientId, config.slack.clientSecret, code, config.slack.installRedirectUri);
+    if (!r.access_token) throw new Error('no bot token in the install');
     return { teamId: r.team.id, teamName: r.team.name, botToken: r.access_token, installerUserId: r.authed_user.id };
   }
 

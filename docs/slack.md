@@ -22,7 +22,7 @@ record: Minglewood mirrors and drives it, and stores no messages of its own.
 | **Walk into a space while you're in a huddle elsewhere → one click to switch.** Slack has no API that moves someone between huddles (Discord does, for voice), so the chat panel shows **🎧 Switch to the huddle in #café** instead of moving you. |
 | **Join the huddle** — one click while a huddle is running: Slack's huddle link (`app.slack.com/huddle/{team}/{channel}`) launches the desktop app straight into it (or the web client). The world knows a huddle is running because its participants are in the room. With nobody in it yet, the button opens the channel, where the headphones button starts one (the huddle link answers "Server Error" until a huddle exists). |
 | **Talk light (opt-in)** — Slack doesn't tell apps who's speaking, so members can let their own browser watch their mic *level* while in a huddle (🎙️ in the chat panel). Only "talking yes/no" leaves the page. |
-| **Status → status** — Calendar "In a meeting" → *In a meeting*. Do Not Disturb, headphones, "focus" → *Focused*. Vacation, lunch, sick, commuting → *Away*. 👋 or "say hi" → *Open to chat*. Anything else shows as a note. Status only applies while someone is around (in the world or in a huddle). |
+| **Status ↔ status** — Slack → world: calendar "In a meeting" → *In a meeting*; Do Not Disturb, headphones, "focus" → *Focused*; vacation, lunch, sick, commuting → *Away*; 👋 or "say hi" → *Open to chat*; anything else shows as a note (only while someone is around). World → Slack: after a one-time grant (Profile → *Sync my status to Slack*, user scope `users.profile:write`), the status and note you set here become your Slack status — 👋 Open to chat, 🎧 Focused, 📅 In a meeting, 🌴 Away, with your note as the text and the status's expiry — and *Available* clears it. Only statuses you set yourself are mirrored (never a calendar's or Slack's own). The echo Slack sends back is recognised, so the two never fight. |
 | **/minglewood** — `who` · `where @maya` · `join @maya` · `wave @maya` · `knock @maya` · `room design` · `help`. Replies are private (ephemeral). |
 | **Link previews** — room links (`/?room=design`) and person links (`/?to=<member>`) unfurl with who's there and a "Walk in" button. |
 | **Knocks as DMs** — opt-in per person (profile). Only while they aren't in the world. |
@@ -150,11 +150,13 @@ oauth_config:
   redirect_urls:
     - https://HOST/api/slack/auth/callback
     - https://HOST/api/slack/install/callback
+    - https://HOST/api/slack/status/callback
   scopes:
     user:
       - openid
       - profile
       - email
+      - users.profile:write
     bot:
       - channels:read
       - groups:read
@@ -211,6 +213,7 @@ click **Retry**.
 | Scope | Used for |
 |---|---|
 | `openid`, `profile`, `email` (user) | Sign in with Slack: who you are, your name, and your email (for matching an existing member). |
+| `users.profile:write` (user) | "Sync my status to Slack": a person's own grant, so the world can set *their* Slack status. Their token is kept server-side with the world (never sent to clients). |
 | `channels:read`, `groups:read` | Listing public and private channels to bind rooms to; following renames and archives. |
 | `channels:history`, `groups:history` | A space's conversation and history from its channel, and the huddle message Slack posts in a channel (how we know which channel a huddle is in). |
 | `users:read`, `users:read.email` | Names and pictures (so posts look like you), statuses, huddle state, admin flags, email matching. |
@@ -235,7 +238,7 @@ Set these in `.env` locally, or in Render → the service → **Environment**. N
 | `SLACK_BOT_TOKEN` | Optional. OAuth & Permissions → **Install to Workspace** → *Bot User OAuth Token* (`xoxb-…`), for a single-workspace server. Not needed when workspaces are added with **Add to Slack** (their tokens are kept server-side, see below). |
 | `SLACK_TEAM_ID` | Optional. Your workspace id (`T…`, the first id in `app.slack.com/client/T…/…`). Ties this server's single world to that workspace, so people can sign in before an admin connects anything, and lets **Add to Slack** on the landing page connect it. |
 | `SLACK_ADMIN_USER_IDS` | Optional, comma-separated Slack user ids (`U…`) that become Minglewood admins. Workspace owners and admins, and whoever installs the app, already do. |
-| `SLACK_REDIRECT_URI`, `SLACK_INSTALL_REDIRECT_URI` | Optional. They default to `PUBLIC_URL` + `/api/slack/auth/callback` and `/api/slack/install/callback`. |
+| `SLACK_REDIRECT_URI`, `SLACK_INSTALL_REDIRECT_URI`, `SLACK_STATUS_REDIRECT_URI` | Optional. They default to `PUBLIC_URL` + `/api/slack/auth/callback`, `/api/slack/install/callback` and `/api/slack/status/callback`. |
 
 Restart. The startup line says `slack: configured`.
 

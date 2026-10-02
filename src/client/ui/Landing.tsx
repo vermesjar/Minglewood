@@ -18,6 +18,8 @@ const ERRORS: Record<string, string> = {
   oauth_failed: 'Discord sign-in failed. Please try again.',
   slack_no_install: 'Minglewood isn’t connected to that Slack workspace yet. Ask a workspace admin to add it.',
   slack_failed: 'Slack sign-in failed. Please try again.',
+  slack_status_other_workspace: 'That grant was for a different Slack workspace than the one this world is connected to.',
+  slack_status_other_account: 'That grant was for a different Slack account than the one you signed in with here.',
   slack_install_unsupported: 'Minglewood was added to your Slack workspace, but this server can’t create a company for it yet. Ask the operator to finish the Slack install on Minglewood Cloud (docs/HOSTING.md).',
   slack_sign_in_first: 'Minglewood was added to your workspace, but it isn’t tied to a company here. Sign in to Minglewood as an admin first, then use Add to Slack from the admin console.',
   activity_auth: 'Minglewood needs your OK in Discord to know who you are. Relaunch the Activity to try again.',

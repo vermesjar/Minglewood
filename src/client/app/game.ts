@@ -121,6 +121,7 @@ class Game {
    * `?to=<memberId>` puts you next to that person. Read once, then tidied out of the address bar.
    */
   private readLink() {
+    this.noteStatusGrant();
     const q = new URLSearchParams(location.search);
     const room = q.get('room');
     const to = q.get('to');
@@ -1010,6 +1011,13 @@ class Game {
 
   setStatus(status: Exclude<PresenceStatus, 'offline'>, note?: string) {
     this.rt?.send({ t: 'status', status, note });
+  }
+
+  /** After "Sync my status to Slack" comes back: say so, once. */
+  noteStatusGrant() {
+    if (new URLSearchParams(location.search).get('status') !== 'slack') return;
+    history.replaceState(null, '', location.pathname + location.hash);
+    toast('Your status now mirrors to Slack: what you set here (and the note) shows up there, and Available clears it.', 'info', undefined, 8000);
   }
 
   /**

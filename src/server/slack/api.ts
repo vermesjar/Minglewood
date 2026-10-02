@@ -31,7 +31,7 @@ export type SlackTransport = (call: SlackCall) => Promise<Record<string, unknown
  * (blocks, unfurls). Every other method is sent form-encoded — Slack answers `invalid_arguments` to JSON on
  * read methods like conversations.info.
  */
-const JSON_METHODS = new Set(['chat.postMessage', 'chat.unfurl', 'chat.update', 'conversations.open']);
+const JSON_METHODS = new Set(['chat.postMessage', 'chat.unfurl', 'chat.update', 'conversations.open', 'users.profile.set']);
 
 /** The real transport: JSON only where Slack takes it, form-encoded otherwise; waits out one 429. */
 export const fetchTransport: SlackTransport = async (call) => {
@@ -61,11 +61,12 @@ export const fetchTransport: SlackTransport = async (call) => {
 /* ------------------------------------------------------------------ response shapes (the fields we read) */
 
 export interface SlackOAuthAccess {
-  access_token: string;
+  access_token?: string;
   bot_user_id?: string;
   scope?: string;
   team: { id: string; name: string };
-  authed_user: { id: string };
+  /** With user scopes requested, the person's own token (xoxp-…) and what it may do. */
+  authed_user: { id: string; access_token?: string; scope?: string };
 }
 
 export interface SlackOpenIdToken {
@@ -218,6 +219,11 @@ export class SlackApi {
     );
   }
 
+  /** Set the status of the person whose user token this is (users.profile:write). */
+  setUserStatus(userToken: string, profile: { status_text: string; status_emoji: string; status_expiration: number }) {
+    return this.call<Record<string, unknown>>('users.profile.set', { profile }, userToken);
+  }
+
   /** Who this bot token is, and which scopes it holds. */
   authTest(botToken: string) {
     return this.call<{ user_id: string; bot_id?: string; team_id: string; team?: string; response_metadata?: { scopes?: string[] } }>('auth.test', {}, botToken).then(
@@ -300,7 +306,9 @@ export class MockSlack {
     const channelOf = (id: unknown) => this.channels.find((c) => c.id === String(id));
     switch (call.method) {
       case 'oauth.v2.access':
-        return { ok: true, access_token: 'xoxb-mock-installed', bot_user_id: this.botUserId, team: { id: 'T0MOCK', name: 'Mock workspace' }, authed_user: { id: 'U0INSTALLER' } };
+        return { ok: true, access_token: 'xoxb-mock-installed', bot_user_id: this.botUserId, team: { id: 'T0MOCK', name: 'Mock workspace' }, authed_user: { id: 'U0INSTALLER', access_token: 'xoxp-mock-user', scope: 'users.profile:write' } };
+      case 'users.profile.set':
+        return { ok: true, profile: call.args.profile };
       case 'auth.test':
         return { ok: true, user_id: this.botUserId, bot_id: this.botId, team_id: 'T0MOCK', team: 'Mock workspace', response_metadata: { scopes: this.scopes } };
       case 'users.info': {

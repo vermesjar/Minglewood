@@ -16,6 +16,7 @@ import { SlackCommands, type CommandReply } from './commands';
 import { dailyNote, knockDm, unfurlFor } from './messages';
 import { SlackPresence, type HuddleRoom } from './presence';
 import type { SlackProvider } from './provider';
+import { slackStatusFor } from './status';
 
 /** The parts of a Slack event we read (https://api.slack.com/events). */
 export interface SlackEvent extends Partial<Omit<SlackMessage, 'channel' | 'user' | 'ts'>> {
@@ -43,6 +44,8 @@ export interface SlackTenants {
 export class SlackService {
   private presence = new Map<string, SlackPresence>();
   private relays = new Set<string>();
+  /** Statuses we just set in Slack, so their echo (user_change) isn't taken for the person changing it there. */
+  private pushed = new Map<string, { text: string; emoji: string; at: number }>();
   /** org → the date (YYYY-MM-DD, org time) its daily note last went out. */
   private dailyPosted = new Map<string, string>();
   private timer: ReturnType<typeof setInterval> | null = null;
@@ -130,7 +133,14 @@ export class SlackService {
     const channelId = typeof ev.channel === 'string' ? ev.channel : ev.channel?.id;
     switch (ev.type) {
       case 'user_change':
-        if (typeof ev.user === 'object') presence.userStatus(ev.user);
+        if (typeof ev.user === 'object') {
+          const p = this.pushed.get(ev.user.id);
+          const echo = p && Date.now() - p.at < 20_000 && (ev.user.profile?.status_text ?? '') === p.text && (ev.user.profile?.status_emoji ?? '') === p.emoji;
+          if (echo) {
+            // still read the huddle state it carries, just not the status we set ourselves
+            if (ev.user.profile && 'huddle_state' in ev.user.profile) presence.userHuddle(ev.user.id, ev.user.profile.huddle_state, ev.user.profile.huddle_state_call_id);
+          } else presence.userStatus(ev.user);
+        }
         return;
       case 'user_huddle_changed':
         if (typeof ev.user === 'object') presence.userHuddle(ev.user.id, ev.user.profile?.huddle_state, ev.user.profile?.huddle_state_call_id);
@@ -228,6 +238,61 @@ export class SlackService {
     for (const orgId of orgIds) if (this.teamFor(orgId)) this.relayKnocks(orgId);
   }
 
+  /* ------------------------------------------------------------------ status → Slack */
+
+  /** The key a person's own Slack token is kept under (server-side secrets, never sent to clients). */
+  static userTokenKey = (memberId: string) => `slackUser:${memberId}`;
+
+  /** People who turned on "sync my status to Slack": what they set here is set there (and cleared there). */
+  private mirrorStatus(orgId: string) {
+    if (this.mirrors.has(orgId)) return;
+    this.mirrors.add(orgId);
+    const hub = this.ensureHub(orgId);
+    hub.on('status', (memberId, p) => {
+      void (async () => {
+        const member = this.store.member(orgId, memberId);
+        const token = this.store.secret(orgId, SlackService.userTokenKey(memberId));
+        const id = this.store.get(orgId).identities.find((i) => i.provider === 'slack' && i.memberId === memberId);
+        if (!member?.settings.slackStatusSync || !token || !id) return;
+        const profile = slackStatusFor(p.status, p.note, p.until) ?? { status_text: '', status_emoji: '', status_expiration: 0 };
+        this.pushed.set(id.externalId, { text: profile.status_text, emoji: profile.status_emoji, at: Date.now() });
+        await this.provider.api.setUserStatus(token, profile);
+      })().catch((e) => {
+        console.warn('[slack] status sync failed:', (e as Error).message);
+        if (e instanceof Error && /invalid_auth|token_revoked|account_inactive|missing_scope/.test(e.message)) {
+          // the grant is gone: stop trying until they connect again
+          const member = this.store.member(orgId, memberId);
+          if (member) this.store.updateMember(orgId, memberId, { settings: { ...member.settings, slackStatusSync: false } });
+          this.store.setSecret(orgId, SlackService.userTokenKey(memberId), null);
+        }
+      });
+    });
+  }
+  private mirrors = new Set<string>();
+
+  /** A person's own grant arrived: keep their token and turn the mirror on. */
+  connectStatus(orgId: string, memberId: string, userToken: string) {
+    this.store.setSecret(orgId, SlackService.userTokenKey(memberId), userToken);
+    const member = this.store.member(orgId, memberId);
+    if (member) this.store.updateMember(orgId, memberId, { settings: { ...member.settings, slackStatusSync: true } });
+    this.mirrorStatus(orgId);
+    // and what they're showing right now goes out straight away
+    const hub = this.ensureHub(orgId);
+    const p = hub.presenceOf(memberId);
+    if (p.status !== 'offline') hub.emit('status', memberId, { ...p });
+  }
+
+  setStatusSync(orgId: string, memberId: string, enabled: boolean) {
+    const member = this.store.member(orgId, memberId);
+    if (!member) return;
+    this.store.updateMember(orgId, memberId, { settings: { ...member.settings, slackStatusSync: enabled } });
+    if (enabled) this.mirrorStatus(orgId);
+  }
+
+  hasStatusGrant(orgId: string, memberId: string): boolean {
+    return !!this.store.secret(orgId, SlackService.userTokenKey(memberId));
+  }
+
   /* ------------------------------------------------------------------ the daily note */
 
   /** Posts each company's daily note once, at its chosen hour (in the org's timezone). */
@@ -252,6 +317,7 @@ export class SlackService {
   start() {
     if (this.timer) return;
     this.watch(this.store.orgIds());
+    for (const orgId of this.store.orgIds()) if (this.teamFor(orgId)) this.mirrorStatus(orgId);
     this.timer = setInterval(() => void this.postDailyNotes(), 60_000);
   }
 

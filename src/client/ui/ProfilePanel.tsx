@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { MemberSettings } from '@shared/domain/types';
 import { api } from '../app/api';
 import { game } from '../app/game';
@@ -16,6 +16,10 @@ export function ProfilePanel() {
   const prefs = useStore((s) => s.prefs);
   const slackConnected = useStore((s) => s.boot?.slackConnected);
   const [knockDms, setKnockDms] = useState(me?.settings.slackKnockDms ?? false);
+  const [statusSync, setStatusSync] = useState<{ enabled: boolean; granted: boolean } | null>(null);
+  useEffect(() => {
+    if (slackConnected) api<{ enabled: boolean; granted: boolean }>('/slack/me/status-sync').then(setStatusSync).catch(() => setStatusSync(null));
+  }, [slackConnected]);
   const discordLinked = useStore((s) => !!s.boot?.discordConnected);
   const [f, setF] = useState(() => ({
     displayName: me?.displayName ?? '',
@@ -116,6 +120,40 @@ export function ProfilePanel() {
                     : 'Voice follows me — when I join a huddle in Slack, my avatar walks into that huddle’s space'}
                 </span>
               </label>
+            )}
+            {slackConnected && (
+              <div className="slack-status-sync">
+                {statusSync?.granted ? (
+                  <label className="check">
+                    <input
+                      type="checkbox"
+                      checked={statusSync.enabled}
+                      onChange={(e) => {
+                        const enabled = e.target.checked;
+                        setStatusSync({ ...statusSync, enabled });
+                        api('/slack/me/status-sync', { method: 'PUT', json: { enabled } }).catch((x) => (setStatusSync({ ...statusSync, enabled: !enabled }), toast(`Couldn’t save: ${(x as Error).message}`)));
+                      }}
+                    />
+                    <span>Mirror my status to Slack — the status and note I set here become my Slack status (emoji + text); Available clears it</span>
+                  </label>
+                ) : (
+                  <p className="check">
+                    <a className="btn small slack" href="/api/slack/status/connect">
+                      💬 Sync my status to Slack
+                    </a>
+                    <span className="muted small"> One-time grant: lets Minglewood set your own Slack status (and nothing else). Slack → here already works.</span>
+                  </p>
+                )}
+                {statusSync?.granted && (
+                  <button
+                    type="button"
+                    className="btn small ghost"
+                    onClick={() => api('/slack/me/status-sync', { method: 'DELETE' }).then(() => setStatusSync({ enabled: false, granted: false })).catch((x) => toast(`Couldn’t disconnect: ${(x as Error).message}`))}
+                  >
+                    Forget my Slack status grant
+                  </button>
+                )}
+              </div>
             )}
             {slackConnected && (
               <label className="check">

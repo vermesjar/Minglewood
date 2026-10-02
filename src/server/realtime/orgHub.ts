@@ -71,6 +71,8 @@ export type HubEvents = {
   /** A knock for someone who isn't in the world (providers may deliver it elsewhere, e.g. a Slack DM). */
   missedKnock: [knock: Knock];
   bindings: [];
+  /** Someone set their own status (not a calendar, not a provider): the one worth mirroring out. */
+  status: [memberId: string, presence: PresenceState];
 };
 
 const facingFromDir = (dx: number, dy: number, prev: Facing): Facing => {
@@ -733,6 +735,7 @@ export class OrgHub extends EventEmitter<HubEvents> {
     if (a) this.toScene(a.sceneId, { t: 'updated', memberId, patch: { status, note: p.note } });
     this.directoryDirty = true;
     if (!wasInterruptible && STATUS_META[status].interruptible) this.releaseHeldKnocks(memberId);
+    if (source === 'manual') this.emit('status', memberId, { ...p });
   }
 
   setSpeaking(memberId: string, speaking: boolean) {

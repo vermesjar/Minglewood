@@ -74,6 +74,8 @@ export interface MemberSettings {
   slackKnockDms?: boolean;
   /** While I'm in a Discord voice channel, move me to the voice channel of whatever space I walk into. Default on. */
   voiceFollow?: boolean;
+  /** Mirror the status I set here (and its note) to my Slack status. Needs a one-time Slack grant; opt-in. */
+  slackStatusSync?: boolean;
 }
 
 export interface ExternalIdentity {

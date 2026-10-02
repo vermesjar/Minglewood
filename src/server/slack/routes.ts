@@ -26,7 +26,7 @@ import { SlackApiError, type MockSlack } from './api';
 import { upsertSlackMember } from './members';
 import { askToJoin, huddleInvite } from './messages';
 import type { SlackInstall } from './provider';
-import type { SlackEvent } from './service';
+import { SlackService, type SlackEvent } from './service';
 import { readiness, runSlackSetup } from './setup';
 import { verifySlackRequest } from './verify';
 
@@ -54,6 +54,7 @@ export function slackAdminStatus(ctx: AppContext, orgId: string): SlackAdminStat
       interactions: `${base}/api/slack/interactions`,
       signInRedirect: config.slack.signInRedirectUri,
       installRedirect: config.slack.installRedirectUri,
+      statusRedirect: config.slack.statusRedirectUri,
     },
   };
 }
@@ -240,6 +241,67 @@ export function slackRoutes(ctx: AppContext, mock?: MockSlack): Router {
       console.error('[slack] install failed', (e as Error).message);
       res.redirect(admin ? back : '/?error=slack_failed');
     }
+  });
+
+  /* ------------------------------------------------------------------ sync my status to Slack */
+
+  const STATUS_COOKIE = 'mw_slack_status_state';
+  const statusCookie = (value: string, maxAge: number) =>
+    `${STATUS_COOKIE}=${value}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${config.isProd ? '; Secure' : ''}`;
+
+  /** A person grants Minglewood the right to set their own Slack status (OAuth v2 user scope). */
+  r.get('/status/connect', requireMember(ctx), (req, res) => {
+    const { orgId } = authed(req);
+    if (!slackConfigured()) return res.status(404).send('Slack is not configured. See docs/slack.md.');
+    if (!oauthLimiter.allow(req.ip ?? 'x')) return res.status(429).send('Too many attempts');
+    const state = randomBytes(16).toString('hex');
+    res.setHeader('Set-Cookie', statusCookie(state, 600));
+    res.redirect(ctx.slack.provider.statusGrantUrl(state, ctx.slack.teamFor(orgId)));
+  });
+
+  r.get('/status/callback', requireMember(ctx), async (req, res) => {
+    const { orgId, member } = authed(req);
+    const state = parseCookies(req.headers.cookie)[STATUS_COOKIE] ?? '';
+    const code = typeof req.query.code === 'string' ? req.query.code : '';
+    res.setHeader('Set-Cookie', statusCookie('', 0));
+    if (!state || state !== req.query.state || !code) return res.redirect('/?error=oauth_state');
+    try {
+      const g = await ctx.slack.provider.statusGrant(code);
+      const team = ctx.slack.teamFor(orgId);
+      if (team && g.teamId !== team) return res.redirect('/?error=slack_status_other_workspace');
+      // the grant is this person's Slack account — link it if it wasn't
+      const linked = ctx.store.get(orgId).identities.find((i) => i.provider === 'slack' && i.memberId === member.id);
+      if (!linked) ctx.store.linkIdentity(orgId, { provider: 'slack', externalId: g.userId, memberId: member.id, linkedAt: new Date().toISOString() });
+      else if (linked.externalId !== g.userId) return res.redirect('/?error=slack_status_other_account');
+      ctx.slack.connectStatus(orgId, member.id, g.userToken);
+      ctx.store.audit(orgId, member.id, 'slack.status-sync', g.userId, 'connected');
+      res.redirect('/?status=slack');
+    } catch (e) {
+      console.error('[slack] status grant failed', (e as Error).message);
+      res.redirect('/?error=slack_failed');
+    }
+  });
+
+  r.put('/me/status-sync', requireMember(ctx), json, (req, res) => {
+    const { orgId, member } = authed(req);
+    const body = z.object({ enabled: z.boolean() }).safeParse(req.body);
+    if (!body.success) return res.status(400).json({ error: 'invalid input' });
+    if (body.data.enabled && !ctx.slack.hasStatusGrant(orgId, member.id)) return res.status(400).json({ error: 'Connect your Slack status first.' });
+    ctx.slack.setStatusSync(orgId, member.id, body.data.enabled);
+    res.json({ enabled: body.data.enabled, granted: ctx.slack.hasStatusGrant(orgId, member.id) });
+  });
+
+  /** Forget my Slack status grant. */
+  r.delete('/me/status-sync', requireMember(ctx), (req, res) => {
+    const { orgId, member } = authed(req);
+    ctx.slack.setStatusSync(orgId, member.id, false);
+    ctx.store.setSecret(orgId, SlackService.userTokenKey(member.id), null);
+    res.json({ enabled: false, granted: false });
+  });
+
+  r.get('/me/status-sync', requireMember(ctx), (req, res) => {
+    const { orgId, member } = authed(req);
+    res.json({ enabled: !!member.settings.slackStatusSync, granted: ctx.slack.hasStatusGrant(orgId, member.id) });
   });
 
   /* ------------------------------------------------------------------ admin */

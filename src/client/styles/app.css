@@ -886,6 +886,14 @@ code {
 .huddle-line .huddle-icon {
   margin-left: 0;
 }
+.slack-status-sync {
+  display: grid;
+  gap: 6px;
+  margin: 4px 0;
+}
+.slack-status-sync .btn.ghost {
+  justify-self: start;
+}
 .btn.huddle-act {
   flex: none;
   border-width: 2px;

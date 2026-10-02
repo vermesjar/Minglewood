@@ -117,7 +117,7 @@ export interface SlackAdminStatus {
   /** Where anyone adds Minglewood to a workspace without signing in first (creates or connects a company), when the server supports it. */
   addUrl: string | null;
   /** The URLs to paste into the Slack app's settings. */
-  endpoints: { events: string; commands: string; interactions: string; signInRedirect: string; installRedirect: string };
+  endpoints: { events: string; commands: string; interactions: string; signInRedirect: string; installRedirect: string; statusRedirect: string };
 }
 
 /** One space in the Slack one-click setup: a single channel is both its conversation and its huddle. */

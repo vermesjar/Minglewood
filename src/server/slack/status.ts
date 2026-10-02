@@ -31,6 +31,26 @@ const AWAY_TEXT = /\b(vacation|vacationing|ooo|out of (the )?office|out sick|sic
 const FOCUS_TEXT = /\b(focus|focusing|heads[ -]?down|deep work|do not disturb|dnd|writing)\b/i;
 const OPEN_TEXT = /\b(open to chat|say hi|come say hi|ping me|happy to chat)\b/i;
 
+/** A Minglewood status as a Slack status (emoji + text + expiry); `null` means "clear it". The pairs round-trip through mapSlackStatus. */
+export function slackStatusFor(status: PresenceStatus, note: string | undefined, until: string | undefined): { status_text: string; status_emoji: string; status_expiration: number } | null {
+  const expiration = until ? Math.max(0, Math.floor(Date.parse(until) / 1000)) || 0 : 0;
+  const text = (note ?? '').trim().slice(0, 100);
+  switch (status) {
+    case 'open':
+      return { status_emoji: ':wave:', status_text: text || 'Open to chat', status_expiration: expiration };
+    case 'focused':
+      return { status_emoji: ':headphones:', status_text: text || 'Focused', status_expiration: expiration };
+    case 'meeting':
+      return { status_emoji: ':spiral_calendar_pad:', status_text: text || 'In a meeting', status_expiration: expiration };
+    case 'away':
+      return { status_emoji: ':palm_tree:', status_text: text || 'Away', status_expiration: expiration };
+    case 'available':
+      return text ? { status_emoji: ':speech_balloon:', status_text: text, status_expiration: expiration } : null;
+    default:
+      return null;
+  }
+}
+
 export function mapSlackStatus(s: SlackStatusInput): MappedStatus | null {
   const text = (s.text ?? '').trim().slice(0, 80);
   const emoji = (s.emoji ?? '').trim();

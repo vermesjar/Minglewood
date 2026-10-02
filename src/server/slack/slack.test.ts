@@ -6,7 +6,7 @@ import { config } from '../config';
 import { createApp, type App } from '../app';
 import { MemoryPersistence } from '../store/jsonFile';
 import { MockSlack, SlackApi, fetchTransport, type SlackCall } from './api';
-import { mapSlackStatus } from './status';
+import { mapSlackStatus, slackStatusFor } from './status';
 import { SlackProvider } from './provider';
 import { SlackTokens } from './tokens';
 import { slackSignature, verifySlackRequest } from './verify';
@@ -43,6 +43,16 @@ describe('Slack status → Minglewood status', () => {
     expect(mapSlackStatus({ emoji: ':headphones:', text: 'heads down' })?.status).toBe('focused');
     expect(mapSlackStatus({ emoji: ':wave:', text: 'come say hi' })?.status).toBe('open');
     expect(mapSlackStatus({ emoji: ':taco:', text: 'taco tuesday' })).toEqual({ status: 'available', note: 'taco tuesday', until: undefined });
+  });
+
+  it('maps a Minglewood status to a Slack status that reads back as the same status', () => {
+    for (const s of ['open', 'focused', 'meeting', 'away'] as const) {
+      const out = slackStatusFor(s, undefined, undefined)!;
+      expect(mapSlackStatus({ text: out.status_text, emoji: out.status_emoji })?.status).toBe(s);
+    }
+    expect(slackStatusFor('meeting', 'standup', '2030-01-01T10:00:00.000Z')).toEqual({ status_emoji: ':spiral_calendar_pad:', status_text: 'standup', status_expiration: Date.parse('2030-01-01T10:00:00.000Z') / 1000 });
+    expect(slackStatusFor('available', undefined, undefined)).toBeNull(); // clears it
+    expect(slackStatusFor('available', 'reviewing PRs', undefined)).toMatchObject({ status_text: 'reviewing PRs' });
   });
 
   it('treats Do Not Disturb as focus, and an empty status as no opinion', () => {
@@ -400,6 +410,52 @@ describe('Huddles with the people at your table (over HTTP, the mock out)', () =
     const bad = await post('/huddle', ari.cookie, { memberIds: [demo.id] });
     expect(bad.status).toBe(400);
     expect(((await bad.json()) as { error: string }).error).toContain('signed in with Slack');
+  });
+
+  it('mirrors a status set in the world to Slack after a one-time grant, and ignores the echo', async () => {
+    const hub = app.hubs.get(ORG_ID)!;
+    const ari = await signin('U0INSTALLER', 'Ari'); // the mock's grant comes back as U0INSTALLER
+    // the grant: state cookie → Slack → callback with a user token
+    const start = await fetch(`${base}/api/slack/status/connect`, { headers: { cookie: ari.cookie }, redirect: 'manual' });
+    expect(start.status).toBe(302);
+    const to = new URL(start.headers.get('location')!);
+    expect(to.searchParams.get('user_scope')).toBe('users.profile:write');
+    const cookie = [ari.cookie, ...start.headers.getSetCookie().map((c) => c.split(';')[0])].join('; ');
+    const cb = await fetch(`${base}/api/slack/status/callback?code=abc&state=${to.searchParams.get('state')}`, { headers: { cookie }, redirect: 'manual' });
+    expect(cb.headers.get('location')).toBe('/?status=slack');
+    expect(app.store.member(ORG_ID, ari.memberId)?.settings.slackStatusSync).toBe(true);
+    expect(app.store.secret(ORG_ID, `slackUser:${ari.memberId}`)).toBe('xoxp-mock-user');
+    // what they set here goes there, with their own token
+    hub.connect({ id: 'c-ari-s', memberId: ari.memberId, sceneId: null, send: () => undefined });
+    hub.setStatus(ari.memberId, 'meeting', 'standup');
+    await settle();
+    const set = (await outbox()).outbox.filter((c) => c.method === 'users.profile.set').pop()!;
+    expect(set.token).toBe('xoxp-…');
+    expect(set.args.profile).toMatchObject({ status_emoji: ':spiral_calendar_pad:', status_text: 'standup' });
+    // Slack echoes it back as a user_change: that isn't them changing it in Slack, so the source stays "manual"
+    const ev = (e: Record<string, unknown>) => {
+      const body = JSON.stringify({ type: 'event_callback', team_id: TEAM, event: e });
+      const ts = String(Math.floor(Date.now() / 1000));
+      return fetch(`${base}/api/slack/events`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Slack-Request-Timestamp': ts, 'X-Slack-Signature': slackSignature(config.slack.signingSecret, ts, body) }, body });
+    };
+    await ev({ type: 'user_change', user: { id: 'U0INSTALLER', profile: { status_text: 'standup', status_emoji: ':spiral_calendar_pad:', status_expiration: 0 } } });
+    await settle();
+    expect(hub.presenceOf(ari.memberId)).toMatchObject({ status: 'meeting', note: 'standup', source: 'manual' });
+    // back to available clears the Slack status
+    hub.setStatus(ari.memberId, 'available', undefined);
+    await settle();
+    const cleared = (await outbox()).outbox.filter((c) => c.method === 'users.profile.set').pop()!;
+    expect(cleared.args.profile).toEqual({ status_emoji: '', status_text: '', status_expiration: 0 });
+    // a calendar- or provider-set status is not mirrored (only what they set themselves)
+    const before = (await outbox()).outbox.filter((c) => c.method === 'users.profile.set').length;
+    hub.setStatus(ari.memberId, 'meeting', 'from calendar', 'calendar');
+    await settle();
+    expect((await outbox()).outbox.filter((c) => c.method === 'users.profile.set').length).toBe(before);
+    // off: nothing goes out
+    await fetch(`${base}/api/slack/me/status-sync`, { method: 'PUT', headers: { cookie: ari.cookie, 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: false }) });
+    hub.setStatus(ari.memberId, 'focused', undefined);
+    await settle();
+    expect((await outbox()).outbox.filter((c) => c.method === 'users.profile.set').length).toBe(before);
   });
 
   it('"ask to join" reaches everyone on that call, in the world and by DM', async () => {
