@@ -16,6 +16,8 @@ export interface SlackPerson {
   email?: string;
   emailVerified?: boolean;
   timezone?: string;
+  /** Their Slack picture, so what they say in the world can show up in the channel as them. */
+  picture?: string;
   /** Workspace owner/admin, or the installer. */
   manager?: boolean;
 }
@@ -25,14 +27,14 @@ export function upsertSlackMember(ctx: AppContext, orgId: string, p: SlackPerson
   const admin = !!p.manager || config.slack.adminUserIds.includes(p.userId);
   const email = p.email && p.emailVerified !== false ? p.email.toLowerCase() : undefined;
   const link = (memberId: string) =>
-    ctx.store.linkIdentity(orgId, { provider: 'slack', externalId: p.userId, memberId, username: p.name, email, linkedAt: new Date().toISOString() });
+    ctx.store.linkIdentity(orgId, { provider: 'slack', externalId: p.userId, memberId, username: p.name, email, avatarUrl: p.picture, linkedAt: new Date().toISOString() });
 
   const existing = ctx.store.identity(orgId, 'slack', p.userId);
   const known = existing && ctx.store.member(orgId, existing.memberId);
   const byEmail = !known && email ? data.identities.find((i) => i.email === email && ctx.store.member(orgId, i.memberId)) : undefined;
   const found = known ?? (byEmail ? ctx.store.member(orgId, byEmail.memberId) : undefined);
   if (found) {
-    if (!known) link(found.id);
+    if (!known || (p.picture && existing?.avatarUrl !== p.picture)) link(found.id);
     if (admin && found.role === 'member') ctx.store.updateMember(orgId, found.id, { role: 'admin' });
     return found;
   }

@@ -11,6 +11,8 @@
  * mapSlackStatus turns them into a Minglewood status (source: 'provider'). We only show a status for someone
  * who's around (in the world or in a huddle) — being in a Slack meeting doesn't make an absent person present.
  */
+import { bindingSlot } from '@shared/domain/types';
+import { TOWN_ID } from '@shared/world';
 import type { Store } from '../store/store';
 import type { OrgHub } from '../realtime/orgHub';
 import { VoicePresenceSync } from '../providers/voiceSync';
@@ -46,13 +48,36 @@ export class SlackPresence {
 
   /* ------------------------------------------------------------------ huddles */
 
+  /** Someone is in a huddle in a channel: they appear in its room — and if they're already walking around, they walk over. */
+  private inHuddle(slackUserId: string, channel: string) {
+    this.voice.apply({ externalUserId: slackUserId, channelId: channel, muted: false, video: false });
+    this.walkOver(slackUserId, channel);
+  }
+
+  /**
+   * Slack can't move you between huddles, but the other way round works: when you join a huddle in Slack while
+   * you're in the world, your avatar walks into that huddle's space (unless you turned "voice follows me" off).
+   */
+  private walkOver(slackUserId: string, channel: string) {
+    const memberId = this.memberFor(slackUserId);
+    if (!memberId) return;
+    const d = this.store.get(this.hub.orgId);
+    const binding = d.bindings.find((b) => b.provider === 'slack' && bindingSlot(b.kind) === 'voice' && b.externalChannelId === channel);
+    const member = d.members.get(memberId);
+    const actor = this.hub.actor(memberId);
+    if (!binding || !member || member.settings.voiceFollow === false || actor?.via !== 'live' || actor.sceneId === binding.roomId) return;
+    this.hub.enter(memberId, binding.roomId, 'live');
+    const place = binding.roomId === TOWN_ID ? 'town' : (d.rooms.find((r) => r.id === binding.roomId)?.name ?? 'the room');
+    this.hub.notify(memberId, `🎧 You joined the huddle in ${binding.label.replace(/^🎧\s*/, '')} — walked you over to ${place}.`);
+  }
+
   /** user_huddle_changed: `in_a_huddle` with a call id, or `default_unset` when they leave. */
   userHuddle(slackUserId: string, state: string | undefined, callId: string | undefined) {
     if (state === 'in_a_huddle' && callId) {
       this.inCall.set(slackUserId, callId);
       const channel = this.callChannel.get(callId);
       // the huddle's channel may not be known yet: its huddle_thread message will place them
-      if (channel) this.voice.apply({ externalUserId: slackUserId, channelId: channel, muted: false, video: false });
+      if (channel) this.inHuddle(slackUserId, channel);
     } else {
       if (!this.inCall.has(slackUserId)) return;
       this.inCall.delete(slackUserId);
@@ -68,7 +93,7 @@ export class SlackPresence {
     const here = new Set(room.has_ended ? [] : (room.participants ?? []));
     for (const user of here) {
       this.inCall.set(user, room.id);
-      this.voice.apply({ externalUserId: user, channelId: channel, muted: false, video: false });
+      this.inHuddle(user, channel);
     }
     for (const [user, call] of [...this.inCall]) {
       if (call === room.id && !here.has(user)) {

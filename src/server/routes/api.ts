@@ -53,7 +53,7 @@ export function apiRoutes(ctx: AppContext): Router {
       brand: BRAND,
       demoMode: config.demoMode,
       discord: { enabled: discordConfigured(), clientId: config.discord.clientId || null },
-      slack: { enabled: slackConfigured() },
+      slack: { enabled: slackConfigured(), addUrl: ctx.slack.addUrl() },
       installUrl: config.installUrl || null,
     });
   });

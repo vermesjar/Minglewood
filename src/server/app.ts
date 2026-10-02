@@ -21,6 +21,7 @@ import { serverArt } from './art';
 import { authRoutes } from './routes/auth';
 import { adminRoutes } from './routes/admin';
 import { MockSlack, SlackApi } from './slack/api';
+import { SlackBridge } from './slack/bridge';
 import { SlackProvider } from './slack/provider';
 import { slackRoutes } from './slack/routes';
 import { SlackService } from './slack/service';
@@ -58,6 +59,29 @@ export async function createApp(opts: AppOptions): Promise<App> {
 
   const hubs = new Map<string, OrgHub>();
   const sims: LifeSim[] = [];
+  // Slack: real Web API, or the recording mock for local development (SLACK_MOCK=true). Workspace tokens from the
+  // in-app install are kept in a local file and with the company's world state (so they survive a redeploy).
+  const slackMock = config.slack.mock ? new MockSlack() : undefined;
+  const slackTokens = new SlackTokens(() => config.slack.botToken || (slackMock ? 'xoxb-mock' : ''), opts.slackTokenFile, {
+    get: (teamId) => {
+      const orgId = store.orgForWorkspace('slack', teamId);
+      return orgId ? store.secret(orgId, 'slackBotToken') : undefined;
+    },
+    set: (teamId, token) => {
+      const orgId = store.orgForWorkspace('slack', teamId);
+      if (orgId) store.setSecret(orgId, 'slackBotToken', token);
+    },
+  });
+  const slackApi = new SlackApi(slackMock?.transport);
+  const slackProvider = new SlackProvider(slackApi, slackTokens);
+  // Each space *is* its Slack channel too: chat both ways, history, renames followed.
+  const slackBridge = new SlackBridge({
+    store,
+    api: slackApi,
+    tokens: slackTokens,
+    hubFor: (orgId) => ensureHub(orgId),
+    teamFor: (orgId) => slack.teamFor(orgId),
+  });
   // Each space *is* its Discord channels: chat both ways, history, voice that follows you (needs the bot).
   const bridge = discordBotConfigured()
     ? new DiscordBridge({
@@ -76,6 +100,7 @@ export async function createApp(opts: AppOptions): Promise<App> {
     hub = new OrgHub(orgId, store);
     hubs.set(orgId, hub);
     bridge?.attach(hub);
+    slackBridge.attach(hub);
     // Simulated coworkers only live in the demo company.
     if (opts.simulateCoworkers && orgId === ORG_ID) {
       const sim = new LifeSim(hub, store, calendar);
@@ -101,10 +126,7 @@ export async function createApp(opts: AppOptions): Promise<App> {
     return undefined;
   };
 
-  // Slack: real Web API, or the recording mock for local development (SLACK_MOCK=true)
-  const slackMock = config.slack.mock ? new MockSlack() : undefined;
-  const slackTokens = new SlackTokens(() => config.slack.botToken || (slackMock ? 'xoxb-mock' : ''), opts.slackTokenFile);
-  const slack = new SlackService(store, ensureHub, new SlackProvider(new SlackApi(slackMock?.transport), slackTokens));
+  const slack: SlackService = new SlackService(store, ensureHub, slackProvider, slackBridge, tenants);
   slack.start();
 
   const ctx: AppContext = { store, hubs, discord: new DiscordProvider(), demo: new DemoProvider(), slack, resolveGuild, discordBridge: bridge };

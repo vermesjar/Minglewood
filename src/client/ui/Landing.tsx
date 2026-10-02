@@ -18,6 +18,8 @@ const ERRORS: Record<string, string> = {
   oauth_failed: 'Discord sign-in failed. Please try again.',
   slack_no_install: 'Minglewood isn’t connected to that Slack workspace yet. Ask a workspace admin to add it.',
   slack_failed: 'Slack sign-in failed. Please try again.',
+  slack_install_unsupported: 'Minglewood was added to your Slack workspace, but this server can’t create a company for it yet. Ask the operator to finish the Slack install on Minglewood Cloud (docs/HOSTING.md).',
+  slack_sign_in_first: 'Minglewood was added to your workspace, but it isn’t tied to a company here. Sign in to Minglewood as an admin first, then use Add to Slack from the admin console.',
   activity_auth: 'Minglewood needs your OK in Discord to know who you are. Relaunch the Activity to try again.',
 };
 
@@ -158,9 +160,16 @@ export function Landing() {
           <span>or</span>
         </div>
         {config?.slack?.enabled && (
-          <a className="btn slack big" href="/api/slack/auth/start">
-            <span aria-hidden>💬</span> Continue with Slack
-          </a>
+          <>
+            <a className="btn slack big" href="/api/slack/auth/start">
+              <span aria-hidden>💬</span> Continue with Slack
+            </a>
+            {config.slack.addUrl && (
+              <p className="muted small center-text">
+                Running a team? <a href={config.slack.addUrl}>Add Minglewood to your Slack workspace</a>.
+              </p>
+            )}
+          </>
         )}
         {config?.discord.enabled ? (
           <>

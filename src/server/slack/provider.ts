@@ -7,34 +7,13 @@ import type { RoomBinding } from '@shared/domain/types';
 import { config, slackConfigured, slackSigningConfigured } from '../config';
 import type { CommunicationProvider, ExternalChannel, JoinInstruction, ProviderCapabilities } from '../providers/types';
 import { SlackApi, type SlackUser } from './api';
+import { SLACK_BOT_SCOPES } from './scopes';
 import type { SlackTokens } from './tokens';
 
 /** Sign in with Slack: who you are, your workspace, your email (to link you across sign-in methods). */
 export const SLACK_SIGNIN_SCOPES = ['openid', 'profile', 'email'];
 
-/**
- * The bot's scopes, each for one feature (docs/slack.md explains every one):
- * channels:read, groups:read — list channels to bind rooms to;
- * channels:history, groups:history — see a huddle's thread message in a bound channel (which channel a huddle is in);
- * users:read, users:read.email — statuses and huddle state (user_change, user_huddle_changed), matching people;
- * dnd:read — Do Not Disturb; chat:write, im:write — the daily note and knock DMs; commands — /minglewood;
- * links:read, links:write — room link previews; team:read — the workspace's name.
- */
-export const SLACK_BOT_SCOPES = [
-  'channels:read',
-  'groups:read',
-  'channels:history',
-  'groups:history',
-  'users:read',
-  'users:read.email',
-  'dnd:read',
-  'chat:write',
-  'im:write',
-  'commands',
-  'links:read',
-  'links:write',
-  'team:read',
-];
+export { SLACK_BOT_SCOPES } from './scopes';
 
 export interface SlackSignIn {
   userId: string;
@@ -74,8 +53,9 @@ export class SlackProvider implements CommunicationProvider {
       directVoiceJoin: false,
       deepLinkJoin: true,
       embeddedApp: false,
-      // not yet: Slack messages stay in Slack; huddles can't be joined or switched by an app
-      chatBridge: false,
+      // what's said in a space is posted to its channel as you, and the channel's messages show in the space (Events API)
+      chatBridge: bot && slackSigningConfigured(),
+      // no API moves someone between huddles; the other way round (joining a huddle walks your avatar) is part of voicePresence
       voiceFollow: false,
     };
   }
@@ -94,7 +74,7 @@ export class SlackProvider implements CommunicationProvider {
     return `https://slack.com/openid/connect/authorize?${p}`;
   }
 
-  /** Add Minglewood to a workspace (OAuth v2): the bot token that powers presence, previews and DMs. */
+  /** Add Minglewood to a workspace (OAuth v2): the bot token that powers presence, chat, previews and DMs. */
   installUrl(state: string): string {
     const p = new URLSearchParams({
       client_id: config.slack.clientId,

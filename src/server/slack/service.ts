@@ -1,25 +1,29 @@
 /**
  * Slack for every company world on this server: routes each verified event to its company (by workspace),
- * keeps huddle and status presence in sync, answers /minglewood, previews links, relays knocks as DMs for
- * people who opted in, and posts the optional daily note.
+ * keeps huddle and status presence in sync, mirrors channel chat into spaces (and back, through the bridge),
+ * answers /minglewood, previews links, relays knocks as DMs for people who opted in, and posts the optional
+ * daily note.
  */
 import type { ProviderConnection } from '@shared/domain/types';
 import { ORG_ID } from '@shared/seed/northstar';
-import { config } from '../config';
+import { config, slackConfigured } from '../config';
+import type { NewSlackTenant } from '../cloud/controlPlane';
 import type { OrgHub } from '../realtime/orgHub';
 import type { Store } from '../store/store';
-import type { SlackUser } from './api';
+import type { SlackMessage, SlackUser } from './api';
+import type { SlackBridge } from './bridge';
 import { SlackCommands, type CommandReply } from './commands';
 import { dailyNote, knockDm, unfurlFor } from './messages';
 import { SlackPresence, type HuddleRoom } from './presence';
 import type { SlackProvider } from './provider';
 
 /** The parts of a Slack event we read (https://api.slack.com/events). */
-export interface SlackEvent {
+export interface SlackEvent extends Partial<Omit<SlackMessage, 'channel' | 'user' | 'ts'>> {
   type: string;
   subtype?: string;
   user?: string | SlackUser;
-  channel?: string;
+  /** A channel id — or, on channel_rename / group_rename, the channel itself. */
+  channel?: string | { id: string; name?: string };
   ts?: string;
   message_ts?: string;
   unfurl_id?: string;
@@ -28,6 +32,12 @@ export interface SlackEvent {
   room?: HuddleRoom;
   message?: { subtype?: string; room?: HuddleRoom };
   dnd_status?: { dnd_enabled?: boolean; snooze_enabled?: boolean; next_dnd_start_ts?: number; next_dnd_end_ts?: number };
+}
+
+/** Minglewood Cloud's view of Slack installs (when the server runs with the control plane). */
+export interface SlackTenants {
+  forSlackTeam(teamId: string): Promise<string | undefined>;
+  createForSlack(t: NewSlackTenant): Promise<string>;
 }
 
 export class SlackService {
@@ -41,6 +51,9 @@ export class SlackService {
     private readonly store: Store,
     private readonly ensureHub: (orgId: string) => OrgHub,
     readonly provider: SlackProvider,
+    /** Chat both ways, history, channel renames (present whenever Slack is wired up). */
+    readonly bridge: SlackBridge,
+    private readonly tenants: SlackTenants | null = null,
   ) {}
 
   /** The company world a workspace belongs to: its installed connection, or SLACK_TEAM_ID for the demo. */
@@ -49,6 +62,31 @@ export class SlackService {
     if (connected) return connected;
     if (config.slack.teamId && config.slack.teamId === teamId && this.store.hasOrg(ORG_ID)) return ORG_ID;
     return undefined;
+  }
+
+  /** Like orgForTeam, also asking Minglewood Cloud about workspaces that installed through it. */
+  async resolveOrg(teamId: string): Promise<string | undefined> {
+    const local = this.orgForTeam(teamId);
+    if (local) return local;
+    return this.tenants?.forSlackTeam(teamId).catch((e) => {
+      console.warn('[cloud] slack team lookup failed:', (e as Error).message);
+      return undefined;
+    });
+  }
+
+  /** A new company from an Add-to-Slack install (through Minglewood Cloud). */
+  createCompany(t: NewSlackTenant): Promise<string> {
+    if (!this.tenants) return Promise.reject(new Error('no control plane'));
+    return this.tenants.createForSlack(t);
+  }
+
+  /**
+   * Can someone add Minglewood to a workspace without signing in first? Yes when the install can create a company
+   * (Minglewood Cloud) or connect the one workspace this server was set up for (SLACK_TEAM_ID).
+   */
+  addUrl(): string | null {
+    if (!slackConfigured() || !(this.tenants || config.slack.teamId)) return null;
+    return `${config.publicUrl.replace(/\/$/, '')}/api/slack/add`;
   }
 
   connection(orgId: string): ProviderConnection | undefined {
@@ -73,9 +111,10 @@ export class SlackService {
 
   async onEvent(teamId: string, ev: SlackEvent): Promise<void> {
     if (ev.type === 'app_uninstalled' || ev.type === 'tokens_revoked') return this.disconnect(teamId);
-    const orgId = this.orgForTeam(teamId);
+    const orgId = await this.resolveOrg(teamId);
     if (!orgId) return;
     const presence = this.presenceFor(orgId);
+    const channelId = typeof ev.channel === 'string' ? ev.channel : ev.channel?.id;
     switch (ev.type) {
       case 'user_change':
         if (typeof ev.user === 'object') presence.userStatus(ev.user);
@@ -87,9 +126,27 @@ export class SlackService {
         if (typeof ev.user === 'string' && ev.dnd_status) presence.dnd(ev.user, ev.dnd_status);
         return;
       case 'message':
-        if (ev.subtype === 'huddle_thread' && ev.room && ev.channel) presence.huddleRoom(ev.channel, ev.room);
-        else if (ev.subtype === 'message_changed' && ev.message?.subtype === 'huddle_thread' && ev.message.room && ev.channel)
-          presence.huddleRoom(ev.channel, ev.message.room);
+        if (ev.subtype === 'huddle_thread' && ev.room && channelId) presence.huddleRoom(channelId, ev.room);
+        else if (ev.subtype === 'message_changed' && ev.message?.subtype === 'huddle_thread' && ev.message.room && channelId)
+          presence.huddleRoom(channelId, ev.message.room);
+        else if (channelId && ev.ts && typeof ev.user !== 'object') await this.bridge.onMessage(orgId, { ...ev, user: ev.user, channel: channelId, ts: ev.ts });
+        return;
+      case 'channel_rename':
+      case 'group_rename':
+        if (typeof ev.channel === 'object') this.bridge.onChannel(orgId, { id: ev.channel.id, name: ev.channel.name, gone: false });
+        return;
+      case 'channel_archive':
+      case 'channel_deleted':
+      case 'group_archive':
+      case 'group_deleted':
+        if (channelId) this.bridge.onChannel(orgId, { id: channelId, gone: true });
+        return;
+      case 'member_joined_channel':
+        if (channelId && typeof ev.user === 'string' && (await this.bridge.isBot(teamId, ev.user))) this.bridge.onMembership(orgId, channelId);
+        return;
+      case 'channel_left':
+      case 'group_left':
+        if (channelId) this.bridge.onMembership(orgId, channelId);
         return;
       case 'link_shared':
         return this.unfurl(orgId, teamId, ev);
@@ -106,13 +163,15 @@ export class SlackService {
       if (u) unfurls[l.url] = u;
     }
     if (!Object.keys(unfurls).length) return;
-    const target = ev.unfurl_id && ev.source ? { unfurl_id: ev.unfurl_id, source: ev.source } : { channel: ev.channel ?? '', ts: ev.message_ts ?? '' };
+    const channel = typeof ev.channel === 'string' ? ev.channel : '';
+    const target = ev.unfurl_id && ev.source ? { unfurl_id: ev.unfurl_id, source: ev.source } : { channel, ts: ev.message_ts ?? '' };
     await this.provider.api.unfurl(token, target, unfurls).catch((e) => console.warn('[slack] unfurl failed:', (e as Error).message));
   }
 
   private disconnect(teamId: string) {
     const orgId = this.store.orgForWorkspace('slack', teamId);
     const conn = orgId ? this.connection(orgId) : undefined;
+    this.provider.tokens.clear(teamId);
     if (!orgId || !conn) return;
     this.store.setConnection(orgId, { ...conn, status: 'disconnected' });
     this.store.audit(orgId, conn.connectedBy, 'slack.disconnected', teamId, 'the app was uninstalled from Slack');
@@ -120,8 +179,8 @@ export class SlackService {
 
   /* ------------------------------------------------------------------ /minglewood */
 
-  command(teamId: string, slackUserId: string, text: string): CommandReply {
-    const orgId = this.orgForTeam(teamId);
+  async command(teamId: string, slackUserId: string, text: string): Promise<CommandReply> {
+    const orgId = await this.resolveOrg(teamId);
     if (!orgId) return { response_type: 'ephemeral', text: 'Minglewood isn’t connected to this workspace yet — an admin can add it from the Minglewood admin console.' };
     const hub = this.ensureHub(orgId);
     this.presenceFor(orgId);

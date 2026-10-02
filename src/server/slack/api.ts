@@ -3,6 +3,8 @@
  * transport so the same code talks to Slack in production, to a mocked `fetch` in tests, and to the recording
  * mock transport in local development (SLACK_MOCK=true), where nothing leaves the machine.
  */
+import { SLACK_BOT_SCOPES } from './scopes';
+
 export const SLACK_API = 'https://slack.com/api';
 
 export class SlackApiError extends Error {
@@ -41,7 +43,11 @@ export const fetchTransport: SlackTransport = async (call) => {
       continue;
     }
     if (!res.ok) throw new SlackApiError(call.method, `http_${res.status}`, res.status);
-    return (await res.json()) as Record<string, unknown>;
+    const json = (await res.json()) as Record<string, unknown>;
+    // Slack names the token's granted scopes in a header on every call; the readiness check reads them.
+    const scopes = res.headers.get('x-oauth-scopes');
+    if (scopes) json.response_metadata = { ...((json.response_metadata as Record<string, unknown> | undefined) ?? {}), scopes: scopes.split(',').map((s) => s.trim()).filter(Boolean) };
+    return json;
   }
 };
 
@@ -78,6 +84,7 @@ export interface SlackProfile {
   real_name?: string;
   email?: string;
   image_72?: string;
+  image_192?: string;
   status_text?: string;
   status_emoji?: string;
   status_expiration?: number;
@@ -104,6 +111,33 @@ export interface SlackChannel {
   is_private?: boolean;
   is_member?: boolean;
   is_archived?: boolean;
+}
+
+/** auth.test — who the bot token is, plus (from the response header) the scopes it was granted. */
+export interface SlackAuthTest {
+  user_id: string;
+  bot_id?: string;
+  team_id: string;
+  team?: string;
+  scopes: string[];
+}
+
+/** A channel message (conversations.history, or a `message` event). */
+export interface SlackMessage {
+  type?: string;
+  subtype?: string;
+  ts: string;
+  user?: string;
+  /** Set on messages from apps and bots (including ours). */
+  bot_id?: string;
+  /** A custom name a bot posted under (chat:write.customize). */
+  username?: string;
+  bot_profile?: { id?: string; name?: string; icons?: { image_72?: string } };
+  text?: string;
+  thread_ts?: string;
+  files?: Array<{ name?: string; title?: string }>;
+  /** Only on events. */
+  channel?: string;
 }
 
 /* ------------------------------------------------------------------ the client */
@@ -156,8 +190,49 @@ export class SlackApi {
     return out;
   }
 
-  postMessage(botToken: string, channel: string, text: string, blocks?: unknown[]) {
-    return this.call<{ ts: string; channel: string }>('chat.postMessage', { channel, text, ...(blocks ? { blocks } : {}), unfurl_links: false }, botToken);
+  /**
+   * Post in a channel. With `as`, the message carries that person's name and picture (chat:write.customize);
+   * Slack still marks it as from the app. Mentions typed as text are never linked, so nothing pings anyone.
+   */
+  postMessage(botToken: string, channel: string, text: string, blocks?: unknown[], as?: { username: string; iconUrl?: string }) {
+    return this.call<{ ts: string; channel: string }>(
+      'chat.postMessage',
+      {
+        channel,
+        text,
+        ...(blocks ? { blocks } : {}),
+        ...(as ? { username: as.username, ...(as.iconUrl ? { icon_url: as.iconUrl } : {}) } : {}),
+        unfurl_links: false,
+        link_names: false,
+      },
+      botToken,
+    );
+  }
+
+  /** Who this bot token is, and which scopes it holds. */
+  authTest(botToken: string) {
+    return this.call<{ user_id: string; bot_id?: string; team_id: string; team?: string; response_metadata?: { scopes?: string[] } }>('auth.test', {}, botToken).then(
+      (r): SlackAuthTest => ({ user_id: r.user_id, bot_id: r.bot_id, team_id: r.team_id, team: r.team, scopes: r.response_metadata?.scopes ?? [] }),
+    );
+  }
+
+  /** A channel's recent messages, newest first (channels:history / groups:history; the app must be in the channel). */
+  conversationsHistory(botToken: string, channel: string, limit = 30) {
+    return this.call<{ messages: SlackMessage[] }>('conversations.history', { channel, limit }, botToken).then((r) => r.messages);
+  }
+
+  conversationsInfo(botToken: string, channel: string) {
+    return this.call<{ channel: SlackChannel }>('conversations.info', { channel }, botToken).then((r) => r.channel);
+  }
+
+  /** Create a public channel (channels:manage). Names must be lowercase, no spaces or periods, at most 80 characters. */
+  conversationsCreate(botToken: string, name: string) {
+    return this.call<{ channel: SlackChannel }>('conversations.create', { name, is_private: false }, botToken).then((r) => r.channel);
+  }
+
+  /** Join a public channel (channels:join), so its messages and huddles reach us. Private ones need /invite. */
+  conversationsJoin(botToken: string, channel: string) {
+    return this.call<{ channel: SlackChannel }>('conversations.join', { channel }, botToken).then((r) => r.channel);
   }
 
   /** Previews for links in a message: by channel + message ts, or the newer unfurl_id + source. */
@@ -185,18 +260,30 @@ export class MockSlack {
   readonly channels: SlackChannel[] = [
     { id: 'C0CAFE', name: 'cafe', is_member: true },
     { id: 'C0HQ', name: 'general', is_member: true },
-    { id: 'C0ENG', name: 'eng', is_member: true },
+    { id: 'C0ENG', name: 'eng', is_member: false },
     { id: 'C0LAUNCH', name: 'launch-war-room', is_member: true },
     { id: 'C0EVENTS', name: 'all-hands', is_member: true },
     { id: 'C0ARCADE', name: 'game-night', is_member: true },
     { id: 'C0DESIGN', name: 'design', is_member: true },
     { id: 'C0FOCUS', name: 'quiet-hours', is_member: true },
   ];
+  /** Messages per channel, oldest first (conversations.history); what we post lands here too. */
+  readonly history = new Map<string, SlackMessage[]>();
+  /** The pretend bot user, and the scopes the pretend install granted (all of them unless the simulator says otherwise). */
+  botUserId = 'U0MOCKBOT';
+  botId = 'B0MOCK';
+  scopes: string[] = [...SLACK_BOT_SCOPES];
+  private nextChannel = 1;
 
   transport: SlackTransport = async (call) => {
     this.outbox.push({ ...call, token: call.token ? `${call.token.slice(0, 5)}…` : undefined, at: new Date().toISOString() });
     if (this.outbox.length > 200) this.outbox.shift();
+    const channelOf = (id: unknown) => this.channels.find((c) => c.id === String(id));
     switch (call.method) {
+      case 'oauth.v2.access':
+        return { ok: true, access_token: 'xoxb-mock-installed', bot_user_id: this.botUserId, team: { id: 'T0MOCK', name: 'Mock workspace' }, authed_user: { id: 'U0INSTALLER' } };
+      case 'auth.test':
+        return { ok: true, user_id: this.botUserId, bot_id: this.botId, team_id: 'T0MOCK', team: 'Mock workspace', response_metadata: { scopes: this.scopes } };
       case 'users.info': {
         const id = String(call.args.user);
         return { ok: true, user: this.users.get(id) ?? { id, name: id.toLowerCase(), real_name: `Slack user ${id}`, profile: {} } };
@@ -205,10 +292,41 @@ export class MockSlack {
         return { ok: true, team: { id: 'T0MOCK', name: 'Mock workspace', domain: 'mock' } };
       case 'conversations.list':
         return { ok: true, channels: this.channels, response_metadata: { next_cursor: '' } };
+      case 'conversations.info': {
+        const c = channelOf(call.args.channel);
+        return c ? { ok: true, channel: c } : { ok: false, error: 'channel_not_found' };
+      }
+      case 'conversations.history': {
+        const c = channelOf(call.args.channel);
+        if (!c) return { ok: false, error: 'channel_not_found' };
+        if (!c.is_member) return { ok: false, error: 'not_in_channel' };
+        return { ok: true, messages: [...(this.history.get(c.id) ?? [])].reverse().slice(0, Number(call.args.limit ?? 30)) };
+      }
+      case 'conversations.create': {
+        const name = String(call.args.name);
+        if (this.channels.some((c) => c.name === name)) return { ok: false, error: 'name_taken' };
+        const made: SlackChannel = { id: `C0NEW${this.nextChannel++}`, name, is_member: true };
+        this.channels.push(made);
+        return { ok: true, channel: made };
+      }
+      case 'conversations.join': {
+        const c = channelOf(call.args.channel);
+        if (!c) return { ok: false, error: 'channel_not_found' };
+        if (c.is_private) return { ok: false, error: 'method_not_supported_for_channel_type' };
+        c.is_member = true;
+        return { ok: true, channel: c };
+      }
       case 'conversations.open':
         return { ok: true, channel: { id: `D${String(call.args.users)}` } };
-      case 'chat.postMessage':
-        return { ok: true, ts: String(Date.now() / 1000), channel: call.args.channel };
+      case 'chat.postMessage': {
+        const ts = `${Math.floor(Date.now() / 1000)}.${String(this.outbox.length).padStart(6, '0')}`;
+        const c = channelOf(call.args.channel);
+        if (c) {
+          const msg: SlackMessage = { type: 'message', ts, user: this.botUserId, bot_id: this.botId, text: String(call.args.text ?? ''), ...(call.args.username ? { username: String(call.args.username) } : {}) };
+          this.history.set(c.id, [...(this.history.get(c.id) ?? []), msg]);
+        }
+        return { ok: true, ts, channel: call.args.channel };
+      }
       case 'chat.unfurl':
         return { ok: true };
       default:

@@ -2,10 +2,18 @@
  * Where workspace bot tokens live. Secrets never enter the org data the client sees, and never git:
  * - SLACK_BOT_TOKEN (env) — a single-workspace deploy, like DISCORD_BOT_TOKEN;
  * - tokens from the in-app workspace install (OAuth v2), kept in `<DATA_DIR>/slack-tokens.json` (gitignored,
- *   file mode 600) when the server runs with a data directory, or in memory (tests).
+ *   file mode 600) when the server runs with a data directory, or in memory (tests);
+ * - and, through the optional vault, with the company's world state (Minglewood Cloud), so they survive a
+ *   redeploy on hosts without a persistent disk.
  */
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
+
+/** Durable, server-side storage for a workspace's token, keyed by workspace. */
+export interface TokenVault {
+  get(teamId: string): string | undefined;
+  set(teamId: string, token: string | null): void;
+}
 
 export class SlackTokens {
   private byTeam = new Map<string, string>();
@@ -13,6 +21,7 @@ export class SlackTokens {
   constructor(
     private readonly envToken: () => string,
     private readonly file?: string,
+    private readonly vault?: TokenVault,
   ) {
     if (file && existsSync(file)) {
       try {
@@ -24,9 +33,13 @@ export class SlackTokens {
     }
   }
 
-  /** The bot token for a workspace: one saved by its install, else the env token. */
+  /** The bot token for a workspace: one saved by its install (file, then vault), else the env token. */
   forTeam(teamId: string | undefined): string {
-    return (teamId && this.byTeam.get(teamId)) || this.envToken();
+    if (teamId) {
+      const saved = this.byTeam.get(teamId) ?? this.vault?.get(teamId);
+      if (saved) return saved;
+    }
+    return this.envToken();
   }
 
   has(teamId: string | undefined): boolean {
@@ -36,6 +49,14 @@ export class SlackTokens {
   set(teamId: string, token: string) {
     this.byTeam.set(teamId, token);
     this.save();
+    this.vault?.set(teamId, token);
+  }
+
+  /** The app was uninstalled: Slack has revoked the token, so forget it. */
+  clear(teamId: string) {
+    this.byTeam.delete(teamId);
+    this.save();
+    this.vault?.set(teamId, null);
   }
 
   private save() {

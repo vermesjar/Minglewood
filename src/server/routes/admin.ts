@@ -80,7 +80,7 @@ export function adminRoutes(ctx: AppContext, onDiscordConnected: (orgId: string)
     }),
   ]);
 
-  r.put('/bindings/:roomId', (req, res) => {
+  r.put('/bindings/:roomId', async (req, res) => {
     const { orgId, member } = authed(req);
     const d = ctx.store.get(orgId);
     const roomId = req.params.roomId;
@@ -106,8 +106,10 @@ export function adminRoutes(ctx: AppContext, onDiscordConnected: (orgId: string)
     };
     ctx.store.setBinding(orgId, binding, roomId);
     ctx.store.audit(orgId, member.id, 'binding.set', roomId, `${binding.provider}:${binding.externalChannelId}`);
+    // Slack only tells apps about channels they're in: join the public channel now (private ones need an /invite).
+    const inChannel = binding.provider === 'slack' ? await ctx.slack.bridge.ensureInChannel(orgId, binding.externalChannelId) : undefined;
     ctx.hubs.get(orgId)?.bindingsChanged();
-    res.json({ binding: bindingView(ctx, binding) });
+    res.json({ binding: bindingView(ctx, binding), inChannel });
   });
 
   r.get('/channels', async (req, res) => {

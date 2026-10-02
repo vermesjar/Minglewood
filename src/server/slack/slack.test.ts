@@ -1,6 +1,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { AddressInfo } from 'node:net';
 import { ORG_ID } from '@shared/seed/northstar';
+import type { ServerMsg } from '@shared/protocol';
 import { config } from '../config';
 import { createApp, type App } from '../app';
 import { MemoryPersistence } from '../store/jsonFile';
@@ -145,7 +146,7 @@ describe('Slack, end to end (signed requests into a running server, the recordin
   const outbox = () => fetch(`${base}/api/slack/dev/outbox`).then((r) => r.json() as Promise<{ outbox: SlackCall[] }>);
 
   beforeAll(async () => {
-    Object.assign(config.slack, { signingSecret: 'test-signing-secret', teamId: TEAM, mock: true, botToken: '' });
+    Object.assign(config.slack, { signingSecret: 'test-signing-secret', teamId: TEAM, mock: true, botToken: '', clientId: 'test-client', clientSecret: 'test-secret' });
     app = await createApp({ persistence: new MemoryPersistence(), simulateCoworkers: false });
     await new Promise<void>((r) => app.server.listen(0, r));
     base = `http://127.0.0.1:${(app.server.address() as AddressInfo).port}`;
@@ -253,6 +254,88 @@ describe('Slack, end to end (signed requests into a running server, the recordin
     expect(app.store.identity(ORG_ID, 'slack', 'U42')?.memberId).toBe(body.memberId);
     const other = await fetch(`${base}/api/slack/dev/signin`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: 'U43', teamId: 'TOTHER', name: 'Bo' }) });
     expect(other.status).toBe(404);
+  });
+
+  it('mirrors what’s posted in the channel into the space, and what’s said in the space into the channel — as the speaker', async () => {
+    const hub = app.hubs.get(ORG_ID)!;
+    // #design is the Design Loft's conversation too (not only its huddle)
+    app.store.setBinding(ORG_ID, { id: 'b1t', orgId: ORG_ID, roomId: 'design', provider: 'slack', kind: 'text', externalGuildId: TEAM, externalChannelId: 'C0DESIGN', label: '#design' }, 'design');
+    hub.bindingsChanged();
+    const ari = app.store.identity(ORG_ID, 'slack', 'U42')!.memberId;
+    const msgs: ServerMsg[] = [];
+    const c = { id: 'c-ari', memberId: ari, sceneId: null as string | null, send: (m: ServerMsg) => msgs.push(m) };
+    hub.connect(c);
+    hub.enter(ari, 'design', 'live');
+    await settle();
+    await event({ type: 'message', channel: 'C0DESIGN', user: 'U1', text: 'hi <@U42>, see <#C0DESIGN|design>', ts: '1700000000.000100' });
+    await settle();
+    expect(hub.chatLog('design').at(-1)).toMatchObject({ memberId: maya().id, text: 'hi @Ari, see #design', source: 'slack', at: '2023-11-14T22:13:20.000Z' });
+    expect(msgs.some((m) => m.t === 'chat' && m.entry.text === 'hi @Ari, see #design')).toBe(true);
+    hub.say(ari, 'hey Maya 👋');
+    await settle();
+    const post = (await outbox()).outbox.filter((x) => x.method === 'chat.postMessage').pop()!;
+    expect(post.args).toMatchObject({ channel: 'C0DESIGN', text: 'hey Maya 👋', username: 'Ari', link_names: false });
+    // the echo Slack sends back for our own post is not shown a second time
+    const before = hub.chatLog('design').length;
+    await event({ type: 'message', channel: 'C0DESIGN', user: 'U0MOCKBOT', bot_id: 'B0MOCK', username: 'Ari', text: 'hey Maya 👋', ts: '1700000000.000200' });
+    await settle();
+    expect(hub.chatLog('design')).toHaveLength(before);
+    hub.disconnect(c);
+  });
+
+  it('follows Slack when a linked channel is renamed or archived', async () => {
+    await event({ type: 'channel_rename', channel: { id: 'C0DESIGN', name: 'design-crew' } });
+    await settle();
+    expect(app.store.bindingFor(ORG_ID, 'design', 'text')?.label).toBe('#design-crew');
+    expect(app.store.bindingFor(ORG_ID, 'design', 'voice')?.label).toBe('🎧 #design-crew');
+    await event({ type: 'channel_archive', channel: 'C0DESIGN', user: 'U1' });
+    await settle();
+    expect(app.store.bindingFor(ORG_ID, 'design', 'text')).toBeUndefined();
+    expect(app.store.bindingFor(ORG_ID, 'design', 'voice')).toBeUndefined();
+  });
+
+  it('admin: one click links a channel to every space (joining the ones the app is not in), and the readiness check agrees', async () => {
+    const signin = await fetch(`${base}/api/auth/demo`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Ops', teamId: 'team-aurora', admin: true }) });
+    const cookie = signin.headers.getSetCookie().map((c) => c.split(';')[0]).join('; ');
+    const setup = (await fetch(`${base}/api/slack/admin/setup`, { method: 'POST', headers: { cookie, 'Content-Type': 'application/json' }, body: JSON.stringify({ create: true }) }).then((r) => r.json())) as {
+      plan: Array<{ spaceId: string; action: string; channelName: string; joined?: boolean }>;
+      failed: unknown[];
+    };
+    expect(setup.failed).toEqual([]);
+    expect(setup.plan.find((p) => p.spaceId === 'town')).toMatchObject({ action: 'matched', channelName: 'general' });
+    expect(setup.plan.find((p) => p.spaceId === 'eng')).toMatchObject({ action: 'matched', channelName: 'eng', joined: true });
+    expect(setup.plan.find((p) => p.spaceId === 'design')?.action).toBe('matched'); // the channel archived above is gone; nothing else is called design… except #design itself in the mock list
+    expect(app.store.bindingFor(ORG_ID, 'town', 'text')).toMatchObject({ provider: 'slack', externalChannelId: 'C0HQ', label: '#general' });
+    expect(app.store.bindingFor(ORG_ID, 'town', 'voice')).toMatchObject({ externalChannelId: 'C0HQ', label: '🎧 #general' });
+    expect(app.store.bindingFor(ORG_ID, 'focus', 'text')).toBeUndefined();
+    const ready = (await fetch(`${base}/api/slack/admin/readiness`, { headers: { cookie } }).then((r) => r.json())) as { connected: boolean; scopesKnown: boolean; scopes: Array<{ ok: boolean | null }>; channels: Array<{ inChannel: boolean | null }> };
+    expect(ready.connected).toBe(true);
+    expect(ready.scopesKnown).toBe(true);
+    expect(ready.scopes.every((s) => s.ok)).toBe(true);
+    expect(ready.channels.length).toBeGreaterThan(3);
+    expect(ready.channels.every((c) => c.inChannel)).toBe(true);
+  });
+
+  it('Add to Slack from the landing page connects the server’s workspace and signs the installer in as an admin', async () => {
+    const start = await fetch(`${base}/api/slack/add`, { redirect: 'manual' });
+    expect(start.status).toBe(302);
+    const to = new URL(start.headers.get('location')!);
+    expect(to.origin + to.pathname).toBe('https://slack.com/oauth/v2/authorize');
+    expect(to.searchParams.get('scope')).toContain('chat:write.customize');
+    const cookie = start.headers.getSetCookie().map((c) => c.split(';')[0]).join('; ');
+    const cb = await fetch(`${base}/api/slack/install/callback?code=abc&state=${to.searchParams.get('state')}`, { headers: { cookie }, redirect: 'manual' });
+    expect(cb.status).toBe(302);
+    expect(cb.headers.get('location')).toBe('/');
+    expect(app.ctx.slack.connection(ORG_ID)).toMatchObject({ externalWorkspaceId: TEAM, displayName: 'Mock workspace', status: 'active' });
+    // the token is kept server-side with the company (never in anything a client sees), and the installer is an admin
+    expect(app.store.secret(ORG_ID, 'slackBotToken')).toBe('xoxb-mock-installed');
+    expect(app.ctx.slack.provider.tokens.forTeam(TEAM)).toBe('xoxb-mock-installed');
+    const installer = app.store.identity(ORG_ID, 'slack', 'U0INSTALLER')!;
+    expect(app.store.member(ORG_ID, installer.memberId)?.role).toBe('admin');
+    expect(cb.headers.getSetCookie().some((c) => c.includes('_session='))).toBe(true);
+    // a wrong state is refused
+    const bad = await fetch(`${base}/api/slack/install/callback?code=abc&state=nope`, { headers: { cookie }, redirect: 'manual' });
+    expect(bad.headers.get('location')).toBe('/?error=oauth_state');
   });
 });
 

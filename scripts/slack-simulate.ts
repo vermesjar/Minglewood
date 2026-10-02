@@ -3,7 +3,11 @@
 //
 //   npm run slack:sim -- demo                          link Maya → U1, bind Design Loft → #design, huddle
 //   npm run slack:sim -- link U1 maya                  make a demo coworker Slack user U1
-//   npm run slack:sim -- bind design C0DESIGN          bind a room to a mock channel
+//   npm run slack:sim -- bind design C0DESIGN [text]   bind a room to a mock channel (its huddle; with `text`, its conversation too)
+//   npm run slack:sim -- say U1 C0DESIGN "hello"       U1 posts in #design (shows up in the space, bubble if they're there)
+//   npm run slack:sim -- rename C0DESIGN design-crew   Slack renamed the channel (the space's label follows)
+//   npm run slack:sim -- archive C0DESIGN              Slack archived the channel (the space is unlinked)
+//   npm run slack:sim -- history C0DESIGN              what the mock channel holds (what the world posted, and `say`s)
 //   npm run slack:sim -- huddle U1 C0DESIGN            U1 joins the huddle in #design
 //   npm run slack:sim -- leave U1                      U1 leaves their huddle
 //   npm run slack:sim -- status U1 :spiral_calendar_pad: "In a meeting"
@@ -64,8 +68,24 @@ async function main() {
     case 'link':
       return console.log(await dev('link', { userId: args[0], member: args[1] }));
     case 'bind':
-      await dev('bind', { roomId: args[0], channelId: args[1] });
-      return console.log(`${args[0]} ↔ ${args[1]}`);
+      await dev('bind', { roomId: args[0], channelId: args[1], text: args[2] === 'text' });
+      return console.log(`${args[0]} ↔ ${args[1]}${args[2] === 'text' ? ' (text + huddle)' : ''}`);
+    case 'say': {
+      const ts = `${Math.floor(Date.now() / 1000)}.${String(Date.now() % 1000000).padStart(6, '0')}`;
+      await event({ type: 'message', channel: args[1] ?? 'C0DESIGN', user: args[0], text: args.slice(2).join(' ') || 'hello from Slack', ts });
+      return console.log(`${args[0]} said in ${args[1] ?? 'C0DESIGN'}`);
+    }
+    case 'rename':
+      await event({ type: 'channel_rename', channel: { id: args[0], name: args[1] } });
+      return console.log(`${args[0]} is now #${args[1]}`);
+    case 'archive':
+      await event({ type: 'channel_archive', channel: args[0], user: 'U1' });
+      return console.log(`${args[0]} archived`);
+    case 'history': {
+      const { outbox } = (await (await fetch(`${base}/api/slack/dev/outbox`)).json()) as { outbox: Array<{ method: string; args: { channel?: string; text?: string; username?: string } }> };
+      for (const c of outbox.filter((x) => x.method === 'chat.postMessage' && x.args.channel === (args[0] ?? 'C0DESIGN'))) console.log(`${c.args.username ?? '(app)'}: ${c.args.text}`);
+      return;
+    }
     case 'huddle':
       return huddle(args[0], args[1] ?? 'C0DESIGN');
     case 'leave':

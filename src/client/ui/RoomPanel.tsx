@@ -57,7 +57,8 @@ export function RoomPanel() {
   if (!boot || !sceneId) return null;
   const room = boot.rooms.find((r) => r.id === sceneId);
   if (!room) return null;
-  const binding = boot.bindings.find((b) => b.roomId === room.id);
+  // The room panel is about being *in* the room: its voice channel / huddle first; the chat panel covers the text channel.
+  const binding = boot.bindings.find((b) => b.roomId === room.id && b.kind !== 'text') ?? boot.bindings.find((b) => b.roomId === room.id);
   const owner = boot.teams.find((t) => t.id === room.ownerTeamId);
   const now = Date.now();
   const ev = events.find((e) => e.roomId === room.id && Date.parse(e.startsAt) <= now && now < Date.parse(e.endsAt));

@@ -14,6 +14,9 @@ export interface TenantInfo {
   discordGuildId?: string;
   discordGuildIcon?: string | null;
   installedByDiscordUserId?: string | null;
+  /** The Slack workspace that installed Minglewood (a company can come from Discord, Slack, or both). */
+  slackTeamId?: string;
+  installedBySlackUserId?: string | null;
   createdAt: string;
 }
 

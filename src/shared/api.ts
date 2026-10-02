@@ -51,8 +51,8 @@ export interface PublicConfig {
   brand: { name: string; tagline: string };
   demoMode: boolean;
   discord: { enabled: boolean; clientId: string | null };
-  /** Sign in with Slack is available. */
-  slack: { enabled: boolean };
+  /** Sign in with Slack is available; `addUrl` is where a workspace admin adds Minglewood to their workspace (when the server can create or connect a company for it). */
+  slack: { enabled: boolean; addUrl: string | null };
   /** "Add to Discord" page on Minglewood Cloud, when hosted. */
   installUrl: string | null;
 }
@@ -109,6 +109,33 @@ export interface SlackAdminStatus {
   /** The workspace this company's rooms bind to: its connection, or SLACK_TEAM_ID on a single-workspace server. */
   team: string | null;
   capabilities: ProviderCapabilities;
+  /** Where anyone adds Minglewood to a workspace without signing in first (creates or connects a company), when the server supports it. */
+  addUrl: string | null;
   /** The URLs to paste into the Slack app's settings. */
   endpoints: { events: string; commands: string; interactions: string; signInRedirect: string; installRedirect: string };
+}
+
+/** One space in the Slack one-click setup: a single channel is both its conversation and its huddle. */
+export interface SlackSetupItem {
+  spaceId: string;
+  spaceName: string;
+  /** kept: already bound · matched: an existing channel fits · create: will be created · skip: none and not creating */
+  action: 'kept' | 'matched' | 'create' | 'skip';
+  channelId?: string;
+  channelName: string;
+  /** Is the app in the channel (it has to be, to hear it)? Unknown for channels we couldn't look up. */
+  inChannel?: boolean;
+  isPrivate?: boolean;
+  /** The setup joined the channel for you. */
+  joined?: boolean;
+}
+
+/** What the admin console checks before promising Slack features: scopes, and channel membership. */
+export interface SlackReadiness {
+  botUserId: string;
+  teamName?: string;
+  /** False when Slack didn't tell us the granted scopes (then every `ok` is null). */
+  scopesKnown: boolean;
+  scopes: Array<{ scope: string; ok: boolean | null; neededFor: string }>;
+  channels: Array<{ spaceId: string; spaceName: string; channelId: string; channelName: string; slots: Array<'voice' | 'text'>; inChannel: boolean | null; isPrivate: boolean }>;
 }

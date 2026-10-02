@@ -107,10 +107,14 @@ export function ProfilePanel() {
               <input type="checkbox" checked={f.knocksWhileFocused} onChange={(e) => setF({ ...f, knocksWhileFocused: e.target.checked })} />
               <span>Let knocks through even when I’m focused</span>
             </label>
-            {discordLinked && (
+            {(discordLinked || slackConnected) && (
               <label className="check">
                 <input type="checkbox" checked={f.voiceFollow} onChange={(e) => setF({ ...f, voiceFollow: e.target.checked })} />
-                <span>Voice follows me — while I’m in Discord voice, walking into a space moves me into its voice channel</span>
+                <span>
+                  {discordLinked
+                    ? 'Voice follows me — while I’m in Discord voice, walking into a space moves me into its voice channel; switching channels in Discord walks me over'
+                    : 'Voice follows me — when I join a huddle in Slack, my avatar walks into that huddle’s space'}
+                </span>
               </label>
             )}
             {slackConnected && (

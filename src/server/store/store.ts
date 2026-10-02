@@ -57,6 +57,8 @@ export interface OrgData {
   /** Event/artifact ids generated from a template (demo seed or tenant starter) — never persisted. */
   templateIds: Set<string>;
   tenant?: TenantInfo;
+  /** Server-side secrets for this company (a workspace's bot token). Never sent to clients. */
+  secrets?: Record<string, string>;
 }
 
 /** What survives a restart. Seeded demo coworkers & demo events are regenerated at boot. */
@@ -73,6 +75,8 @@ export interface PersistedOrg {
   notes?: BoardNote[];
   audit: AuditEntry[];
   tenant?: TenantInfo;
+  /** Server-side secrets (a Slack workspace's bot token) — stored with the world so they survive a redeploy; never exposed by any route. */
+  secrets?: Record<string, string>;
 }
 
 export interface Persistence {
@@ -114,6 +118,7 @@ export class Store {
         audit: saved?.audit ?? [],
         sim: seed.sim,
         templateIds: new Set([...seed.events.map((e) => e.id), ...seed.artifacts.map((a) => a.id)]),
+        secrets: saved?.secrets,
       });
     }
     // Tenants that were saved locally (single-server installs) come back at boot.
@@ -134,6 +139,7 @@ export class Store {
     if (existing) {
       existing.tenant = t;
       if (t.discordGuildId) this.connectDiscord(existing, t);
+      if (t.slackTeamId) this.connectSlack(existing, t);
       return { orgId, created: false };
     }
     const saved = this.persisted[orgId] ?? (await this.persistence.loadOrg?.(orgId));
@@ -162,8 +168,10 @@ export class Store {
       sim: {},
       templateIds: new Set([...tpl.events.map((e) => e.id), ...tpl.artifacts.map((a) => a.id)]),
       tenant: t,
+      secrets: saved?.secrets,
     };
     if (t.discordGuildId) this.connectDiscord(d, t);
+    if (t.slackTeamId) this.connectSlack(d, t);
     this.orgs.set(tpl.org.id, d);
   }
 
@@ -182,6 +190,37 @@ export class Store {
         status: 'active',
       },
     ];
+  }
+
+  private connectSlack(d: OrgData, t: TenantInfo) {
+    if (d.connections.some((c) => c.provider === 'slack' && c.externalWorkspaceId === t.slackTeamId)) return;
+    d.connections = [
+      ...d.connections.filter((c) => c.provider !== 'slack'),
+      {
+        id: `conn-slack-${t.id.slice(0, 8)}`,
+        orgId: d.org.id,
+        provider: 'slack',
+        externalWorkspaceId: t.slackTeamId!,
+        displayName: t.name,
+        connectedAt: t.createdAt,
+        connectedBy: t.installedBySlackUserId ?? 'installer',
+        status: 'active',
+      },
+    ];
+  }
+
+  /** A server-side secret of this company (never part of any API response). */
+  secret(orgId: string, key: string): string | undefined {
+    return this.get(orgId).secrets?.[key];
+  }
+
+  setSecret(orgId: string, key: string, value: string | null): void {
+    const d = this.get(orgId);
+    const secrets = { ...d.secrets };
+    if (value) secrets[key] = value;
+    else delete secrets[key];
+    d.secrets = Object.keys(secrets).length ? secrets : undefined;
+    this.scheduleSave();
   }
 
   orgIds(): string[] {
@@ -378,6 +417,7 @@ export class Store {
         notes: d.notes,
         audit: d.audit,
         tenant: d.tenant,
+        ...(d.secrets ? { secrets: d.secrets } : {}),
       };
     }
     await this.persistence.save(out);

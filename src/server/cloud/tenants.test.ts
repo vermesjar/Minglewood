@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import type { AddressInfo } from 'node:net';
 import type { TenantInfo } from '@shared/seed/tenant';
 import { createApp, type App } from '../app';
 import { MemoryPersistence } from '../store/jsonFile';
@@ -6,6 +7,7 @@ import { CloudPersistence } from './cloudPersistence';
 import type { ControlPlane } from './controlPlane';
 import type { PersistedOrg } from '../store/store';
 import { pickOrg, upsertDiscordMember } from '../routes/auth';
+import { config } from '../config';
 
 /** In-memory stand-in for Minglewood Cloud. */
 function fakeCloud(tenants: TenantInfo[]) {
@@ -107,5 +109,52 @@ describe('multi-tenant worlds from Minglewood Cloud', () => {
     app = await createApp({ persistence: persistence(), simulateCoworkers: false, demo: false, cloud: cloud as unknown as ControlPlane });
     expect(app.store.get(orgId).rooms.find((r) => r.id === 'cafe')?.name).toBe('The Watering Hole');
     expect(app.store.get(orgId).artifacts.filter((a) => a.title === 'We moved into Minglewood')).toHaveLength(1);
+  });
+});
+
+describe('a company from an Add-to-Slack install', () => {
+  const saved = { ...config.slack };
+  afterEach(() => Object.assign(config.slack, saved));
+
+  it('creates the tenant on Minglewood Cloud, its world here, keeps the token with the world, and signs the installer in as admin', async () => {
+    Object.assign(config.slack, { mock: true, signingSecret: 'test', clientId: 'c', clientSecret: 's', teamId: '', botToken: '' });
+    const cloud = fakeCloud([]);
+    const created: TenantInfo[] = [];
+    const slackCloud = {
+      ...cloud,
+      tenantForSlackTeam: async (team: string) => created.find((t) => t.slackTeamId === team),
+      createTenant: async (t: { name: string; slug: string; slackTeamId: string; installedBySlackUserId: string }) => {
+        const tenant: TenantInfo = { id: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', slug: t.slug, name: t.name, slackTeamId: t.slackTeamId, installedBySlackUserId: t.installedBySlackUserId, createdAt: new Date().toISOString() };
+        created.push(tenant);
+        return tenant;
+      },
+    };
+    app = await createApp({
+      persistence: new CloudPersistence(new MemoryPersistence(), slackCloud as unknown as ControlPlane),
+      simulateCoworkers: false,
+      demo: false,
+      cloud: slackCloud as unknown as ControlPlane,
+    });
+    await new Promise<void>((r) => app!.server.listen(0, r));
+    const base = `http://127.0.0.1:${(app.server.address() as AddressInfo).port}`;
+    const start = await fetch(`${base}/api/slack/add`, { redirect: 'manual' });
+    const to = new URL(start.headers.get('location')!);
+    const cookie = start.headers.getSetCookie().map((c) => c.split(';')[0]).join('; ');
+    const cb = await fetch(`${base}/api/slack/install/callback?code=abc&state=${to.searchParams.get('state')}`, { headers: { cookie }, redirect: 'manual' });
+    expect(cb.headers.get('location')).toBe('/?welcome=slack');
+    const orgId = 't-aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
+    expect(created[0]).toMatchObject({ name: 'Mock workspace', slug: 'mock-workspace', slackTeamId: 'T0MOCK', installedBySlackUserId: 'U0INSTALLER' });
+    expect(app.store.hasOrg(orgId)).toBe(true);
+    const d = app.store.get(orgId);
+    expect(d.org.name).toBe('Mock workspace');
+    expect(d.connections.find((c) => c.provider === 'slack')).toMatchObject({ externalWorkspaceId: 'T0MOCK', status: 'active' });
+    expect(app.store.secret(orgId, 'slackBotToken')).toBe('xoxb-mock-installed');
+    const installer = app.store.identity(orgId, 'slack', 'U0INSTALLER')!;
+    expect(app.store.member(orgId, installer.memberId)?.role).toBe('admin');
+    // the token travels with the world state, so a redeploy without a disk keeps the workspace connected
+    await app.store.flush();
+    expect(cloud.state.get('aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee')?.secrets?.slackBotToken).toBe('xoxb-mock-installed');
+    // and Slack events for that workspace reach the new world
+    expect(await app.ctx.slack.resolveOrg('T0MOCK')).toBe(orgId);
   });
 });

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { AdminOverview, ExternalChannel, ProviderCapabilities } from '@shared/api';
+import type { AdminOverview, ExternalChannel, ProviderCapabilities, SlackReadiness, SlackSetupItem } from '@shared/api';
 import type { Room } from '@shared/domain/types';
 import { BRAND } from '@shared/brand';
 import { MEMORY_SLOTS } from '@shared/world/memory';
@@ -400,6 +400,139 @@ function DiscordSetup({ reload }: { reload: () => void }) {
   );
 }
 
+interface SlackReadinessReport extends Partial<SlackReadiness> {
+  connected: boolean;
+}
+
+/** One click: a channel for every space (its conversation and its huddle), plus what the workspace actually granted. */
+function SlackSetup({ data, reload }: TabProps) {
+  const [ready, setReady] = useState<SlackReadinessReport | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<{ plan: SlackSetupItem[]; failed: Array<SlackSetupItem & { error: string }> } | null>(null);
+  const [err, setErr] = useState('');
+  const check = useCallback(() => {
+    void api<SlackReadinessReport>('/slack/admin/readiness')
+      .then(setReady)
+      .catch((e) => setErr((e as Error).message));
+  }, []);
+  useEffect(check, [check, data.bindings.length]);
+  const run = async (create: boolean) => {
+    setBusy(true);
+    setErr('');
+    try {
+      setResult(await api('/slack/admin/setup', { method: 'POST', json: { create } }));
+      reload();
+      check();
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const join = async (channelId: string) => {
+    try {
+      const r = await api<{ state: string }>('/slack/admin/join', { method: 'POST', json: { channelId } });
+      if (r.state === 'private') setErr('That channel is private — invite the app from Slack: /invite @Minglewood.');
+      check();
+    } catch (e) {
+      setErr((e as Error).message);
+    }
+  };
+  const verb: Record<SlackSetupItem['action'], string> = { kept: 'kept', matched: 'linked', create: 'created', skip: 'no match' };
+  const missing = ready?.scopes?.filter((s) => s.ok === false) ?? [];
+  const notIn = ready?.channels?.filter((c) => c.inChannel === false) ?? [];
+  return (
+    <section className="apanel wide">
+      <h2>Slack: a channel for every space</h2>
+      <p className="amuted">
+        In Slack a channel is both a space’s conversation and its huddle. What you say in a space is posted there under your
+        name; what’s posted there shows up in the space; anyone in the channel’s huddle appears in the room. The town is your
+        workspace’s <strong>#general</strong>. Slack stays the record: renames and archives there are followed here.
+      </p>
+      <div className="arow">
+        <button className="abtn" disabled={busy} onClick={() => void run(false)}>
+          Link matching channels
+        </button>
+        <button className="abtn primary" disabled={busy} onClick={() => void run(true)}>
+          Link, and create what’s missing
+        </button>
+        <span className="amuted">Creates a public channel per space that has none, and joins every channel it links. Existing links are kept.</span>
+      </div>
+      {result && (
+        <ul className="alist">
+          {result.plan
+            .filter((p) => p.action !== 'kept')
+            .map((p, i) => (
+              <li key={i}>
+                {p.spaceName}: {verb[p.action]} {p.action !== 'skip' ? `#${p.channelName}` : ''}
+                {p.joined ? ' (joined)' : ''}
+              </li>
+            ))}
+          {result.failed.map((f, i) => (
+            <li key={`f${i}`} className="aerror">
+              {f.spaceName}: failed — {f.error}
+            </li>
+          ))}
+          {result.plan.every((p) => p.action === 'kept') && <li>Every space already has its channel.</li>}
+        </ul>
+      )}
+      {err && <p className="aerror">{err}</p>}
+      <h3>What the workspace granted{ready?.teamName ? ` (${ready.teamName})` : ''}</h3>
+      {!ready ? (
+        <p className="amuted">Checking…</p>
+      ) : !ready.connected ? (
+        <p className="amuted">Connect a Slack workspace (Slack tab) to check.</p>
+      ) : (
+        <>
+          {!ready.scopesKnown && <p className="amuted">Slack didn’t report the token’s scopes, so they can’t be checked from here.</p>}
+          <ul className="alist perms">
+            {ready.scopes?.map((s) => (
+              <li key={s.scope}>
+                {s.ok === null ? '○' : s.ok ? '✅' : '❌'} <strong>{s.scope}</strong> <span className="amuted">— {s.neededFor}</span>
+              </li>
+            ))}
+          </ul>
+          {missing.length > 0 && data.slack.installUrl && (
+            <p>
+              <a className="abtn" href={data.slack.installUrl}>
+                Re-add to Slack with the missing scopes
+              </a>{' '}
+              <span className="amuted">Update the app’s manifest first (docs/slack.md), then reinstall; nothing else changes.</span>
+            </p>
+          )}
+          <h3>Is the app in each linked channel?</h3>
+          {ready.channels?.length ? (
+            <ul className="alist perms">
+              {ready.channels.map((c) => (
+                <li key={`${c.spaceId}:${c.channelId}`}>
+                  {c.inChannel === null ? '○' : c.inChannel ? '✅' : '❌'} <strong>#{c.channelName}</strong>{' '}
+                  <span className="amuted">
+                    — {c.spaceName} ({c.slots.join(' + ')}){c.isPrivate ? ', private' : ''}
+                  </span>
+                  {c.inChannel === false &&
+                    (c.isPrivate ? (
+                      <span className="amuted"> · in Slack: /invite @Minglewood</span>
+                    ) : (
+                      <button className="abtn" onClick={() => void join(c.channelId)}>
+                        Join
+                      </button>
+                    ))}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="amuted">No spaces are linked to Slack channels yet.</p>
+          )}
+          {notIn.length > 0 && <p className="amuted">Slack only sends a channel’s messages and huddles to apps that are in it.</p>}
+          <button className="abtn" onClick={check}>
+            Check again
+          </button>
+        </>
+      )}
+    </section>
+  );
+}
+
 function RoomsTab({ data, reload }: TabProps) {
   const [channels, setChannels] = useState<Record<string, ExternalChannel[]>>({});
   const discord = data.connections.some((c) => c.provider === 'discord');
@@ -421,6 +554,7 @@ function RoomsTab({ data, reload }: TabProps) {
   return (
     <>
       {discord && <DiscordSetup reload={reload} />}
+      {data.slack.team && <SlackSetup data={data} reload={reload} />}
       <section className="apanel wide">
         <h2>Spaces & channels</h2>
         <p className="amuted">

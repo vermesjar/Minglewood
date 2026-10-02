@@ -4,15 +4,12 @@
  * so it's easy to test; `runSetup` performs the plan against Discord and records the bindings.
  */
 import { randomUUID } from 'node:crypto';
-import { bindingSlot, type BindingSlot, type Room, type RoomBinding } from '@shared/domain/types';
-import { TOWN_ID } from '@shared/world';
+import { bindingSlot, type BindingSlot, type RoomBinding } from '@shared/domain/types';
 import type { Store } from '../../store/store';
+import { namesFor, scoreChannelName, slug, spacesOf, type Space } from '../spaces';
 import { ChannelType, discordApi, type DiscordChannel } from './api';
 
-export interface Space {
-  id: string;
-  name: string;
-}
+export { namesFor, slug, spacesOf, type Space } from '../spaces';
 
 export interface PlanItem {
   spaceId: string;
@@ -24,39 +21,10 @@ export interface PlanItem {
   channelName: string;
 }
 
-export const slug = (s: string) =>
-  s
-    .normalize('NFKD')
-    .replace(/[̀-ͯ]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-
-/** The town and every room that talks (quiet rooms are quiet on purpose: no channels). */
-export function spacesOf(rooms: Pick<Room, 'id' | 'name' | 'quiet'>[]): Space[] {
-  return [{ id: TOWN_ID, name: 'Town' }, ...rooms.filter((r) => !r.quiet).map((r) => ({ id: r.id, name: r.name }))];
-}
-
-/** What a space's channels are called when we create them, and the names we'd recognise as its own. */
-export function namesFor(space: Space): { text: string; voice: string; aliases: string[] } {
-  if (space.id === TOWN_ID) return { text: 'general', voice: 'General', aliases: ['general', 'town', 'town-square', 'lobby', 'hangout'] };
-  const main = slug(space.name);
-  const words = main.split('-').filter((w) => w.length >= 4 && !['room', 'studio', 'hall', 'lab', 'labs'].includes(w));
-  return { text: main, voice: space.name, aliases: [...new Set([main, slug(space.id), ...words])] };
-}
-
 const isText = (c: DiscordChannel) => c.type === ChannelType.GUILD_TEXT;
 const isVoice = (c: DiscordChannel) => c.type === ChannelType.GUILD_VOICE || c.type === ChannelType.GUILD_STAGE_VOICE;
 
-function score(space: Space, channel: DiscordChannel): number {
-  const n = slug(channel.name ?? '');
-  if (!n) return 0;
-  const names = namesFor(space);
-  if (n === names.aliases[0]) return 3;
-  if (names.aliases.includes(n)) return 2;
-  if (names.aliases.some((a) => a.length >= 4 && (n.includes(a) || a.includes(n)) && n.length >= 3)) return 1;
-  return 0;
-}
+const score = (space: Space, channel: DiscordChannel) => scoreChannelName(space, channel.name ?? '');
 
 export function planSetup(spaces: Space[], channels: DiscordChannel[], bindings: RoomBinding[], create: boolean): PlanItem[] {
   const used = new Set(bindings.filter((b) => b.provider === 'discord').map((b) => b.externalChannelId));

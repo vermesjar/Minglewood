@@ -7,9 +7,11 @@ import { api } from '../app/api';
 const CAPS: Array<[keyof ProviderCapabilities, string, string, boolean]> = [
   ['identity', 'Sign in with Slack', 'OpenID Connect (openid, profile, email). People match members by Slack id, then by verified email.', true],
   ['channelListing', 'List channels for binding', 'Bot token, conversations.list (channels:read; groups:read for private channels the app was added to).', true],
-  ['voicePresence', 'See who’s in a huddle', 'Events API: user_huddle_changed plus the channel’s huddle thread (channels:history). People in a huddle in a bound channel appear in the room.', true],
+  ['voicePresence', 'See who’s in a huddle', 'Events API: user_huddle_changed plus the channel’s huddle thread (channels:history). People in a huddle in a bound channel appear in the room; if they were already walking around, their avatar walks over.', true],
+  ['chatBridge', 'Each space’s chat is its channel', 'What’s said in a space is posted to its channel under your name and picture (chat:write.customize); the channel’s messages appear in the space (message events); history loads when you walk in (channels:history). The app must be in the channel.', true],
   ['speakingIndicators', 'Live speaking indicators', 'Slack exposes no audio or speaking state for huddles.', false],
   ['directVoiceJoin', 'Put people into a huddle automatically', 'No Slack API starts or joins a huddle for someone. We deep-link instead.', false],
+  ['voiceFollow', 'Move you between huddles as you walk', 'No Slack API moves someone between huddles. Walking into a space shows a one-click “Switch to the huddle in #…” instead.', false],
   ['deepLinkJoin', 'Open the channel’s huddle in Slack', 'app.slack.com/huddle/{team}/{channel} — one click to join.', true],
   ['embeddedApp', 'Run inside Slack', 'Slack has no embedded-app surface like Discord Activities; link previews and /minglewood cover it.', false],
 ];
@@ -20,6 +22,7 @@ const EXTRAS: Array<[string, string]> = [
   ['/minglewood', 'who’s around · where is @someone · join @someone · wave at @someone · knock @someone · room <name>'],
   ['Link previews', `Room and person links to ${BRAND.name} unfurl with who’s there and a way in.`],
   ['Knocks as DMs', 'People can opt in (profile) to get knocks as a Slack DM when they aren’t in the world.'],
+  ['Channels follow Slack', 'Rename a linked channel and the space’s label follows; archive or delete it and the link goes.'],
 ];
 
 type Props = { data: AdminOverview; reload: () => void };
@@ -95,6 +98,11 @@ export function SlackTab({ data, reload }: Props) {
             </ol>
             {s.team && <p className="amuted">Rooms can already bind to workspace {s.team} (SLACK_TEAM_ID).</p>}
           </>
+        )}
+        {s.addUrl && (
+          <p className="amuted">
+            Anyone can also add {BRAND.name} from the landing page: <code>{s.addUrl}</code> — a new workspace becomes its own company (Minglewood Cloud), or connects this server’s workspace.
+          </p>
         )}
         {msg && <p className="aerror">{msg}</p>}
       </section>

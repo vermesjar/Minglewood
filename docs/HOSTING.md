@@ -93,11 +93,26 @@ Discord → you're the admin of a brand-new world with a housewarming party goin
 
 ## Slack
 
-Slack runs on the game server: Sign in with Slack, the in-app *Add to Slack* install, huddles mapped to rooms,
-`/minglewood`, link previews and knock DMs. See [docs/slack.md](slack.md) for setup. On Render, add the `SLACK_*`
-variables from `render.yaml`. Still to do: a Slack install that creates a *new* company in Minglewood Cloud (like
-the Discord install does) and a `slack_team_id` on tenants. Until then, a workspace connects to the world the admin is
-signed in to, and its install token lives on the game server.
+Slack runs on the game server: Sign in with Slack, *Add to Slack*, each space's chat mirrored both ways with its
+channel, huddles mapped to rooms, one-click channel setup, `/minglewood`, link previews and knock DMs. See
+[docs/slack.md](slack.md) for setup. On Render, add the `SLACK_*` variables from `render.yaml` (`SLACK_CLIENT_ID`,
+`SLACK_CLIENT_SECRET`, `SLACK_SIGNING_SECRET`; `SLACK_BOT_TOKEN` and `SLACK_TEAM_ID` only for a single-workspace server).
+
+**Add to Slack creates a company** the way Add to Discord does, once Minglewood Cloud knows about Slack installs. The
+game server side is done (`GET /api/slack/add` → Slack → `/api/slack/install/callback` → `POST tenants` → the new world,
+with the installer signed in as admin and the workspace's bot token kept in the world's `org_state` under `secrets`, so
+Render's ephemeral disk doesn't lose it). The control plane needs, in the Lovable project:
+
+1. `organizations`: two nullable columns, `slack_team_id text unique` and `installed_by_slack_user_id text`.
+2. `GET /api/public/tenants?slack_team=T…` (server-key protected, like `?guild=`): the tenant rows with that
+   `slack_team_id`, in the same shape as today plus the two new columns (the game server reads them when present).
+3. `POST /api/public/tenants` (server-key protected) with `{ name, slug, slack_team_id, installed_by_slack_user_id }`:
+   inserts an `organizations` row (unique on `slack_team_id`; a repeat returns the existing row) and an
+   `install_events` row, and answers `{ tenant: <row> }`. Make `slug` unique by suffixing if taken.
+4. `GET /api/public/tenants` keeps listing every organization, Slack-installed ones included.
+
+Until those exist, the landing-page install answers "this server can't create a company for it yet"
+(`?error=slack_install_unsupported`), and workspaces are connected from the admin console or via `SLACK_TEAM_ID`.
 
 ## Microsoft Teams next
 

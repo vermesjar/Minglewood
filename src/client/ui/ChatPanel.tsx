@@ -43,6 +43,11 @@ function VoiceLink() {
   const voice = bindings?.find((b) => b.roomId === sceneId && b.kind !== 'text');
   if (!voice) return null;
   const here = myVoice?.providerChannelId === voice.externalChannelId;
+  // Slack can't move you between huddles (Discord can move you between voice channels): there, switching is one click.
+  const slack = voice.provider === 'slack';
+  const canFollow = follow && voice.provider === 'discord';
+  const name = voice.label.replace(/^(🔊|🎧)\s*/, '');
+  const inWords = slack ? `In the huddle · ${name}` : `In voice · ${name}`;
   const mic = (
     <button
       className={`mic-toggle ${talkLight ? 'on' : ''}`}
@@ -60,8 +65,8 @@ function VoiceLink() {
   if (here) {
     return (
       <span className="voice-wrap">
-        <span className="voice-link on" title="You're in this space's voice channel">
-          🔊 In voice · {voice.label.replace(/^🔊\s*/, '')}
+        <span className="voice-link on" title={slack ? "You're in this space's huddle" : "You're in this space's voice channel"}>
+          🔊 {inWords}
           {myVoice?.muted ? ' (muted)' : ''}
         </span>
         {mic}
@@ -70,8 +75,12 @@ function VoiceLink() {
   }
   if (myVoice) {
     return (
-      <button className="voice-link moving" onClick={() => voice.join.webUrl && openLink(voice.join.webUrl)} title="Open this space's voice channel in Discord">
-        {follow ? '🎧 Moving your voice here…' : `🎧 Switch voice to ${voice.label.replace(/^🔊\s*/, '')}`}
+      <button
+        className="voice-link moving"
+        onClick={() => voice.join.webUrl && openLink(voice.join.webUrl)}
+        title={slack ? 'Slack can’t move you between huddles — this opens this space’s huddle, one click to switch.' : "Open this space's voice channel in Discord"}
+      >
+        {canFollow ? '🎧 Moving your voice here…' : slack ? `🎧 Switch to the huddle in ${name}` : `🎧 Switch voice to ${name}`}
       </button>
     );
   }
@@ -81,11 +90,11 @@ function VoiceLink() {
       onClick={() => {
         if (voice.join.webUrl) openLink(voice.join.webUrl);
         else toast(voice.join.explainer, 'info', undefined, 6000);
-        if (voice.provider === 'discord' && follow) toast('Join the voice channel in Discord once — after that your voice follows you as you walk between spaces.', 'info', undefined, 7000);
+        if (canFollow) toast('Join the voice channel in Discord once — after that your voice follows you as you walk between spaces.', 'info', undefined, 7000);
       }}
       title={voice.join.explainer}
     >
-      🎧 Join voice
+      {slack ? '🎧 Join the huddle' : '🎧 Join voice'}
     </button>
   );
   // The demo has no real voice: the talk light can still be tried there.

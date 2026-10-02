@@ -73,7 +73,7 @@
 3. `PostgresPersistence` + Redis fan-out for multi-instance hubs; per-visibility directory caching.
 4. Real calendar provider (Google) behind `CalendarProvider`.
 5. Browser-level smoke tests (Playwright) for enter → knock → jump → party.
-6. Slack integration (preferred over Discord going forward); company design packages / themes.
+6. Slack: finish the Minglewood Cloud side of Add to Slack (docs/HOSTING.md → Slack), then verify the bridge on a real workspace; company design packages / themes.
 
 ## Multi-tenant hosting (Discord) — Minglewood Cloud
 - Control plane built in Lovable ("Minglewood Cloud"), live at https://minglewood-cloud.lovable.app:
@@ -87,3 +87,18 @@
 - 2026-09-29: LIVE end-to-end. Discord app configured, Minglewood Cloud secrets set, game server on
   https://minglewood.onrender.com. First install ("Minglewood Test") created its world within a minute; the
   installer signed in via Discord and landed as admin. Bot intentionally has only View Channels.
+
+## Slack — spaces are their channels (2026-10-02)
+- Slack now matches the Discord bridge: what's said in a space is posted to its channel under the speaker's Slack name and
+  picture (`chat:write.customize`, with a bot fallback); channel messages show in the space and as a bubble over the
+  author; history loads on arrival; renames/archives/deletions are followed; joining a huddle in Slack walks your avatar
+  into that space (voice follows me). Slack can't move people between huddles, so the chat panel offers a one-click
+  "Switch to the huddle in #…" instead — documented, not hacked around.
+- One-click setup (Admin → Spaces & channels): a channel per space, #general for the town, matched by name or created,
+  bound as text + huddle, and the app joins every public channel it links (Slack only sends events for channels the app
+  is in; private ones need /invite). A readiness check shows granted scopes vs. needed and channel membership.
+- Add to Slack from the landing page: a new company on Minglewood Cloud (game-server side done; the Lovable endpoints are
+  specified in docs/HOSTING.md) or the server's SLACK_TEAM_ID workspace; the installer lands as admin. Workspace tokens
+  are kept with the company's world state (`secrets`) so a Render redeploy keeps workspaces connected.
+- Code: `src/server/slack/{bridge,setup,render,scopes}.ts`, `providers/spaces.ts` (shared name matching); 36 Slack tests
+  + a cloud install test. Manifest and scope list: docs/slack.md. Not yet exercised against a live workspace.
