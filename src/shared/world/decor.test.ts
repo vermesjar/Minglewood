@@ -7,7 +7,7 @@ describe('team decoration placement', () => {
   const cafe = getScene('cafe')!;
 
   it('allows an open floor tile', () => {
-    expect(placementProblem(cafe, 6, 6)).toBeNull();
+    expect(placementProblem(cafe, 2, 6)).toBeNull(); // open floor by the left wall ((6, 6) is where the Design Lab piece stands)
   });
 
   it('keeps the doorway clear', () => {
@@ -18,7 +18,7 @@ describe('team decoration placement', () => {
   it('rejects occupied tiles and furniture', () => {
     expect(placementProblem(cafe, 4, 4)).toMatch(/already there/); // table
     expect(placementProblem(cafe, 3, 4)).toMatch(/already there/); // chair (seat)
-    expect(placementProblem(cafe, 6, 6, new Set(['6,6']))).toMatch(/standing/);
+    expect(placementProblem(cafe, 2, 6, new Set(['2,6']))).toMatch(/standing/);
   });
 
   it('never lets decorations cut anyone off from a seat', () => {
