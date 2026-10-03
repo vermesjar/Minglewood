@@ -2125,7 +2125,7 @@
       "sitStyle": "chair",
       "backrest": true,
       "rotation": "mirror",
-      "name": "Café chair",
+      "name": "Caf\u00e9 chair",
       "category": "seating",
       "tags": [
         "chair",
@@ -4239,7 +4239,7 @@
       "sitStyle": "chair",
       "backrest": true,
       "rotation": "mirror",
-      "name": "Founders’ throne",
+      "name": "Founders\u2019 throne",
       "category": "seating",
       "tags": [
         "heirloom",
@@ -7876,6 +7876,72 @@
       "walk": "blocked",
       "layer": "object",
       "animated": true
+    },
+    "coffee-machine-roomba-robot": {
+      "name": "Coffee Machine neon cyberpunk",
+      "category": "appliance",
+      "tags": [
+        "coffee",
+        "machine",
+        "roomba",
+        "robot",
+        "appliance"
+      ],
+      "rooms": [
+        "lounge",
+        "lobby",
+        "office",
+        "cafe"
+      ],
+      "footprint": [
+        1,
+        1
+      ],
+      "height": 75,
+      "rotation": "full",
+      "themes": [
+        "neon"
+      ],
+      "layer": "object",
+      "walk": "blocked",
+      "use": {
+        "face": "front",
+        "actions": [
+          "vend"
+        ]
+      },
+      "base": "filled",
+      "fit": "anchor",
+      "facings": {
+        "ne": {
+          "file": "coffee-machine-roomba-robot.ne.png",
+          "anchor": [
+            64,
+            121
+          ]
+        },
+        "nw": {
+          "file": "coffee-machine-roomba-robot.nw.png",
+          "anchor": [
+            64,
+            125
+          ]
+        },
+        "se": {
+          "file": "coffee-machine-roomba-robot.se.png",
+          "anchor": [
+            64,
+            135
+          ]
+        },
+        "sw": {
+          "file": "coffee-machine-roomba-robot.sw.png",
+          "anchor": [
+            64,
+            142
+          ]
+        }
+      }
     }
   }
 }

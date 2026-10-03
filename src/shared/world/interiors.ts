@@ -136,6 +136,17 @@ export function buildInteriors(): SceneDef[] {
         label: 'The house machine',
         actions: [{ kind: 'vend', item: 'coffee', label: 'Pull a shot' }],
       },
+      // Carter's Design Lab piece, published as drawn (2026-10-03): she stands on the open floor mid-room, where the
+      // drawing (wider than her tile) covers nothing beside her.
+      {
+        id: 'cafe-blue-girl',
+        sprite: 'coffee-machine-roomba-robot',
+        x: 6,
+        y: 6,
+        facing: 'sw',
+        label: 'Coffee Machine neon cyberpunk',
+        actions: [{ kind: 'vend', item: 'coffee', label: 'Get a coffee' }],
+      },
     ],
   );
   // The lane behind the bar is the barista's: guests order across the counter, they don't walk behind it.
