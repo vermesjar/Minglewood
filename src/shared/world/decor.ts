@@ -71,6 +71,8 @@ export const DECOR_CATALOG: DecorItem[] = [
   { id: 'easel', name: 'Easel', sprite: 'easel', variant: 'b', facing: 'se' },
   { id: 'balloons', name: 'Balloons', sprite: 'balloons', variant: 'b', anySide: true },
   { id: 'arcade', name: 'Arcade cabinet', sprite: 'arcade-cabinet', variant: 'cyan', facing: 'sw' },
+  // Published from the Design Lab (2026-10-03): a coffee machine that is also a lamp, used from any side.
+  { id: 'coffee-machine-lamp', name: 'Coffee machine lamp', sprite: 'coffee-machine-lamp', facing: 'sw', anySide: true },
   // Heirlooms: the jewelry of a company's world.
   { id: 'heirloom-throne', name: 'Founders’ Throne', sprite: 'heirloom-throne', facing: 'sw', sit: true, heirloom: true },
   { id: 'heirloom-dragonlamp', name: 'Jade Dragon Lamp', sprite: 'heirloom-dragonlamp', facing: 'sw', heirloom: true, anySide: true },

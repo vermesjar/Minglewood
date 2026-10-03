@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { getScene } from './index';
-import { placementProblem, decorObjects, type Decoration } from './decor';
+import { DECOR_CATALOG, decorObject, decorObjects, placementProblem, type Decoration } from './decor';
 import { livedScene } from './lived';
 
 describe('team decoration placement', () => {
@@ -8,6 +8,14 @@ describe('team decoration placement', () => {
 
   it('allows an open floor tile', () => {
     expect(placementProblem(cafe, 6, 6)).toBeNull();
+  });
+
+  it("offers the Design Lab's coffee machine lamp and places it like any floor piece", () => {
+    const item = DECOR_CATALOG.find((i) => i.id === 'coffee-machine-lamp')!;
+    expect(item).toMatchObject({ sprite: 'coffee-machine-lamp', anySide: true });
+    expect(placementProblem(cafe, 2, 6)).toBeNull();
+    const obj = decorObject({ id: 'd1', roomId: 'cafe', itemId: 'coffee-machine-lamp', x: 2, y: 6, facing: 'sw', placedBy: 'm1', placedAt: '2026-10-03T00:00:00Z' });
+    expect(obj).toMatchObject({ sprite: 'coffee-machine-lamp', x: 2, y: 6, facing: 'sw' });
   });
 
   it('keeps the doorway clear', () => {

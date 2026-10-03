@@ -7876,6 +7876,65 @@
       "walk": "blocked",
       "layer": "object",
       "animated": true
+    },
+    "coffee-machine-lamp": {
+      "name": "Coffee machine lamp",
+      "category": "appliance",
+      "tags": [
+        "coffee",
+        "machine",
+        "lamp",
+        "appliance"
+      ],
+      "rooms": [
+        "lounge"
+      ],
+      "footprint": [
+        1,
+        1
+      ],
+      "height": 46,
+      "rotation": "full",
+      "layer": "object",
+      "walk": "blocked",
+      "use": {
+        "face": "any",
+        "actions": [
+          "vend"
+        ]
+      },
+      "base": "filled",
+      "fit": "anchor",
+      "facings": {
+        "ne": {
+          "file": "coffee-machine-lamp.ne.png",
+          "anchor": [
+            32,
+            80
+          ]
+        },
+        "nw": {
+          "file": "coffee-machine-lamp.nw.png",
+          "anchor": [
+            32,
+            80
+          ]
+        },
+        "se": {
+          "file": "coffee-machine-lamp.se.png",
+          "anchor": [
+            32,
+            85
+          ]
+        },
+        "sw": {
+          "file": "coffee-machine-lamp.sw.png",
+          "anchor": [
+            32,
+            85
+          ]
+        }
+      }
     }
   }
 }
