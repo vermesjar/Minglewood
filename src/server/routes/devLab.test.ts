@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { SeatModel } from '@shared/world/seatModels';
-import { cleanFurniture, cleanSeatModel, devLabRoutes, DraftStore, isLocalRequest, LabError, MAX_REF_BYTES, zipDir } from './devLab';
+import { cleanFurniture, cleanSeatModel, devLabRoutes, DraftStore, footprintPx, isLocalRequest, LabError, MAX_REF_BYTES, tinyNote, zipDir } from './devLab';
 
 const req = (over: { ip?: string; headers?: Record<string, string>; method?: string } = {}) => ({
   socket: { remoteAddress: over.ip ?? '127.0.0.1' },
@@ -144,6 +144,51 @@ describe('drafts on disk', () => {
     expect(f.quality).toBe('medium');
     expect(f.prompts.se).toHaveLength(600);
     expect(f.actions).toEqual([{ kind: 'sit' }]);
+  });
+});
+
+describe('Drawn width is art pixels, not tiles', () => {
+  let root = '';
+  afterEach(() => {
+    if (root) rmSync(root, { recursive: true, force: true });
+    root = '';
+  });
+
+  it('ignores a tile count typed into the pixel field instead of shrinking the piece to a speck', () => {
+    expect(cleanFurniture({ width: 1 }).width).toBeUndefined(); // "1 tile wide" would have been clamped to an 8 px piece
+    expect(cleanFurniture({ width: 8 }).width).toBeUndefined();
+    expect(cleanFurniture({ width: null as never }).width).toBeUndefined(); // a cleared field
+    expect(cleanFurniture({ width: 64 }).width).toBe(64);
+    expect(cleanFurniture({ width: 9000 }).width).toBe(400);
+  });
+
+  it('fails a drawing far narrower than its footprint, naming the field that did it', () => {
+    expect(footprintPx([1, 1])).toBe(64);
+    expect(tinyNote(8, [1, 1])).toMatch(/^tiny: 8 px across for a 1×1 footprint \(≈64 px\)/);
+    expect(tinyNote(40, [1, 1])).toBeNull(); // a narrow lamp is fine
+    expect(tinyNote(30, [2, 1])).toMatch(/2×1 footprint \(≈96 px\)/);
+  });
+
+  it('clearing the field in the editor clears it on the draft (a null travels where JSON would drop an undefined)', async () => {
+    root = mkdtempSync(join(tmpdir(), 'lab-'));
+    const store = new DraftStore(root);
+    const d = store.create({ kind: 'furniture', key: 'espresso', furniture: { width: 400 } });
+    expect(store.read(d.id).furniture!.width).toBe(400);
+    const server = express().use('/lab', devLabRoutes(root, { run: async () => ({ code: 0, result: {} }) })).listen(0);
+    try {
+      const port = (server.address() as AddressInfo).port;
+      const headers = { 'x-lab': '1', 'Content-Type': 'application/json' };
+      // what the client sends for a blanked field (src/client/studio/api.ts turns undefined into null)
+      const res = await fetch(`http://127.0.0.1:${port}/lab/drafts/${d.id}`, { method: 'PUT', headers, body: JSON.stringify({ furniture: { width: null } }) });
+      expect(res.status).toBe(200);
+      expect(store.read(d.id).furniture!.width).toBeUndefined();
+      // a patch that doesn't mention the width leaves it alone
+      await fetch(`http://127.0.0.1:${port}/lab/drafts/${d.id}`, { method: 'PUT', headers, body: JSON.stringify({ furniture: { width: 48 } }) });
+      await fetch(`http://127.0.0.1:${port}/lab/drafts/${d.id}`, { method: 'PUT', headers, body: JSON.stringify({ furniture: { height: 30 } }) });
+      expect(store.read(d.id).furniture).toMatchObject({ width: 48, height: 30 });
+    } finally {
+      server.close();
+    }
   });
 });
 

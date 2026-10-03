@@ -273,6 +273,11 @@ h3.section {
   color: var(--muted);
   font-weight: 600;
 }
+.field-warn {
+  font-size: 11px;
+  color: var(--coral);
+  font-weight: 700;
+}
 input:not([type='checkbox']),
 select,
 textarea {
