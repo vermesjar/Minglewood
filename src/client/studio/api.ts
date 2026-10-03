@@ -175,7 +175,8 @@ async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
   return data as T;
 }
 
-const body = (v: unknown) => JSON.stringify(v);
+/** A cleared field travels as null: JSON drops undefined, and the server merges a patch over the draft, so a dropped key would keep the old value. */
+const body = (v: unknown) => JSON.stringify(v, (_k, val: unknown) => (val === undefined ? null : val));
 
 export const lab = {
   usage: () => call<Usage>('/usage'),

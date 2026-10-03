@@ -371,7 +371,9 @@ export function cleanFurniture(f: Partial<FurnitureSpec>): FurnitureSpec {
     themes: [...new Set(words(f.themes).filter((t): t is Theme => (THEMES as readonly string[]).includes(t)))],
     footprint: [num(fp[0], 1, 4, 1), num(fp[1], 1, 4, 1)],
     height: num(f.height, 1, 200, type?.height ?? d.height),
-    width: f.width ? num(f.width, 8, 400, 64) : undefined,
+    // art pixels across the drawing; blank = the footprint. A tile count typed here by mistake (1, 2) would shrink the
+    // piece to a speck, so anything under 16 px counts as blank rather than being clamped up to a minimum.
+    width: Number(f.width) >= 16 ? num(f.width, 16, 400, 64) : undefined,
     fit: f.fit === 'diamond' ? 'diamond' : 'stand',
     fill: num(f.fill, 0, 1, d.fill),
     rotation,
@@ -547,9 +549,24 @@ interface Review {
 const REVIEW_MODULE = ['..', '..', '..', 'scripts', 'furniture-review'].join('/');
 const review = () => import(/* @vite-ignore */ REVIEW_MODULE) as Promise<Review>;
 
+/** Art pixels a footprint spans across (a 1×1 tile is 64 px wide on screen): what a blank "Drawn width" draws at. */
+export const footprintPx = (footprint: [number, number]) => (footprint[0] + footprint[1]) * 32;
+
+/**
+ * A drawing far narrower than its footprint (under a third): the "Drawn width" field was filled with a tile count, or
+ * the model drew a speck. Either way the piece would be invisible in a room, so the check fails rather than passes
+ * it as a well-centred small piece.
+ */
+export function tinyNote(drawnPx: number, footprint: [number, number]): string | null {
+  const expect = footprintPx(footprint);
+  if (drawnPx * 3 >= expect) return null;
+  return `tiny: ${drawnPx} px across for a ${footprint[0]}×${footprint[1]} footprint (≈${expect} px); Drawn width is art pixels, not tiles: blank it to draw at the footprint`;
+}
+
 async function placementChecks(key: string, entry: Record<string, unknown>, sprites: string) {
   const fr = await review();
   const out: Array<{ facing: Facing; ok: boolean; notes: string[] }> = [];
+  const fp = Array.isArray(entry.footprint) ? ([Number(entry.footprint[0]) || 1, Number(entry.footprint[1]) || 1] as [number, number]) : ([1, 1] as [number, number]);
   for (const facing of ['se', 'sw', 'ne', 'nw'] as Facing[]) {
     const p = fr.resolve(entry, facing, sprites);
     if (!p) {
@@ -557,6 +574,8 @@ async function placementChecks(key: string, entry: Record<string, unknown>, spri
       continue;
     }
     const notes: string[] = [];
+    const tiny = tinyNote(p.img.w, fp);
+    if (tiny) notes.push(tiny);
     const fit = fr.placement(p, false, key);
     if (fit.kind === 'small') {
       if (Math.abs(fit.dx) > 3 || Math.abs(fit.dy) > 3) notes.push(`small piece: base ${fit.dx.toFixed(1)}, ${fit.dy.toFixed(1)} px off centre (centred automatically in game)`);

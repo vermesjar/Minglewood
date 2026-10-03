@@ -47,6 +47,9 @@ export function FurnitureEditor({ id, usage, onUsage, onClose }: { id: string; u
   const needed = drawnViews(f, have);
   const allAccepted = needed.every((v) => draft.views[v]?.accepted);
 
+  /** What a blank Drawn width draws at: the footprint's width on screen (a 1×1 tile spans 64 art px). */
+  const drawnPx = (f.footprint[0] + f.footprint[1]) * 32;
+
   function patch(p: Partial<FurnitureSpec>) {
     const next = { ...draft!, furniture: { ...f, ...p } };
     setDraft(next);
@@ -188,8 +191,22 @@ export function FurnitureEditor({ id, usage, onUsage, onClose }: { id: string; u
             <input type="number" min={1} max={200} value={f.height} onChange={(e) => patch({ height: Number(e.target.value) })} />
           </Field>
         </div>
-        <Field label="Drawn width (px, optional)" hint="the model doesn't keep scale: this fixes it; blank = footprint width">
-          <input type="number" value={f.width ?? ''} onChange={(e) => patch({ width: e.target.value ? Number(e.target.value) : undefined })} />
+        <Field label="Drawn width (art px)" hint={`across the whole drawing, in art pixels (not tiles): the model doesn't keep scale, this fixes it. ${drawnPx} = its ${f.footprint[0]}×${f.footprint[1]} footprint, the default`}>
+          <input
+            type="number"
+            min={16}
+            max={400}
+            value={f.width ?? drawnPx}
+            onChange={(e) => {
+              const n = Number(e.target.value);
+              patch({ width: e.target.value && n !== drawnPx ? n : undefined });
+            }}
+          />
+          {f.width !== undefined && f.width * 3 < drawnPx && (
+            <span className="field-warn">
+              {f.width} px would be a speck: a {f.footprint[0]}×{f.footprint[1]} piece is about {drawnPx} px across. Leave it blank.
+            </span>
+          )}
         </Field>
         <Field label="How it turns" hint={ROTATION_HELP[f.rotation]}>
           <div className="seg wide">
